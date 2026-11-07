@@ -13,13 +13,12 @@
   const script = (code: string): PdfActionTree => ({
     root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   });
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   const GREETING = "app.alert('Hello, ' + identity.name + ' from ' + identity.corporation + '!');";
@@ -50,7 +49,11 @@
   </label>
   <textarea id="script" class="code" spellcheck={false} rows={3} bind:value={code}></textarea>
   <div class="actions">
-    <button type="button" class="button primary" onclick={() => actions.execute(script(code), click)}>
+    <button
+      type="button"
+      class="button primary"
+      onclick={() => actions.execute(script(code), click)}
+    >
       Run
     </button>
     <button type="button" class="button" onclick={() => (code = 'app.alrt("typo");')}>

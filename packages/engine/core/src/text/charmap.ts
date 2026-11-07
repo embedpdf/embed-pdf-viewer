@@ -14,8 +14,9 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
  *     `PageTextSnapshot.text` — what search matching and slicing operate on.
  *
  * They diverge in exactly two ways, both encoded by `charMap` anchors:
- *   - a non-printing character occupies a character slot but contributes
- *     zero text units (PDFium's `char_indices_` skip list);
+ *   - a character with no text occupies a character slot but contributes
+ *     zero text units: a non-printing character (PDFium's `char_indices_`
+ *     skip list), or one {@link toPageText} leaves out;
  *   - a supplementary-plane character contributes two text units (a
  *     surrogate pair) once extraction is UTF-16-faithful.
  *
@@ -152,6 +153,72 @@ export function sliceText(snapshot: PageTextSnapshot, range: TextRange): string 
     boundaryTextOffset(snapshot, range.start),
     boundaryTextOffset(snapshot, range.start + range.count),
   );
+}
+
+/**
+ * Whether a code point is one of Unicode's noncharacters: `U+FDD0–U+FDEF` and
+ * the last two code points of every plane. Unicode reserves them for a
+ * program's internal use, so they are never text a document's author wrote.
+ */
+export function isNoncharacter(codePoint: number): boolean {
+  return (codePoint >= 0xfdd0 && codePoint <= 0xfdef) || (codePoint & 0xfffe) === 0xfffe;
+}
+
+const LINE_BREAK_OR_NONCHARACTER = /[\r\p{Noncharacter_Code_Point}]/u;
+
+/**
+ * The version of the rules {@link toPageText} reads page text by. Raise it
+ * when they return different text for the same page: a server's engine
+ * values for page text and search change with it, so cached answers are
+ * read again.
+ */
+export const PAGE_TEXT_VERSION = 1;
+
+/**
+ * The page text the engine returns, from the text as PDFium extracted it:
+ *
+ *   - a line break is `\n`: PDFium writes `\r\n`, and its `\r` gives no text
+ *     (a lone `\r` becomes `\n`);
+ *   - a noncharacter gives no text: PDFium writes `U+FFFE` for a line-end
+ *     hyphen it joined into one word, and for a glyph mapped to NUL.
+ *
+ * Every character keeps its place in character space, so selection, boxes
+ * and hit ranges are the same before and after. Returns `extracted` itself
+ * when it has neither.
+ */
+export function toPageText(extracted: PageTextSnapshot): PageTextSnapshot {
+  const { text, charCount } = extracted;
+  if (!LINE_BREAK_OR_NONCHARACTER.test(text)) return extracted;
+  const anchors = extracted.charMap ?? [];
+  const pieces: string[] = [];
+  const charMap: CharMapAnchor[] = [];
+  let anchorIndex = 0;
+  let start = 0;
+  let length = 0;
+  for (let char = 0; char < charCount; char++) {
+    let end = start + 1;
+    if (anchorIndex < anchors.length && anchors[anchorIndex][0] === char + 1) {
+      end = anchors[anchorIndex][1];
+      anchorIndex++;
+    }
+    const piece = pageTextOf(text.slice(start, end), text[end]);
+    pieces.push(piece);
+    length += piece.length;
+    // An anchor after every character that gives other than one unit.
+    if (piece.length !== 1) charMap.push([char + 1, length]);
+    start = end;
+  }
+  const pageText = pieces.join('');
+  return charMap.length > 0
+    ? { text: pageText, charCount, charMap }
+    : { text: pageText, charCount };
+}
+
+/** One character's text in the page text, given the unit that follows it. */
+function pageTextOf(extracted: string, next: string | undefined): string {
+  if (extracted === '\r') return next === '\n' ? '' : '\n';
+  if (extracted !== '' && isNoncharacter(extracted.codePointAt(0)!)) return '';
+  return extracted;
 }
 
 /**

@@ -13,8 +13,14 @@ import { foldRecords, NO_RECORDS, type AnnotationRecords } from '../../src/sync/
  */
 const event = (partial: Record<string, unknown>): DocumentEvent =>
   ({
-    origin: { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: 45 },
-    meta: { changed: [], shouldRefetch: null, weakRefsInvalidated: false },
+    origin: {
+      kind: 'remote',
+      sessionId: 'them',
+      subject: null,
+      at: new Date(0).toISOString(),
+      serverSequence: 45,
+    },
+    meta: { changedRefs: [], shouldRefetch: null, weakRefsInvalidated: false },
     ...partial,
   }) as unknown as DocumentEvent;
 
@@ -41,7 +47,9 @@ const inlineOn = (pageObjectNumber: number, baseIndex: number): Annotation =>
   });
 
 const recordsOf = (...dtos: Annotation[]): AnnotationRecords => ({
-  byKey: Object.fromEntries(dtos.map((dto) => [annotationKey(dto.ref), { dto, pictureVersion: 0 }])),
+  byKey: Object.fromEntries(
+    dtos.map((dto) => [annotationKey(dto.ref), { dto, pictureVersion: 0 }]),
+  ),
   order: dtos.map((dto) => annotationKey(dto.ref)),
 });
 
@@ -145,7 +153,8 @@ describe('foldRecords', () => {
 
 describe('appearance versions', () => {
   const square = recordOn(11, 1);
-  const versionOf = (records: AnnotationRecords, key = 'obj:1') => records.byKey[key]?.pictureVersion;
+  const versionOf = (records: AnnotationRecords, key = 'obj:1') =>
+    records.byKey[key]?.pictureVersion;
 
   it('a created record starts with a freshly baked appearance', () => {
     const records = applied(

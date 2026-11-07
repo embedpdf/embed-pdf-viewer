@@ -49,7 +49,7 @@ describe('<KernelProvider>', () => {
     expect(elsewhere.find('[data-testid="count"]').text()).toBe('1');
 
     elsewhere.unmount();
-    expect(kernel.status()).toBe('started');
+    expect(kernel.getStatus()).toBe('started');
     expect(kernel.capability(CounterToken).getCount()).toBe(1);
   });
 

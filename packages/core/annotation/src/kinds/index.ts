@@ -30,6 +30,7 @@ import {
   widgetBox,
   widgetButton,
   widgetChoice,
+  widgetMark,
   widgetRadio,
   widgetText,
   widgetToggle,
@@ -45,7 +46,7 @@ export {
   type FlagKey,
   type KindCaps,
 } from './define';
-export { fieldFamilyOfKind, widgetKindOf } from './widget';
+export { fieldKindOf, widgetKindOf } from './widget';
 
 /** The kinds, by name. */
 export const KINDS: Readonly<Record<string, AnnotationKind>> = {
@@ -73,6 +74,7 @@ export const KINDS: Readonly<Record<string, AnnotationKind>> = {
   [widgetToggle.name]: widgetToggle,
   [widgetRadio.name]: widgetRadio,
   [widgetBox.name]: widgetBox,
+  [widgetMark.name]: widgetMark,
 };
 
 /**

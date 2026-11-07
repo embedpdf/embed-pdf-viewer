@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { matchesOrigin } from '../src/auth/origins';
 import { createJwtVerifier, signDevToken } from '../src/auth/JwtVerifier';
-import { hashSharePassword, verifySharePassword } from '../src/auth/share-password';
+import { hashGrantPassphrase, verifyGrantPassphrase } from '../src/auth/grant-passphrase';
 
 describe('matchesOrigin', () => {
   test('exact origins: scheme, host, and port must all agree', () => {
@@ -74,22 +74,22 @@ describe('origins claim discipline', () => {
   });
 });
 
-describe('share passwords', () => {
+describe('grant passphrases', () => {
   test('round-trips and rejects, constant-shape envelope', () => {
-    const envelope = hashSharePassword('q3-review');
+    const envelope = hashGrantPassphrase('q3-review');
     expect(envelope.startsWith('scrypt$')).toBe(true);
-    expect(verifySharePassword('q3-review', envelope)).toBe(true);
-    expect(verifySharePassword('Q3-review', envelope)).toBe(false);
-    expect(verifySharePassword('', envelope)).toBe(false);
+    expect(verifyGrantPassphrase('q3-review', envelope)).toBe(true);
+    expect(verifyGrantPassphrase('Q3-review', envelope)).toBe(false);
+    expect(verifyGrantPassphrase('', envelope)).toBe(false);
   });
 
   test('two hashes of the same phrase differ (per-grant salt)', () => {
-    expect(hashSharePassword('same')).not.toBe(hashSharePassword('same'));
+    expect(hashGrantPassphrase('same')).not.toBe(hashGrantPassphrase('same'));
   });
 
   test('malformed envelopes never match', () => {
-    expect(verifySharePassword('x', 'not-an-envelope')).toBe(false);
-    expect(verifySharePassword('x', 'scrypt$a$b$c$d$e')).toBe(false);
-    expect(verifySharePassword('x', 'scrypt$16384$8$1$$')).toBe(false);
+    expect(verifyGrantPassphrase('x', 'not-an-envelope')).toBe(false);
+    expect(verifyGrantPassphrase('x', 'scrypt$a$b$c$d$e')).toBe(false);
+    expect(verifyGrantPassphrase('x', 'scrypt$16384$8$1$$')).toBe(false);
   });
 });

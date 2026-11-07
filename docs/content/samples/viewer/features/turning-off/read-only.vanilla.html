@@ -1,0 +1,15 @@
+<embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  // [!doc-source report]
+  const report = '/pdfs/report.pdf';
+  // [!/doc-source]
+
+  document.getElementById('viewer').config = {
+    src: report,
+    readOnly: true,
+    disable: ['documents.download', 'documents.print'],
+  };
+</script>

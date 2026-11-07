@@ -1,12 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -19,35 +12,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-// On load: a sticky note on the cover. It's Dana's, like everything drawn here.
-@Component({
-  selector: 'demo-add-note',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '',
-})
-export class AddNote {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
-
-  constructor() {
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 470, y: 232, width: 20, height: 20 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        });
-      });
-    });
-  }
-}
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -113,7 +78,6 @@ export class Authors {
     EpdfPageTemplate,
     EpdfRenderLayer,
     EpdfAnnotationLayer,
-    AddNote,
     Toolbar,
     Authors,
   ],
@@ -122,7 +86,7 @@ export class Authors {
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: sketch }],
       },
       withStage(),
       withRender(),
@@ -135,7 +99,6 @@ export class Authors {
   encapsulation: ViewEncapsulation.None,
   template: `
     <ng-container *epdfDocumentGate="let document; fallback: loading">
-      <demo-add-note />
       <demo-toolbar />
       <div class="viewer">
         <epdf-stage class="stage">

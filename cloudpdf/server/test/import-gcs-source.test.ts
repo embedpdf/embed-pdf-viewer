@@ -1,71 +1,23 @@
 /**
- * GCS import source: shared conformance over an in-memory SDK fake,
- * plus generation (revision) semantics — pinning, mismatch, digit
- * validation, and stat-generation read pinning.
+ * GCS import source: shared conformance over the in-memory SDK fake
+ * (`__mocks__/@google-cloud/storage.ts`), plus generation (revision)
+ * semantics — pinning, mismatch, digit validation, and stat-generation
+ * read pinning.
  */
-import { Readable } from 'node:stream';
 import { describe, expect, test, vi } from 'vitest';
 
-import { ImportConnectionSchema, type GcsImportConnection } from '../src/import/config/ImportConnectionSchema';
+import { FakeBucket, gcs } from '../__mocks__/@google-cloud/storage';
+
+import {
+  ImportConnectionSchema,
+  type GcsImportConnection,
+} from '../src/import/config/ImportConnectionSchema';
 import { ImportPolicySchema, type ImportPolicy } from '../src/import/config/ImportPolicySchema';
 import { ImportSourceError } from '../src/import/ImportSource';
 import { runImportSourceConformance } from './_helpers/import-source-conformance';
 
-const g = vi.hoisted(() => {
-  interface Obj {
-    bytes: Buffer;
-    contentType?: string;
-    generation: number;
-  }
-  return { objects: new Map<string, Obj>(), nextGeneration: 1000 };
-});
-
-vi.mock('@google-cloud/storage', () => {
-  const gcsErr = (code: number): Error => Object.assign(new Error(`gcs ${code}`), { code });
-  class FakeFile {
-    constructor(
-      readonly key: string,
-      readonly opts?: { generation?: number },
-    ) {}
-    async getMetadata(): Promise<[Record<string, unknown>, unknown]> {
-      if (this.key.startsWith('err/')) throw gcsErr(Number(this.key.slice(4)));
-      const o = g.objects.get(this.key);
-      if (!o) throw gcsErr(404);
-      if (this.opts?.generation !== undefined && this.opts.generation !== o.generation) {
-        throw gcsErr(404);
-      }
-      return [
-        {
-          size: String(o.bytes.byteLength),
-          generation: String(o.generation),
-          ...(o.contentType ? { contentType: o.contentType } : {}),
-        },
-        null,
-      ];
-    }
-    createReadStream(): Readable {
-      const o = g.objects.get(this.key);
-      if (!o || (this.opts?.generation !== undefined && this.opts.generation !== o.generation)) {
-        const r = new Readable({ read() {} });
-        process.nextTick(() => r.destroy(gcsErr(404)));
-        return r;
-      }
-      return Readable.from([o.bytes]);
-    }
-  }
-  class FakeBucket {
-    file(key: string, opts?: { generation?: number }): FakeFile {
-      return new FakeFile(key, opts);
-    }
-  }
-  return {
-    Storage: class {
-      bucket(): FakeBucket {
-        return new FakeBucket();
-      }
-    },
-  };
-});
+// No factory: vitest serves __mocks__/@google-cloud/storage.ts.
+vi.mock('@google-cloud/storage');
 
 const { GcsImportSource } = await import('../src/import/adapters/GcsImportSource');
 
@@ -89,23 +41,32 @@ function sourceFor(key: string, opts: { revision?: string; maxBytes?: number } =
 }
 
 function seed(name: string, bytes: Uint8Array, contentType?: string): number {
-  const generation = ++g.nextGeneration;
-  g.objects.set(name, {
+  const generation = ++gcs.generation;
+  gcs.objects.set(name, {
     bytes: Buffer.from(bytes),
     ...(contentType ? { contentType } : {}),
+    metadata: {},
     generation,
   });
   return generation;
 }
 
+/** The source's SDK bucket, made without calling it: a real one would call Google. */
+function bucketOf(source: ReturnType<typeof sourceFor>): Promise<unknown> {
+  return (source as unknown as { bucket(): Promise<unknown> }).bucket();
+}
+
 runImportSourceConformance('gcs', () => {
-  g.objects.clear();
+  gcs.objects.clear();
+  gcs.failures.clear();
   return {
     seed(name, bytes, opts) {
       seed(name, bytes, opts?.contentType);
     },
     source(name, opts) {
-      return sourceFor(name, { ...(opts?.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}) });
+      return sourceFor(name, {
+        ...(opts?.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}),
+      });
     },
     missingName: () => 'definitely-missing',
   };
@@ -116,7 +77,9 @@ describe('GcsImportSource specifics', () => {
 
   test('revisions pin generations and resolvedRevision reports what was served', async () => {
     const gen = seed('inv/a.pdf', Buffer.from('%PDF gcs bytes'));
-    const opened = await sourceFor('inv/a.pdf', { revision: String(gen) }).open({ signal: signal() });
+    const opened = await sourceFor('inv/a.pdf', { revision: String(gen) }).open({
+      signal: signal(),
+    });
     expect(opened.resolvedRevision).toBe(String(gen));
     expect(opened.contentLength).toBe(14);
   });
@@ -131,19 +94,31 @@ describe('GcsImportSource specifics', () => {
     const gen = seed('inv/c.pdf', Buffer.from('x'));
     const err = await sourceFor('inv/c.pdf', { revision: String(gen + 1) })
       .open({ signal: signal() })
-      .then(() => null, (e: unknown) => e);
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
     expect(err).toBeInstanceOf(ImportSourceError);
     expect((err as ImportSourceError).code).toBe('not_found');
   });
 
-  test.each([['0'], ['abc'], ['-5'], ['1.5']])('revision %s is refused as non-generation', (rev) => {
-    expect(() => sourceFor('inv/a.pdf', { revision: rev })).toThrowError(/positive decimal integer/);
-  });
+  test.each([['0'], ['abc'], ['-5'], ['1.5']])(
+    'revision %s is refused as non-generation',
+    (rev) => {
+      expect(() => sourceFor('inv/a.pdf', { revision: rev })).toThrowError(
+        /positive decimal integer/,
+      );
+    },
+  );
 
   test('403 maps to terminal denied', async () => {
-    const err = await sourceFor('err/403')
+    gcs.failures.set('inv/locked.pdf', 403);
+    const err = await sourceFor('inv/locked.pdf')
       .open({ signal: signal() })
-      .then(() => null, (e: unknown) => e);
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
     expect((err as ImportSourceError).code).toBe('denied');
   });
 
@@ -151,8 +126,21 @@ describe('GcsImportSource specifics', () => {
     seed('inv/empty.pdf', Buffer.alloc(0));
     const err = await sourceFor('inv/empty.pdf')
       .open({ signal: signal() })
-      .then(() => null, (e: unknown) => e);
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
     expect((err as ImportSourceError).code).toBe('unsupported');
+  });
+
+  test('sources opened back to back all get the fake SDK', async () => {
+    // Each source starts its own import of the SDK on first use, so these
+    // imports overlap. A vi.mock factory hands about half of them the
+    // real client.
+    const buckets = await Promise.all(
+      Array.from({ length: 8 }, () => bucketOf(sourceFor('inv/a.pdf'))),
+    );
+    expect(buckets.every((b) => b instanceof FakeBucket)).toBe(true);
   });
 
   test('info identifies the connection without secrets', () => {

@@ -11,6 +11,7 @@ import { useState } from 'react';
 
 import { Icon } from './icons';
 import { MenuItem, MenuPopover } from './menu';
+import { useTooltip } from './tooltip';
 
 export function PanelSwitcher({
   id,
@@ -26,13 +27,15 @@ export function PanelSwitcher({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // What the button does; its name is the open panel's title.
+  const tooltip = useTooltip({ label: t('panels.switch') });
   return (
     <div className="relative flex min-w-0">
       <button
+        {...tooltip.trigger}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={t('panels.switch')}
         data-epdf-panel-switcher=""
         onClick={() => setOpen((previous) => !previous)}
         className="text-fg hover:bg-hover -ms-1.5 flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-sm font-semibold"
@@ -40,6 +43,7 @@ export function PanelSwitcher({
         <span className="truncate">{title}</span>
         <Icon name="chevronDown" size={16} className="text-fg-muted shrink-0" />
       </button>
+      {tooltip.element}
       {open && (
         <MenuPopover onClose={() => setOpen(false)}>
           <div className="min-w-48 p-1">

@@ -75,6 +75,27 @@ describe('foldText', () => {
     expect(Array.from(f.map)).toEqual([0, 0, 2]);
   });
 
+  test('ignores invisible characters, so a match runs across them', () => {
+    // Soft hyphen, zero-width space, word joiner, a left-to-right mark.
+    const f = foldText('Veri\u00ADta\u200Bse\u2060ru\u200Em');
+    expect(f.folded).toBe('veritaserum');
+    expect(Array.from(f.map)).toEqual([0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14]);
+  });
+
+  test('ignores U+FEFF rather than reading it as a space', () => {
+    // JavaScript's `\s` includes `U+FEFF`.
+    expect(foldText('a\uFEFFb').folded).toBe('ab');
+  });
+
+  test('ignores control codes and noncharacters, but not tab or line breaks', () => {
+    expect(foldText('a\u0007b\uFFFEc\u{1FFFF}d').folded).toBe('abcd');
+    expect(foldText('a\tb\nc\rd').folded).toBe('a b c d');
+  });
+
+  test('an invisible character between spaces leaves one space', () => {
+    expect(foldText('a \u200B b').folded).toBe('a b');
+  });
+
   test('empty input folds to empty', () => {
     const f = foldText('');
     expect(f.folded).toBe('');

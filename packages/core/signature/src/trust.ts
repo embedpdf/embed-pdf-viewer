@@ -15,12 +15,12 @@ export interface TrustPort {
 /**
  * When a chain is judged. `now` is the honest default; `timestamp` is only
  * legitimate for a verified RFC 3161 token, which is why it carries the
- * proof flag. The signature's own `/M` is a claim and never a validation
- * time.
+ * proof flag; its `genTime` is the token's time as an ISO 8601 string. The
+ * signature's own `/M` is a claim and never a validation time.
  */
 export type ValidationTime =
   | { kind: 'now' }
-  | { kind: 'timestamp'; genTime: Date; tokenVerified: true };
+  | { kind: 'timestamp'; genTime: string; tokenVerified: true };
 
 export type TrustStatus = 'trusted' | 'untrusted' | 'unknown';
 
@@ -39,7 +39,7 @@ export interface TrustVerdict {
  */
 export async function validateChain(
   cms: Uint8Array | ParsedCmsInternal,
-  trust: TrustPort | null | undefined,
+  trust: TrustPort | null,
   at: ValidationTime = { kind: 'now' },
 ): Promise<TrustVerdict> {
   if (!trust) return { status: 'unknown', reason: 'no trust anchors configured' };
@@ -56,7 +56,7 @@ export async function validateChain(
   const chainEngine = new pkijs.CertificateChainValidationEngine({
     certs: internal.certificates,
     trustedCerts,
-    checkDate: at.kind === 'now' ? new Date() : at.genTime,
+    checkDate: at.kind === 'now' ? new Date() : new Date(at.genTime),
   });
   try {
     const result = await chainEngine.verify();

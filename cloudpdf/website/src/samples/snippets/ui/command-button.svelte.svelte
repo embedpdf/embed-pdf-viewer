@@ -8,9 +8,13 @@
 
 {#if command.current.visible}
   {@const cmd = command.current}
-  <button onclick={cmd.run} disabled={!cmd.enabled} aria-pressed={cmd.active}>
+  <button
+    onclick={cmd.run}
+    disabled={!cmd.enabled}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
+  >
     <Icon name={cmd.icon} />
     {cmd.label}
-    {#if cmd.shortcut}<kbd>{cmd.shortcut}</kbd>{/if}
+    {#if cmd.shortcutLabel}<kbd>{cmd.shortcutLabel}</kbd>{/if}
   </button>
 {/if}

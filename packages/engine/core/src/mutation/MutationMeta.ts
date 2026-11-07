@@ -32,12 +32,17 @@ export interface CacheDelta {
    * New plane pins, present when this mutation bumped them: `layoutVersion`
    * for a page-structure write (move, rotate, delete, insert, names),
    * `metadataVersion` for a metadata write, `attachmentsVersion` for an
-   * attachment write. Absorbing them re-points the cached manifest's leaf
-   * without a refetch.
+   * attachment write, `outlineVersion` for an outline write. Absorbing them
+   * re-points the cached manifest's leaf without a refetch.
    */
   layoutVersion?: number;
   metadataVersion?: number;
   attachmentsVersion?: number;
+  outlineVersion?: number;
+  /** The fonts list's pin, when the write changed the fonts the list shows. */
+  fontsVersion?: number;
+  /** The contents pin, when the write moved a page's content or the page set. */
+  contentsVersion?: number;
   /**
    * The layer's write serial after this mutation and whether an artifact
    * now exists (cloud only). Absorbing them keeps the client's cached
@@ -75,4 +80,10 @@ export interface MutationMeta {
    * before it on the layer.
    */
   undoable: boolean;
+  /**
+   * Characters the write drew with no font that has them (each a grapheme,
+   * first seen first): the PDF shows them as boxes. Absent when every
+   * character was drawn.
+   */
+  missingCharacters?: string[];
 }

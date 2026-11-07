@@ -4,11 +4,11 @@ import {
   displaySize,
   invert,
   rotateScaleMatrix,
-  type PageRotation,
+  type Rotation,
   type Size,
 } from '../src/index';
 
-const ROTATIONS: PageRotation[] = [0, 90, 180, 270];
+const ROTATIONS: Rotation[] = [0, 90, 180, 270];
 
 describe('displaySize: w↔h swap for quarter-turns', () => {
   it('swaps for 90/270, keeps for 0/180', () => {

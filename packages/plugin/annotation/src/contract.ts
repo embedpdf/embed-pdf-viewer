@@ -33,6 +33,7 @@ import type {
   ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { Point } from '@embedpdf/core-geometry';
+import type { MountableFontProgram } from '@embedpdf/plugin-fonts/contract';
 import type {
   Annotation,
   AnnotationBundle,
@@ -58,7 +59,7 @@ import type { TextFormat } from './rich-text';
 import type { AnnotationToolInput, ResolvedGhost } from './tools/definitions';
 
 export { AnnotationToken } from './token';
-export { annotationState } from './state';
+export { annotationState, type AnnotationState } from './state';
 export { AnnotationTransfer } from '@embedpdf/engine-core/public';
 export type { Face, TextFormat, TextSelection } from './rich-text';
 export type {
@@ -166,7 +167,10 @@ export interface ChromeSettings {
     /** Line width of both kinds, px. */
     readonly width: number;
   };
-  /** The box you drag to select several annotations. */
+  /**
+   * The box you drag to select several annotations, one value: a change
+   * replaces it whole, and a color it leaves out is `null` again.
+   */
   readonly marquee: {
     /** `null`: `accent` at 8%. */
     readonly fill: string | null;
@@ -189,7 +193,8 @@ export interface ChromeSettings {
  * fields most tools have are typed, the rest read as `unknown`.
  */
 export interface ToolDefaults {
-  readonly color?: string;
+  /** `null` on a shape or line tool: no stroke. */
+  readonly color?: string | null;
   readonly interiorColor?: string | null;
   readonly opacity?: number;
   readonly strokeWidth?: number;
@@ -220,9 +225,10 @@ export interface AfterCreateSettings {
  */
 export interface AnnotationSettings {
   /**
-   * Change the built-in tools or add your own. An entry with a built-in's id
-   * changes it (`{ id: 'ink', defaults: { strokeWidth: 6 } }`), a new id adds
-   * a tool, and `extends` starts from another tool.
+   * Change the built-in tools or add your own, entry by entry in order. An
+   * entry with a tool's id changes only that tool
+   * (`{ id: 'ink', defaults: { strokeWidth: 6 } }`), a new id adds a tool, and
+   * `extends` starts from a copy of a tool listed before it, without its `meta`.
    */
   readonly tools: readonly AnnotationToolInput[];
   readonly afterCreate: AfterCreateSettings;
@@ -264,10 +270,10 @@ export const ANNOTATION_DEFAULTS: AnnotationSettings = {
   },
   snap: {
     alignment: true,
-    alignmentThreshold: 6,
+    alignmentThresholdPx: 6,
     rotation: true,
     rotationAngles: [0, 90, 180, 270],
-    rotationThreshold: 4,
+    rotationThresholdDeg: 4,
   },
   editable: true,
 };
@@ -283,13 +289,13 @@ export type AnnotationConfig = DeepPartial<AnnotationSettings>;
  * with the page's items (`source: 'ghost'`).
  */
 export interface ImageGhost {
-  page: PageRef;
+  readonly page: PageRef;
   /** The box the stamp's placement would use, before its turn. */
-  box: Rect;
+  readonly box: Rect;
   /** The tool's upright turn at this hover (degrees clockwise). */
-  rot: number;
+  readonly rot: number;
   /** How opaque it paints (0–1); `--epdf-ghost-opacity` wins over it. */
-  opacity: number;
+  readonly opacity: number;
 }
 
 /**
@@ -299,10 +305,10 @@ export interface ImageGhost {
  */
 export interface LinkNavItem {
   /** Stable per-page key: the annot id, `#n`-suffixed for attached segments. */
-  id: string;
+  readonly id: string;
   /** The clickable area in page space. */
-  bounds: Rect;
-  target: PdfLinkTarget;
+  readonly bounds: Rect;
+  readonly target: PdfLinkTarget;
   /**
    * True for a link child riding an editable annotation (an `/RT /Group`
    * subordinate): a property of its parent while authoring, a nav behavior
@@ -310,17 +316,17 @@ export interface LinkNavItem {
    * items whenever the active tool enables `annotation-edit`, so the parent
    * stays selectable/movable; standalone document links navigate regardless.
    */
-  attached: boolean;
+  readonly attached: boolean;
   /** The full payload-carrying `/A` tree, when one exists: the action
    *  engine's dispatch input. `target` remains its root projection. */
-  activate?: PdfActionTree;
+  readonly activate?: PdfActionTree;
   /** The annotation ref, carried for ActionSource context. */
-  ref?: AnnotationRef;
+  readonly ref?: AnnotationRef;
   /** Which `/AA` hover trees this link carries: the nav layer's pump flags
    *  (tree-less hover must cost zero dispatches). Links are behavior-inert
    *  to the annotation plane's hover feed while navigable, so their
    *  cursorEnter/cursorExit can only fire from the LinkLayer anchors. */
-  hoverEvents?: { enter: boolean; exit: boolean };
+  readonly hoverEvents?: { enter: boolean; exit: boolean };
 }
 
 /**
@@ -329,7 +335,7 @@ export interface LinkNavItem {
  * are not geometry-editable. Not engaged, they are edited like any other.
  */
 export interface Behavior {
-  id: string;
+  readonly id: string;
   /** Whether this behavior is about the annotation at all. */
   matches(annotation: Annotation): boolean;
   /** Whether it owns the annotation now (read live: the active tool, the app's mode). */
@@ -365,18 +371,26 @@ export interface AnnotationProperties {
  * live view matches the baked appearance.
  */
 export interface TextItem {
-  id: string;
-  ref: AnnotationRef | null;
-  box: Rect;
-  contents: string;
+  readonly id: string;
+  readonly ref: AnnotationRef | null;
+  readonly box: Rect;
+  readonly contents: string;
   /** The rich paragraphs the editor renders and edits (run deltas over the
    *  body, which `css` carries). `contents` is their plain projection. */
-  richText: { paragraphs: RichTextParagraph[] };
-  editing: boolean;
+  readonly richText: { paragraphs: RichTextParagraph[] };
+  /** The face of its text without one of its own: the body's. */
+  readonly face: { family: string; weight: number; italic: boolean };
+  /**
+   * The font programs its text is drawn in (`css.fontFamily` and the runs'
+   * families name them): mount them where the box is drawn
+   * (`createFontMounts` in `@embedpdf/web`). Empty without the fonts plugin.
+   */
+  readonly programs: readonly MountableFontProgram[];
+  readonly editing: boolean;
   /** Applied rotation (deg, CW). `box` is the unrotated text box; the framework
    *  rotates the editable element about its centre by this. 0/undefined = none. */
-  rot?: number;
-  css: {
+  readonly rot?: number;
+  readonly css: {
     fontFamily: string;
     /** Content units (the framework multiplies by the page scale). The line
      *  height is not here: the editor binding states the engine's line model
@@ -394,8 +408,8 @@ export interface TextItem {
 
 /** What `comments.deleteThread()` did: everything went, or nothing did and `failed` says why. */
 export interface ThreadDeleteResult {
-  deleted: AnnotationRef[];
-  failed: Array<{ ref: AnnotationRef; error: unknown }>;
+  readonly deleted: AnnotationRef[];
+  readonly failed: Array<{ ref: AnnotationRef; error: unknown }>;
 }
 
 /** The public shape of a tool: a named preset over a kind. */
@@ -516,7 +530,7 @@ export interface ToolDefaultsChangedEvent {
 /** A thread changed through this viewer. */
 export interface CommentThreadChangedEvent {
   readonly rootRef: AnnotationRef;
-  readonly change: 'reply' | 'text' | 'status' | 'marked' | 'deleted';
+  readonly type: 'reply' | 'text' | 'status' | 'marked' | 'deleted';
 }
 
 /** Which annotations `list()` returns: every field narrows. */
@@ -547,9 +561,9 @@ export interface AnnotationExportSelection {
 // ── the nouns ────────────────────────────────────────────────────────────────
 
 /** The selection: what is selected, and the verbs that change it as one. */
-export interface AnnotationSelectionApi {
+export interface AnnotationSelectionCapability {
   /** Select these annotations; an annotation in a group brings its group. */
-  set(refs: readonly AnnotationRef[]): void;
+  select(refs: readonly AnnotationRef[]): void;
   /** Add these annotations to the selection, with their groups. */
   add(refs: readonly AnnotationRef[]): void;
   /** Select everything that can be selected, on one page or in the whole document. */
@@ -564,13 +578,14 @@ export interface AnnotationSelectionApi {
   /** Clear the selection. */
   clear(): void;
   /** The selected annotations, as the user sees them. */
-  list(): readonly Annotation[];
+  getSelected(): readonly Annotation[];
   /**
    * Change the selected annotations: each takes the fields its kind has, and
-   * skips the rest. A function changes each relative to itself. While words
-   * are selected in a text box being typed in, its font, size, colour and
-   * formats change those words. Resolves once the engine wrote every change,
-   * with what it refused in `failed`.
+   * skips the rest. A function changes each relative to itself. A text box's
+   * font, size, colour and formats change all of its text; while words are
+   * selected in a text box being typed in, those words, and at its caret, the
+   * text typed there next. Resolves once the engine wrote every change, with
+   * what it refused in `failed`.
    */
   update(
     changes: AnnotationPatch | ((annotation: Annotation) => AnnotationPatch),
@@ -607,7 +622,7 @@ export interface AnnotationSelectionApi {
 }
 
 /** A polygon or polyline being drawn, a click per point. */
-export interface AnnotationDraftApi {
+export interface AnnotationDraftCapability {
   /** The shape being drawn, or `null`. */
   get(): CreationDraft | null;
   /** End the shape and create it, as a double-click does. Resolves `null` when there was none to make. */
@@ -617,24 +632,32 @@ export interface AnnotationDraftApi {
 }
 
 /** Typing in a text box. */
-export interface AnnotationTextApi {
+export interface AnnotationTextCapability {
   /** Start typing in a text box, as a double-click does. */
   begin(ref: AnnotationRef): void;
   /** Stop typing, and save what was typed. */
   end(options?: OperationOptions): Promise<void>;
   /** The text box being typed in, or `null`. */
   getEditing(): Annotation | null;
-  /** Bold, italic or underline on or off: for the selected words, or the whole of each selected box. */
+  /**
+   * Bold, italic or underline on or off: for the selected words, the text
+   * typed next at the caret, or all the text of each selected box. On, unless
+   * all of it already has it.
+   */
   toggleFormat(format: TextFormat, options?: OperationOptions): Promise<void>;
 }
 
 /** The tools: what a click or a drag creates, with which defaults. */
-export interface AnnotationToolsApi {
+export interface AnnotationToolsCapability {
   /** Every tool, the built-in ones and yours. */
   list(): readonly AnnotationTool[];
   /** One tool, or `null`. */
   get(id: string): AnnotationTool | null;
-  /** Add a tool while the app runs, or replace the one with the same id. Returns a function that removes it. */
+  /**
+   * Add or change a tool while the app runs: one more entry after the `tools`
+   * setting's. Returns a function that takes it back: a tool it added goes
+   * away, a tool it changed goes back to what it was.
+   */
   register(tool: AnnotationToolInput): Unsubscribe;
   /** The fields a tool's next annotation starts with: its defaults over the engine's. The same object until they change. */
   getDefaults(id: string): ToolDefaults;
@@ -679,19 +702,19 @@ export interface StampInput {
 /** Where `stamps.place()` puts a stamp, without a click. */
 export interface StampPlacement {
   /** The page, as a ref or an index. */
-  page: PageRef | number;
+  readonly page: PageRef | number;
   /** Where its middle goes, in page space. The size comes from the picture. */
-  center: Point;
+  readonly center: Point;
   /** Placed width in PDF points; default the picture's own (or the stamp's `targetWidth`). */
-  targetWidth?: number;
+  readonly targetWidth?: number;
   /** Its turn, degrees clockwise. Default 0. */
-  rotation?: number;
+  readonly rotation?: number;
   /** Select it, as placing it with a click would. Default false: code never changes the selection. */
-  select?: boolean;
+  readonly select?: boolean;
 }
 
 /** Stamps placed from bytes: armed for the next click, or placed from code. */
-export interface AnnotationStampsApi {
+export interface AnnotationStampsCapability {
   /**
    * Arm a stamp's bytes so the next click places them, as the `stamp` tool
    * does after picking a file. Rejects `invalid-input` for bytes that aren't
@@ -717,7 +740,7 @@ export interface AnnotationStampsApi {
 }
 
 /** Links attached to annotations (a link child), or a link annotation's own target. */
-export interface AnnotationLinksApi {
+export interface AnnotationLinksCapability {
   /** Where an annotation links to, or `null`. */
   get(ref: AnnotationRef): PdfLinkTarget | null;
   /** Link an annotation to a page or a website. */
@@ -731,7 +754,7 @@ export interface AnnotationLinksApi {
  * annotation create, change or delete, so other people's changes, this
  * viewer's and reloads all show in `listThreads()`.
  */
-export interface CommentsApi {
+export interface CommentsCapability {
   /** Every thread, in reading order: by page, then from the top of the page. */
   listThreads(): readonly CommentThread[];
   /** The thread a comment is in (its first comment, a reply or a review state), or `null`. */
@@ -764,9 +787,12 @@ export interface CommentsApi {
   canSetStatus(ref: AnnotationRef): boolean;
   /** Whether the user may check this thread off (`annotations:create`). */
   canSetMarked(ref: AnnotationRef): boolean;
-  /** Whether the user may delete this comment (`annotations:delete`, and not `locked`). */
+  /**
+   * Whether the user may delete this comment with its replies (`annotations:delete`): the
+   * comment unlocked, and every reply too.
+   */
   canDelete(ref: AnnotationRef): boolean;
-  /** Whether the user may delete every comment in this thread. */
+  /** Whether the user may delete this thread: `canDelete()` of its first comment. */
   canDeleteThread(ref: AnnotationRef): boolean;
   /** A thread changed through this viewer: a reply, a text, a review state, a check mark or a delete. */
   readonly onThreadChanged: EventHook<CommentThreadChangedEvent>;
@@ -899,13 +925,13 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   ): Promise<Uint8Array>;
 
   // ── the nouns ──
-  readonly links: AnnotationLinksApi;
-  readonly selection: AnnotationSelectionApi;
-  readonly draft: AnnotationDraftApi;
-  readonly text: AnnotationTextApi;
-  readonly tools: AnnotationToolsApi;
-  readonly stamps: AnnotationStampsApi;
-  readonly comments: CommentsApi;
+  readonly links: AnnotationLinksCapability;
+  readonly selection: AnnotationSelectionCapability;
+  readonly draft: AnnotationDraftCapability;
+  readonly text: AnnotationTextCapability;
+  readonly tools: AnnotationToolsCapability;
+  readonly stamps: AnnotationStampsCapability;
+  readonly comments: CommentsCapability;
 
   // ── ports and checks ──
   /**
@@ -919,7 +945,10 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   canCreate(): boolean;
   /** Whether the user may change this annotation: its permission and its own `locked` flag. */
   canUpdate(ref: AnnotationRef): boolean;
-  /** Whether the user may delete this annotation: its permission and its own `locked` flag. */
+  /**
+   * Whether the user may delete this annotation, and with it its replies, review states and
+   * popups: the permission for each of them and their `locked` flags.
+   */
   canDelete(ref: AnnotationRef): boolean;
   /**
    * Whether the `editable` setting lets people change this annotation by
@@ -966,8 +995,8 @@ export interface ArmedStampInfo {
 
 /** The armed stamp's paintable preview, for the render layer's ghost `<img>`. */
 export interface ArmedStampPreview {
-  bytes: Uint8Array;
-  mimeType?: string;
+  readonly bytes: Uint8Array;
+  readonly mimeType?: string;
 }
 
 /**

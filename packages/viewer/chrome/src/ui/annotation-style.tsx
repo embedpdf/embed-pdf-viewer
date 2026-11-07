@@ -31,14 +31,23 @@ import {
 } from '@embedpdf/react/annotation';
 import { useCommands } from '@embedpdf/react/commands';
 import { useInteractionState } from '@embedpdf/react/interaction';
-import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
+import { FontsToken } from '@embedpdf/react/fonts';
+import {
+  isLocalEngine,
+  useDocumentId,
+  useKernelValue,
+  useOptionalCapability,
+  useOptionalSelector,
+  type Font,
+  type FontRestriction,
+} from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
 import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
-import { useAnnotationFonts } from './annotation-fonts';
-import { AnnotationFlagsSection } from './annotation-flags';
+import { useConfiguredFonts } from '../config-context';
 import { useLabel } from './labels';
+import { TooltipButton, WithTooltip } from './tooltip';
 
 // ── app-level vocabulary (a viewer's decision) ────────────────────────────────
 // The schema says which controls to show, with each one's label and its
@@ -59,8 +68,17 @@ const PRESET_COLORS = [
   '#ffffff',
 ];
 
-/** The standard fonts the picker offers, of the schema's; the registered fonts follow them. */
+/** The standard fonts the picker offers, of the schema's: its last group. */
 const OFFERED_FONTS: readonly string[] = ['helvetica', 'helvetica-bold', 'times-roman', 'courier'];
+
+/** Why a font can't be chosen, by its restriction, in the order the picker names the first. */
+const CHOICE_RESTRICTIONS: readonly (readonly [FontRestriction, string])[] = [
+  ['not-embedded', 'notEmbedded'],
+  ['subset', 'subset'],
+  ['preview-and-print', 'previewAndPrint'],
+  ['unsupported-format', 'unsupportedFormat'],
+  ['no-unicode-map', 'noUnicodeMap'],
+];
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 36, 48, 72];
 
@@ -106,6 +124,16 @@ const borderFields = (border: Border): FieldValues => ({
 /** The option of a choice with this value, for its label. */
 const optionOf = (options: readonly AnnotationOption[], value: string) =>
   options.find((option) => option.value === value);
+
+/** Each kind a selection can become, by its tool's icon. */
+const KIND_ICON: Readonly<Record<string, string>> = {
+  highlight: 'highlight',
+  underline: 'underline',
+  squiggly: 'squiggly',
+  strikeout: 'strikethrough',
+  square: 'square',
+  circle: 'circle',
+};
 
 // ── layout primitives ────────────────────────────────────────────────────────
 function Field({
@@ -156,9 +184,8 @@ function Swatch({
       }
     : { backgroundColor: color };
   return (
-    <button
-      type="button"
-      title={isTransparent(color) ? t('stylePanel.transparent') : color}
+    <TooltipButton
+      label={isTransparent(color) ? t('stylePanel.transparent') : color}
       onClick={() => onSelect(color)}
       className={`border-border-strong h-5 w-5 rounded-full border ${active ? 'outline-accent outline outline-2 outline-offset-2' : ''}`}
       style={style}
@@ -257,25 +284,38 @@ function DropdownShell({
 function OptionRow({
   selected,
   title,
+  disabled,
+  hint,
   onClick,
   children,
 }: {
   selected: boolean;
   /** The option's name, for an option drawn as a picture. */
   title?: string;
+  /** It can't be picked: drawn greyed, with `hint` saying why. */
+  disabled?: boolean;
+  /** A line under the option. */
+  hint?: string;
   onClick: () => void;
   children: ReactNode;
 }) {
+  // An option drawn as a picture is named, in its tooltip too, beside it as in a menu.
   return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      className={`hover:bg-hover flex w-full items-center rounded px-2 py-1.5 text-start text-sm ${selected ? 'bg-selected text-accent' : 'text-fg'}`}
-    >
-      {children}
-    </button>
+    <WithTooltip content={title ? { label: title } : null} options={{ inMenu: true }}>
+      {(tooltip) => (
+        <button
+          {...tooltip}
+          type="button"
+          aria-label={title}
+          disabled={disabled}
+          onClick={onClick}
+          className={`flex w-full flex-col items-start rounded px-2 py-1.5 text-start text-sm ${disabled ? 'text-fg-muted cursor-not-allowed' : 'hover:bg-hover'} ${selected ? 'bg-selected' : ''} ${selected && !disabled ? 'text-accent' : ''} ${!selected && !disabled ? 'text-fg' : ''}`}
+        >
+          {children}
+          {hint && <span className="text-fg-muted text-xs">{hint}</span>}
+        </button>
+      )}
+    </WithTooltip>
   );
 }
 
@@ -436,6 +476,20 @@ function LineEndingSelect({
 }
 
 // ── font family picker ───────────────────────────────────────────────────────
+interface FontOption {
+  readonly value: string;
+  readonly label: string;
+  /** Why it can't be chosen for new text; absent when it can. */
+  readonly reason?: string;
+}
+
+/**
+ * Every font a text box, a form field or a redaction label can be written in, as the fonts
+ * plugin lists them: the document's, the engine's (yours on a local engine, the server's on the
+ * cloud), then the standard fonts the property offers. A font that can't be chosen isn't
+ * offered, and neither is a fallback font the engine comes with: it fills in characters on its
+ * own. The box's own font shows whatever it is, greyed with why when it can't be chosen.
+ */
 function FontFamilySelect({
   value,
   standard,
@@ -447,34 +501,79 @@ function FontFamilySelect({
   onChange: (family: string) => void;
 }) {
   const label = useLabel();
-  // The standard faces the viewer offers plus the configured fonts that are
-  // registered and mounted (`engine.fonts`) — a registered key is a
-  // `fontFamily` value like any standard name, labelled by the app.
-  const configured = useAnnotationFonts();
-  const options = [
-    ...standard
-      .filter((option) => OFFERED_FONTS.includes(option.value))
-      .map((option) => ({ value: option.value, label: label(option) })),
-    ...configured.map((font) => ({ value: font.key, label: font.label })),
-  ];
-  // A font the document uses that the picker doesn't offer still shows by its name.
+  const t = useT();
+  const configured = useConfiguredFonts();
+  const fonts = useOptionalCapability(FontsToken);
+  const list = useOptionalSelector(FontsToken, (capability) => capability.getFontList(), null);
+  const local = useKernelValue((kernel) => isLocalEngine(kernel.engine));
+  // The document's fonts are read the first time the picker shows.
+  useEffect(() => {
+    fonts?.ensureLoaded().catch(() => {});
+  }, [fonts]);
+
+  const fontOption = (font: Font): FontOption => {
+    const style =
+      font.weight >= 600 ? (font.italic ? 'boldItalic' : 'bold') : font.italic ? 'italic' : null;
+    const named = style
+      ? `${font.familyName} ${t(`stylePanel.fontStyles.${style}`)}`
+      : font.familyName;
+    const why = CHOICE_RESTRICTIONS.find(([restriction]) =>
+      font.restrictions.includes(restriction),
+    )?.[1];
+    return {
+      value: font.name,
+      label: configured.find((own) => own.key === font.name)?.label ?? named,
+      ...(font.canChoose ? {} : { reason: t(`stylePanel.fontRestrictions.${why ?? 'other'}`) }),
+    };
+  };
+  const listed = (source: Font['source']) =>
+    (list?.fonts ?? [])
+      .filter(
+        (font) =>
+          font.source === source && ((font.canChoose && !font.builtIn) || font.name === value),
+      )
+      .map(fontOption);
+  const groups: { readonly title: string; readonly options: readonly FontOption[] }[] = [
+    { title: t('stylePanel.fontGroups.document'), options: listed('document') },
+    {
+      title: t(local ? 'stylePanel.fontGroups.yours' : 'stylePanel.fontGroups.server'),
+      options: listed('engine'),
+    },
+    {
+      title: t('stylePanel.fontGroups.standard'),
+      options: standard
+        .filter((option) => OFFERED_FONTS.includes(option.value))
+        .map((option) => ({ value: option.value, label: label(option) })),
+    },
+  ].filter((group) => group.options.length > 0);
+  // A font the picker doesn't offer still shows by its name.
   const named = optionOf(standard, value);
   const current =
-    options.find((option) => option.value === value)?.label ?? (named ? label(named) : value);
+    groups.flatMap((group) => group.options).find((option) => option.value === value)?.label ??
+    (named ? label(named) : value);
   return (
-    <DropdownShell trigger={<span className="text-fg text-sm">{current}</span>}>
+    <DropdownShell trigger={<span className="text-fg truncate text-sm">{current}</span>}>
       {(close) =>
-        options.map((option) => (
-          <OptionRow
-            key={option.value}
-            selected={option.value === value}
-            onClick={() => {
-              onChange(option.value);
-              close();
-            }}
-          >
-            {option.label}
-          </OptionRow>
+        groups.map((group) => (
+          <div key={group.title} role="group" aria-label={group.title}>
+            {groups.length > 1 && (
+              <div className="text-fg-muted px-2 pb-1 pt-2 text-xs font-medium">{group.title}</div>
+            )}
+            {group.options.map((option) => (
+              <OptionRow
+                key={option.value}
+                selected={option.value === value}
+                disabled={option.reason !== undefined}
+                hint={option.reason}
+                onClick={() => {
+                  onChange(option.value);
+                  close();
+                }}
+              >
+                {option.label}
+              </OptionRow>
+            ))}
+          </div>
         ))
       }
     </DropdownShell>
@@ -590,9 +689,9 @@ function Toggle({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
+    <TooltipButton
+      label={title}
+      aria-pressed={active}
       onClick={onClick}
       onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${
@@ -602,7 +701,7 @@ function Toggle({
       }`}
     >
       {children}
-    </button>
+    </TooltipButton>
   );
 }
 
@@ -674,23 +773,13 @@ function FieldControl({
   switch (spec.key) {
     case 'color':
     case 'fontColor':
-      return (
-        <Field label={label(spec)} mixed={mixed}>
-          <SwatchGrid
-            value={value as string}
-            onSelect={(color) => onChange({ [spec.key]: color })}
-          />
-        </Field>
-      );
     case 'interiorColor':
       return (
         <Field label={label(spec)} mixed={mixed}>
           <SwatchGrid
             value={value as string | null}
-            allowTransparent
-            onSelect={(color) =>
-              onChange({ interiorColor: color === 'transparent' ? null : color })
-            }
+            allowTransparent={spec.allowsNone}
+            onSelect={(color) => onChange({ [spec.key]: color === 'transparent' ? null : color })}
           />
         </Field>
       );
@@ -788,6 +877,25 @@ function FieldControl({
           />
         </Field>
       );
+    // The kind the selection becomes: one of its sibling kinds, as the same
+    // annotation (the plugin offers only kinds it can become).
+    case 'subtype':
+      return (
+        <Field label={label(spec)} mixed={mixed}>
+          <div className="flex gap-2">
+            {spec.options.map((option) => (
+              <Toggle
+                key={option.value}
+                title={label(option)}
+                active={!mixed && value === option.value}
+                onClick={() => onChange({ subtype: option.value })}
+              >
+                <Icon name={KIND_ICON[option.value] ?? 'palette'} size={18} />
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+      );
     case 'textAlign': {
       const alignIcon: Record<TextAlign, string> = {
         left: 'alignLeft',
@@ -883,7 +991,7 @@ export function AnnotationStylePanel() {
 
   const hasSel = selection.properties.length > 0;
   const { properties, values, mixed } = hasSel ? selection : tool;
-  // The flags have their own section below, and a redaction's label its own.
+  // The flags aren't styles, and a redaction's label has its own section below.
   const fields = properties.filter(
     (property) => property.control !== 'flag' && property.control !== 'text',
   );
@@ -905,9 +1013,8 @@ export function AnnotationStylePanel() {
     });
   };
 
-  // A selection with no editable fields (e.g. a stamp, or a locked annotation —
-  // its style is frozen) still shows its flags: that's how you unlock it.
-  if (fields.length === 0 && selected.length === 0) return <EmptyState />;
+  // Nothing to edit: no tool with styles, or a selection whose style is frozen (locked).
+  if (fields.length === 0) return <EmptyState />;
 
   const context = hasSel
     ? t('stylePanel.selected', { params: { count: selected.length } })
@@ -943,8 +1050,6 @@ export function AnnotationStylePanel() {
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
-      {/* `/F` flags for whatever is selected — the live flags test surface. */}
-      <AnnotationFlagsSection />
     </div>
   );
 }

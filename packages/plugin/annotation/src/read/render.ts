@@ -15,6 +15,7 @@ import {
   type AnnotationRef,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import {
   RenderToken as RenderHostToken,
   type AppearanceFamily,
@@ -23,9 +24,9 @@ import {
 
 import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationAppearancePicture } from '../host-contract';
-import type { AnnotationState } from '../model';
+import type { AnnotationModel } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { buildTextItems } from '../text-item';
+import { buildTextItem, buildTextItems } from '../text-item';
 import type { Ghost } from '../tools/ghost';
 import type { Stamps } from '../write/stamps';
 
@@ -40,7 +41,12 @@ import type { Stamps } from '../write/stamps';
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc' | 'tryGet'>,
-  { view: { pageModel }, lending }: Pick<AnnotationServices, 'view' | 'lending'>,
+  {
+    view: { pageModel },
+    lending,
+    fonts: fontLookup,
+    textFonts,
+  }: Pick<AnnotationServices, 'view' | 'lending' | 'fonts' | 'textFonts'>,
   ghost: Pick<Ghost, 'itemsOn'>,
   stamps: Pick<Stamps, 'lookOf'>,
 ) {
@@ -48,13 +54,28 @@ export function createRenderReads(
     number,
     {
       model: Model;
-      ghostAt: AnnotationState['ghostAt'];
-      placing: AnnotationState['placing'];
+      ghostAt: AnnotationModel['ghostAt'];
+      placing: AnnotationModel['placing'];
       zoom: number | undefined;
       rotation: number | undefined;
+      fontsEpoch: number;
       v: RenderItem[];
     }
   >();
+  const fonts = () => ctx.tryGet(FontsToken);
+  /**
+   * A hovered redaction's label with the fonts its preview draws it in, as
+   * the engine picks them for the label's font; without the fonts plugin, or
+   * while it finds them, the label's standard font draws it.
+   */
+  const withLabelFonts = (item: RenderItem): RenderItem => {
+    if (!item.hovered || !item.label) return item;
+    const labelFonts = fonts()?.getPaintFonts(
+      item.text?.fontFamily ?? 'helvetica',
+      item.label.text,
+    );
+    return labelFonts ? { ...item, label: { ...item.label, fonts: labelFonts } } : item;
+  };
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
@@ -63,6 +84,7 @@ export function createRenderReads(
     const state = ctx.state.get();
     const ghostAt = state.ghostAt?.page.objectNumber === pageObjectNumber ? state.ghostAt : null;
     const placing = state.placing?.page.objectNumber === pageObjectNumber ? state.placing : null;
+    const fontsEpoch = fonts()?.getPaintFontsEpoch() ?? 0;
     const cached = itemsCache.get(pageObjectNumber);
     if (
       cached &&
@@ -70,13 +92,14 @@ export function createRenderReads(
       cached.ghostAt === ghostAt &&
       cached.placing === placing &&
       cached.zoom === view?.zoom &&
-      cached.rotation === view?.rotation
+      cached.rotation === view?.rotation &&
+      cached.fontsEpoch === fontsEpoch
     )
       return cached.v;
     // The tool's ghost and a sibling's placement paint on top, as the
     // annotations they will be (tools/ghost.ts).
     const items = [
-      ...corePageItems(model, page, view),
+      ...corePageItems(model, page, view).map(withLabelFonts),
       ...ghost.itemsOn(pageObjectNumber, model, view),
     ];
     itemsCache.set(pageObjectNumber, {
@@ -85,6 +108,7 @@ export function createRenderReads(
       placing,
       zoom: view?.zoom,
       rotation: view?.rotation,
+      fontsEpoch,
       v: items,
     });
     return items;
@@ -92,27 +116,67 @@ export function createRenderReads(
 
   const textsCache = new Map<
     number,
-    { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
+    {
+      model: Model;
+      zoom: number | undefined;
+      rotation: number | undefined;
+      fonts: object;
+      v: TextItem[];
+    }
   >();
   const textItemsOf = (page: PageRef, view?: ViewEnv): TextItem[] => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
+    const fonts = textFonts.version();
     const cached = textsCache.get(pageObjectNumber);
     if (
       cached &&
       cached.model === model &&
       cached.zoom === view?.zoom &&
-      cached.rotation === view?.rotation
+      cached.rotation === view?.rotation &&
+      cached.fonts === fonts
     )
       return cached.v;
-    const items = buildTextItems(model, page, view);
+    const items = buildTextItems(model, page, view, { lookup: fontLookup, text: textFonts });
     textsCache.set(pageObjectNumber, {
       model: model,
       zoom: view?.zoom,
       rotation: view?.rotation,
+      fonts,
       v: items,
     });
     return items;
+  };
+
+  // One free text's item whatever its state, for a renderer that draws the
+  // box itself: the page list has only live text. Memoized by its page's
+  // slice of the model, like the list.
+  const textCache = new Map<
+    string,
+    {
+      model: Model;
+      zoom: number | undefined;
+      rotation: number | undefined;
+      fonts: object;
+      v: TextItem | null;
+    }
+  >();
+  const textItemOf = (ref: AnnotationRef, view?: ViewEnv): TextItem | null => {
+    const key = annotationKey(ref);
+    const model = pageModel(ref.page.objectNumber);
+    const fonts = textFonts.version();
+    const cached = textCache.get(key);
+    if (
+      cached &&
+      cached.model === model &&
+      cached.zoom === view?.zoom &&
+      cached.rotation === view?.rotation &&
+      cached.fonts === fonts
+    )
+      return cached.v;
+    const item = buildTextItem(model, key, view, { lookup: fontLookup, text: textFonts });
+    textCache.set(key, { model, zoom: view?.zoom, rotation: view?.rotation, fonts, v: item });
+    return item;
   };
 
   // The navigation plane's feed: clickable link areas per page — standalone
@@ -162,6 +226,7 @@ export function createRenderReads(
   const api = {
     listPageItems: (page: PageRef, view?: ViewEnv) => pageItemsOf(page, view),
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
+    getTextItem: (ref: AnnotationRef, view?: ViewEnv) => textItemOf(ref, view),
     listLinkItems: (page: PageRef) => linkItemsOf(page.objectNumber),
     getAppearanceEpoch: (page: PageRef) => {
       const { engine, placed, lent } = epochOf(page);
@@ -227,7 +292,7 @@ export function createRenderReads(
     return {
       engine,
       placed: placed.sort().join('|'),
-      lent: lentShown && lender ? `lent:${lender.pictureEpoch(page)}` : '',
+      lent: lentShown && lender ? `lent:${lender.getPictureEpoch(page)}` : '',
     };
   };
 
@@ -268,7 +333,7 @@ export function createRenderReads(
 
   /** The engine's last pictures of a record, kept a while after it left its page. */
   const keptOf = (id: string, ref: AnnotationRef) =>
-    ctx.tryGet(RenderHostToken)?.keptAppearances(familyOf(id), ref) ?? [];
+    ctx.tryGet(RenderHostToken)?.getKeptAppearances(familyOf(id), ref) ?? [];
 
   /**
    * The pictures of what shows on `page` that the engine hasn't written yet:

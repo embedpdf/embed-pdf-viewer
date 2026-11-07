@@ -41,14 +41,22 @@ const ruleMatches = (rule: ResponsiveRule, box: StageBox): boolean =>
 
 /**
  * Merge a patch over settings, skipping undefined values (Partial semantics).
- * Each value replaces the setting whole; a `pageFrame` that names only some
- * sides reserves 0 on the others.
+ * Each value replaces the setting whole; a `pageFrame` or a `padding` that names
+ * only some sides has 0 on the others, and a `zoomBox` that names only some
+ * colors leaves the others following the accent.
  */
 export const mergeSettings = (into: StageSettings, patch: StageSettingsPatch): StageSettings => {
   const merged = { ...into };
   let key: keyof StageSettingsPatch;
   for (key in patch) {
-    const value = key === 'pageFrame' ? frameOf(patch.pageFrame) : patch[key];
+    const value =
+      key === 'pageFrame'
+        ? frameOf(patch.pageFrame)
+        : key === 'padding'
+          ? paddingOf(patch.padding)
+          : key === 'zoomBox'
+            ? zoomBoxOf(patch.zoomBox)
+            : patch[key];
     if (value !== undefined) Object.assign(merged, { [key]: value });
   }
   return merged;
@@ -56,6 +64,14 @@ export const mergeSettings = (into: StageSettings, patch: StageSettingsPatch): S
 
 const frameOf = (frame: StageSettingsPatch['pageFrame']) =>
   frame === undefined ? undefined : { ...NO_FRAME, ...frame };
+
+const paddingOf = (padding: StageSettingsPatch['padding']) =>
+  padding === undefined || typeof padding === 'number'
+    ? padding
+    : { top: 0, right: 0, bottom: 0, left: 0, ...padding };
+
+const zoomBoxOf = (look: StageSettingsPatch['zoomBox']) =>
+  look === undefined ? undefined : { fill: look.fill ?? null, stroke: look.stroke ?? null };
 
 /**
  * Setting-value equality: primitives by identity, the flat objects the

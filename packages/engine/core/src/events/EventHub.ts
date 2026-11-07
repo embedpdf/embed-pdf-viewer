@@ -18,12 +18,12 @@ import { subscribeToType, type DocumentEventStream } from './DocumentEventStream
  *   - error isolation: a throwing listener is re-thrown on a microtask
  *     (so it surfaces to the host's unhandled-error reporting) without
  *     blocking other listeners or failing the mutation path;
- *   - `lastServerId` tracks the highest remote cursor seen, for the
+ *   - `lastServerSequence` tracks the highest remote cursor seen, for the
  *     remote channel's reconnect/backfill.
  */
 export class EventHub implements DocumentEventStream {
   private readonly listeners = new Set<(event: DocumentEvent) => void>();
-  private serverId: number | null = null;
+  private latestSequence: number | null = null;
 
   constructor(
     /** Where a throwing listener's error goes. Defaults to an async
@@ -53,9 +53,12 @@ export class EventHub implements DocumentEventStream {
     // Transport notices (`stream.desynced`) carry no origin; only mutation
     // events advance the server cursor.
     if ('origin' in event) {
-      const { serverId } = event.origin;
-      if (serverId !== null) {
-        this.serverId = this.serverId === null ? serverId : Math.max(this.serverId, serverId);
+      const { serverSequence } = event.origin;
+      if (serverSequence !== null) {
+        this.latestSequence =
+          this.latestSequence === null
+            ? serverSequence
+            : Math.max(this.latestSequence, serverSequence);
       }
     }
     // Snapshot so a listener that (un)subscribes mid-fan-out cannot skew
@@ -69,8 +72,8 @@ export class EventHub implements DocumentEventStream {
     }
   }
 
-  lastServerId(): number | null {
-    return this.serverId;
+  lastServerSequence(): number | null {
+    return this.latestSequence;
   }
 
   /** Drop every listener (handle close). Idempotent. */
@@ -82,10 +85,13 @@ export class EventHub implements DocumentEventStream {
 /**
  * Stamps provenance onto events a mutation path produces. One per open
  * handle: the engine shell constructs it with the instance's `sessionId`
- * (and, on cloud, the authenticated `sub` when known) and hands it to the
+ * (and, on cloud, the authenticated `subject` when known) and hands it to the
  * mutation services — they publish results, never build origins.
  */
 export class SessionEventPublisher {
+  /** Writes that changed the document's fonts, by `opId`, until their events are published. */
+  private readonly fontsChangedBy = new Set<string>();
+
   constructor(
     private readonly hub: EventHub,
     private readonly sessionId: string,
@@ -93,12 +99,38 @@ export class SessionEventPublisher {
   ) {}
 
   /**
+   * The write `opId` changed the fonts that can be named in the document (the
+   * engine said so): its events end with `fonts.changed` when published.
+   */
+  noteFontsChanged(opId: string): void {
+    this.fontsChangedBy.add(opId);
+  }
+
+  /**
    * Publish what one write of this session just committed: one
    * event per fact, in order, all carrying the write's `opId` as
-   * `origin.tx`.
+   * `origin.transaction`.
    */
   publishWrite(opId: string, ...events: DocumentEventInit[]): void {
     this.publishChange(opId, events);
+  }
+
+  /**
+   * Publish a fact no write of this session carries (the local engine's
+   * fonts changed, which changes every open document's list): stamped like
+   * a write's events, with no `transaction`.
+   */
+  publishFact(event: DocumentEventInit): void {
+    this.hub.publish({
+      ...event,
+      origin: {
+        kind: 'local',
+        sessionId: this.sessionId,
+        subject: this.sub,
+        at: new Date().toISOString(),
+        serverSequence: null,
+      },
+    } as DocumentEvent);
   }
 
   /**
@@ -106,17 +138,20 @@ export class SessionEventPublisher {
    * does, and for an undo, the `opId` of the change it undid.
    */
   publishChange(opId: string, events: readonly DocumentEventInit[], undoOf?: string): void {
-    const ts = Date.now();
-    events.forEach((event, index) => {
+    const at = new Date().toISOString();
+    const all: readonly DocumentEventInit[] = this.fontsChangedBy.delete(opId)
+      ? [...events, { type: 'fonts.changed' }]
+      : events;
+    all.forEach((event, index) => {
       this.hub.publish({
         ...event,
         origin: {
           kind: 'local',
           sessionId: this.sessionId,
-          sub: this.sub,
-          ts,
-          serverId: null,
-          tx: { id: opId, index, count: events.length },
+          subject: this.sub,
+          at,
+          serverSequence: null,
+          transaction: { id: opId, index, count: all.length },
           ...(undoOf !== undefined ? { undoOf } : {}),
         },
       } as DocumentEvent);

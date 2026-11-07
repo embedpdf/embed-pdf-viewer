@@ -5,35 +5,34 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { formPlugin } from '@embedpdf/svelte/form';
-  import { stampPlugin } from '@embedpdf/svelte/stamp';
-  import { createTestSigner, signaturePlugin } from '@embedpdf/svelte/signature';
+  import { signaturePlugin } from '@embedpdf/svelte/signature';
   import { cloudEngine } from '@cloudpdf/engine';
-import { localEngine } from '@embedpdf/engine';
   import WarningBar from './WarningBar.svelte';
 
   import '../break-warning.css';
 
   const engine = cloudEngine();
-  const assetEngine = localEngine();
-  const signer = createTestSigner({ commonName: 'Ada Lovelace' });
+
+  // The certificate Lanternfield signed the agreement with, published next to it. Trusting it is
+  // what makes the signature read 'valid'; your app trusts its own certificates the same way.
+  const lanternfieldCertificate = async () => {
+    const response = await fetch('/pdfs/agreement.cer');
+    return new Uint8Array(await response.arrayBuffer());
+  };
+
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
     annotationPlugin(),
     formPlugin(),
-    stampPlugin({ assetEngine }),
-    signaturePlugin({
-      key: () => signer,
-      // Trust the demo key itself, so its signature checks out as 'valid'.
-      trust: { anchors: async () => [(await signer).certificate] },
-    }),
+    signaturePlugin({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: agreement }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

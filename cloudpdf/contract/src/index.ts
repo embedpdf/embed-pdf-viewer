@@ -1,11 +1,13 @@
+import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
+  closed,
+  IsoDateTimeSchema,
   ChangeRequestSchema,
   ChangeResponseSchema,
   PageScaleInputSchema,
   PageScaleResultSchema,
   PageMeasurementViewportListSchema,
 } from '@embedpdf/engine-core/wire';
-import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
@@ -18,7 +20,8 @@ import {
   DocumentManifestSchema,
   CustomMetadataSchema,
   DocumentMetadataSchema,
-  EngineErrorPayloadSchema,
+  DocumentOutlineSchema,
+  ErrorResponseSchema,
   FormResetBodySchema,
   FormWidgetDeleteResultSchema,
   FormWidgetUpdateBodySchema,
@@ -30,30 +33,38 @@ import {
   FormResetResultSchema,
   FormSetValueResultSchema,
   FormSnapshotSchema,
+  FontListSchema,
+  FontProgramInfoSchema,
+  FontResolutionSchema,
+  FontResolveRequestSchema,
+  IdentityInputSchema,
   IdentitySchema,
-  PageDeleteResultSchema,
   PageFlattenResultSchema,
-  PageInsertResultSchema,
-  PageReorderInputSchema,
-  PageReorderResultSchema,
   PageNameResultSchema,
-  PageRotateResultSchema,
   RedactionApplyResultSchema,
-  RedactionApplyScopeSchema,
+  RedactionApplyScopeInputSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
-  DocumentVersionsSchema,
+  LayerVersionsSchema,
   SignatureCancelResultSchema,
   SignatureCompleteBodySchema,
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
   SignatureSnapshotSchema,
+  AttachmentListSchema,
   wireTemplates,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
 
 const sha256Hex = /^[0-9a-f]{64}$/i;
 const docIdPattern = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * A point in time a request gives: ISO 8601 with its offset (`Z` or
+ * `±HH:mm`), as every response says one. Without an offset the moment would
+ * depend on the server's zone, so it's refused.
+ */
+const InstantInputSchema = z.string().datetime({ offset: true });
 /**
  * Tenant ids share the doc-id charset: URL-safe by construction, since
  * they appear in every tenant-scoped path (and therefore in logs — do
@@ -80,8 +91,20 @@ const originPatternArray = z
   )
   .min(1)
   .max(32);
-/** Share tokens are the grant row id: `shr_` + 24 url-safe random chars. */
-const shareTokenPattern = /^shr_[A-Za-z0-9_-]{24}$/;
+/**
+ * A grant's id: `grt_` + 24 url-safe random chars. Grants made before the rename are `shr_…`
+ * and keep working.
+ */
+const grantIdPattern = /^(grt|shr)_[A-Za-z0-9_-]{24}$/;
+
+/** What a grant is called in the dashboard, for example "Website" or "Sent to Acme". */
+const grantNameSchema = z.string().trim().min(1).max(100);
+
+/** A query-string flag, `true` or `false`. */
+const queryFlag = z.preprocess(
+  (value) => (value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean(),
+);
 
 /**
  * Wire paths. The URL carries the full resource identity — tenant
@@ -107,23 +130,29 @@ export const adminWirePaths = {
   /** The warmed dashboard-tile artifact. Returns 404 while `pending`/`locked`. */
   documentThumbnail: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/thumbnail`,
+  folders: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/folders`,
+  folder: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}`,
+  folderMoveInto: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}/move-into`,
   tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
-  shares: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/shares`,
-  share: (tenantId: string, shareId: string) =>
-    `/v1/tenants/${encodeURIComponent(tenantId)}/shares/${encodeURIComponent(shareId)}`,
+  grants: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/grants`,
+  grant: (tenantId: string, grantId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/grants/${encodeURIComponent(grantId)}`,
   tenantUsage: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/usage`,
   tenantSuspend: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/suspend`,
   tenantResume: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/resume`,
   /**
-   * The public share-session exchange. Deliberately outside any tenant
-   * subtree: the caller holds only a share token and does not know the
+   * The public grant-session exchange. Deliberately outside any tenant
+   * subtree: the caller holds only a grant's id and does not know the
    * tenant — the grant row resolves it server-side.
    */
-  shareSessions: '/v1/share-sessions',
+  grantSessions: '/v1/grant-sessions',
   /** Deployment-global singletons: API-token only, no tenant context. */
   deploymentLicenseStatus: '/v1/deployment/license/status',
+  deploymentModules: '/v1/deployment/modules',
 } as const;
 
 export const DedupModeSchema = z
@@ -136,35 +165,75 @@ export type DedupMode = z.infer<typeof DedupModeSchema>;
 export const UploadPreferenceSchema = z.enum(['auto', 'presigned', 'proxy']);
 export type UploadPreference = z.infer<typeof UploadPreferenceSchema>;
 
-export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleting']);
+export const DocumentStateSchema = closed(z.enum(['pending', 'ready', 'failed', 'deleting']));
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
+
+/** Any text a person can read: no control characters, no leading or trailing whitespace. */
+const readableNamePattern =
+  // eslint-disable-next-line no-control-regex -- excluding control characters is its job
+  /^[^\s\u0000-\u001F\u007F](?:[^\u0000-\u001F\u007F]*[^\s\u0000-\u001F\u007F])?$/u;
+
+export const DocumentNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(readableNamePattern)
+  .describe(
+    'What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique.',
+  );
+
+const folderIdPattern = /^fld_[0-9a-f]{24}$/;
+/** A folder id, or `root` for the top level, which has no folder of its own. */
+const folderPlacePattern = /^(root|fld_[0-9a-f]{24})$/;
+
+export const FolderPlaceSchema = z
+  .string()
+  .regex(folderPlacePattern)
+  .describe('A folder id, or root for the top level.');
+
+export const FolderNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(readableNamePattern)
+  .describe(
+    "What people call the folder: 1 to 255 characters, no control characters, no leading or trailing whitespace, and unique among the folder's siblings, ignoring case.",
+  );
 
 export const AdminDocumentRecordSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
+  name: z.string(),
+  folderId: z.string().describe('The folder the document is in, or root.'),
   state: DocumentStateSchema,
-  baseSha: z.string().nullable(),
-  storageSizeBytes: z.number().nullable(),
+  baseSha256: z.string().nullable(),
+  /** The size of the PDF, in bytes; null until its upload is committed. */
+  sizeBytes: z.number().int().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
   idempotencyKey: z.string().nullable(),
   failureReason: z.string().nullable(),
-  /** Dashboard tile lifecycle. Optional because older servers omit these fields. */
-  thumbnailState: z.enum(['pending', 'ready', 'locked', 'failed']).optional(),
-  thumbnailUrl: z.string().nullable().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
+  /** Dashboard tile lifecycle. */
+  thumbnailState: closed(z.enum(['pending', 'ready', 'locked', 'failed'])),
+  /** Where to fetch the tile once `thumbnailState` is `ready`; null before. */
+  thumbnailUrl: z.string().nullable(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
   createdBy: z.string().nullable(),
 });
 export type AdminDocumentRecord = z.infer<typeof AdminDocumentRecordSchema>;
 
 export const AdminDocumentInitRequestSchema = z.object({
-  contentLength: z.number().finite().min(1),
+  sizeBytes: z.number().int().min(1),
   contentSha256: z.string().regex(sha256Hex),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
   docId: z.string().regex(docIdPattern).optional(),
-  uploadTtlSec: z.number().finite().min(60).max(3600).optional(),
+  uploadTtlSeconds: z.number().int().min(60).max(3600).optional(),
   uploadPreference: UploadPreferenceSchema.optional(),
 });
 export type AdminDocumentInitRequest = z.infer<typeof AdminDocumentInitRequestSchema>;
@@ -172,41 +241,46 @@ export type AdminDocumentInitRequest = z.infer<typeof AdminDocumentInitRequestSc
 export const AdminPresignedUploadSchema = z.object({
   url: z.string(),
   headers: z.record(z.string(), z.string()),
-  method: z.literal('PUT'),
-  expiresAt: z.number(),
+  method: closed(z.literal('PUT')),
+  /** When the URL stops taking the upload. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type AdminPresignedUpload = z.infer<typeof AdminPresignedUploadSchema>;
 
-export const AdminInitUploadSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('presigned'),
-    presigned: AdminPresignedUploadSchema,
-    key: z.string(),
-  }),
-  z.object({
-    kind: z.literal('proxy'),
-    url: z.string(),
-    key: z.string(),
-  }),
-]);
+export const AdminInitUploadSchema = closed(
+  z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('presigned'),
+      presigned: AdminPresignedUploadSchema,
+      key: z.string(),
+    }),
+    z.object({
+      kind: z.literal('proxy'),
+      url: z.string(),
+      key: z.string(),
+    }),
+  ]),
+);
 export type AdminInitUpload = z.infer<typeof AdminInitUploadSchema>;
 
-export const AdminDocumentInitResponseSchema = z.discriminatedUnion('tag', [
-  z.object({
-    tag: z.literal('created'),
-    document: AdminDocumentRecordSchema,
-    upload: AdminInitUploadSchema,
-  }),
-  z.object({
-    tag: z.literal('resumed'),
-    document: AdminDocumentRecordSchema,
-    upload: AdminInitUploadSchema,
-  }),
-  z.object({
-    tag: z.literal('deduped'),
-    document: AdminDocumentRecordSchema,
-  }),
-]);
+export const AdminDocumentInitResponseSchema = closed(
+  z.discriminatedUnion('status', [
+    z.object({
+      status: z.literal('created'),
+      document: AdminDocumentRecordSchema,
+      upload: AdminInitUploadSchema,
+    }),
+    z.object({
+      status: z.literal('resumed'),
+      document: AdminDocumentRecordSchema,
+      upload: AdminInitUploadSchema,
+    }),
+    z.object({
+      status: z.literal('deduped'),
+      document: AdminDocumentRecordSchema,
+    }),
+  ]),
+);
 export type AdminDocumentInitResponse = z.infer<typeof AdminDocumentInitResponseSchema>;
 
 export const AdminDocumentCommitRequestSchema = z.object({
@@ -322,6 +396,10 @@ export const AdminDocumentImportRequestSchema = z.object({
     .describe(
       'Integrity pins, enforced when present. When absent, the server-observed values become authoritative.',
     ),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z
     .string()
@@ -357,7 +435,7 @@ export const AdminDocumentImportResponseSchema = z.object({
    * `accepted` — async: the job is queued (HTTP 202); poll the
    * document until `ready` or `failed`.
    */
-  tag: z.enum(['imported', 'deduped', 'accepted']),
+  status: closed(z.enum(['imported', 'deduped', 'accepted'])),
   document: AdminDocumentRecordSchema,
 });
 export type AdminDocumentImportResponse = z.infer<typeof AdminDocumentImportResponseSchema>;
@@ -367,14 +445,32 @@ export const AdminDocumentResponseSchema = z.object({
 });
 export type AdminDocumentResponse = z.infer<typeof AdminDocumentResponseSchema>;
 
+export const AdminDocumentUpdateRequestSchema = z.object({
+  name: DocumentNameSchema,
+});
+export type AdminDocumentUpdateRequest = z.infer<typeof AdminDocumentUpdateRequestSchema>;
+
 export const ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT = 100;
 export const ADMIN_DOCUMENT_LIST_MAX_LIMIT = 200;
+
+export const DocumentListSortSchema = z
+  .enum(['createdAt', 'name', 'size'])
+  .describe('createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending).');
+export type DocumentListSort = z.infer<typeof DocumentListSortSchema>;
+
+export const ListOrderSchema = z
+  .enum(['asc', 'desc'])
+  .describe(
+    'Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise.',
+  );
+export type ListOrder = z.infer<typeof ListOrderSchema>;
 
 /**
  * Query parameters for `documents.list`. `limit` arrives as a string on
  * the wire, hence the coercion; values outside [1, max] are a validation
  * error, not a silent clamp. `cursor` is an opaque continuation token
- * from a previous page's `nextCursor` — clients must not parse it.
+ * from a previous page's `nextCursor` — clients must not parse it, and it
+ * only continues the `sort` and `order` it was made with.
  */
 export const AdminDocumentListQuerySchema = z.object({
   limit: z.coerce
@@ -384,49 +480,109 @@ export const AdminDocumentListQuerySchema = z.object({
     .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
     .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
   cursor: z.string().min(1).optional(),
-  state: DocumentStateSchema.optional(),
+  state: DocumentStateSchema.describe(
+    'Only documents in this state. Without it, every state except deleting.',
+  ).optional(),
+  q: z
+    .string()
+    .min(1)
+    .max(255)
+    .describe('Only documents whose name contains this text, ignoring case.')
+    .optional(),
+  folderId: FolderPlaceSchema.describe(
+    'Only documents directly in this folder (root: the top level). Without it, documents in every folder.',
+  ).optional(),
+  sort: DocumentListSortSchema.default('createdAt'),
+  order: ListOrderSchema.optional(),
 });
 export type AdminDocumentListQuery = z.infer<typeof AdminDocumentListQuerySchema>;
 
 export const AdminDocumentListResponseSchema = z.object({
   documents: z.array(AdminDocumentRecordSchema),
-  /**
-   * Opaque cursor for the next page; `null` on the last page. Optional
-   * because pre-pagination servers omit it — clients treat absence as
-   * "no continuation available", same convention as the thumbnail fields.
-   */
-  nextCursor: z.string().nullable().optional(),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
 });
 export type AdminDocumentListResponse = z.infer<typeof AdminDocumentListResponseSchema>;
+
+export const FolderRecordSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  parentId: z.string().describe('The folder it is in, or root.'),
+  name: z.string(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+  createdBy: z.string().nullable(),
+});
+export type FolderRecord = z.infer<typeof FolderRecordSchema>;
+
+export const FolderResponseSchema = z.object({
+  folder: FolderRecordSchema,
+});
+export type FolderResponse = z.infer<typeof FolderResponseSchema>;
+
+export const FolderGetResponseSchema = z.object({
+  folder: FolderRecordSchema,
+  path: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .describe(
+      'The folders above this one, from the top level down. Neither root nor the folder itself.',
+    ),
+});
+export type FolderGetResponse = z.infer<typeof FolderGetResponseSchema>;
+
+export const FolderCreateRequestSchema = z.object({
+  name: FolderNameSchema,
+  /** Defaults to root. */
+  parentId: FolderPlaceSchema.optional(),
+});
+export type FolderCreateRequest = z.infer<typeof FolderCreateRequestSchema>;
+
+export const FolderUpdateRequestSchema = z.object({
+  name: FolderNameSchema,
+});
+export type FolderUpdateRequest = z.infer<typeof FolderUpdateRequestSchema>;
+
+/** Query parameters for `folders.list`, which orders folders by name. */
+export const FolderListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  parentId: FolderPlaceSchema.describe(
+    'Only the folders directly in this folder (root: the top level). Without it, every folder.',
+  ).optional(),
+});
+export type FolderListQuery = z.infer<typeof FolderListQuerySchema>;
+
+export const FolderListResponseSchema = z.object({
+  folders: z.array(FolderRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+});
+export type FolderListResponse = z.infer<typeof FolderListResponseSchema>;
+
+export const FolderDeleteQuerySchema = z.object({
+  recursive: queryFlag
+    .describe('true deletes everything in the folder too. Never the default.')
+    .optional(),
+});
+export type FolderDeleteQuery = z.infer<typeof FolderDeleteQuerySchema>;
+
+export const FOLDER_MOVE_MAX_IDS = 1000;
+
+export const FolderMoveIntoRequestSchema = z.object({
+  docIds: z.array(z.string().regex(docIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+  folderIds: z.array(z.string().regex(folderIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+});
+export type FolderMoveIntoRequest = z.infer<typeof FolderMoveIntoRequestSchema>;
 
 export const AdminUploadProxyResponseSchema = z.object({
   sha256: z.string().regex(sha256Hex),
 });
 export type AdminUploadProxyResponse = z.infer<typeof AdminUploadProxyResponseSchema>;
-
-export const AdminErrorPayloadSchema = z.object({
-  error: z.object({
-    code: z.string(),
-    message: z.string(),
-  }),
-});
-export type AdminErrorPayload = z.infer<typeof AdminErrorPayloadSchema>;
-
-/**
- * The thumbnail route's 404 while the warmed artifact is `pending`,
- * `locked`, or `failed` — the standard error envelope plus the tile
- * state so dashboards can render the right placeholder.
- */
-export const AdminThumbnailUnavailablePayloadSchema = z.object({
-  error: z.object({
-    code: z.string(),
-    message: z.string(),
-    state: z.string(),
-  }),
-});
-export type AdminThumbnailUnavailablePayload = z.infer<
-  typeof AdminThumbnailUnavailablePayloadSchema
->;
 
 export const AdminTenantParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
@@ -435,9 +591,72 @@ export type AdminTenantParams = z.infer<typeof AdminTenantParamsSchema>;
 
 export const AdminTenantDocParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
-  id: z.string().regex(docIdPattern),
+  docId: z.string().regex(docIdPattern),
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
+
+export const AdminTenantFolderParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: z.string().regex(folderIdPattern),
+});
+export type AdminTenantFolderParams = z.infer<typeof AdminTenantFolderParamsSchema>;
+
+/** A destination: any folder, or root. */
+export const AdminTenantFolderPlaceParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: FolderPlaceSchema,
+});
+export type AdminTenantFolderPlaceParams = z.infer<typeof AdminTenantFolderPlaceParamsSchema>;
+
+export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend({
+  layerName: z.string().min(1).max(256),
+});
+export type AdminTenantDocLayerParams = z.infer<typeof AdminTenantDocLayerParamsSchema>;
+
+/**
+ * A layer that holds changes: one a grant or your tokens name, or a
+ * grant visitor's own. A layer appears at its first change, and a
+ * deleted one is no longer listed. Read and download it with the API token
+ * through `/v1/docs/{docId}/layers/{layerName}`.
+ */
+export const AdminLayerRecordSchema = z.object({
+  docId: z.string(),
+  layerName: z.string(),
+  /** The grant whose visitor made it (the grant may since be deleted); null otherwise. */
+  grantId: z.string().nullable(),
+  /** That visitor; null for a layer a grant or token names. */
+  visitorId: z.string().nullable(),
+  /** Bytes the layer stores: its changes over the document, not the whole PDF. */
+  sizeBytes: z.number().int().nullable(),
+  /** Its first change. */
+  createdAt: IsoDateTimeSchema,
+  /** Its last change. */
+  updatedAt: IsoDateTimeSchema,
+  /** A visitor's layer: when the visitor last opened it; null otherwise. */
+  lastSeenAt: IsoDateTimeSchema.nullable(),
+});
+export type AdminLayerRecord = z.infer<typeof AdminLayerRecordSchema>;
+
+/** Query parameters for `documents.layers.list`, as for the other lists. */
+export const AdminDocumentLayerListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  /** Only the layers this grant's visitors made, a deleted grant's too. */
+  grantId: z.string().regex(grantIdPattern).optional(),
+});
+export type AdminDocumentLayerListQuery = z.infer<typeof AdminDocumentLayerListQuerySchema>;
+
+export const AdminDocumentLayerListResponseSchema = z.object({
+  layers: z.array(AdminLayerRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+});
+export type AdminDocumentLayerListResponse = z.infer<typeof AdminDocumentLayerListResponseSchema>;
 
 export const AdminTenantJtiParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
@@ -449,25 +668,43 @@ export const AdminTokenRevokeRequestSchema = z.object({
   /** Optional human reason, written to the audit row. */
   reason: z.string().max(1024).optional(),
   /**
-   * The token's `exp` (unix seconds); the revocation row is garbage-collected
-   * once the token would have expired anyway. Defaults server-side to
-   * now + 30 days.
+   * When the token expires (its `exp`); the revocation row is
+   * garbage-collected once the token would have expired anyway. Defaults
+   * server-side to 30 days from now.
    */
-  expiresAtSeconds: z.number().int().positive().optional(),
+  expiresAt: InstantInputSchema.optional(),
 });
 export type AdminTokenRevokeRequest = z.infer<typeof AdminTokenRevokeRequestSchema>;
 
 /**
  * License/reporting/usage passthrough. The inner shapes belong to the
  * licensing runtime and are surfaced as-is; they tighten to full
- * schemas when the licensing contract stabilizes.
+ * schemas when the licensing contract stabilizes. Each is always there:
+ * `reporting` is null without a usage reporter, `usage` without meters.
  */
 export const AdminLicenseStatusResponseSchema = z.object({
-  license: z.unknown(),
-  reporting: z.unknown().nullable(),
-  usage: z.unknown().nullable(),
+  license: z.record(z.string(), z.unknown()),
+  reporting: z.record(z.string(), z.unknown()).nullable(),
+  usage: z.record(z.string(), z.unknown()).nullable(),
 });
 export type AdminLicenseStatusResponse = z.infer<typeof AdminLicenseStatusResponseSchema>;
+
+/**
+ * One server module a tenant may use, named by the module's id. A
+ * module's routes answer only tenants whose `features` hold it.
+ * `stopped` keeps the feature but stops its routes (`402`): `'cap'` is
+ * a spending cap reached, set by whoever bills the tenant; the server
+ * keeps no caps itself.
+ */
+export const TenantFeatureSchema = z.object({
+  /** The module's id: lowercase words joined by `-`. */
+  id: z
+    .string()
+    .max(64)
+    .regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/),
+  stopped: closed(z.enum(['cap'])).optional(),
+});
+export type TenantFeature = z.infer<typeof TenantFeatureSchema>;
 
 export const AdminTenantRecordSchema = z.object({
   id: z.string(),
@@ -476,14 +713,33 @@ export const AdminTenantRecordSchema = z.object({
   autoProvisioned: z.boolean(),
   /**
    * `suspended` tenants fail closed: every tenant JWT, doc JWT, and
-   * share exchange is refused until resume. The API token is exempt —
+   * grant exchange is refused until resume. The API token is exempt —
    * the operator must be able to inspect, resume, or delete a
    * suspended tenant. Optional because older servers omit it.
    */
-  status: z.enum(['active', 'suspended']).optional(),
-  createdAt: z.number(),
+  status: closed(z.enum(['active', 'suspended'])).optional(),
+  /**
+   * The server modules this tenant may use; empty for a new tenant.
+   * Optional because older servers omit it.
+   */
+  features: z.array(TenantFeatureSchema).optional(),
+  createdAt: IsoDateTimeSchema,
 });
 export type AdminTenantRecord = z.infer<typeof AdminTenantRecordSchema>;
+
+export const AdminTenantUpdateRequestSchema = z.object({
+  /**
+   * The tenant's whole list, replacing the one it had: `[]` turns every
+   * module off. Each id must name a module the server has installed.
+   */
+  features: z
+    .array(TenantFeatureSchema)
+    .max(64)
+    .refine((features) => new Set(features.map((f) => f.id)).size === features.length, {
+      message: 'a feature is listed once',
+    }),
+});
+export type AdminTenantUpdateRequest = z.infer<typeof AdminTenantUpdateRequestSchema>;
 
 export const AdminTenantCreateRequestSchema = z.object({
   id: z.string().regex(tenantIdPattern),
@@ -518,7 +774,7 @@ export type AdminTenantListQuery = z.infer<typeof AdminTenantListQuerySchema>;
 export const AdminTenantListResponseSchema = z.object({
   tenants: z.array(AdminTenantRecordSchema),
   /** Opaque cursor for the next page; `null` on the last page. */
-  nextCursor: z.string().nullable().optional(),
+  nextCursor: z.string().nullable(),
 });
 export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSchema>;
 
@@ -532,18 +788,36 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * creation), revocation leaking is an availability risk (mass session
  * kill). Different failure directions, different scopes.
  *
- * `shares.manage` covers the whole share-grant lifecycle with one
+ * `grants.manage` covers the whole grant lifecycle with one
  * scope: a grant is a standing mint capability, so creating and
  * revoking it are the same trust decision — unlike ephemeral tokens,
  * where issue and revoke fail in different directions.
+ *
+ * The `docs.*` scopes are create, read, update and delete over the
+ * records of the tenant's documents and folders: names, folders, sizes,
+ * states. `docs.update` renames and moves; `docs.delete` stays separate
+ * because its failure direction is loss. No `docs.*` scope reaches what is
+ * inside a document.
+ *
+ * Everything inside a document, reading included, takes document
+ * permissions in the doc-token vocabulary (capabilities, collab scopes,
+ * `pdf.permissions`). A doc JWT carries them for one document; a tenant JWT
+ * may carry them next to its tenant scopes, and then they hold for every
+ * document of the tenant. That includes the two collection calls that hand
+ * out content: the original file needs `doc.download`, the thumbnail
+ * `doc.render`. `tokens.issue-doc` and `grants.manage` hand out only the
+ * document permissions the token holds itself (`scopeNotCovered` in
+ * engine-core): next to `doc.open` and `doc.render` they make reading
+ * tokens and reading grants, and nothing more.
  */
 export const adminTenantScopes = [
   'docs.create',
   'docs.read',
+  'docs.update',
   'docs.delete',
   'tokens.issue-doc',
   'tokens.revoke',
-  'shares.manage',
+  'grants.manage',
 ] as const;
 export type AdminTenantScope = (typeof adminTenantScopes)[number];
 
@@ -556,7 +830,8 @@ export const AdminTokenIssueDocRequestSchema = z.object({
   /**
    * Doc capability scopes (`doc.open`, `doc.render`, …, plus the
    * collab grammar). Validated server-side against the engine's scope
-   * vocabulary — an unknown string rejects the whole request.
+   * vocabulary — an unknown string rejects the whole request. A tenant
+   * token gives only document permissions it holds itself.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /**
@@ -564,7 +839,7 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    * open time. `displayName` becomes the author of the annotations the token
    * creates, `userId` and `groupId` their owner and group.
    */
-  identity: IdentitySchema.optional(),
+  identity: IdentityInputSchema.optional(),
   /**
    * Origin lock: web origins (scheme + host, optional port; one leading
    * `*.` wildcard label allowed) the minted token may be presented
@@ -574,7 +849,7 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    */
   origins: originPatternArray.optional(),
   /** Token lifetime in seconds. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -585,12 +860,14 @@ export type AdminTokenIssueDocRequest = z.infer<typeof AdminTokenIssueDocRequest
 export const AdminTokenIssueTenantRequestSchema = z.object({
   kind: z.literal('tenant'),
   sub: z.string().min(1).max(256),
-  scope: z
-    .array(z.union([z.literal('*'), z.enum(adminTenantScopes)]))
-    .min(1)
-    .max(16),
+  /**
+   * Tenant scopes (`docs.read`, `tokens.issue-doc`, …, or `*`) and document
+   * permissions in the doc-token vocabulary, which hold for every document
+   * of the tenant. Validated server-side, as a doc token's scope is.
+   */
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /** Token lifetime in seconds. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -598,17 +875,53 @@ export const AdminTokenIssueTenantRequestSchema = z.object({
 });
 export type AdminTokenIssueTenantRequest = z.infer<typeof AdminTokenIssueTenantRequestSchema>;
 
+/** The most JSON an upload token's `metadata` may hold: it rides inside the token. */
+export const UPLOAD_TOKEN_METADATA_MAX_BYTES = 4096;
+
+export const AdminTokenIssueUploadRequestSchema = z.object({
+  kind: z.literal('upload'),
+  /** Who is uploading: the end user's id in your system. */
+  sub: z.string().min(1).max(256),
+  /** The folder every upload goes into: a folder id, or root (the default). */
+  folderId: FolderPlaceSchema.optional(),
+  /**
+   * Your own data, put on every document uploaded with the token. The
+   * browser can't change it: init takes the token's, not the request's.
+   */
+  metadata: z
+    .record(z.string(), z.unknown())
+    .refine(
+      (value) => JSON.stringify(value).length <= UPLOAD_TOKEN_METADATA_MAX_BYTES,
+      `metadata: at most ${UPLOAD_TOKEN_METADATA_MAX_BYTES} bytes of JSON`,
+    )
+    .optional(),
+  /** How many documents the token uploads. Defaults to 1. */
+  maxFiles: z.number().int().min(1).max(1000).optional(),
+  /** The largest file the token takes, in bytes. */
+  maxBytes: z.number().int().min(1).optional(),
+  /** Origin lock, as on a doc token: the websites the token works on. */
+  origins: originPatternArray.optional(),
+  /** Token lifetime in seconds. */
+  expiresInSeconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24 * 90),
+});
+export type AdminTokenIssueUploadRequest = z.infer<typeof AdminTokenIssueUploadRequestSchema>;
+
 export const AdminTokenIssueRequestSchema = z.discriminatedUnion('kind', [
   AdminTokenIssueDocRequestSchema,
   AdminTokenIssueTenantRequestSchema,
+  AdminTokenIssueUploadRequestSchema,
 ]);
 export type AdminTokenIssueRequest = z.infer<typeof AdminTokenIssueRequestSchema>;
 
 export const AdminTokenIssueResponseSchema = z.object({
   token: z.string(),
   jti: z.string(),
-  /** Unix seconds. */
-  expiresAt: z.number(),
+  /** When the token expires. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSchema>;
 
@@ -631,58 +944,189 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
  * the capability scopes it carries.
  */
 // ---------------------------------------------------------------------------
-// Share grants
+// Grants
 // ---------------------------------------------------------------------------
 //
-// A share grant is a standing, revocable authorization decision stored
+// A grant is a standing, revocable authorization decision stored
 // with the documents: "anyone presenting this reference, from these
 // origins, gets exactly these capabilities on this document". The grant
-// id doubles as the public share token — it is a reference whose power
+// id is what a page holds to open the document — it is a reference whose power
 // is evaluated at exchange time, never a bearer credential, which is
 // what lets it live in public HTML while staying editable and
 // revocable. The only credential it ever produces is an ordinary
-// short-lived doc JWT, minted downward at `shares.exchange`.
+// short-lived doc JWT, minted downward at `grants.exchange`.
 
-export const ShareGrantRecordSchema = z.object({
-  /** Grant id; doubles as the public share token (`shr_…`). */
+/**
+ * Whose layer a grant's visitors write into: `'shared'`, one layer everyone
+ * reads and writes (`layerName`), or `'per-visitor'`, a layer of each
+ * visitor's own (`visitor-<id>`), made at their first change.
+ */
+export const GrantLayerModeSchema = closed(z.enum(['shared', 'per-visitor']));
+export type GrantLayerMode = z.infer<typeof GrantLayerModeSchema>;
+
+/** Delete a visitor after this long unseen: an hour to 30 days. */
+const visitorIdleSecondsSchema = z
+  .number()
+  .int()
+  .min(60 * 60)
+  .max(30 * 24 * 60 * 60);
+
+const visitorQuestionSchema = closed(z.enum(['required', 'optional']));
+
+/**
+ * What a grant asks its visitors, so what they add carries their name and
+ * the owner learns who they are. The answers are stored once per visitor
+ * and go into every session token issued for them; a visitor can't change
+ * an answer they gave (they start over instead). `userId` is never asked: a
+ * visitor's is `visitor_<id>`.
+ */
+export const GrantVisitorIdentitySchema = z.object({
+  /** The identity fields to ask, each required or optional; at least one. */
+  fields: z.object({
+    /** Their name: the author of what they add. */
+    displayName: visitorQuestionSchema.optional(),
+    email: visitorQuestionSchema.optional(),
+    title: visitorQuestionSchema.optional(),
+    organization: visitorQuestionSchema.optional(),
+    organizationalUnit: visitorQuestionSchema.optional(),
+  }),
+  /**
+   * `'on-open'`: before the document opens (a lead gate). `'before-first-change'`:
+   * reading is free, and the first change asks (a review grant).
+   */
+  ask: closed(z.enum(['on-open', 'before-first-change'])),
+  /** Shown with the questions: why they're asked. */
+  purpose: z.string().min(1).max(500).optional(),
+  /** The link owner's privacy notice, linked from the questions. */
+  privacyUrl: z.string().url().max(2048).optional(),
+});
+export type GrantVisitorIdentity = z.infer<typeof GrantVisitorIdentitySchema>;
+
+/** A visitor's answers, the identity fields a grant asks. */
+export const GrantVisitorAnswersSchema = z.object({
+  displayName: z.string().max(4096).optional(),
+  email: z.string().max(4096).optional(),
+  title: z.string().max(4096).optional(),
+  organization: z.string().max(4096).optional(),
+  organizationalUnit: z.string().max(4096).optional(),
+});
+export type GrantVisitorAnswers = z.infer<typeof GrantVisitorAnswersSchema>;
+
+const visitorFieldSchema = closed(
+  z.enum(['displayName', 'email', 'title', 'organization', 'organizationalUnit']),
+);
+
+/**
+ * What a visitor is still asked: the details of `VisitorIdentityRequired`,
+ * and the exchange's `visitor.identityRequest` on a grant that asks before
+ * the first change.
+ */
+export const GrantVisitorIdentityRequestSchema = z.object({
+  /** What the grant asks, each required or optional. */
+  fields: GrantVisitorIdentitySchema.shape.fields,
+  /** Required fields not answered yet. */
+  missing: z.array(visitorFieldSchema),
+  /** Answers given this time that can't be taken (an email that isn't one, too long). */
+  invalid: z.array(visitorFieldSchema),
+  purpose: z.string().optional(),
+  privacyUrl: z.string().optional(),
+});
+export type GrantVisitorIdentityRequest = z.infer<typeof GrantVisitorIdentityRequestSchema>;
+
+export const GrantRecordSchema = z.object({
+  /** The grant's id (`grt_…`; older grants `shr_…`): what a link page or an embed opens. */
   id: z.string(),
   tenantId: z.string(),
   docId: z.string(),
-  layerName: z.string(),
+  /** What it's called, for example "Website" or "Sent to Acme"; null when unnamed. */
+  name: z.string().nullable(),
+  layerMode: GrantLayerModeSchema,
+  /** The layer every visitor shares; null for a per-visitor grant. */
+  layerName: z.string().nullable(),
+  /**
+   * Per-visitor grants: a visitor's browser comes back to their layer on the next visit; false
+   * gives every visit a new visitor and a new layer.
+   */
+  keepVisitorLayers: z.boolean(),
+  /**
+   * Delete a visitor (their answers and their layer) after this long
+   * unseen; null keeps them until they are deleted on purpose.
+   */
+  visitorIdleSeconds: z.number().int().nullable(),
+  /** What the grant asks its visitors; null asks nothing. */
+  visitorIdentity: GrantVisitorIdentitySchema.nullable(),
+  /**
+   * Who the grant's visitors are, for a grant made for one person; null when
+   * they are whoever they answer. It prevails over their answers.
+   */
+  identity: IdentitySchema.nullable(),
   /** Doc capabilities the exchanged session carries. */
   scope: z.array(z.string()),
   /** Origin allowlist; null means any origin. */
   origins: z.array(z.string()).nullable(),
   /** True when a passphrase is required at exchange. The passphrase itself is never returned. */
-  passwordProtected: z.boolean(),
+  passphraseProtected: z.boolean(),
   /** Lifetime of each exchanged session token, in seconds. */
-  sessionTtlSeconds: z.number(),
+  sessionTtlSeconds: z.number().int(),
   /** Paused grants refuse exchange (404) but keep their configuration. */
   disabled: z.boolean(),
-  /** Unix epoch ms after which exchange returns 410; null = no expiry. */
-  expiresAt: z.number().nullable(),
+  /**
+   * When the grant was archived: it refuses exchange for good and keeps what
+   * its visitors made. Null while it works.
+   */
+  archivedAt: IsoDateTimeSchema.nullable(),
+  /** When exchange starts returning 410; null = no expiry. */
+  expiresAt: IsoDateTimeSchema.nullable(),
   /** Total successful exchanges — a dashboard convenience, not the usage meter. */
-  exchangeCount: z.number(),
-  lastExchangedAt: z.number().nullable(),
+  exchangeCount: z.number().int(),
+  lastExchangedAt: IsoDateTimeSchema.nullable(),
   createdBy: z.string(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
 });
-export type ShareGrantRecord = z.infer<typeof ShareGrantRecordSchema>;
+export type GrantRecord = z.infer<typeof GrantRecordSchema>;
 
-export const ShareGrantCreateRequestSchema = z.object({
+export const GrantCreateRequestSchema = z.object({
   docId: z.string().regex(docIdPattern),
+  /** What to call it, 1 to 100 characters after trimming. Omit or null for none. */
+  name: grantNameSchema.nullable().optional(),
+  /** Default `'shared'`. */
+  layerMode: GrantLayerModeSchema.optional(),
+  /** The shared layer, default `default`. Not for a per-visitor grant, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
+  /**
+   * Per-visitor grants: a visitor's browser comes back to their layer on the next visit; false
+   * gives every visit a new visitor and a new layer. Default true.
+   */
+  keepVisitorLayers: z.boolean().optional(),
+  /**
+   * Delete a visitor (their answers and their layer) after this long unseen,
+   * for grants whose visitors' work is throwaway (examples, demos). Omit or
+   * null to keep visitors until they are deleted on purpose (the default).
+   */
+  visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
+  /** Ask visitors who they are; omit or null to ask nothing. */
+  visitorIdentity: GrantVisitorIdentitySchema.nullable().optional(),
+  /**
+   * Who the grant's visitors are, for a grant made for one person: the same
+   * `Identity` as `tokens.issue`'s. Every session the grant gives carries it,
+   * whoever opens the grant: a field it sets is never asked, and a visitor's
+   * answer for it is ignored, so `visitorIdentity` can't ask it too. `userId`
+   * replaces the visitor's own (`visitor_<id>`). Omit or null for visitors
+   * who are whoever they answer.
+   */
+  identity: IdentityInputSchema.nullable().optional(),
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
-   * `tokens.issue`.
+   * `tokens.issue`, and as there a tenant token gives only document
+   * permissions it holds itself.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
-  /** Origin allowlist; omit to allow any origin. */
-  origins: originPatternArray.optional(),
+  /** Origin allowlist; left out or `null` allows any origin, as a read says. */
+  origins: originPatternArray.nullable().optional(),
   /** Optional passphrase gate, checked at exchange. Stored as a hash; never returned. */
-  password: z.string().min(1).max(1024).optional(),
+  passphrase: z.string().min(1).max(1024).optional(),
   /** Lifetime of exchanged session tokens. Default 600. */
   sessionTtlSeconds: z
     .number()
@@ -690,22 +1134,39 @@ export const ShareGrantCreateRequestSchema = z.object({
     .min(60)
     .max(60 * 60)
     .optional(),
-  /** Unix epoch ms after which the grant stops exchanging; omit for no expiry. */
-  expiresAt: z.number().int().positive().optional(),
+  /** When the grant stops exchanging; left out or `null` for no expiry. */
+  expiresAt: InstantInputSchema.nullable().optional(),
 });
-export type ShareGrantCreateRequest = z.infer<typeof ShareGrantCreateRequestSchema>;
+export type GrantCreateRequest = z.infer<typeof GrantCreateRequestSchema>;
 
 /**
  * Partial update. `origins: null` clears the allowlist (any origin),
- * `password: null` removes the passphrase, `expiresAt: null` removes
+ * `passphrase: null` removes the passphrase, `name: null` the name, `expiresAt: null` removes
  * the expiry. Absent fields stay untouched. The exchanged capabilities
  * and origin lock of every embedded snippet follow the row — editing a
  * grant retargets the copies already pasted into pages.
  */
-export const ShareGrantUpdateRequestSchema = z.object({
+export const GrantUpdateRequestSchema = z.object({
+  /** Renames it; null removes the name. */
+  name: grantNameSchema.nullable().optional(),
+  /**
+   * Switching to `'per-visitor'` stops visitors writing into the shared
+   * layer (it stays); switching to `'shared'` takes `layerName`, default
+   * `default`. The id stays the same either way.
+   */
+  layerMode: GrantLayerModeSchema.optional(),
+  /** A shared grant's layer. Not for a per-visitor grant, and never `visitor-…`. */
+  layerName: z.string().min(1).max(256).optional(),
+  keepVisitorLayers: z.boolean().optional(),
+  /** null stops deleting visitors who go unseen. */
+  visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
+  /** null stops asking; a change applies at each visitor's next exchange. */
+  visitorIdentity: GrantVisitorIdentitySchema.nullable().optional(),
+  /** Replaces the grant's identity; null clears it. Applies at each visitor's next exchange. */
+  identity: IdentityInputSchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
-  password: z.string().min(1).max(1024).nullable().optional(),
+  passphrase: z.string().min(1).max(1024).nullable().optional(),
   sessionTtlSeconds: z
     .number()
     .int()
@@ -713,16 +1174,17 @@ export const ShareGrantUpdateRequestSchema = z.object({
     .max(60 * 60)
     .optional(),
   disabled: z.boolean().optional(),
-  expiresAt: z.number().int().positive().nullable().optional(),
+  /** When the grant stops exchanging; `null` removes the expiry. */
+  expiresAt: InstantInputSchema.nullable().optional(),
 });
-export type ShareGrantUpdateRequest = z.infer<typeof ShareGrantUpdateRequestSchema>;
+export type GrantUpdateRequest = z.infer<typeof GrantUpdateRequestSchema>;
 
-export const ShareGrantResponseSchema = z.object({
-  share: ShareGrantRecordSchema,
+export const GrantResponseSchema = z.object({
+  grant: GrantRecordSchema,
 });
-export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
+export type GrantResponse = z.infer<typeof GrantResponseSchema>;
 
-export const ShareGrantListQuerySchema = z.object({
+export const GrantListQuerySchema = z.object({
   limit: z.coerce
     .number()
     .int()
@@ -732,46 +1194,132 @@ export const ShareGrantListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /** Filter to one document's grants. */
   docId: z.string().regex(docIdPattern).optional(),
+  /** `true` lists the archived grants instead of the ones that still work. */
+  archived: queryFlag.optional(),
 });
-export type ShareGrantListQuery = z.infer<typeof ShareGrantListQuerySchema>;
+export type GrantListQuery = z.infer<typeof GrantListQuerySchema>;
 
-export const ShareGrantListResponseSchema = z.object({
-  shares: z.array(ShareGrantRecordSchema),
+export const GrantListResponseSchema = z.object({
+  grants: z.array(GrantRecordSchema),
   /** Opaque cursor for the next page; `null` on the last page. */
-  nextCursor: z.string().nullable().optional(),
+  nextCursor: z.string().nullable(),
 });
-export type ShareGrantListResponse = z.infer<typeof ShareGrantListResponseSchema>;
+export type GrantListResponse = z.infer<typeof GrantListResponseSchema>;
 
-export const AdminTenantShareParamsSchema = z.object({
+export const AdminTenantGrantParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
-  shareId: z.string().regex(shareTokenPattern),
+  grantId: z.string().regex(grantIdPattern),
 });
-export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
+export type AdminTenantGrantParams = z.infer<typeof AdminTenantGrantParamsSchema>;
+
+export const AdminTenantGrantVisitorParamsSchema = AdminTenantGrantParamsSchema.extend({
+  visitorId: z.string().regex(/^[0-9a-f]{24}$/),
+});
+export type AdminTenantGrantVisitorParams = z.infer<typeof AdminTenantGrantVisitorParamsSchema>;
 
 /**
- * The share token travels in the body, never the path — URLs land in
- * access logs and proxy logs, and the token is the whole credential.
+ * A grant's visitor who answered its questions or made a change: their
+ * answers, when they agreed and were last seen, and their own layer.
  */
-export const ShareExchangeRequestSchema = z.object({
-  shareToken: z.string().regex(shareTokenPattern),
-  /** Required when the grant is passphrase-protected (422 otherwise). */
-  password: z.string().min(1).max(1024).optional(),
+export const GrantVisitorRecordSchema = z.object({
+  visitorId: z.string(),
+  /** Their answers to what the grant asked; empty for a visitor who was asked nothing. */
+  answers: GrantVisitorAnswersSchema,
+  /** Whether their email was verified (not yet offered: always false). */
+  emailVerified: z.boolean(),
+  /** When they gave their answers; null for one who was asked nothing. */
+  consentedAt: IsoDateTimeSchema.nullable(),
+  firstSeenAt: IsoDateTimeSchema,
+  lastSeenAt: IsoDateTimeSchema,
+  /** Their own layer, when it holds changes (per-visitor grants). */
+  layer: z
+    .object({
+      layerName: z.string(),
+      sizeBytes: z.number().int().nullable(),
+    })
+    .nullable(),
 });
-export type ShareExchangeRequest = z.infer<typeof ShareExchangeRequestSchema>;
+export type GrantVisitorRecord = z.infer<typeof GrantVisitorRecordSchema>;
 
-export const ShareSessionResponseSchema = z.object({
+/** Query parameters for `grants.visitors.list`, as for the other lists. */
+export const GrantVisitorListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+});
+export type GrantVisitorListQuery = z.infer<typeof GrantVisitorListQuerySchema>;
+
+export const GrantVisitorListResponseSchema = z.object({
+  visitors: z.array(GrantVisitorRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+});
+export type GrantVisitorListResponse = z.infer<typeof GrantVisitorListResponseSchema>;
+
+/**
+ * The grant travels in the body, never the path — URLs land in
+ * access logs and proxy logs.
+ */
+export const GrantExchangeRequestSchema = z.object({
+  grant: z.string().regex(grantIdPattern),
+  /** Required when the grant is passphrase-protected (422 otherwise). */
+  passphrase: z.string().min(1).max(1024).optional(),
+  /**
+   * The `visitor.handle` an earlier exchange answered: the same visitor, and
+   * on a per-visitor grant the same layer. One the grant didn't issue, or
+   * whose layer was deleted, gets a new visitor.
+   */
+  visitorHandle: z.string().min(1).max(256).optional(),
+  /** With `visitorHandle` on a per-visitor grant: delete that visitor's layer and start a new visitor. */
+  restart: z.boolean().optional(),
+  /**
+   * The visitor's answers to what the grant asks (`visitorIdentity`). Only
+   * the fields the grant asks and they haven't answered count: an answer once
+   * given stays.
+   */
+  visitorIdentity: GrantVisitorAnswersSchema.optional(),
+});
+export type GrantExchangeRequest = z.infer<typeof GrantExchangeRequestSchema>;
+
+export const GrantSessionResponseSchema = z.object({
   /** A doc-scoped session JWT carrying the grant's capabilities and origin lock. */
   token: z.string(),
   docId: z.string(),
+  /** The layer the session reads and writes: the shared one, or this visitor's own. */
   layerName: z.string(),
-  /** Unix seconds when the session token expires; exchange again for a fresh one. */
-  expiresAt: z.number(),
+  layerMode: GrantLayerModeSchema,
+  /** Who the session acts as: the session token names them as the author of what they add. */
+  visitor: z.object({
+    /** Send it back with the next exchange: renewals keep the same visitor. */
+    handle: z.string(),
+    /**
+     * Keep the handle for the next visit too: the browser comes back as this visitor, with their
+     * answers and, on a per-visitor grant, their layer. False only on a per-visitor grant that
+     * doesn't keep visitors' layers, where every visit is a new visitor.
+     */
+    keep: z.boolean(),
+    /**
+     * What the grant asks before this visitor's first change, when they
+     * haven't answered it: their writes are refused (403
+     * `VisitorIdentityRequired`) until they exchange again with their
+     * answers. `null` when nothing is asked.
+     */
+    identityRequest: GrantVisitorIdentityRequestSchema.nullable(),
+  }),
+  /** When the session token expires; exchange again for a fresh one. */
+  expiresAt: IsoDateTimeSchema,
 });
-export type ShareSessionResponse = z.infer<typeof ShareSessionResponseSchema>;
+export type GrantSessionResponse = z.infer<typeof GrantSessionResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Tenant usage + suspension
 // ---------------------------------------------------------------------------
+
+const utcDayPattern = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export const TenantUsageQuerySchema = z.object({
   /** UTC month to report, `YYYY-MM`. Defaults to the current month. */
@@ -779,27 +1327,100 @@ export const TenantUsageQuerySchema = z.object({
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
     .optional(),
+  /**
+   * The first UTC day to report, `YYYY-MM-DD`, with `to` in place of
+   * `period`: a billing period that starts mid-month, say.
+   */
+  from: z.string().regex(utcDayPattern).optional(),
+  /** The UTC day after the last one reported, `YYYY-MM-DD`: at most 366 days after `from`. */
+  to: z.string().regex(utcDayPattern).optional(),
 });
 export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 
 /**
- * Per-tenant usage facts for one UTC month. Deliberately opinion-free:
- * no limits, no plans, no billing state — those belong to whoever
- * operates the deployment. `pdf.views` counts share exchanges plus
- * authorized `/v1/access` grants, deduplicated (a share session that
- * later establishes access is not counted twice).
+ * Per-tenant usage facts for a window of UTC days: a month, or `from` to
+ * `to`. Deliberately opinion-free: no limits, no plans, no billing state —
+ * those belong to whoever operates the deployment. `pdfViews` counts
+ * grant exchanges plus authorized `/v1/access` requests, deduplicated (a
+ * grant session that later establishes access is not counted twice).
+ * `storageBytes` is what the tenant stores now, whatever the window.
  */
 export const TenantUsageResponseSchema = z.object({
   tenantId: z.string(),
+  /** The first day reported, `YYYY-MM-DD`. */
   periodStart: z.string(),
+  /** The day after the last one reported, `YYYY-MM-DD`. */
   periodEnd: z.string(),
+  /** The core's meters. */
   metrics: z.object({
-    'pdf.views': z.number(),
-    'pdf.uploads': z.number(),
-    'storage.bytes': z.number(),
+    pdfViews: z.number().int(),
+    pdfUploads: z.number().int(),
+    storageBytes: z.number().int(),
   }),
+  /**
+   * The modules' meters by their names (`protected-display.views`): each
+   * installed module's, 0 when nothing counted it, and any other module meter
+   * counted in the window.
+   */
+  moduleMeters: z.record(z.string(), z.number().int()),
 });
 export type TenantUsageResponse = z.infer<typeof TenantUsageResponseSchema>;
+
+/** One of a module's permissions, as the module declares it. */
+export const ModulePermissionSchema = z.object({
+  /** The whole permission: `protected-display.view`. */
+  name: z.string(),
+  /** `document`: in viewer tokens and grants; `tenant`: in tenant tokens and API keys. */
+  level: closed(z.enum(['document', 'tenant'])),
+  /** What a grant or API key dialog says for it. */
+  label: z.string(),
+  description: z.string().optional(),
+  /**
+   * The core document permission this one is another way of doing:
+   * protected display's `view` replaces `doc.render`. A dialog can offer
+   * the two as a choice. A scope may hold both; the core one then has its
+   * usual effect, and a viewer plugin uses it.
+   */
+  replaces: z.string().optional(),
+  /**
+   * Core document permissions that let out what this one protects, like
+   * `doc.download`. Facts for a dialog to show; the server enforces none.
+   */
+  bypassedBy: z.array(z.string()).optional(),
+});
+export type ModulePermission = z.infer<typeof ModulePermissionSchema>;
+
+/** One of a module's meters, counted per tenant and UTC day and reported in the tenants' usage. */
+export const ModuleMeterSchema = z.object({
+  /** The whole meter: `protected-display.views`. */
+  name: z.string(),
+  /** What a usage page calls it: `Protected views`. */
+  label: z.string(),
+  /** What one counts as, plural: `views`. */
+  unit: z.string(),
+  description: z.string().optional(),
+});
+export type ModuleMeter = z.infer<typeof ModuleMeterSchema>;
+
+/** A server module this deployment has installed: what it is and what it adds, as it declares it. */
+export const ModuleManifestSchema = z.object({
+  /** Its id, the namespace of everything it adds: `protected-display`. */
+  id: z.string(),
+  /** What people call it: `Screenshot protection`. */
+  name: z.string(),
+  description: z.string().optional(),
+  permissions: z.array(ModulePermissionSchema),
+  meters: z.array(ModuleMeterSchema),
+  /** What it does beyond whoever calls it: the core document permissions it holds itself. */
+  requires: z.object({ document: z.array(z.string()) }),
+});
+export type ModuleManifest = z.infer<typeof ModuleManifestSchema>;
+
+export const DeploymentModulesResponseSchema = z.object({
+  /** In the order the server loads them. */
+  modules: z.array(ModuleManifestSchema),
+});
+export type DeploymentModulesResponse = z.infer<typeof DeploymentModulesResponseSchema>;
 
 export const TenantSuspendRequestSchema = z.object({
   /** Optional operator reason, written to the security-events trail. */
@@ -807,7 +1428,7 @@ export const TenantSuspendRequestSchema = z.object({
 });
 export type TenantSuspendRequest = z.infer<typeof TenantSuspendRequestSchema>;
 
-export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
+export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt', 'upload-jwt'] as const;
 export type AdminCredential = (typeof adminCredentials)[number];
 
 export type AdminOperationMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -829,6 +1450,15 @@ export interface AdminOperationResponse {
   /** Body schema; absent for empty or binary bodies. */
   schema?: z.ZodTypeAny;
 }
+
+/**
+ * Every error response, whichever route and status:
+ * `{ error: { code, message, details? } }` (`ErrorResponseSchema`).
+ */
+const errorResponse: AdminOperationResponse = {
+  contentType: 'application/json',
+  schema: ErrorResponseSchema,
+};
 
 export interface AdminOperationBody {
   /** Accepted request MIME type(s). */
@@ -859,22 +1489,25 @@ export interface AdminOperation {
   path: string;
   /**
    * Credentials accepted by this operation. The API token is root and
-   * passes every scope check; a tenant JWT additionally requires the
-   * path's `tenantId` to equal the token's `tenant_id`. Doc-scoped
-   * tokens are always rejected on these surfaces.
+   * passes every scope check. A tenant JWT reaches only its own tenant:
+   * on the admin surfaces the path's `tenantId` must equal the token's
+   * `tenant_id`, and on the doc plane the document must belong to it.
+   * Doc-scoped tokens are always rejected on the admin surfaces.
    */
   credentials: ReadonlyArray<AdminCredential>;
   /**
    * Tenant scopes accepted on the tenant-jwt path — possessing any one
    * grants access (`*` always does). Empty for API-token-only
-   * operations, where no scope model applies.
+   * operations, where no scope model applies, and for operations on what
+   * is inside a document, which take `docCapabilities` instead.
    */
   scope: ReadonlyArray<AdminTenantScope>;
   /**
-   * Doc capabilities required on the doc-jwt path — typed against the
-   * engine-core vocabulary so a misspelled capability fails compile.
-   * The API token bypasses capability checks, same as it passes tenant
-   * scope checks. Present only on doc-plane operations.
+   * Document permissions the operation needs, on a doc JWT and a tenant
+   * JWT alike: doc-plane operations, and the collection operations that
+   * hand out what is inside a document. Typed against the engine-core
+   * vocabulary so a misspelled capability fails compile. The API token
+   * bypasses capability checks.
    */
   docCapabilities?: ReadonlyArray<DocCapability>;
   /** Documented request headers (beyond Authorization). */
@@ -906,7 +1539,7 @@ export const adminOperations = {
     body: { contentType: 'application/json', schema: AdminTenantCreateRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminTenantCreateResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
     },
   },
   'tenants.list': {
@@ -920,7 +1553,7 @@ export const adminOperations = {
     query: AdminTenantListQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: AdminTenantListResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
     },
   },
   'tenants.get': {
@@ -934,8 +1567,29 @@ export const adminOperations = {
     params: AdminTenantParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: AdminTenantResponseSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: errorResponse,
     },
+  },
+  'tenants.update': {
+    operationId: 'tenants.update',
+    title: 'Update tenant',
+    summary: 'Set the server modules a tenant may use: its whole features list.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: AdminTenantUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTenantResponseSchema },
+      400: errorResponse,
+      404: errorResponse,
+    },
+    notes:
+      'A feature names an installed module; any other id is a 400. A module route answers a ' +
+      'tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 ' +
+      'FeatureStopped (details.feature, details.stopped). Other replicas apply a change within ' +
+      '30 seconds.',
   },
   'tenants.delete': {
     operationId: 'tenants.delete',
@@ -948,7 +1602,7 @@ export const adminOperations = {
     params: AdminTenantParamsSchema,
     responses: {
       204: {},
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: errorResponse,
     },
     notes:
       'Destroys the tenant and everything in its namespace — documents, layers, stored bytes, audit history. Irreversible.',
@@ -960,38 +1614,42 @@ export const adminOperations = {
       'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/init',
-    credentials: ['api-token', 'tenant-jwt'],
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantParamsSchema,
     body: { contentType: 'application/json', schema: AdminDocumentInitRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentInitResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      403: errorResponse,
     },
+    notes:
+      "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
   },
   'documents.commit': {
     operationId: 'documents.commit',
     title: 'Commit upload',
     summary: 'Finish an upload: verify the SHA-256 and promote the document to ready.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/documents/:id/commit',
-    credentials: ['api-token', 'tenant-jwt'],
+    path: '/v1/tenants/:tenantId/documents/:docId/commit',
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
     body: { contentType: 'application/json', schema: AdminDocumentCommitRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentCommitResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
+    notes: 'An upload token commits only the documents it started; any other document answers 404.',
   },
   'documents.uploadProxy': {
     operationId: 'documents.uploadProxy',
     title: 'Upload document through the origin',
     summary: 'Upload a bounded PDF through the API when the initialized transfer kind is proxy.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/documents/:id/upload-proxy',
-    credentials: ['api-token', 'tenant-jwt'],
+    path: '/v1/tenants/:tenantId/documents/:docId/upload-proxy',
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
     body: {
@@ -999,11 +1657,12 @@ export const adminOperations = {
     },
     responses: {
       200: { contentType: 'application/json', schema: AdminUploadProxyResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
     notes:
-      'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.',
+      'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.',
   },
   'documents.importFrom': {
     operationId: 'documents.importFrom',
@@ -1019,9 +1678,9 @@ export const adminOperations = {
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentImportResponseSchema },
       202: { contentType: 'application/json', schema: AdminDocumentImportResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      502: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      403: errorResponse,
+      502: errorResponse,
     },
     notes:
       'Default mode is synchronous and bounded: the response returns only after the transfer verified and committed (or failed). mode=async (connection sources only) answers 202 immediately and an in-process worker performs the transfer with leased, fenced retries; poll the document until ready/failed. The deployment import policy gates scheme, network range, and size; sources must declare a length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. URL sources are capabilities and never echoed back. Connection sources name operator-registered storage (bucket/prefix scope, allowed credential classes, and tenant bindings are deployment configuration); `revision` is provider-interpreted (S3 VersionId, GCS generation, Azure version id).',
@@ -1029,7 +1688,8 @@ export const adminOperations = {
   'documents.list': {
     operationId: 'documents.list',
     title: 'List documents',
-    summary: 'List documents in the tenant, newest first, cursor-paginated.',
+    summary:
+      'List documents in the tenant, cursor-paginated: newest first by default, or searched by name and sorted by name or size.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1038,7 +1698,7 @@ export const adminOperations = {
     query: AdminDocumentListQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentListResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
     },
   },
   'documents.get': {
@@ -1046,29 +1706,48 @@ export const adminOperations = {
     title: 'Get document',
     summary: 'Fetch one document record.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id',
+    path: '/v1/tenants/:tenantId/documents/:docId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.read'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentResponseSchema },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: errorResponse,
+      404: errorResponse,
     },
+  },
+  'documents.update': {
+    operationId: 'documents.update',
+    title: 'Update document',
+    summary: 'Rename a document.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/documents/:docId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantDocParamsSchema,
+    body: { contentType: 'application/json', schema: AdminDocumentUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+    },
+    notes: 'A document that is being deleted answers 404.',
   },
   'documents.download': {
     operationId: 'documents.download',
     title: 'Download document',
     summary: 'Download the stored base PDF bytes.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id/download',
+    path: '/v1/tenants/:tenantId/documents/:docId/download',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.download'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: errorResponse,
+      404: errorResponse,
     },
   },
   'documents.delete': {
@@ -1076,14 +1755,49 @@ export const adminOperations = {
     title: 'Delete document',
     summary: 'Delete a document and its stored artifacts.',
     method: 'DELETE',
-    path: '/v1/tenants/:tenantId/documents/:id',
+    path: '/v1/tenants/:tenantId/documents/:docId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.delete'],
     params: AdminTenantDocParamsSchema,
     responses: {
       204: {},
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: errorResponse,
+      404: errorResponse,
+    },
+  },
+  'documents.layers.list': {
+    operationId: 'documents.layers.list',
+    title: 'List layers',
+    summary:
+      "A document's layers that hold changes, newest first, cursor-paginated: the ones grants and your tokens name, and each grant visitor's own.",
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/documents/:docId/layers',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantDocParamsSchema,
+    query: AdminDocumentLayerListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentLayerListResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+    },
+  },
+  'documents.layers.delete': {
+    operationId: 'documents.layers.delete',
+    title: 'Delete layer',
+    summary:
+      "Delete a layer and everything it stored. A layer that was written can't be used again under its name; one nobody wrote stays usable.",
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/documents/:docId/layers/:layerName',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantDocLayerParamsSchema,
+    responses: {
+      204: {},
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
   },
   'documents.thumbnail': {
@@ -1091,14 +1805,128 @@ export const adminOperations = {
     title: 'Get thumbnail',
     summary: 'Fetch the warmed dashboard-tile render for a document.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id/thumbnail',
+    path: '/v1/tenants/:tenantId/documents/:docId/thumbnail',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.render'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: ['image/webp', 'image/png'] },
-      404: { contentType: 'application/json', schema: AdminThumbnailUnavailablePayloadSchema },
+      404: errorResponse,
     },
+  },
+  'folders.create': {
+    operationId: 'folders.create',
+    title: 'Create folder',
+    summary: 'Create a folder at the top level or inside another folder.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.create'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: FolderCreateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
+    },
+    notes:
+      '409 Conflict carries `details.reason`: `name-taken` (a sibling has the name, ignoring case; `details.name`) or `too-deep` (folders nest at most 100 levels; `details.maxDepth`). 404 when the parent folder does not exist.',
+  },
+  'folders.list': {
+    operationId: 'folders.list',
+    title: 'List folders',
+    summary:
+      'List folders by name, cursor-paginated: every folder, or those directly in one folder.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantParamsSchema,
+    query: FolderListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderListResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+    },
+  },
+  'folders.get': {
+    operationId: 'folders.get',
+    title: 'Get folder',
+    summary: 'Fetch one folder and the folders above it.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantFolderParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderGetResponseSchema },
+      403: errorResponse,
+      404: errorResponse,
+    },
+  },
+  'folders.update': {
+    operationId: 'folders.update',
+    title: 'Update folder',
+    summary: 'Rename a folder.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderParamsSchema,
+    body: { contentType: 'application/json', schema: FolderUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
+    },
+    notes:
+      '409 Conflict with `details.reason` `name-taken` when a sibling has the name, ignoring case.',
+  },
+  'folders.moveInto': {
+    operationId: 'folders.moveInto',
+    title: 'Move into folder',
+    summary:
+      'Move documents and folders into a folder, or to the top level with root. All of them move, or none do.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders/:folderId/move-into',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderPlaceParamsSchema,
+    body: { contentType: 'application/json', schema: FolderMoveIntoRequestSchema },
+    responses: {
+      204: {},
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
+    },
+    notes:
+      "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+  },
+  'folders.delete': {
+    operationId: 'folders.delete',
+    title: 'Delete folder',
+    summary: 'Delete an empty folder, or with recursive=true a folder and everything in it.',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantFolderParamsSchema,
+    query: FolderDeleteQuerySchema,
+    responses: {
+      204: {},
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
+    },
+    notes:
+      'Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its grants at once; their stored files and grants are removed in the background. Uploads into those folders that have not committed cannot commit.',
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',
@@ -1112,10 +1940,28 @@ export const adminOperations = {
       200: { contentType: 'application/json', schema: AdminLicenseStatusResponseSchema },
     },
   },
+  'deployment.modules': {
+    operationId: 'deployment.modules',
+    title: 'Installed modules',
+    summary:
+      "The server modules this deployment has installed: each one's name, permissions and meters.",
+    method: 'GET',
+    path: adminWirePaths.deploymentModules,
+    credentials: ['api-token'],
+    scope: [],
+    responses: {
+      200: { contentType: 'application/json', schema: DeploymentModulesResponseSchema },
+    },
+    notes:
+      'What each module declares, for a dashboard or a script that lists modules, offers their ' +
+      'permissions in its dialogs and shows their meters. Which tenants may use one is in ' +
+      "their `features` (`tenants.get`); what it costs, if anything, is the operator's.",
+  },
   'tokens.issue': {
     operationId: 'tokens.issue',
     title: 'Issue token',
-    summary: 'Mint a delegated JWT: a doc token, or (API token only) a tenant token.',
+    summary:
+      'Mint a delegated JWT: a doc token, an upload token for a browser, or (API token only) a tenant token.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/tokens',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1124,12 +1970,12 @@ export const adminOperations = {
     body: { contentType: 'application/json', schema: AdminTokenIssueRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminTokenIssueResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
     },
     notes:
-      'kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
+      'Authority mints only downward: kind "doc" gives only document permissions the caller holds itself, kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
   },
   'tokens.revoke': {
     operationId: 'tokens.revoke',
@@ -1147,7 +1993,7 @@ export const adminOperations = {
     },
     responses: {
       204: {},
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
     },
     notes: 'Mounted only when the deployment enables token revocation.',
   },
@@ -1163,17 +2009,17 @@ export const adminOperations = {
     query: TenantUsageQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: TenantUsageResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
     notes:
-      'Facts only — no limits or billing state. Views count share exchanges plus authorized ' +
-      '/v1/access grants, deduplicated across the two.',
+      'Facts only — no limits or billing state. Views count grant exchanges plus authorized ' +
+      '/v1/access requests, deduplicated across the two.',
   },
   'tenants.suspend': {
     operationId: 'tenants.suspend',
     title: 'Suspend tenant',
-    summary: 'Fail the tenant closed: refuse every tenant JWT, doc JWT, and share exchange.',
+    summary: 'Fail the tenant closed: refuse every tenant JWT, doc JWT, and grant exchange.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/suspend',
     credentials: ['api-token'],
@@ -1186,7 +2032,7 @@ export const adminOperations = {
     },
     responses: {
       204: {},
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: errorResponse,
     },
     notes:
       'Instantly reversible with resume. The API token is exempt, so a suspended tenant can ' +
@@ -1203,110 +2049,172 @@ export const adminOperations = {
     params: AdminTenantParamsSchema,
     responses: {
       204: {},
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: errorResponse,
     },
   },
-  'shares.create': {
-    operationId: 'shares.create',
-    title: 'Create share',
-    summary: 'Create a standing share grant for one document — the no-backend embed credential.',
+  'grants.create': {
+    operationId: 'grants.create',
+    title: 'Create grant',
+    summary: 'Create a standing grant for one document — the no-backend embed credential.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/shares',
+    path: '/v1/tenants/:tenantId/grants',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
     params: AdminTenantParamsSchema,
-    body: { contentType: 'application/json', schema: ShareGrantCreateRequestSchema },
+    body: { contentType: 'application/json', schema: GrantCreateRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
     },
     notes:
-      'The returned share id is the public share token. Mounted only when the deployment can ' +
+      'The returned id is what a link page or an embed opens. Its scope gives only document ' +
+      'permissions the caller holds itself, as tokens.issue does. Mounted only when the deployment can ' +
       'sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.',
   },
-  'shares.list': {
-    operationId: 'shares.list',
-    title: 'List shares',
-    summary: 'List share grants in the tenant, newest first, cursor-paginated.',
+  'grants.list': {
+    operationId: 'grants.list',
+    title: 'List grants',
+    summary: 'List grants in the tenant, newest first, cursor-paginated.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/shares',
+    path: '/v1/tenants/:tenantId/grants',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
     params: AdminTenantParamsSchema,
-    query: ShareGrantListQuerySchema,
+    query: GrantListQuerySchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantListResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: GrantListResponseSchema },
+      400: errorResponse,
     },
   },
-  'shares.get': {
-    operationId: 'shares.get',
-    title: 'Get share',
-    summary: 'Fetch one share grant.',
+  'grants.get': {
+    operationId: 'grants.get',
+    title: 'Get grant',
+    summary: 'Fetch one grant.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
+      404: errorResponse,
     },
   },
-  'shares.update': {
-    operationId: 'shares.update',
-    title: 'Update share',
-    summary: 'Edit a grant in place — every embedded copy of the token follows the row.',
+  'grants.update': {
+    operationId: 'grants.update',
+    title: 'Update grant',
+    summary: 'Edit a grant in place — every link and embed of it follows.',
     method: 'PATCH',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
-    body: { contentType: 'application/json', schema: ShareGrantUpdateRequestSchema },
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    body: { contentType: 'application/json', schema: GrantUpdateRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
   },
-  'shares.delete': {
-    operationId: 'shares.delete',
-    title: 'Revoke share',
-    summary: 'Delete a grant; exchange stops immediately, live sessions lapse at their exp.',
-    method: 'DELETE',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+  'grants.archive': {
+    operationId: 'grants.archive',
+    title: 'Archive grant',
+    summary:
+      "End a grant for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/grants/:grantId/archive',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
+      404: errorResponse,
+    },
+    notes:
+      'Archiving is final: an archived grant never exchanges again, and to give access again you create a new grant. Pausing (`disabled`) is the reversible stop. An archived grant no longer counts as using its shared layer, so that layer can be deleted.',
+  },
+  'grants.visitors.list': {
+    operationId: 'grants.visitors.list',
+    title: 'List visitors',
+    summary:
+      "A grant's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/grants/:grantId/visitors',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    query: GrantVisitorListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: GrantVisitorListResponseSchema },
+      400: errorResponse,
+      404: errorResponse,
+    },
+    notes: "An archived grant's visitors are listed too.",
+  },
+  'grants.visitors.delete': {
+    operationId: 'grants.visitors.delete',
+    title: 'Delete visitor',
+    summary: "Erase a grant's visitor: their answers and their own layer.",
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/grants/:grantId/visitors/:visitorId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['grants.manage'],
+    params: AdminTenantGrantVisitorParamsSchema,
     responses: {
       204: {},
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: errorResponse,
+    },
+    notes:
+      'Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.',
+  },
+  'grants.delete': {
+    operationId: 'grants.delete',
+    title: 'Delete grant',
+    summary:
+      'Delete a grant that has no visitors; exchange stops immediately, live sessions lapse at their exp. A grant whose visitors answered its questions or have layers is archived instead (409).',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    responses: {
+      204: {},
+      404: errorResponse,
+      409: errorResponse,
     },
   },
-  'shares.exchange': {
-    operationId: 'shares.exchange',
-    title: 'Exchange share token',
-    summary: 'Trade a public share token for a short-lived document session JWT.',
+  'grants.exchange': {
+    operationId: 'grants.exchange',
+    title: 'Exchange grant',
+    summary: 'Trade a grant for a short-lived document session JWT.',
     method: 'POST',
-    path: adminWirePaths.shareSessions,
+    path: adminWirePaths.grantSessions,
     credentials: [],
     scope: [],
-    body: { contentType: 'application/json', schema: ShareExchangeRequestSchema },
+    body: { contentType: 'application/json', schema: GrantExchangeRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareSessionResponseSchema },
-      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      410: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
-      422: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: GrantSessionResponseSchema },
+      400: errorResponse,
+      403: errorResponse,
+      404: errorResponse,
+      410: errorResponse,
+      422: errorResponse,
     },
     notes:
       'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
-      'allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). ' +
-      'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
-      'supplied. Mounted only when the deployment can sign (HS256 mode).',
+      'allowlist. Unknown, deleted, paused and archived grants are indistinguishable (404). ' +
+      'Passphrase-protected grants return 422 GrantPassphraseRequired until `passphrase` is ' +
+      'supplied. A grant that asks its visitors who they are on open returns 422 ' +
+      'VisitorIdentityRequired until the required answers are given; `error.details` carries ' +
+      '`fields` (what the grant asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A grant ' +
+      'that asks before the first change issues the session at once with ' +
+      '`visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same ' +
+      'details until the visitor exchanges again with their answers. Answers that can not be ' +
+      'taken answer 422 on any grant. Mounted only when the deployment can sign (HS256 mode).',
   },
 } as const satisfies Record<string, AdminOperation>;
 export type AdminOperationId = keyof typeof adminOperations;
@@ -1317,14 +2225,16 @@ export type AdminOperationId = keyof typeof adminOperations;
 //
 // The "API vs protocol" split: these are the document operations a backend
 // can genuinely call — plain origin paths, credentialed by the API token
-// (which the server resolves to the document's own tenant) or a doc JWT
-// carrying the listed capabilities. The viewer-session protocol — /v1/access,
-// /v1/warm, the immutable `@{version}` CDN variants, SSE, password
-// sessions — deliberately stays out of this registry: it
-// is the transport between the CloudPDF viewer SDK and the engine, free to
-// evolve behind the SDK boundary. Body/response schemas start deliberately
-// loose (documented paths, params, credentials, capabilities) and tighten
-// incrementally as the wire shapes are ported from engine-core.
+// (which the server resolves to the document's own tenant), or a tenant
+// JWT or doc JWT carrying the listed capabilities, a tenant JWT on its own
+// tenant's documents. Browsers only ever get doc JWTs. The viewer-session
+// protocol — /v1/access, /v1/warm, the immutable `@{version}` CDN
+// variants, SSE, password sessions — deliberately stays out of this
+// registry: it is the transport between the CloudPDF viewer SDK and the
+// engine, free to evolve behind the SDK boundary. Body/response schemas
+// start deliberately loose (documented paths, params, credentials,
+// capabilities) and tighten incrementally as the wire shapes are ported
+// from engine-core.
 
 export const DocIdParamsSchema = z.object({
   docId: z.string().regex(docIdPattern),
@@ -1332,17 +2242,39 @@ export const DocIdParamsSchema = z.object({
 export const DocLayerParamsSchema = DocIdParamsSchema.extend({
   layerName: z.string().min(1),
 });
+
+export const DownloadLinkRequestSchema = z.object({
+  /** Seconds the link works for: 60 to 3600, default 300. */
+  expiresInSeconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .optional(),
+});
+export type DownloadLinkRequest = z.infer<typeof DownloadLinkRequestSchema>;
+
+export const DownloadLinkResponseSchema = z.object({
+  /**
+   * Downloads the layer's PDF as it is now, saved incrementally, with a
+   * plain GET and no Authorization header. Use it as given.
+   */
+  url: z.string(),
+  /** When the link stops working. */
+  expiresAt: IsoDateTimeSchema,
+});
+export type DownloadLinkResponse = z.infer<typeof DownloadLinkResponseSchema>;
 export const DocPageParamsSchema = DocLayerParamsSchema.extend({
   pageKey: z
     .string()
     .min(1)
     .regex(/^obj:[1-9][0-9]*$/)
     .describe(
-      "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`.",
+      "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`.",
     ),
 });
 export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
-  annotKey: z
+  annotationKey: z
     .string()
     .min(1)
     .regex(/^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$/)
@@ -1352,6 +2284,14 @@ export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
 });
 export const DocFieldParamsSchema = DocLayerParamsSchema.extend({
   fieldKey: z.string().min(1),
+});
+export const DocAttachmentParamsSchema = DocLayerParamsSchema.extend({
+  fileKey: z
+    .string()
+    .min(1)
+    .describe(
+      "The embedded file's name-tree key (its `ref.key`), token-text encoded, as `fieldKey` is.",
+    ),
 });
 
 /**
@@ -1378,14 +2318,18 @@ export const idempotencyKeyHeader: AdminOperationHeader = {
 };
 
 const looseJson = z.record(z.string(), z.unknown());
-const docCredentials = ['api-token', 'doc-jwt'] as const;
+const docCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 
+/** A font program, by the hash of the file a browser loads. */
+export const DocFontProgramParamsSchema = DocLayerParamsSchema.extend({
+  displaySha256: z.string().regex(sha256Hex),
+});
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
 const sha256Pattern = /^[0-9a-f]{64}$/;
-export const DocVersionParamsSchema = DocIdParamsSchema.extend({
-  sha: z.string().regex(sha256Pattern),
+export const DocVersionParamsSchema = DocLayerParamsSchema.extend({
+  sha256: z.string().regex(sha256Pattern),
 });
 export const DocVersionFieldParamsSchema = DocVersionParamsSchema.extend({
   fieldKey: z.string().min(1),
@@ -1422,7 +2366,7 @@ export const docOperations = {
     params: DocIdParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: DocumentHeadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.manifest': {
@@ -1438,7 +2382,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: DocumentManifestSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.metadata.get': {
@@ -1454,7 +2398,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: DocumentMetadataSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.metadata.custom.get': {
@@ -1471,8 +2415,138 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: CustomMetadataSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
+  },
+  'doc.outline.get': {
+    operationId: 'doc.outline.get',
+    title: 'Get outline',
+    summary:
+      "The document's outline (its bookmarks) for a layer: every item, depth first, with its parent, its target in page space, its look and whether it opens. Edit it with the outline ops of a change.",
+    method: 'GET',
+    path: wireTemplates.layerOutline,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: DocumentOutlineSchema },
+      404: errorResponse,
+    },
+  },
+  'doc.attachments.list': {
+    operationId: 'doc.attachments.list',
+    title: 'List attachments',
+    summary:
+      'The files embedded in the document (its /EmbeddedFiles) for a layer, in key order: each with its name, type, description, size, checksum and dates, never its bytes. Add and remove them with the attachment ops of a change.',
+    method: 'GET',
+    path: wireTemplates.layerAttachments,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AttachmentListSchema },
+      404: errorResponse,
+    },
+    notes:
+      "A file-attachment annotation's file is listed with the annotation; read its bytes with `doc.annotations.readFile`.",
+  },
+  'doc.attachments.download': {
+    operationId: 'doc.attachments.download',
+    title: 'Download an attachment',
+    summary:
+      "One embedded file's bytes, decoded. Its name and type are what the listing says; `Content-Type` is its type, or `application/octet-stream` when it has none.",
+    method: 'GET',
+    path: wireTemplates.layerAttachmentFile,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAttachmentParamsSchema,
+    responses: {
+      200: { contentType: 'application/octet-stream' },
+      400: errorResponse,
+      404: errorResponse,
+      413: errorResponse,
+    },
+    notes: "A file that decodes past the server's limit is refused (PayloadTooLarge).",
+  },
+  'doc.fonts.list': {
+    operationId: 'doc.fonts.list',
+    title: 'List fonts',
+    summary:
+      "Every font text can be written in, in a layer: the standard fonts, the server's, and the document's own, each with whether new text can be written in it and why not, and its font files.",
+    method: 'GET',
+    path: wireTemplates.layerFonts,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FontListSchema },
+      404: errorResponse,
+    },
+  },
+  'doc.fonts.resolve': {
+    operationId: 'doc.fonts.resolve',
+    title: 'Resolve fonts',
+    summary:
+      'The fonts a write would draw each run of text in, found the way the write finds them, without writing: what an editor shows while someone types.',
+    method: 'POST',
+    path: wireTemplates.layerFontsResolve,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: FontResolveRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FontResolutionSchema },
+      400: errorResponse,
+      404: errorResponse,
+    },
+  },
+  'doc.fonts.programs.get': {
+    operationId: 'doc.fonts.programs.get',
+    title: 'Get font program',
+    summary:
+      "A font file's facts, by the hash of the file a browser loads: the characters the engine can write with it and its line metrics.",
+    method: 'GET',
+    path: wireTemplates.layerFontProgram,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocFontProgramParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FontProgramInfoSchema },
+      404: errorResponse,
+    },
+  },
+  'doc.fonts.programs.download': {
+    operationId: 'doc.fonts.programs.download',
+    title: 'Download font program',
+    summary:
+      'A font file a browser can load, by its hash: to show text being typed in the font the engine writes it with.',
+    method: 'GET',
+    path: wireTemplates.layerFontProgramFile,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.annotate.modify', 'doc.forms.fill', 'doc.forms.modify', 'doc.redact'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocFontProgramParamsSchema,
+    responses: {
+      200: { contentType: 'font/sfnt' },
+      403: errorResponse,
+      404: errorResponse,
+    },
+    notes:
+      'A document token needs any one of the listed capabilities: one that may write text in the document. ' +
+      "A file the list says can't be downloaded (`canDownload: false`) is not found.",
   },
   'doc.signatures.list': {
     operationId: 'doc.signatures.list',
@@ -1488,7 +2562,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: SignatureSnapshotSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
     notes:
       "Describes the bytes the layer is over: the base version's signatures plus the layer's own edits as the last revision. " +
@@ -1509,8 +2583,8 @@ export const docOperations = {
     query: LayerSignaturesAnalysisQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: ChangeAnalysisSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
     notes:
       "Exactly one of `since.signature=<index>` or `since.revision=<index>`; the layer's pending edits are the end. " +
@@ -1532,15 +2606,15 @@ export const docOperations = {
     body: { contentType: 'multipart/form-data' },
     responses: {
       200: { contentType: 'application/json', schema: SignaturePreparedWireSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
     notes:
       'Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance ' +
       "PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) " +
       'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). ' +
-      'A layer behind the document head cannot sign (StaleBase).',
+      "The signature is made over the layer's own base: the upload, or the version its last signature made.",
   },
   'doc.signatures.complete': {
     operationId: 'doc.signatures.complete',
@@ -1557,14 +2631,14 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: SignatureCompleteBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: SignatureCompleteResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
     notes:
       '`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. ' +
-      'Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; ' +
-      'refetch the manifest after a completion.',
+      "Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer's own: only this layer moves " +
+      'to it, and the document and every other layer stay as they were. Refetch the manifest after a completion.',
   },
   'doc.signatures.cancel': {
     operationId: 'doc.signatures.cancel',
@@ -1579,32 +2653,35 @@ export const docOperations = {
     params: DocSigningParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: SignatureCancelResultSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.versions.list': {
     operationId: 'doc.versions.list',
     title: 'List versions',
-    summary: "The document's base versions, oldest first, and its head.",
+    summary:
+      "A layer's versions, oldest first: the upload, then the ones its signatures made; and its base.",
     method: 'GET',
-    path: wireTemplates.docVersions,
+    path: wireTemplates.layerVersions,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.open'],
     requestHeaders: [documentPasswordHeader],
-    params: DocIdParamsSchema,
+    params: DocLayerParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: DocumentVersionsSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      200: { contentType: 'application/json', schema: LayerVersionsSchema },
+      404: errorResponse,
     },
-    notes: 'Every completed signature publishes a new version. Never cached: the list grows.',
+    notes:
+      "Every completed signature makes a new version of its layer; another layer's versions are never listed. " +
+      'Never cached: the list grows.',
   },
   'doc.versions.signatures': {
     operationId: 'doc.versions.signatures',
     title: 'Version signatures',
-    summary: 'The signature snapshot of one base version (immutable).',
+    summary: "The signature snapshot of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatures,
+    path: wireTemplates.layerVersionSignatures,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -1612,15 +2689,15 @@ export const docOperations = {
     params: DocVersionParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: SignatureSnapshotSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.versions.signatureContents': {
     operationId: 'doc.versions.signatureContents',
     title: 'Signature contents',
-    summary: 'The DER /Contents of a signed field in one base version (immutable).',
+    summary: "The DER /Contents of a signed field in one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatureContents,
+    path: wireTemplates.layerVersionSignatureContents,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -1628,7 +2705,7 @@ export const docOperations = {
     params: DocVersionFieldParamsSchema,
     responses: {
       200: { contentType: 'application/pkcs7-signature' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
     notes:
       "`fieldKey` is the field's fully qualified name, token-text encoded (the same encoding attachment keys use).",
@@ -1636,9 +2713,9 @@ export const docOperations = {
   'doc.versions.signatureDigest': {
     operationId: 'doc.versions.signatureDigest',
     title: 'Signature digest',
-    summary: "The digest of a signed field's /ByteRange in one base version (immutable).",
+    summary: "The digest of a signed field's /ByteRange in one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatureDigest,
+    path: wireTemplates.layerVersionSignatureDigest,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -1646,16 +2723,16 @@ export const docOperations = {
     params: DocVersionDigestParamsSchema,
     responses: {
       200: { contentType: 'application/octet-stream' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
     notes: 'What a CMS verifier compares its message digest to.',
   },
   'doc.versions.analysis': {
     operationId: 'doc.versions.analysis',
     title: 'Analyze version history',
-    summary: 'What changed between two revisions of one base version (immutable).',
+    summary: "What changed between two revisions of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionAnalysis,
+    path: wireTemplates.layerVersionAnalysis,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -1664,19 +2741,19 @@ export const docOperations = {
     query: VersionAnalysisQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: ChangeAnalysisSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
     notes:
       'Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. ' +
-      'The same answer for every layer and every caller.',
+      'The same answer for every caller.',
   },
   'doc.versions.download': {
     operationId: 'doc.versions.download',
     title: 'Download a version',
-    summary: 'The bytes of one base version (immutable).',
+    summary: "The bytes of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionDownload,
+    path: wireTemplates.layerVersionDownload,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.download'],
@@ -1684,16 +2761,16 @@ export const docOperations = {
     params: DocVersionParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.versions.revision': {
     operationId: 'doc.versions.revision',
     title: 'Download a revision',
     summary:
-      'The byte prefix of one revision of a base version: exactly what a signature over it signed (immutable).',
+      "The byte prefix of one revision of a layer's version: exactly what a signature over it signed (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionRevision,
+    path: wireTemplates.layerVersionRevision,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.download'],
@@ -1701,7 +2778,7 @@ export const docOperations = {
     params: DocVersionRevisionParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.render': {
@@ -1720,7 +2797,7 @@ export const docOperations = {
       '`?viewport.kind=width&viewport.width=800`; the full grammar is documented with the viewer.',
     responses: {
       200: { contentType: 'image/webp' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.text': {
@@ -1736,7 +2813,7 @@ export const docOperations = {
     params: DocPageParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: PageTextSnapshotSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.annotations.list': {
@@ -1752,7 +2829,7 @@ export const docOperations = {
     params: DocPageParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: AnnotationListSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.annotations.listAll': {
@@ -1770,8 +2847,8 @@ export const docOperations = {
       'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.',
     responses: {
       200: { contentType: 'application/json', schema: AnnotationListSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
+      409: errorResponse,
     },
   },
   'doc.changes': {
@@ -1785,9 +2862,12 @@ export const docOperations = {
     scope: [],
     docCapabilities: [
       'doc.annotate.modify',
+      'doc.attachments.modify',
       'doc.forms.fill',
       'doc.forms.modify',
       'doc.metadata.modify',
+      'doc.outline.modify',
+      'doc.pages.assemble',
     ],
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
@@ -1803,16 +2883,18 @@ export const docOperations = {
       'an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair ' +
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
-      "`doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's " +
-      "artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
+      '`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`, ' +
+      'embedded files `doc.attachments.modify`. ' +
+      "Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as " +
+      "multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
       'and each file as the part `resource:<key>`. ' +
       'At most 64 changes per request and 512 ops per change.',
     responses: {
       200: { contentType: 'application/json', schema: ChangeResponseSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      413: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
+      413: errorResponse,
     },
   },
   'doc.annotations.create': {
@@ -1832,8 +2914,8 @@ export const docOperations = {
       'per-annotation authorship rules; the API token is exempt from both.',
     responses: {
       200: { contentType: 'application/json', schema: AnnotationCreateResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.annotations.update': {
@@ -1850,8 +2932,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: AnnotationUpdateResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.annotations.delete': {
@@ -1867,7 +2949,7 @@ export const docOperations = {
     params: DocAnnotationParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: AnnotationDeleteResultSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.annotations.reorder': {
@@ -1885,8 +2967,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: AnnotationReorderBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: AnnotationReorderResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.annotations.flatten': {
@@ -1904,8 +2986,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: AnnotationFlattenResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.annotations.exportAppearance': {
@@ -1923,8 +3005,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/pdf' },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.annotations.readAppearance': {
@@ -1941,9 +3023,29 @@ export const docOperations = {
     params: DocAnnotationParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
+  },
+  'doc.annotations.readFile': {
+    operationId: 'doc.annotations.readFile',
+    title: 'Read an attached file',
+    summary:
+      "A file-attachment annotation's file, decoded: its `file` resource. Its name and type are what the annotation's `file` says. A read; the source is untouched.",
+    method: 'GET',
+    path: wireTemplates.layerAnnotationItemFileResource,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAnnotationParamsSchema,
+    responses: {
+      200: { contentType: 'application/octet-stream' },
+      400: errorResponse,
+      404: errorResponse,
+      413: errorResponse,
+    },
+    notes: "A file that decodes past the server's limit is refused (PayloadTooLarge).",
   },
   'doc.forms.list': {
     operationId: 'doc.forms.list',
@@ -1959,7 +3061,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: FormSnapshotSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.forms.setValue': {
@@ -1976,8 +3078,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: FormSetValueResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.forms.updateWidget': {
@@ -1995,8 +3097,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: FormWidgetUpdateBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: FormWidgetUpdateResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.forms.deleteWidget': {
@@ -2013,8 +3115,8 @@ export const docOperations = {
     params: DocAnnotationParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: FormWidgetDeleteResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.forms.reorderWidgets': {
@@ -2032,8 +3134,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: FormWidgetsReorderBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: FormWidgetsReorderResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.forms.reorderCalculations': {
@@ -2051,8 +3153,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: FormCalculationsReorderBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: FormCalculationsReorderResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.forms.reset': {
@@ -2070,8 +3172,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: FormResetBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: FormResetResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.pages.viewports': {
@@ -2087,7 +3189,7 @@ export const docOperations = {
     params: DocPageParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: PageMeasurementViewportListSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
   'doc.pages.setScale': {
@@ -2105,63 +3207,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: PageScaleInputSchema },
     responses: {
       200: { contentType: 'application/json', schema: PageScaleResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.pages.reorder': {
-    operationId: 'doc.pages.reorder',
-    title: 'Reorder pages',
-    summary:
-      'Move pages together, in the order given, next to a neighbour page (`{ before }`, `{ after }`) or to the start or end. Returns the new layout.',
-    method: 'POST',
-    path: wireTemplates.layerPagesReorder,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: PageReorderInputSchema },
-    responses: {
-      200: { contentType: 'application/json', schema: PageReorderResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.pages.rotate': {
-    operationId: 'doc.pages.rotate',
-    title: 'Rotate pages',
-    summary: 'Set absolute rotation on pages.',
-    method: 'POST',
-    path: wireTemplates.layerPagesRotate,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageRotateResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.pages.delete': {
-    operationId: 'doc.pages.delete',
-    title: 'Delete pages',
-    summary: 'Delete pages.',
-    method: 'POST',
-    path: wireTemplates.layerPagesDelete,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageDeleteResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.pages.setName': {
@@ -2179,8 +3226,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: PageNameResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.pages.removeName': {
@@ -2197,8 +3244,8 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: PageNameResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
   },
   'doc.pages.flatten': {
@@ -2215,51 +3262,9 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson, required: false },
     responses: {
       200: { contentType: 'application/json', schema: PageFlattenResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
-  },
-  'doc.pages.insert': {
-    operationId: 'doc.pages.insert',
-    title: 'Insert pages from a PDF',
-    summary: 'Copy every page of an uploaded PDF into the document at an index.',
-    method: 'POST',
-    path: wireTemplates.layerPagesInsert,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: {
-      contentType: 'multipart/form-data',
-    },
-    responses: {
-      200: { contentType: 'application/json', schema: PageInsertResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-    notes:
-      'Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.',
-  },
-  'doc.pages.insertBlank': {
-    operationId: 'doc.pages.insertBlank',
-    title: 'Insert blank pages',
-    summary: 'Create blank pages of an explicit size at a position.',
-    method: 'POST',
-    path: wireTemplates.layerPagesInsertBlank,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageInsertResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-    notes:
-      'Body is `{"size": {"width", "height"}, "count"?, "position"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).',
   },
   'doc.pages.extract': {
     operationId: 'doc.pages.extract',
@@ -2275,11 +3280,11 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/pdf' },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
     notes:
-      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.',
+      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[], "flatten"?: {"usage"?: "display" | "print"}, "includeAnnotations"?: boolean, "includeFormFields"?: boolean}`; the response body is the new PDF. With `flatten` the copy is the pages as they draw for `usage` (`"print"`: a print copy): the annotations and form fields painted in, nothing interactive left, layers in their state for the usage. A flattened copy takes `doc.download` or `doc.download.flattened`, and paints only what the caller may read; `includeAnnotations` and `includeFormFields` choose what it paints, and are refused without `flatten`.',
   },
   'doc.redactions.apply': {
     operationId: 'doc.redactions.apply',
@@ -2292,12 +3297,33 @@ export const docOperations = {
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify', 'doc.redact'],
     requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: RedactionApplyScopeSchema },
+    body: { contentType: 'application/json', schema: RedactionApplyScopeInputSchema },
     responses: {
       200: { contentType: 'application/json', schema: RedactionApplyResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      400: errorResponse,
+      404: errorResponse,
     },
+  },
+  'doc.downloadLink': {
+    operationId: 'doc.downloadLink',
+    title: 'Create download link',
+    summary:
+      "A short-lived URL that downloads the layer's current PDF without an Authorization header, for services that only take a plain URL.",
+    method: 'POST',
+    path: wireTemplates.layerDownloadLink,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: DownloadLinkRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: DownloadLinkResponseSchema },
+      404: errorResponse,
+      501: errorResponse,
+    },
+    notes:
+      'The link opens the layer as it is when created: once the layer changes, it answers 404, so create it right before handing it over. It downloads that one file and nothing else, and a password-protected document is checked when the link is created. Deployments that verify tokens with their own keys (JWKS) mint links on their backend: a doc token with `layer_name`, a `download: { docVersion, mode: "incremental" }` claim and a short `exp`, passed as `link` on the versioned download URL.',
   },
   'doc.download': {
     operationId: 'doc.download',
@@ -2312,7 +3338,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: errorResponse,
     },
   },
 } as const satisfies Record<string, AdminOperation>;
@@ -2338,13 +3364,20 @@ export const docsGroups = {
   deployment: { title: 'Deployment' },
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
+  'documents.layers': { title: 'Layers' },
+  folders: { title: 'Folders' },
   tokens: { title: 'Tokens' },
-  shares: { title: 'Shares' },
+  grants: { title: 'Grants' },
+  'grants.visitors': { title: 'Visitors' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
+  'doc.attachments': { title: 'Attachments' },
+  'doc.fonts': { title: 'Fonts' },
+  'doc.fonts.programs': { title: 'Font programs' },
   'doc.forms': { title: 'Forms' },
   'doc.metadata': { title: 'Metadata' },
   'doc.metadata.custom': { title: 'Custom keys' },
+  'doc.outline': { title: 'Outline' },
   'doc.pages': { title: 'Pages' },
   'doc.redactions': { title: 'Redactions' },
   'doc.signatures': { title: 'Digital signatures' },

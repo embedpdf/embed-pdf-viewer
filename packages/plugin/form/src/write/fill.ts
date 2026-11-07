@@ -23,7 +23,7 @@ import {
   fieldValueOf,
   formEffectOps,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormFieldValue,
   type PdfActionTree,
@@ -97,7 +97,7 @@ const FILLS = new Set(['form.fill', 'form.reset']);
 const sameOp = (left: ChangeOp, right: ChangeOp): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-const sameValue = (left: FormFieldDTO | null, right: FormFieldDTO | null): boolean =>
+const sameValue = (left: FormField | null, right: FormField | null): boolean =>
   JSON.stringify(left?.valueEntry ?? null) === JSON.stringify(right?.valueEntry ?? null);
 
 export function createFill(

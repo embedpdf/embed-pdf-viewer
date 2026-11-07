@@ -1,11 +1,10 @@
-import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import { FreeTextDeclaration } from './declaration';
 import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
-import { FreeTextDeclaration } from './declaration';
 
 export { FreeTextDeclaration } from './declaration';
-export { RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
 
 export type FreeTextAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof FreeTextDeclaration,

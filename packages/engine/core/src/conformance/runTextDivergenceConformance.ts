@@ -23,7 +23,10 @@ import { EVERY_PERMISSION } from './fixtureScope';
  *     characters in lockstep with the text, identity map, real segments);
  *   - supplementary-plane text via a ToUnicode surrogate pair
  *     (`embedpdf_astral_tounicode.pdf` — two lockstep surrogate entries,
- *     identity map, astral content survives extraction).
+ *     identity map, astral content survives extraction);
+ *   - characters the page text leaves out (`bug_781804.pdf` — the `U+FFFE`
+ *     PDFium writes for a line-end hyphen it joined, and the `\r` of each
+ *     line break).
  *
  * The search probe closes the loop: a hit's `start`/`count` must be
  * character-space (segments join geometry), and slicing the snapshot by the
@@ -51,16 +54,16 @@ export interface TextDivergenceConformanceOptions extends Omit<ConformanceOption
 
 export function runTextDivergenceConformance(
   runner: ConformanceTestRunner,
-  opts: TextDivergenceConformanceOptions,
+  options: TextDivergenceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const fixture = opts.fixture;
+  const fixture = options.fixture;
 
-  describe(`text divergence conformance: ${opts.label} [${fixture.id}]`, () => {
+  describe(`text divergence conformance: ${options.label} [${fixture.id}]`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -68,7 +71,7 @@ export function runTextDivergenceConformance(
     });
 
     test('snapshot is schema-valid with the exact text, charCount, and charMap', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
         // Schema-parse enforces every charMap invariant (the {0,2} step
@@ -90,7 +93,7 @@ export function runTextDivergenceConformance(
     });
 
     test('char-space slicing round-trips through the map', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fixture.pageObjectNumber));
         const snap = await page.text.get();
@@ -106,7 +109,7 @@ export function runTextDivergenceConformance(
     if (fixture.search) {
       const probe = fixture.search;
       test('search hits address character space and join the text by slicing', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
           const slice = await doc.search.query({ text: probe.query });
           const hit = slice.matches.find((m) => m.page.objectNumber === fixture.pageObjectNumber);
@@ -146,22 +149,26 @@ export type TextDivergenceCase = Omit<
 /**
  * The pinned divergence cases — one table, consumed by both engines' suites
  * so expected values cannot drift. Values verified against the wasm runtime
- * (see each case). All fixtures are single-page; the page's indirect object
- * number is 3 in each.
+ * (see each case). All fixtures are single-page.
  */
 export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>> = {
-  /** Leading non-printing character: 31 character slots, 30 text units —
-   *  every text offset shifts by one, encoded by the single anchor [1, 0].
-   *  The searchex embeddertest for this fixture pins the same +1 shift. */
+  /** Leading non-printing character: 31 character slots, 29 text units —
+   *  every text offset shifts by one ([1, 0]), as the searchex embeddertest
+   *  for this fixture pins too, and the line break's `\r` gives no text
+   *  ([15, 13]), so the line ends in `\n`. */
   bug1139: {
     resource: 'bug_1139.pdf',
     pageObjectNumber: 3,
-    exactText: 'Hello, world!\r\nGoodbye, world!',
+    exactText: 'Hello, world!\nGoodbye, world!',
     expectedCharCount: 31,
-    expectedCharMap: [[1, 0]],
+    expectedCharMap: [
+      [1, 0],
+      [15, 13],
+    ],
     slices: [
       { start: 0, count: 1, text: '' }, // the non-printing char alone projects to nothing
       { start: 1, count: 6, text: 'Hello,' },
+      { start: 14, count: 2, text: '\n' }, // the line break: `\r` and `\n`, one unit
       { start: 16, count: 7, text: 'Goodbye' },
     ],
     search: { query: 'Goodbye', start: 16, count: 7, matchedText: 'Goodbye' },
@@ -196,5 +203,27 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
       { start: 2, count: 1, text: 'B' },
     ],
     search: { query: 'B!', start: 2, count: 2, matchedText: 'B!' },
+  },
+  /** A line-end hyphen PDFium joined into one word: it writes `U+FFFE` for the
+   *  hyphen (as Adobe's extraction does), which gives no text ([7, 6]), so
+   *  the word reads, copies and searches whole while the hyphen keeps its
+   *  slot inside the hit. Each line break's `\r` gives no text too. A real
+   *  hyphen (U+2010 in "User‐generated") stays. */
+  joinedHyphen: {
+    resource: 'bug_781804.pdf',
+    pageObjectNumber: 14,
+    exactText: 'Veritaserum\nUser‐\ngenerated',
+    expectedCharCount: 30,
+    expectedCharMap: [
+      [7, 6],
+      [13, 11],
+      [20, 17],
+    ],
+    slices: [
+      { start: 6, count: 1, text: '' }, // the joined hyphen alone gives nothing
+      { start: 0, count: 12, text: 'Veritaserum' },
+      { start: 12, count: 2, text: '\n' },
+    ],
+    search: { query: 'Veritaserum', start: 0, count: 12, matchedText: 'Veritaserum' },
   },
 };

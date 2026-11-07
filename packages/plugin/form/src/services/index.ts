@@ -7,10 +7,12 @@
  */
 import type { Mirror, SerialQueue } from '@embedpdf/core';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 
 import { canonicalKey, type FieldIndex, type FieldKey } from '../model';
 import { createFieldsMirror } from '../sync/fields';
 import type { FormContext } from './context';
+import { createCursor, type FormCursor } from './cursor';
 import { createDesign, type FormDesign } from './design';
 import { createEvents, type FormEvents } from './events';
 import { createFillRights, type FillRights } from './fill-rights';
@@ -27,6 +29,8 @@ export interface FormServices {
   /** Who may fill in which field. */
   readonly rights: FillRights;
   readonly events: FormEvents;
+  /** Where the cursor is among the fields, and the controls it can go into. */
+  readonly cursor: FormCursor;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
   /** Whether the widgets are lent to the annotation plugin now (design mode). */
@@ -56,12 +60,13 @@ export function createServices(ctx: FormContext): FormServices {
     fields,
     rights: createFillRights(ctx, fields),
     events,
+    cursor: createCursor(ctx, fields, events),
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
     design,
     formatted,
     pictures: createWidgetPictures(fields, siblings),
-    looks: createWidgetLooks({ fields, formatted, design }),
+    looks: createWidgetLooks({ fields, formatted, design, fonts: () => ctx.tryGet(FontsToken) }),
     enqueue: ctx.serialQueue('writes'),
     keyOf: (ref) => canonicalKey(fields.view(), ref),
   };

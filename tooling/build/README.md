@@ -40,6 +40,17 @@ plugin authors; this file is the law for how packages BUILD.
    `pnpm check:plugin-boundaries` verifies imports and follows each contract's
    runtime graph so reducers, capabilities, effects, and plugin wiring cannot
    leak into it.
+6. **dist holds the package's own files and nothing from another package.**
+   The bundler copies in what it can't leave as an import: code from a
+   package that isn't a dependency, and in declarations any type whose name
+   points at one. An inferred type does that whenever TypeScript happens to
+   reach the type through that package, which depends on the order it writes
+   the files in, so the copy comes and goes between builds. The build fails on
+   any copy (`src/own-source-only.mjs`); files the package's own build script
+   writes, like the engine's `workers/`, are its own. The fix is a named type
+   exported by a dependency (a plugin's state is its `XState` interface, never
+   an inferred object), or an import from a dependency. A package meant to
+   ship inside the build is listed in `epdf.bundle`.
 
 ## Package setup
 
@@ -68,8 +79,10 @@ plugin authors; this file is the law for how packages BUILD.
     "devExports": "development",
     // Specifiers dist keeps as written, for the consumer's resolver: a
     // `package.json` `imports` entry whose target depends on where the code
-    // runs (engine's `#inline-transport`).
-    "neverBundle": ["#inline-transport"]
+    // runs (engine's `#inline-transport`, js-sandbox's `#quickjs-variant`).
+    "neverBundle": ["#inline-transport"],
+    // Packages from node_modules shipped inside dist (law 6). None today.
+    "bundle": []
   }
 }
 ```

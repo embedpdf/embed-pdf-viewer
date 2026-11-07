@@ -25,9 +25,9 @@ import {
   type DocumentEvent,
   type DocumentHandle,
   type EventOrigin,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
-  type SignatureDTO,
+  type Signature,
   type SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
@@ -43,7 +43,7 @@ import {
   type SignatureSignedEvent,
 } from '../src/contract';
 import { createSignatureController } from '../src/controller';
-import { initialSignatureState, type SignatureState } from '../src/model';
+import { initialSignatureModel, type SignatureModel } from '../src/model';
 import { signatureState } from '../src/state';
 import { createArmedMarkHandler } from '../src/tools/armed-mark';
 
@@ -96,11 +96,11 @@ afterAll(async () => {
 
 const SIG: FormFieldRef = { kind: 'fqn', name: 'sig' };
 
-function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
+function signatureField(overrides: Partial<FormField> = {}): FormField {
   return {
     ref: { kind: 'objectNumber', objectNumber: 9 },
     name: 'sig',
-    family: 'signature',
+    kind: 'signature',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -117,13 +117,13 @@ function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
     defaultValueEntry: { kind: 'none' },
     widgets: [{ objectNumber: 9, page: toPageRef(3) }],
     ...overrides,
-  } as FormFieldDTO;
+  } as FormField;
 }
 
 /** Contexts a case opened; disposed after it, so no re-judgement timer outlives its case. */
-const contexts: TestContext<SignatureState, SignatureSettings>[] = [];
+const contexts: TestContext<SignatureModel, SignatureSettings>[] = [];
 afterEach(async () => {
-  for (const ctx of contexts.splice(0)) await ctx.dispose();
+  for (const ctx of contexts.splice(0)) await ctx.destroy();
 });
 
 /** The signature capability over a kernel context bound to `doc`, connected. */
@@ -138,8 +138,8 @@ function makeSignature(
   if (options.stamp) capabilities.push([StampToken, options.stamp]);
   const ctx = createTestContext({
     id: 'signature',
-    state: initialSignatureState(),
-    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['key', 'trust'] },
+    state: initialSignatureModel(),
+    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['signingKey', 'trust'] },
     documentId: 'doc-1',
     doc,
     capabilities,
@@ -156,7 +156,7 @@ async function openDoc() {
 }
 
 const stampStub = (bytes: Uint8Array) => ({
-  readAssetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
+  getAssetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
   getLibrary: (id: string) => (id === 'people' ? { id, kind: 'signatures', name: 'Bob' } : null),
   getArmedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
   disarm: vi.fn(),
@@ -176,12 +176,12 @@ describe('mode', () => {
       // Signing is a permission: a per-call key or two-step signing needs no key setting.
       expect(visual.canSign(SIG)).toBe(true);
       const signer = await createTestSigner();
-      const { signature: signing } = makeSignature(doc, { key: signer });
+      const { signature: signing } = makeSignature(doc, { signingKey: signer });
       expect(signing.getMode()).toBe('sign');
       expect(signing.canSign(SIG)).toBe(true);
       expect(signing.canCertify()).toBe(false);
       const { signature: asking } = makeSignature(doc, {
-        key: signer,
+        signingKey: signer,
         mode: 'ask',
         allowCertify: true,
       });
@@ -200,7 +200,7 @@ describe('settings, permissions and cancelling', () => {
       const { signature } = makeSignature(doc, {});
       expect(signature.getMode()).toBe('visual');
       const signer = await createTestSigner();
-      signature.updateSettings({ key: () => signer });
+      signature.updateSettings({ signingKey: () => signer });
       expect(signature.getMode()).toBe('sign');
       signature.updateSettings({ mode: 'ask' });
       expect(signature.getMode()).toBe('ask');
@@ -218,7 +218,11 @@ describe('settings, permissions and cancelling', () => {
     );
     try {
       const signer = await createTestSigner();
-      const { signature } = makeSignature(doc, { key: signer }, { stamp: stampStub(artwork) });
+      const { signature } = makeSignature(
+        doc,
+        { signingKey: signer },
+        { stamp: stampStub(artwork) },
+      );
       expect(signature.canSign(SIG)).toBe(false);
       expect(signature.canFill(SIG)).toBe(false);
       expect(signature.canReadRevision()).toBe(false);
@@ -285,7 +289,7 @@ describe('settings, permissions and cancelling', () => {
       await signature.refresh();
       await expect(
         signature.sign(
-          { field: SIG, mark: { assetId: 'people:signature' }, key: slowKey },
+          { field: SIG, mark: { assetId: 'people:signature' }, signingKey: slowKey },
           { signal: controller.signal },
         ),
       ).rejects.toMatchObject({ code: 'operation-cancelled' });
@@ -339,7 +343,7 @@ describe('signing', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { key: signer, trust: { anchors: async () => [signer.certificate] } },
+        { signingKey: signer, trust: { anchors: async () => [signer.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];
@@ -491,7 +495,7 @@ describe('signing', () => {
       });
       const { signature } = makeSignature(
         doc,
-        { key: () => Promise.resolve(remote) },
+        { signingKey: () => Promise.resolve(remote) },
         { stamp: stampStub(artwork) },
       );
       const result = await signature.sign({ field: SIG, mark: { source: artwork } });
@@ -513,7 +517,7 @@ describe('signing', () => {
     try {
       const { signature } = makeSignature(
         secondDoc,
-        { key: again, trust: { anchors: async () => [first.certificate] } },
+        { signingKey: again, trust: { anchors: async () => [first.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const result = await signature.sign({ field: SIG, mark: { source: artwork } });
@@ -534,7 +538,7 @@ describe('facts from every session', () => {
     const unsigned = await doc.signatures.list();
     await doc.close();
     const field = unsigned.signatures[0]!;
-    const sealed: SignatureDTO = {
+    const sealed: Signature = {
       ...field,
       signed: true,
       coverage: 'whole-revision',
@@ -544,9 +548,9 @@ describe('facts from every session', () => {
     const remote: EventOrigin = {
       kind: 'remote',
       sessionId: 'other-session',
-      sub: 'alice',
-      ts: 1,
-      serverId: 7,
+      subject: 'alice',
+      at: new Date(1).toISOString(),
+      serverSequence: 7,
     };
     const { ctx, signature } = makeSignature({
       signatures: { list: async () => unsigned },
@@ -573,7 +577,7 @@ describe('facts from every session', () => {
       origin: remote,
       status: 'completed',
       signature: sealed,
-      version: { sha256: 'after', byteLength: 2 },
+      version: { sha256: 'after', sizeBytes: 2 },
       previous: { sha256: 'before', byteLength: 1 },
       protection,
       meta: {},
@@ -646,7 +650,7 @@ describe('the armed mark over a field', () => {
     const stamp = stampStub(artwork);
     const hits: Record<string, ReturnType<typeof signatureField> | null> = {
       sig: signatureField(),
-      text: signatureField({ family: 'text', name: 'name' } as Partial<FormFieldDTO>),
+      text: signatureField({ kind: 'text', name: 'name' } as Partial<FormField>),
       signed: signatureField({ valueEntry: { kind: 'unsupported' } }),
     };
     let where: keyof typeof hits | 'nothing' = 'sig';
@@ -661,7 +665,7 @@ describe('the armed mark over a field', () => {
     expect(handler.enabledFor({ id: 'pointer', enables: new Set() } as never)).toBe(false);
 
     // Over an unsigned signature field: the mark goes into the field, the tool disarms.
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
     expect(placeMark).toHaveBeenCalledWith(
       { assetId: 'people:signature' },
       { field: hits.sig!.ref },
@@ -670,20 +674,20 @@ describe('the armed mark over a field', () => {
 
     // Elsewhere the click stays a stamp placement (decline).
     where = 'text';
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
     where = 'nothing';
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
     // A signed field is final: consumed, nothing placed.
     where = 'signed';
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
     expect(placeMark).toHaveBeenCalledTimes(1);
 
     // A plain stamp (any other library) never captures.
     stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
     where = 'sig';
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
     stamp.getArmedAsset.mockReturnValue(null as never);
-    expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
   });
 });
 
@@ -694,7 +698,7 @@ describe('judging what a save would write', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { key: signer, trust: { anchors: async () => [signer.certificate] } },
+        { signingKey: signer, trust: { anchors: async () => [signer.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];
@@ -745,7 +749,7 @@ describe('judging what a save would write', () => {
       // A new form field after an approval signature is not fill-in, signing
       // or commenting (corpus v3/86: "Form Fields Added", invalid): the
       // working copy is judged forbidden and the plugin warns, once.
-      await doc.forms.create({ family: 'text', name: 'late_field' } as never);
+      await doc.forms.create({ kind: 'text', name: 'late_field' } as never);
       await settle(700);
       expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'invalid',
@@ -758,7 +762,7 @@ describe('judging what a save would write', () => {
       expect((warnings[0] as { detail: string }).detail).toMatch(/field/i);
 
       // A second forbidden edit changes nothing about the verdict: no second warning.
-      await doc.forms.create({ family: 'text', name: 'later_field' } as never);
+      await doc.forms.create({ kind: 'text', name: 'later_field' } as never);
       await settle(700);
       expect(events.filter((event) => event.type === 'invalidating')).toHaveLength(1);
 
@@ -777,7 +781,7 @@ describe('judging what a save would write', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { key: signer, allowCertify: true },
+        { signingKey: signer, allowCertify: true },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];

@@ -2,6 +2,7 @@
 
 import {
   CodeExampleCard,
+  ExamplePoster,
   type ExampleFile,
   type ExampleFrame,
   type ExampleMode,
@@ -18,13 +19,14 @@ import {
   isDocsIntegration,
 } from '@/lib/docs-integrations';
 import { docsProductFromPath } from '@/lib/docs-products';
+import { exampleScreenshot, examplePageHref, exampleSlug } from '@/lib/examples';
 
 /** Mounts a built demo module (public/demos/…) via a NATIVE dynamic import —
  * the module carries its own framework runtime, so Vue/Svelte/Angular demos
  * run inside the Next site with no bundler integration at all. Import cost is
  * deferred until the preview is open AND near the viewport; once mounted, a
- * collapse keeps the instance alive (state survives toggling). */
-function DemoMount({ url, active }: { url: string; active: boolean }) {
+ * collapse keeps the instance alive (state survives toggling). `data-demo` says how far it got. */
+export function DemoMount({ url, active }: { url: string; active: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
   const [started, setStarted] = useState(false);
@@ -70,7 +72,7 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
   }, [started, url]);
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full" data-demo={error ? 'error' : loaded ? 'loaded' : 'loading'}>
       <div ref={ref} className="h-full min-h-[220px]" />
       {!loaded && !error ? (
         <p className="text-ep-soft absolute inset-0 m-0 flex animate-pulse items-center justify-center font-sans text-sm">
@@ -88,22 +90,21 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
 }
 
 /**
- * A bigger preview than an example gets by default: `tall`, or `wide`, which is as tall and on a
- * wide screen also takes the table of contents' column (the card covers it while it scrolls by).
+ * A bigger preview than an example gets by default: `tall`, or `page`, an app that needs the
+ * whole window: it opens on a page of its own (`/examples/<slug>`), and here its screenshot links
+ * there (`lib/examples.ts`).
  */
-export type ExampleSize = 'tall' | 'wide';
+export type ExampleSize = 'tall' | 'page';
 
 /**
  * The preview's frame: a ready-made viewer example (`viewer/…`) fills a frame that suits the docs
- * column, which `size` makes bigger; other examples are as tall as they are, unless `size` says.
+ * column, which `size` makes bigger; other examples, and a screenshot, are as tall as they are.
  */
 function frameOf(name: string | undefined, size: ExampleSize | undefined): ExampleFrame {
-  if (size === 'tall' || size === 'wide') return 'tall';
+  if (size === 'tall') return 'tall';
+  if (size === 'page') return 'content';
   return name?.startsWith('viewer/') ? 'viewer' : 'content';
 }
-
-/** The table of contents' column (toc.tsx) and the gap before it (docs-page.tsx). */
-const WIDE = 'relative z-10 md:w-[calc(100%+268px+clamp(28px,4vw,60px))]';
 
 /**
  * The route-variant-resolved sample display. This site's job is RESOLUTION —
@@ -182,13 +183,11 @@ export function Example({
     );
   }
 
-  const card = (
-    <CodeExampleCard
-      files={files}
-      mode={mode}
-      frame={frameOf(name, size)}
-      demo={demoUrl ? (active) => <DemoMount url={demoUrl} active={active} /> : undefined}
-    />
-  );
-  return size === 'wide' ? <div className={WIDE}>{card}</div> : card;
+  const slug = size === 'page' && name ? exampleSlug(name) : null;
+  const demo = slug
+    ? () => <ExamplePoster {...exampleScreenshot(name!)} href={examplePageHref(slug)} />
+    : demoUrl
+      ? (active: boolean) => <DemoMount url={demoUrl} active={active} />
+      : undefined;
+  return <CodeExampleCard files={files} mode={mode} frame={frameOf(name, size)} demo={demo} />;
 }

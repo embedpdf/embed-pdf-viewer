@@ -13,7 +13,8 @@ const { documents } = useDocumentsState();
 const nameOf = (id: string) => documents.value.find((document) => document.id === id)?.name ?? id;
 
 function split() {
-  if (props.pane.activeDocumentId) views.splitPane(props.pane.activeDocumentId, { from: props.pane.id });
+  if (props.pane.activeDocumentId)
+    views.splitPane(props.pane.activeDocumentId, { from: props.pane.id });
 }
 </script>
 
@@ -47,7 +48,7 @@ function split() {
         type="button"
         class="button"
         :disabled="!canRemove"
-        @click="views.removePane(pane.id)"
+        @click="views.deletePane(pane.id)"
       >
         Close pane
       </button>

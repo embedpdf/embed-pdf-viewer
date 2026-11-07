@@ -10,7 +10,7 @@
 
   // A change on load: the document gets a new title, so it has something to lose.
   onMount(() => {
-    void metadata.update({ title: 'Quarterly report (draft)' });
+    void metadata.update({ title: 'Documents belong on the web (draft)' });
   });
 
   // While there's something to lose, the browser asks before the page closes.
@@ -22,7 +22,7 @@
   });
 
   async function download() {
-    saveFile(await documents.download(), 'report.pdf');
+    saveFile(await documents.download(), 'welcome.pdf');
   }
 </script>
 

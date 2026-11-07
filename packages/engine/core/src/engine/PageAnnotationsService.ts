@@ -66,8 +66,9 @@ export interface PageAnnotationsService {
    * `appearance`, a file attachment its `file`; a resource the kind doesn't
    * take is refused), and the object number it gets (`objectNumber`, taken
    * from `doc.objectNumbers`), which makes its ref known before the engine
-   * answers. Without a number the engine picks the next free one. Without
-   * an `nm` in the data the annotation gets a fresh UUIDv7 `/NM`.
+   * answers. Without a number the engine picks the next free one. Data that
+   * leaves `nm` out gets a fresh UUIDv7 `/NM`; `nm: null` writes none, as a
+   * file from a tool that names nothing reads.
    *
    * A number this session doesn't hold, or one an object already has, is
    * refused with `ObjectNumberUnavailable`.

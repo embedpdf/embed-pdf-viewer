@@ -1,3 +1,6 @@
+import type { Snippet } from 'svelte';
+import type { AnchoredPlacement } from '@embedpdf/web';
+
 /** The props of `<RenderLayer>`. */
 export interface RenderLayerProps {
   /**
@@ -13,4 +16,19 @@ export interface RenderLayerProps {
    * arithmetic: leave it on, and pass false only for a view that must never tile.
    */
   tiles?: boolean;
+  /**
+   * Draw the page's thumbnail instead: one small picture of the whole page, without tiles, which
+   * needs only `doc.render.thumbnail` (a strip of thumbnails, a page picker).
+   */
+  thumbnail?: boolean;
+}
+
+/** The props of `<SnapshotMenu>`. */
+export interface SnapshotMenuProps {
+  /** The menu: buttons that call `useSnapshot()`, `copyImage()` and `saveFile()`. */
+  children: Snippet;
+  /** The gap in screen pixels between the box and the menu. Default 8. */
+  gap?: number;
+  /** Where the menu sits next to the box. Default `'bottom'`. */
+  placement?: AnchoredPlacement;
 }

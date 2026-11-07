@@ -180,10 +180,17 @@ function attributionOf(
   };
 }
 
-/** `bundle` with every item's name dropped. */
+/**
+ * `bundle` with every item's name left out, so each copy gets a fresh one
+ * (`nm: null` would ask for none). The items are no longer reads, only the
+ * creates they become.
+ */
 function withoutNames(bundle: WireAnnotationBundle): WireAnnotationBundle {
   return {
     ...bundle,
-    items: bundle.items.map((item) => ({ ...item, data: { ...item.data, nm: null } })),
+    items: bundle.items.map(({ data: { nm: _name, ...data }, ...item }) => ({
+      ...item,
+      data: data as (typeof bundle.items)[number]['data'],
+    })),
   };
 }

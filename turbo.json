@@ -57,6 +57,9 @@
     "@embedpdf/default-signature-fonts#build": {
       "outputs": ["modules/**"]
     },
+    "@embedpdf/default-fallback-fonts#build": {
+      "outputs": ["modules/**"]
+    },
     "@embedpdf/viewer#test": {
       "dependsOn": ["build"]
     },
@@ -76,6 +79,9 @@
       "dependsOn": ["^build", "build"]
     },
     "@embedpdf/viewer-vue#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/core-acrojs#test": {
       "dependsOn": ["^build", "build"]
     },
     "@embedpdf/engine#test": {

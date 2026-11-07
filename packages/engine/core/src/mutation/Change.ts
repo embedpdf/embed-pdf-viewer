@@ -1,5 +1,10 @@
 import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type {
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+  AttachmentRestoreResult,
+} from './AttachmentMutationResults';
+import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
   AnnotationReorderResult,
@@ -20,9 +25,27 @@ import type {
   FormWidgetsReorderResult,
   FormWidgetUpdateResult,
 } from './FormMutationResults';
-import type { AnnotationPosition, FieldPosition } from './ListPosition';
+import type {
+  AnnotationPosition,
+  FieldPosition,
+  OutlinePosition,
+  PagePosition,
+} from './ListPosition';
 import type { MetadataUpdateResult } from './MetadataUpdateResult';
 import type { MutationMeta } from './MutationMeta';
+import type {
+  OutlineCreateResult,
+  OutlineDeleteResult,
+  OutlineMoveResult,
+  OutlineRestoreResult,
+  OutlineUpdateResult,
+} from './OutlineMutationResults';
+import type { PageDeleteResult } from './PageDeleteResult';
+import type { PageInsertBlankSpec } from './PageInsertBlankInput';
+import type { PageInsertResult } from './PageInsertResult';
+import type { PageReorderResult } from './PageReorderResult';
+import type { PageRestoreResult } from './PageRestoreResult';
+import type { PageRotateResult } from './PageRotateResult';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationActor } from '../auth/scope/types';
@@ -34,16 +57,20 @@ import {
   type AnnotationResources,
   type WireAnnotationResources,
 } from '../annotation/resources';
+import type { AttachmentFileBase, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
+import type { OutlineItemDraft, OutlineItemPatch } from '../dto/DocumentOutline';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDisplay } from '../forms/effects';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormFieldValue } from '../forms/value';
+import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { OutlineItemRef } from '../identity/OutlineItemRef';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { SignatureAppearanceInput } from '../signature/types';
@@ -201,7 +228,103 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
   | {
       readonly type: 'metadata.updateCustom';
       readonly patch: CustomMetadataPatch;
-    };
+    }
+  | {
+      /**
+       * A new outline item under `parent` (`null`: the top level), at
+       * `position` among its children: at the end when left out.
+       */
+      readonly type: 'outline.create';
+      readonly parent: OutlineItemRef | null;
+      readonly position?: OutlinePosition;
+      readonly data: OutlineItemDraft<C['destination']>;
+      readonly objectNumber?: number;
+    }
+  | {
+      readonly type: 'outline.update';
+      readonly ref: OutlineItemRef;
+      readonly patch: OutlineItemPatch<C['destination']>;
+      readonly expect?: OutlineItemPatch<C['destination']>;
+    }
+  | {
+      /**
+       * The items go together, in the order given and each with the items
+       * under it, under `parent` (`null`: the top level), at `position` among
+       * its children.
+       */
+      readonly type: 'outline.move';
+      readonly refs: readonly OutlineItemRef[];
+      readonly parent: OutlineItemRef | null;
+      readonly position: OutlinePosition;
+    }
+  | {
+      /** The item goes, with the items under it. */
+      readonly type: 'outline.delete';
+      readonly ref: OutlineItemRef;
+      readonly expect?: OutlineItemPatch<C['destination']>;
+    }
+  | {
+      /** Every page gets `rotation`, its display rotation from now on. */
+      readonly type: 'pages.rotate';
+      readonly pages: readonly PageRef[];
+      readonly rotation: PdfRotation;
+    }
+  | {
+      /** The pages go together, in the order given, to `position`. */
+      readonly type: 'pages.reorder';
+      readonly pages: readonly PageRef[];
+      readonly position: PagePosition;
+    }
+  | {
+      /** The pages go, with their annotations. A document keeps at least one page. */
+      readonly type: 'pages.delete';
+      readonly pages: readonly PageRef[];
+    }
+  | {
+      /**
+       * `spec.count` blank pages at `position` (the end when left out), each at
+       * the number `objectNumbers` gives it, in order, when it gives one.
+       */
+      readonly type: 'pages.insertBlank';
+      readonly spec: PageInsertBlankSpec;
+      readonly position?: PagePosition;
+      readonly objectNumbers?: readonly number[];
+    }
+  | {
+      /**
+       * Every page of the PDF `source`, copied in at `position` (the end when
+       * left out), each at the number `objectNumbers` gives it, in order, when
+       * it gives one.
+       */
+      readonly type: 'pages.insert';
+      readonly source: Uint8Array;
+      readonly position?: PagePosition;
+      readonly objectNumbers?: readonly number[];
+    }
+  | {
+      /**
+       * A copy of each of `pages`, in the order given, at `position` (the end
+       * when left out), each at the number `objectNumbers` gives it, in order,
+       * when it gives one. The copies bring the pages' annotations, and their
+       * form fields as fields of their own (a name the document uses gets a
+       * free one, as an insert's do).
+       */
+      readonly type: 'pages.copy';
+      readonly pages: readonly PageRef[];
+      readonly position?: PagePosition;
+      readonly objectNumbers?: readonly number[];
+    }
+  | {
+      /**
+       * A file embedded in the document (`/EmbeddedFiles`), under its name:
+       * the name is its key, and a name another file has is refused.
+       */
+      readonly type: 'attachments.create';
+      readonly file: AttachmentFileBase;
+      /** Its bytes, as the `file` resource. */
+      readonly resources: R;
+    }
+  | { readonly type: 'attachments.delete'; readonly ref: AttachmentRef };
 
 /**
  * An import, as the one op of its change: `doc.annotations.import` runs it,
@@ -266,7 +389,10 @@ export type ChangeItemType =
   | RecordedOp['type']
   | 'annotations.restore'
   | 'forms.restore'
-  | 'forms.restoreWidget';
+  | 'forms.restoreWidget'
+  | 'outline.restore'
+  | 'pages.restore'
+  | 'attachments.restore';
 
 /**
  * An op an undo left alone entirely: the document no longer showed what the
@@ -325,7 +451,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | ({ type: 'forms.delete' } & FormFieldDeleteResult)
   | {
       type: 'forms.restore';
-      field: FormFieldDTO<C>;
+      field: FormField<C>;
       widgets: WidgetAnnotation<C>[];
       meta: FormMutationMeta;
     }
@@ -351,6 +477,37 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
       /** The keys an undo left alone. */
       skipped?: readonly string[];
     } & CustomMetadataUpdateResult)
+  | ({ type: 'outline.create' } & OutlineCreateResult<C['destination']>)
+  | ({
+      type: 'outline.update';
+      /** The fields an undo left alone: they no longer showed what the change had set. */
+      skipped?: readonly string[];
+    } & OutlineUpdateResult<C['destination']>)
+  | ({ type: 'outline.move' } & OutlineMoveResult)
+  | ({ type: 'outline.delete' } & OutlineDeleteResult)
+  /** An undo of a delete: the items it brought back. */
+  | ({ type: 'outline.restore' } & OutlineRestoreResult<C['destination']>)
+  | ({
+      type: 'pages.rotate';
+      /** The pages turned, and the rotation each has now. */
+      pages: PageRef[];
+      rotation: PdfRotation;
+    } & PageRotateResult<C>)
+  | ({ type: 'pages.reorder' } & PageReorderResult<C>)
+  | ({
+      type: 'pages.delete';
+      /** The pages that went, in the order they had. */
+      pages: PageRef[];
+    } & PageDeleteResult<C>)
+  | ({ type: 'pages.insertBlank' } & PageInsertResult<C>)
+  | ({ type: 'pages.insert' } & PageInsertResult<C>)
+  | ({ type: 'pages.copy' } & PageInsertResult<C>)
+  /** An undo of a delete, or a redo of an insert: the pages it brought back. */
+  | ({ type: 'pages.restore' } & PageRestoreResult<C>)
+  | ({ type: 'attachments.create' } & AttachmentCreateResult)
+  | ({ type: 'attachments.delete' } & AttachmentDeleteResult)
+  /** An undo of a delete, or a redo of a create: the file it brought back. */
+  | ({ type: 'attachments.restore' } & AttachmentRestoreResult)
   | SkippedChangeItem;
 
 /** Whether an item is an op an undo left alone entirely. */
@@ -384,7 +541,8 @@ export interface ChangeResult<C extends Coordinates = PageCoordinates> {
   items: ChangeItem<C>[];
   /**
    * Every page the change touched, the cloud's cache delta, the change's
-   * `opId` (what `{ undoOf }` names) and whether it can be undone.
+   * `opId` (what `{ undoOf }` names), whether it can be undone, and what
+   * its ops drew with no font (each item's `meta` says it for its op).
    */
   meta: MutationMeta;
 }
@@ -426,6 +584,14 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
       case 'forms.addWidget':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);
         if (op.splitObjectNumber !== undefined) named.push(op.splitObjectNumber);
+        break;
+      case 'outline.create':
+        if (op.objectNumber !== undefined) named.push(op.objectNumber);
+        break;
+      case 'pages.insertBlank':
+      case 'pages.insert':
+      case 'pages.copy':
+        named.push(...(op.objectNumbers ?? []));
         break;
       default:
         break;
@@ -499,6 +665,18 @@ export async function resolveChangeResources(change: Change): Promise<{
         const pdf = op.appearance.pdf.slice();
         buffers.push(pdf.buffer);
         ops.push({ ...op, appearance: { pdf } });
+        break;
+      }
+      case 'pages.insert': {
+        const source = op.source.slice();
+        buffers.push(source.buffer);
+        ops.push({ ...op, source });
+        break;
+      }
+      case 'attachments.create': {
+        const wire = await resolveAnnotationResources(op.resources);
+        buffers.push(...annotationResourceBuffers(wire));
+        ops.push({ ...op, resources: wire });
         break;
       }
       default:

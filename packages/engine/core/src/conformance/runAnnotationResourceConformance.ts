@@ -62,15 +62,15 @@ export interface AnnotationResourceConformanceOptions {
  */
 export function runAnnotationResourceConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationResourceConformanceOptions,
+  options: AnnotationResourceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation resource conformance: ${opts.label}`, () => {
+  describe(`annotation resource conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -81,7 +81,7 @@ export function runAnnotationResourceConformance(
       fixture: AnnotationResourceFixture,
       run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       try {
         await run(doc.page(await firstPage(doc)), doc);
       } finally {
@@ -538,7 +538,8 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
  * it a fresh one.
  */
 function copyOnItsPage(dto: Annotation): AnnotationDraft {
-  return { ...(JSON.parse(JSON.stringify(dto)) as AnnotationDraft), nm: null };
+  const { nm: _name, ...copy } = JSON.parse(JSON.stringify(dto)) as AnnotationDraft;
+  return copy as AnnotationDraft;
 }
 
 /**

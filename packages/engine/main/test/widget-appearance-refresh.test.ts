@@ -14,7 +14,7 @@ import type {
   AnnotationRef,
   LocalDocumentHandle,
   LocalEngine,
-  FormFieldDTO,
+  FormField,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
@@ -59,7 +59,7 @@ function countPixels(
 describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   let engine: LocalEngine;
   let doc: LocalDocumentHandle;
-  let field: FormFieldDTO;
+  let field: FormField;
   let widgetRef: AnnotationRef;
   let pageObjectNumber: number;
 

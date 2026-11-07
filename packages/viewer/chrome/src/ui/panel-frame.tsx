@@ -5,14 +5,18 @@
  * (`panel-layout.ts`):
  *
  * - dock: beside the pages, which make room for it. Its inner edge drags it
- *   wider or narrower, by pointer or with the arrow keys on the edge, within
- *   the panel's `width` limits, unless it isn't `resizable`. The viewer
+ *   wider or narrower, by pointer or with the keys on the edge, within the
+ *   panel's `width` limits, unless it isn't `resizable`. The viewer
  *   remembers that width per panel while it runs, and tells the app
  *   (`onPanelResize`). It is part of the page: Tab reaches it in order, and
- *   it never takes focus.
+ *   it never takes focus. A panel that can't close (`closable: false`) has no
+ *   close button here.
  * - overlay: over the edge of the pages, which stay where they are and dim.
- *   A click on them closes it; the bars around the pages keep working.
- * - sheet: up from the bottom of the viewer, over everything (`sheet.tsx`).
+ *   A click on them closes it; the bars around the pages keep working. Its
+ *   inner edge drags as a docked panel's does, to the same width.
+ * - sheet: up from the bottom of the viewer, over everything (`sheet.tsx`):
+ *   as wide as the viewer on a phone, and as wide as the panel, in the
+ *   middle, on a wider viewer. It has no edge.
  *
  * An overlay or a sheet takes focus when it opens, closes on Escape and gives
  * focus back to the button that opened it. A sheet keeps Tab inside it; from
@@ -20,6 +24,8 @@
  * list closes from either when one of its items is picked
  * ({@link useCloseOnPick}). The frame is named after its title for assistive
  * technology: a region when docked, a dialog otherwise (modal as a sheet).
+ *
+ * A panel with nothing to list opens as a bar instead ({@link PanelBar}).
  */
 import type { PanelPresentation, PanelPresentationBySize, PanelWidth } from '@embedpdf/core-ui';
 import { useT } from '@embedpdf/react/i18n';
@@ -41,6 +47,7 @@ import {
   overlayWidthOf,
   panelWidthsOf,
   presentationOf,
+  sheetWidthOf,
   widthAfterDrag,
   widthAfterKey,
   type PanelEdge as PanelEdgeOf,
@@ -48,6 +55,7 @@ import {
   type PanelWidths,
 } from './panel-layout';
 import { CloseOnPickProvider, SCRIM_CLASS, Sheet, useCloseOnPick } from './sheet';
+import { WithTooltip } from './tooltip';
 import { holdFocus } from './viewer-layer';
 
 export { useCloseOnPick };
@@ -60,13 +68,17 @@ export interface PanelFrameProps {
   readonly present?: PanelPresentation | PanelPresentationBySize;
   /** Its width in px, or where it starts and how far it drags. Default 288, from 200 to 640. */
   readonly width?: number | PanelWidth;
-  /** Whether its edge drags. Default true. */
+  /** Whether its edge drags, docked or as an overlay. Default true. */
   readonly resizable?: boolean;
+  /** Whether it can close where it docks: without, it has no close button there. Default true. */
+  readonly closable?: boolean;
   /** Its title: in its header, and the name assistive technology gives the frame. */
   readonly title: string;
   readonly onClose: () => void;
   /** Drawn in the header in place of the title: the switcher between the panels on its side. */
   readonly header?: ReactNode;
+  /** Drawn under the header, outside what scrolls: the bars the layout puts in the panel. */
+  readonly bars?: ReactNode;
   /** It holds a list: in a sheet or an overlay, picking an item closes it ({@link useCloseOnPick}). */
   readonly list?: boolean;
   readonly children: ReactNode;
@@ -82,6 +94,7 @@ export function PanelFrame(props: PanelFrameProps) {
 
 // ── the header ───────────────────────────────────────────────────────────────
 
+/** The header: the title, or what the panel puts there, and a close button with `onClose`. */
 function PanelHeader({
   title,
   header,
@@ -89,7 +102,7 @@ function PanelHeader({
 }: {
   title: string;
   header: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const t = useT();
   return (
@@ -101,15 +114,21 @@ function PanelHeader({
       <div className="flex min-w-0 flex-1 items-center">
         {header ?? <h2 className="text-fg truncate text-sm font-semibold">{title}</h2>}
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t('panel.close')}
-        title={t('panel.close')}
-        className="text-fg-muted hover:bg-hover grid h-7 w-7 shrink-0 place-items-center rounded-md"
-      >
-        <Icon name="x" size={16} />
-      </button>
+      {onClose && (
+        <WithTooltip content={{ label: t('panel.close') }}>
+          {(tooltip) => (
+            <button
+              {...tooltip}
+              type="button"
+              onClick={onClose}
+              aria-label={t('panel.close')}
+              className="text-fg-muted hover:bg-hover grid h-7 w-7 shrink-0 place-items-center rounded-md"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
+        </WithTooltip>
+      )}
     </div>
   );
 }
@@ -151,9 +170,11 @@ function DockedPanel({
   side,
   width,
   resizable = true,
+  closable = true,
   title,
   onClose,
   header,
+  bars,
   children,
 }: PanelFrameProps) {
   const env = useLayoutEnv();
@@ -177,7 +198,8 @@ function DockedPanel({
       }`}
       style={{ width: shown }}
     >
-      <PanelHeader title={title} header={header} onClose={onClose} />
+      <PanelHeader title={title} header={header} onClose={closable ? onClose : undefined} />
+      {bars}
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       {resizable && (
         <PanelEdge
@@ -194,10 +216,10 @@ function DockedPanel({
 }
 
 /**
- * A docked panel's inner edge: a separator that drags the panel wider or narrower, and takes
- * the arrow keys (Home and End for the narrowest and the widest) when it has focus. `onWidth`
- * follows every move; `onResized` hears the width the user gave it, once a drag ends and on
- * each key that changes it.
+ * A panel's inner edge, docked or as an overlay: a separator that drags the panel wider or
+ * narrower, and takes the arrow keys (Home and End for the narrowest and the widest) when it
+ * has focus. `onWidth` follows every move; `onResized` hears the width the user gave it, once a
+ * drag ends and on each key that changes it.
  */
 function PanelEdge({
   regionId,
@@ -287,15 +309,21 @@ function OverlayPanel({
   id,
   side,
   width,
+  resizable = true,
   title,
   onClose,
   header,
+  bars,
   list,
   children,
 }: PanelFrameProps) {
   const env = useLayoutEnv();
+  const regionId = useId();
   const widths = panelWidthsOf(width);
-  const [wanted] = usePanelWidth(id, widths);
+  const [wanted, setWidth] = usePanelWidth(id, widths);
+  const shown = clampPanelWidth(wanted, env.width, widths);
+  const resized = usePanelResize();
+  const edge: PanelEdgeOf = { side, dir: env.dir, viewerWidth: env.width, widths };
   const panel = useRef<HTMLElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -318,20 +346,32 @@ function OverlayPanel({
       />
       <section
         ref={panel}
+        id={regionId}
         role="dialog"
         aria-label={title}
         part="panel"
         data-epdf-panel={id}
         data-present="overlay"
         className={`bg-surface border-border-subtle absolute inset-y-0 z-40 flex flex-col shadow-xl transition-[translate] duration-200 ease-out motion-reduce:transition-none ${OVERLAY_ENTRY[side]}`}
-        style={{ width: overlayWidthOf(clampPanelWidth(wanted, env.width, widths), env.width) }}
+        style={{ width: overlayWidthOf(shown, env.width) }}
       >
         <PanelHeader title={title} header={header} onClose={onClose} />
+        {bars}
         <div className="flex min-h-0 flex-1 flex-col">
           <CloseOnPickProvider value={list ? () => close.current() : () => {}}>
             {children}
           </CloseOnPickProvider>
         </div>
+        {resizable && (
+          <PanelEdge
+            regionId={regionId}
+            edge={edge}
+            title={title}
+            width={shown}
+            onWidth={setWidth}
+            onResized={(next) => resized({ id, width: next })}
+          />
+        )}
       </section>
     </>
   );
@@ -339,18 +379,87 @@ function OverlayPanel({
 
 // ── sheet ────────────────────────────────────────────────────────────────────
 
-function SheetPanel({ id, title, onClose, header, list, children }: PanelFrameProps) {
+function SheetPanel({ id, width, title, onClose, header, bars, list, children }: PanelFrameProps) {
+  const env = useLayoutEnv();
+  const widths = panelWidthsOf(width);
+  const [wanted] = usePanelWidth(id, widths);
   return (
     <Sheet
       label={title}
       onClose={onClose}
       size="panel"
+      // The viewer's width on a phone; the panel's, in the middle, on a wider viewer.
+      width={env.size === 'compact' ? undefined : sheetWidthOf(wanted, env.width, widths)}
       list={list}
       part="panel"
       data={{ 'epdf-panel': id, present: 'sheet' }}
-      header={<PanelHeader title={title} header={header} onClose={onClose} />}
+      header={
+        <>
+          <PanelHeader title={title} header={header} onClose={onClose} />
+          {bars}
+        </>
+      }
     >
       {children}
     </Sheet>
+  );
+}
+
+// ── bar ──────────────────────────────────────────────────────────────────────
+
+/**
+ * A panel with nothing to list, as a bar over the top corner of the pages on its side, across
+ * them on a phone; the layout's `present` doesn't apply. The pages stay as they are and keep
+ * working under it. It takes focus as it opens, closes on Escape and gives focus back; Tab
+ * moves on from it to the rest of the viewer.
+ */
+export function PanelBar({
+  id,
+  side,
+  title,
+  onClose,
+  children,
+}: Pick<PanelFrameProps, 'id' | 'side' | 'title' | 'onClose' | 'children'>) {
+  const t = useT();
+  const { size } = useLayoutEnv();
+  const bar = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useLayoutEffect(() => {
+    const element = bar.current;
+    if (!element) return;
+    const held = holdFocus(element, { onEscape: () => close.current(), trap: false });
+    return () => held.release();
+    // The bar opens once; it closes by unmounting.
+  }, []);
+  const place =
+    size === 'compact'
+      ? 'inset-x-2'
+      : `w-[24rem] max-w-[calc(100%-1rem)] ${side === 'start' ? 'start-2' : 'end-2'}`;
+  return (
+    <section
+      ref={bar}
+      role="dialog"
+      aria-label={title}
+      part="panel"
+      data-epdf-panel={id}
+      data-present="bar"
+      className={`bg-surface border-border-subtle absolute top-2 z-40 flex items-start gap-1 rounded-lg border p-2 shadow-xl ${place}`}
+    >
+      <div className="min-w-0 flex-1">{children}</div>
+      <WithTooltip content={{ label: t('panel.close') }}>
+        {(tooltip) => (
+          <button
+            {...tooltip}
+            type="button"
+            onClick={onClose}
+            aria-label={t('panel.close')}
+            className="text-fg-muted hover:bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-md"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        )}
+      </WithTooltip>
+    </section>
   );
 }

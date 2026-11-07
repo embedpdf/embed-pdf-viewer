@@ -3,6 +3,7 @@ import type {
   FormFieldCreatedEvent,
   FormFieldDeletedEvent,
   FormFieldUpdatedEvent,
+  FormFocusChangedEvent,
   FormResyncedEvent,
   FormValidationRejectedEvent,
   FormValueChangedEvent,
@@ -17,6 +18,7 @@ export function createEvents(ctx: FormContext) {
     fieldDeleted: ctx.events.source<FormFieldDeletedEvent>(),
     validationRejected: ctx.events.source<FormValidationRejectedEvent>(),
     resynced: ctx.events.source<FormResyncedEvent>(),
+    focusChanged: ctx.events.source<FormFocusChangedEvent>(),
   };
 }
 export type FormEvents = ReturnType<typeof createEvents>;

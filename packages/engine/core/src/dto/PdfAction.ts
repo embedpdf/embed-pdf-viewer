@@ -14,14 +14,13 @@ export type PdfActionTargetRef =
   | { kind: 'objectNumber'; objectNumber: number };
 
 /**
- * Decoded SubmitForm `/Flags` word (ISO 32000-2:2020 Table 240) plus the raw
- * value. `exclude` is derived from bit 1 — never stored separately, so the
- * two cannot disagree. Note the two easily-missed positions verified against
- * the spec: bit 12 is `ExclFKey` (not "ExclFDFTemplate") and bit 13 is
- * reserved/undefined, so `EmbedForm` is bit 14.
+ * SubmitForm's `/Flags` word (ISO 32000-2:2020 Table 240), named. The engine
+ * reads and writes the bits; the API only names them. Note the two
+ * easily-missed positions verified against the spec: bit 12 is `ExclFKey`
+ * (not "ExclFDFTemplate") and bit 13 is reserved/undefined, so `EmbedForm`
+ * is bit 14.
  */
 export interface SubmitFormFlags {
-  raw: number;
   /** Bit 1: set → `fields` lists excluded fields. */
   exclude: boolean;
   /** Bit 2: submit designated valueless fields too, as name-only entries. */
@@ -60,7 +59,6 @@ export const decodeSubmitFormFlags = (raw: number): SubmitFormFlags => {
   const bit = (n: number): boolean => (raw & (1 << (n - 1))) !== 0;
   const format = bit(9) ? 'pdf' : bit(6) ? 'xfdf' : bit(3) ? 'html' : 'fdf';
   return {
-    raw,
     exclude: bit(1),
     includeNoValueFields: bit(2),
     format,
@@ -76,13 +74,43 @@ export const decodeSubmitFormFlags = (raw: number): SubmitFormFlags => {
 };
 
 /**
+ * The `/Flags` word for named flags, the inverse of
+ * {@link decodeSubmitFormFlags}: a flag left out is off, `format` is `'fdf'`
+ * and `method` is `'post'`.
+ */
+export const encodeSubmitFormFlags = (flags: Partial<SubmitFormFlags>): number => {
+  const bits: Array<[number, boolean | undefined]> = [
+    [1, flags.exclude],
+    [2, flags.includeNoValueFields],
+    [3, flags.format === 'html'],
+    [4, flags.method === 'get'],
+    [5, flags.submitCoordinates],
+    [6, flags.format === 'xfdf'],
+    [7, flags.includeAppendSaves],
+    [8, flags.includeAnnotations],
+    [9, flags.format === 'pdf'],
+    [10, flags.canonicalFormat],
+    [11, flags.exclNonUserAnnots],
+    [12, flags.exclFKey],
+    [14, flags.embedForm],
+  ];
+  return bits.reduce((word, [bit, on]) => (on ? word | (1 << (bit - 1)) : word), 0);
+};
+
+/** The named flags of a payload, without its URL, fields or charset. */
+function submitFormFlagsOf(payload: SubmitFormPayload): SubmitFormFlags {
+  const { url: _url, fields: _fields, charSet: _charSet, ...flags } = payload;
+  return flags;
+}
+
+/**
  * SubmitForm's extracted intent. Atomic on purpose: either every required
  * component resolved (a complete, executable payload) or the node carries no
  * payload at all — partial states are unrepresentable. An unreadable
  * required component (`/F`) degrades the whole node to `unknown` +
  * `payload-dropped` at read time instead.
  */
-export interface SubmitFormPayload {
+export interface SubmitFormPayload extends SubmitFormFlags {
   /** Resolved `/F` URL — a `<< /FS /URL >>` file specification (7.11.5,
    *  `/UF` preferred over `/F` per 7.11.2); a bare string `/F` is accepted
    *  as a producer-compat extension. */
@@ -94,7 +122,6 @@ export interface SubmitFormPayload {
    * everything eligible — presence and emptiness are different states.
    */
   fields: PdfActionTargetRef[] | null;
-  flags: SubmitFormFlags;
   /** `/CharSet` (PDF 2.0), extracted but not encoded by this stack. */
   charSet?: string;
 }
@@ -169,9 +196,7 @@ export interface PdfActionTree<Destination = PageDestination> {
   /** Null when the model was valid but its root exceeded a safety bound. */
   root: PdfActionNode<Destination> | null;
   incomplete: boolean;
-  /** Raw native bits, retained so newer warnings survive older SDKs.
-   *  TS-detected warnings (`payload-dropped`) appear only in `warnings`. */
-  warningFlags: number;
+  /** What the reader dropped or couldn't read, by name. */
   warnings: PdfActionWarning[];
 }
 
@@ -213,10 +238,8 @@ export interface DocumentActionsSnapshot<Destination = PageDestination> {
   /** Action-form `/OpenAction`. Mutually exclusive with `openDestination` —
    *  `/OpenAction` is one entry, a dictionary or an array. */
   openAction: PdfActionTree<Destination> | null;
-  /** Destination-form `/OpenAction` — the initial view, not an action.
-   *  Optional on the wire for skew tolerance (absent ≡ null); the schema
-   *  defaults it, so parsed snapshots always carry the key. */
-  openDestination?: Destination | null;
+  /** Destination-form `/OpenAction` — the initial view, not an action. */
+  openDestination: Destination | null;
   willClose?: PdfActionTree<Destination>;
   willSave?: PdfActionTree<Destination>;
   didSave?: PdfActionTree<Destination>;
@@ -265,14 +288,12 @@ export type PdfActionWrite<Destination = PageDestination> = {
       fields: PdfActionTargetRef[] | null;
       exclude: boolean;
     }
-  | {
+  | ({
       type: 'submit-form';
       url: string;
       /** As read: `null` submits every field the form exports. */
       fields: PdfActionTargetRef[] | null;
-      /** The raw `/Flags` word (ISO 32000-2 Table 240); 0 when left out. */
-      flags?: number;
-    }
+    } & Partial<SubmitFormFlags>)
 );
 
 /**
@@ -429,10 +450,10 @@ function nodeWriteOf<Destination>(
     case 'submit-form':
       return node.payload
         ? {
+            ...submitFormFlagsOf(node.payload),
             type: 'submit-form',
             url: node.payload.url,
             fields: node.payload.fields,
-            flags: node.payload.flags.raw,
             ...tail,
           }
         : null;

@@ -10,9 +10,9 @@ import './identity.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -42,7 +42,7 @@ function Toolbar({ role, onRoleChange }: { role: Role; onRoleChange: (role: Role
 
   const openAgain = async () => {
     await documents.close(id);
-    await documents.open(ebook, { name: 'ebook.pdf' });
+    await documents.open(welcome, { name: 'welcome.pdf' });
     setOpenedAs(role);
   };
 
@@ -87,7 +87,7 @@ export default function App() {
       plugins={plugins}
       identity={dana}
       scope={roles[role]}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <Toolbar role={role} onRoleChange={setRole} />
       <DocumentGate fallback={<p className="loading">Opening…</p>}>

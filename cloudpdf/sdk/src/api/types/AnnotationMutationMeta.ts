@@ -7,5 +7,6 @@ export interface AnnotationMutationMeta {
     cacheDelta: CloudPDF.CacheDelta | null;
     opId: string;
     undoable: boolean;
-    changed: CloudPDF.AnnotationRef[];
+    missingCharacters?: string[] | undefined;
+    changedRefs: CloudPDF.AnnotationRef[];
 }

@@ -28,13 +28,13 @@ export type { PageDestination, PdfLinkTarget };
  * with no framework to open it are handed to the caller to perform.
  */
 export type LinkActivation =
-  | { outcome: 'revealed' }
-  | { outcome: 'destination'; destination: PageDestination }
-  | { outcome: 'uri'; uri: string }
-  | { outcome: 'named'; name: string }
-  | { outcome: 'reported'; target: PdfLinkTarget }
-  | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
-  | { outcome: 'none' };
+  | { status: 'revealed' }
+  | { status: 'destination'; destination: PageDestination }
+  | { status: 'uri'; uri: string }
+  | { status: 'named'; name: string }
+  | { status: 'reported'; target: PdfLinkTarget }
+  | { status: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
+  | { status: 'none' };
 
 /**
  * What activating a target would do, with no side effect. A `goto` to a page
@@ -47,16 +47,40 @@ export type LinkResolution =
   | { kind: 'named'; name: string }
   | { kind: 'reported'; target: PdfLinkTarget };
 
+/**
+ * What activating a target would do, by the rule every link and outline item
+ * follows: a `goto` to a page `hasPage` knows is its destination, one to a
+ * page the document doesn't have is reported; a website and a named verb are
+ * handed on; anything else is reported.
+ */
+export function resolveLinkTarget(
+  target: PdfLinkTarget,
+  hasPage: (page: PageRef) => boolean,
+): LinkResolution {
+  switch (target.kind) {
+    case 'goto':
+      return hasPage(target.destination.page)
+        ? { kind: 'destination', destination: target.destination }
+        : { kind: 'reported', target };
+    case 'uri':
+      return { kind: 'uri', uri: target.uri };
+    case 'named':
+      return { kind: 'named', name: target.name };
+    default:
+      return { kind: 'reported', target };
+  }
+}
+
 export interface LinkActivateContext {
   /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
-  activate?: PdfActionTree;
-  ref?: AnnotationRef;
-  page?: PageRef;
+  readonly activate?: PdfActionTree;
+  readonly ref?: AnnotationRef;
+  readonly page?: PageRef;
   /**
    * The view the link was followed in: a page destination moves this Stage.
    * Defaults to the main view.
    */
-  stage?: StageCapability;
+  readonly stage?: StageCapability;
 }
 
 /** A link target was activated through this capability. */
@@ -84,7 +108,7 @@ export interface LinkCapability {
    * Every link in the document; loads pages as needed. Rejects when a page's
    * read fails, and `operation-cancelled` when `signal` fires.
    */
-  listAllLinks(options?: OperationOptions): Promise<readonly Link[]>;
+  readAllLinks(options?: OperationOptions): Promise<readonly Link[]>;
   /**
    * Load a page's links. Resolves at once when the annotation plugin owns
    * them; rejects when the read fails, which `getStatus(page)` then reports,

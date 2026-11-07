@@ -8,7 +8,10 @@ import {
   type AnnotationPatch,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import type {
+  AnnotationCommitEntry,
+  AnnotationCommitResult,
+} from '@embedpdf/plugin-actions/contract/host';
 
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedOrThrow } from './outcomes';
@@ -72,9 +75,11 @@ export function createScriptEffects(
   { store, geometry }: Pick<AnnotationServices, 'store' | 'geometry'>,
 ) {
   const api = {
-    commitScriptEffects: async (entries: AnnotCommitEntry[]): Promise<AnnotCommitResult> => {
+    commitScriptEffects: async (
+      entries: AnnotationCommitEntry[],
+    ): Promise<AnnotationCommitResult> => {
       const doc = ctx.doc;
-      const results: AnnotCommitResult['results'] = [];
+      const results: AnnotationCommitResult['results'] = [];
       let failed = false;
       for (const entry of entries) {
         if (failed) {

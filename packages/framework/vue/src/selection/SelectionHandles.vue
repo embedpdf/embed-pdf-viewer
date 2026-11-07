@@ -16,7 +16,7 @@
   variables override.
 
   What it draws is the plugin's (the view over the Stage, the endpoints,
-  `selectionHandleGeom`, the armed drag) and how a grip follows the pointer is
+  `selectionHandleGeometry`, the armed drag) and how a grip follows the pointer is
   `@embedpdf/web`'s (`attachSelectionHandle`);
   this component keeps what only Vue does: the subscriptions and the markup.
 -->
@@ -29,7 +29,7 @@ import {
   HANDLE_PAD,
   armSelectionHandle,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
@@ -89,8 +89,8 @@ const geometry = computed(() => {
   if (!lens || !ends) return null;
   const view = selectionHandleViewOf(lens);
   return {
-    start: selectionHandleGeom(view, ends.start, 'start'),
-    end: selectionHandleGeom(view, ends.end, 'end'),
+    start: selectionHandleGeometry(view, ends.start, 'start'),
+    end: selectionHandleGeometry(view, ends.end, 'end'),
   };
 });
 

@@ -9,7 +9,7 @@ description: Add text fields, checkboxes, radio groups, dropdowns, lists, button
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'customer.email',
   maxLength: 60,
   widgets: [{ page: page.ref, rect: { x: 72, y: 168, width: 228, height: 24 } }],
@@ -23,7 +23,7 @@ The new field fills in, exports and shows like any other field; see
 
 ## Fields and widgets
 
-A form has two parts. The **field** holds the value: it has a name, a family and a few settings,
+A form has two parts. The **field** holds the value: it has a name, a kind and a few settings,
 and it belongs to the document, not to a page. A **widget** is where the field shows: the box on
 a page that you see and click.
 
@@ -33,13 +33,13 @@ field can have widgets on several pages that all show the same value.
 
 ## Create a field
 
-`create()` takes the family, the field's full name and its settings. `widgets` places it on the
+`create()` takes the kind, the field's full name and its settings. `widgets` places it on the
 pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
 and [add a widget](#add-a-widget) later.
 
 | Field           | What it is                                                                                                                                                | Default    |
 | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
+| `kind`          | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
 | `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                                         |            |
 | `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look).                  | not placed |
 | `readOnly`      | PDF apps don't let the user change it.                                                                                                                    | `false`    |
@@ -53,17 +53,17 @@ and [add a widget](#add-a-widget) later.
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
 with `InvalidArg` too.
 
-Each family adds its own settings:
+Each kind adds its own settings:
 
-| Family       | Settings                                                                                               |
-| :----------- | :----------------------------------------------------------------------------------------------------- |
-| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
-| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
-| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
-| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
-| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
-| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                            |
-| `signature`  | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
+| Family       | Settings                                                                                                                         |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`)                           |
+| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.                                        |
+| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                                           |
+| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                                                        |
+| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)                                      |
+| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                                                      |
+| `signature`  | Only widgets, each drawn as its box until a mark is in it. Signing it is on [Digital signatures](/docs/engine/forms/signatures). |
 
 ### A radio group
 
@@ -72,7 +72,7 @@ with, so it can't be `'Off'`:
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'radio',
+  kind: 'radio',
   name: 'plan',
   noToggleToOff: true,
   widgets: [
@@ -94,7 +94,7 @@ Options are `{ label, value }`: the user sees the `label`, the form stores the `
 
 ```ts
 await doc.forms.create({
-  family: 'combobox',
+  kind: 'combobox',
   name: 'country',
   options: [
     { label: 'Netherlands', value: 'NL' },
@@ -112,7 +112,7 @@ A push button holds no value: it does something when it's clicked. Give each wid
 
 ```ts
 await doc.forms.create({
-  family: 'pushbutton',
+  kind: 'pushbutton',
   name: 'clear',
   widgets: [
     {
@@ -136,19 +136,19 @@ submits the form or opens a web address needs `doc.forms.script` too.
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
 fields you change later with `doc.forms.updateWidget()`:
 
-| Field           | What it is                                                                                       |
-| :-------------- | :----------------------------------------------------------------------------------------------- |
-| `color`         | Border color, `'#rrggbb'`                                                                        |
-| `interiorColor` | Background color                                                                                 |
-| `strokeWidth`   | Border width in points                                                                           |
-| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)          |
-| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                               |
-| `fontFamily`    | A standard PDF font, such as `'helvetica'` or `'courier'`, or the `key` of a font you registered |
-| `fontSize`      | Text size in points                                                                              |
-| `fontColor`     | Text color                                                                                       |
-| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                |
-| `caption`       | A push button's caption; other widgets take none                                                 |
-| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                     |
+| Field           | What it is                                                                                                   |
+| :-------------- | :----------------------------------------------------------------------------------------------------------- |
+| `color`         | Border color, `'#rrggbb'`                                                                                    |
+| `interiorColor` | Background color                                                                                             |
+| `strokeWidth`   | Border width in points                                                                                       |
+| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)                      |
+| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                                           |
+| `fontFamily`    | The `name` of a font in `doc.fonts.list()`, such as `'helvetica'`; see [Fonts](/docs/engine/documents/fonts) |
+| `fontSize`      | Text size in points                                                                                          |
+| `fontColor`     | Text color                                                                                                   |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                            |
+| `caption`       | A push button's caption; other widgets take none                                                             |
+| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                                 |
 
 ```ts
 widgets: [
@@ -165,9 +165,10 @@ widgets: [
 A mark is `'check'`, `'cross'`, `'star'`, `'circle'`, `'square'` or `'diamond'`. With
 `checkStyle: null`, a checkbox draws a check and a radio button a circle.
 
-A font the document already has, and that you didn't register, reads as its family name, such as
-`'Roboto'`. Changing a widget's color or size keeps its font; to change the font, name a standard
-font or a registered one.
+A font the document already has reads as its name in `doc.fonts.list()`, such as `'Roboto-Bold'`.
+Changing a widget's color or size keeps its font, whatever it is; to change the font, name one
+whose `canChoose` is `true`. Text in any language is filled in: characters the widget's font
+doesn't have come from fallback fonts (see [Text in any language](/docs/engine/documents/fonts#text-in-any-language)).
 
 To change the look later, update the widget with the same fields (see
 [Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when
@@ -185,7 +186,7 @@ await doc.forms.update(field.ref, { required: true, maxLength: 80 });
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
 `{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip.
 
-You can change the settings in the tables above, except the family and the widgets. A signature
+You can change the settings in the tables above, except the kind and the widgets. A signature
 field takes the settings every field has: `name`, `readOnly`, `required`, `noExport`,
 `alternateName` and `mappingName`.
 Also:
@@ -204,7 +205,7 @@ take them in `actions`:
 
 ```ts
 const { field: total } = await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'total',
   readOnly: true,
   actions: {
@@ -306,6 +307,12 @@ field's `readOnly`: PDF apps ignore a widget annotation's own `readOnly`.
 
 A widget is the form's, so `page.annotations.update()` refuses one with `InvalidArg`.
 
+A signature field's widget draws its box: its background and border, in the style above. Once a
+mark is in it, because the field is signed or a mark was drawn in with
+[`setSignatureAppearance()`](/docs/engine/forms/signatures), the widget reads `hasMark: true` and
+shows that mark instead. Its style no longer applies, so changing it fails with `InvalidArg`;
+moving or resizing the widget keeps the mark.
+
 ### Turned widgets
 
 A widget's contents can turn a quarter, so that a field on a turned page reads upright, or a label
@@ -316,7 +323,7 @@ the `rect` or the `box`, as a create of any shape that turns does:
 
 ```ts
 await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'side',
   // 24 wide and 160 tall: the text runs up the page
   widgets: [{ page: page.ref, rect: { x: 20, y: 120, width: 24, height: 160 }, rotation: 270 }],

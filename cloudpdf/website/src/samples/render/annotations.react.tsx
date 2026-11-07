@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { AnnotationLayer, annotationPlugin, useAnnotation } from '@embedpdf/react/annotation';
+import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './annotations.css';
@@ -12,29 +12,7 @@ import './annotations.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-// A rectangle on the first page, made on load so there's an annotation to show.
-function AddRectangle() {
-  const annotation = useAnnotation();
-  const firstPage = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!firstPage || added.current) return;
-    added.current = true;
-    void annotation.create(firstPage, {
-      subtype: 'square',
-      box: { x: 72, y: 96, width: 300, height: 140 },
-      color: '#e11d48',
-      interiorColor: '#ffe4e6',
-      opacity: 0.7,
-      strokeWidth: 3,
-    });
-  }, [annotation, firstPage]);
-
-  return null;
-}
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 type Painter = 'picture' | 'layer';
 
@@ -42,9 +20,8 @@ export default function App() {
   const [painter, setPainter] = useState<Painter>('picture');
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: report }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddRectangle />
         <div className="toolbar">
           <div className="segmented" role="group" aria-label="Who draws the annotations">
             <button

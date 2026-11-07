@@ -21,9 +21,9 @@
     commandsPlugin({ commands: standardCommands }),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/welcome.pdf');
+    return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 
   // Your icons, by the names the standard commands give them.
@@ -68,7 +68,7 @@
   let width = $state(100);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
@@ -87,7 +87,7 @@
             title={cmd.label}
             aria-label={cmd.label}
             disabled={!cmd.enabled}
-            aria-pressed={cmd.active}
+            aria-pressed={cmd.pressable ? cmd.active : undefined}
             onclick={run}
           >
             <span class="icon" aria-hidden="true">

@@ -22,7 +22,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A result: its row follows the command, so it greys out the moment the command can't run.
 function Result({ id }: { id: string }) {
@@ -33,7 +33,7 @@ function Result({ id }: { id: string }) {
     <li>
       <button type="button" className="result" disabled={!command.enabled} onClick={command.run}>
         <span>{command.label}</span>
-        {command.shortcut && <kbd className="shortcut">{command.shortcut}</kbd>}
+        {command.shortcutLabel && <kbd className="shortcut">{command.shortcutLabel}</kbd>}
       </button>
     </li>
   );
@@ -71,7 +71,7 @@ function CommandPalette() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="layout">
           <CommandPalette />

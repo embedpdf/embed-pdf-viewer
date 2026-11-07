@@ -20,8 +20,8 @@
     searchPlugin(),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 
@@ -49,7 +49,7 @@
   {engine}
   {plugins}
   scope={roles[role]}
-  initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+  initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
 >
   <div class="toolbar">
     <label class="label">
@@ -61,7 +61,7 @@
       </select>
     </label>
   </div>
-  <ReopenOnRoleChange {role} {ebook} />
+  <ReopenOnRoleChange {role} {welcome} />
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

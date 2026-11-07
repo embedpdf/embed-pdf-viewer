@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    'modules/index': 'src/modules/index.ts',
     'bin/cloudpdf-server': 'src/bin/cloudpdf-server.ts',
     'runtime/worker-entry': 'src/runtime/worker-entry.ts',
     'runtime/engine-host-entry': 'src/runtime/engine-host-entry.ts',
@@ -19,7 +20,12 @@ export default defineConfig({
   // Inline workspace packages that can resolve to TS source in development
   // so the built server runs directly in Node. The runtime stays external
   // because it ships built artifacts.
-  noExternal: ['@embedpdf/core-signature', '@embedpdf/engine-core', '@embedpdf/engine-services'],
+  noExternal: [
+    '@embedpdf/core-fonts',
+    '@embedpdf/core-signature',
+    '@embedpdf/engine-core',
+    '@embedpdf/engine-services',
+  ],
   external: [
     /^@embedpdf\//,
     'fastify',

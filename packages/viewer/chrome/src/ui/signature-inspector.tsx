@@ -12,6 +12,7 @@ import { FormToken } from '@embedpdf/react/form';
 import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
+import { saveFile } from '@embedpdf/web';
 import {
   useSignature,
   useSignatureState,
@@ -177,13 +178,7 @@ function DownloadRevision({ field }: { field: FormFieldRef }) {
     setBusy(true);
     try {
       const bytes = await signature.readRevision({ revisionIndex });
-      const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${dto.fieldName}-signed.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      saveFile(bytes, `${dto.fieldName}-signed.pdf`, 'application/pdf');
     } catch (error) {
       console.error('[embedpdf] signed revision download failed:', error);
     } finally {

@@ -10,11 +10,11 @@ type Props = ComponentProps<typeof PDFViewer>;
 export const props: Props[] = [
   { src: { token: 'eyJ…' }, style: 'height: 100vh' },
   { src: { token: async () => 'eyJ…' } },
-  { src: { shareToken: 'shr_…' }, theme: 'dark', onready: (viewer) => viewer.documents },
+  { src: { grant: 'grt_…' }, theme: 'dark', onready: (viewer) => viewer.documents },
   { src: { id: 'contract-42' }, engine: { token: 'eyJ…' } },
   { src: { token: 'eyJ…' }, engine: { baseUrl: 'https://pdf.example.com' } },
   { documents: [{ src: { token: 'eyJ…' }, name: 'Contract', active: true }] },
-  // @ts-expect-error A cloud document is named by its token, id or share link, not by URL.
+  // @ts-expect-error A cloud document is named by its token, id or grant, not by URL.
   { src: '/report.pdf' },
   // @ts-expect-error Nor by a URL in `documents`.
   { documents: [{ src: '/report.pdf' }] },

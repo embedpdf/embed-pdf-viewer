@@ -3,9 +3,11 @@
  * bottom of the viewer, a submenu slides in over its menu and goes back, the
  * whole viewer dims behind a sheet, less as its handle drags it down, and a
  * sheet closes on a tap above it, Escape or a drag down its handle; the mode
- * tabs after the first fold behind a chevron; the page
- * number hides while the pages scroll; every button and menu row is 44 px
- * tall when the main pointer is a finger; the viewer keeps clear of the
+ * tabs after the first fold behind a chevron; the page number rests out of
+ * sight once still, and a touch wakes it; every button and menu row is 44 px
+ * tall when the main pointer is a finger; `size` and `touch` give the phone's
+ * layout and a finger's sizes at any width and pointer, or keep them away;
+ * the viewer keeps clear of the
  * notch where it reaches the screen's edge; and the dialogs hold focus until
  * they close and give it back.
  *
@@ -58,8 +60,16 @@ const SHARE = `{
       .add('acme:share', { to: 'document', after: 'document:download' }),
 }`;
 
+/** A layout function that keeps each env it gets, in `window.envs`. */
+const KEEP_ENV = `layout: (layout, env) => {
+    (window.envs ??= []).push(env);
+    return layout;
+  }`;
+
 const PAGES = {
   '/whole.html': page(WHOLE),
+  '/kiosk.html': page(WHOLE, `{ size: 'compact', touch: true, ${KEEP_ENV} }`),
+  '/desk.html': page(WHOLE, `{ size: 'expanded', touch: false, ${KEEP_ENV} }`),
   '/share.html': page(WHOLE, SHARE),
   '/inset.html': page('left: 40px; top: 60px; width: 320px; height: 600px'),
 };
@@ -452,39 +462,60 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
     await tab.close();
   });
 
-  it('hides the page number while the pages scroll on a phone, and brings it back after', async () => {
+  /** The env the layout function got last, and what the viewer draws for it. */
+  const envOf = (tab: Page) =>
+    tab.evaluate(() => {
+      const envs = (
+        window as unknown as { envs: { size: string; width: number; touch: boolean }[] }
+      ).envs;
+      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+      const buttons = [...root.querySelectorAll('[role="toolbar"] button')]
+        .filter((button) => !button.closest('[aria-hidden="true"]'))
+        .map((button) => button.getBoundingClientRect().height);
+      return {
+        env: envs[envs.length - 1]!,
+        touch: root.querySelector('[data-touch]') !== null,
+        shortest: Math.min(...buttons),
+      };
+    });
+
+  it('lays a wide viewer out as a phone, for a finger, with size and touch', async () => {
+    const tab = await open('/kiosk.html', 1280);
+    const { env, touch, shortest } = await envOf(tab);
+    expect(env).toMatchObject({ size: 'compact', width: 1280, touch: true });
+    expect(touch).toBe(true);
+    expect(shortest).toBeGreaterThanOrEqual(44);
+    // A phone's menu: a sheet from the bottom.
+    await clickBox(tab, await buttonOf(tab, 'Menu'), 'the Menu button');
+    await settle(tab);
+    expect(await sheetsOf(tab)).toHaveLength(1);
+    await tab.close();
+  });
+
+  it('lays a phone out wide, for a mouse, with size and touch', async () => {
+    const tab = await open('/desk.html', 375, { touch: true });
+    const { env, touch, shortest } = await envOf(tab);
+    expect(env).toMatchObject({ size: 'expanded', width: 375, touch: false });
+    expect(touch).toBe(false);
+    expect(shortest).toBeLessThan(44);
+    await tab.close();
+  });
+
+  it('rests the page number out of sight once still on a phone too, and a touch wakes it', async () => {
     const pagerHidden = (tab: Page) =>
       tab.evaluate(() => {
         const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
         const pager = root.querySelector('[data-bar="pager"]');
-        return pager ? pager.hasAttribute('data-scroll-hidden') : null;
+        return pager ? pager.hasAttribute('data-idle-hidden') : null;
       });
-    const scroll = async (tab: Page, width: number) => {
-      await tab.mouse.move(width / 2, 400);
-      for (let i = 0; i < 4; i += 1) {
-        await tab.mouse.wheel(0, 120);
-        await tab.waitForTimeout(40);
-      }
-    };
 
-    const phone = await open('/whole.html');
+    const phone = await open('/whole.html', 375, { touch: true });
     expect(await pagerHidden(phone)).toBe(false);
-    await scroll(phone, 375);
-    expect(await pagerHidden(phone)).toBe(true);
-    const shown = await phone.evaluate(() => {
-      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-      return getComputedStyle(root.querySelector('[data-bar="pager"]')!).visibility;
-    });
-    // Still fading out; then it takes no presses.
-    expect(['visible', 'hidden']).toContain(shown);
-    await phone.waitForTimeout(1200);
-    expect(await pagerHidden(phone)).toBe(false);
+    await expect.poll(() => pagerHidden(phone), { timeout: 4000 }).toBe(true);
+    // A finger on the pages wakes it, where a mouse would move.
+    await phone.touchscreen.tap(375 / 2, 300);
+    await expect.poll(() => pagerHidden(phone)).toBe(false);
     await phone.close();
-
-    const wide = await open('/whole.html', 1280);
-    await scroll(wide, 1280);
-    expect(await pagerHidden(wide)).toBe(false);
-    await wide.close();
   });
 
   it('makes every bar button and menu row 44 px tall when the main pointer is a finger', async () => {

@@ -6,7 +6,7 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
-import AddShapes from './AddShapes.vue';
+import SelectShapes from './SelectShapes.vue';
 import TurnAndGroup from './TurnAndGroup.vue';
 
 import '../turn-group.css';
@@ -14,14 +14,14 @@ import '../turn-group.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddShapes />
+      <SelectShapes />
       <TurnAndGroup />
       <Stage class="stage">
         <template #page>

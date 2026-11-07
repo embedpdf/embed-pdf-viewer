@@ -11,16 +11,28 @@ import {
   type CommentThreadView,
 } from '@embedpdf/react/annotation';
 import { StageToken } from '@embedpdf/react/stage';
-import { useCommands, useCommandsSettings } from '@embedpdf/react/commands';
+import { useCommand, useCommands, useCommandsSettings } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
+import { useLayoutEnv } from '../config-context';
+import { REVIEW_STATE_LABEL_KEYS, hasComment, reviewStateOf } from '../config/comments';
 import { Icon } from './icons';
 import { commentIconAccent, commentTypeConfig } from './comment-config';
+import { CommandButton, buttonClass, buttonPart } from './toolbar';
+import { TooltipButton, WithTooltip } from './tooltip';
 
 /**
  * The comments sidebar (right panel): a live view over the conversation
  * plane — page-grouped sections, and a card that identifies its annotation at
- * a glance by the type's glyph tinted with that annotation's own colors, plus
- * the ISO 32000 §12.5.6.3 review status per thread.
+ * a glance by the type's glyph tinted with that annotation's own colors.
+ *
+ * A card shows what its thread has, and offers what can be done next:
+ * - nothing said yet: a box to write the comment, which becomes the
+ *   annotation's own text (`/Contents`) where it may change, else a reply;
+ * - a conversation: the comment, its replies, and a box to reply;
+ * - a status (ISO 32000 §12.5.6.3): a chip by the date, only once one is set.
+ * The box shows on the selected card, and on one that holds a draft. The
+ * check marks a thread completed; the card's menu (`menu:comment-item`) sets
+ * any review status and deletes the thread.
  *
  * There is no per-page loading dance: the plugin hydrates the whole document
  * at open (`annotations.list()`), so the list is complete the moment `hydration()`
@@ -34,11 +46,9 @@ import { commentIconAccent, commentTypeConfig } from './comment-config';
  * on the one optimistic pipeline — and every control is gated by
  * `permissionsFor`, the engine's own collab-resolver mirrors: what shows here
  * is what the engine will allow. With writing turned off (`comments.writing`,
- * which `readOnly` turns off) the threads are only read: no composer, no
- * status, no edit and no delete.
+ * which `readOnly` turns off) the threads are only read: no box, no check,
+ * no menu, no edit and no delete.
  */
-
-const REVIEW_STATES = ['none', 'accepted', 'rejected', 'cancelled', 'completed'] as const;
 
 const dateLabel = (iso: string | null): string => {
   if (!iso) return '';
@@ -79,12 +89,16 @@ export function CommentsPanel() {
     // `selection` identity changes on every selection write — the right key.
   }, [selection, comments]);
 
-  // Reverse sync: the selected card scrolls itself into view.
+  // Reverse sync: the selected card scrolls itself into view, unless it's in view already
+  // (pressing a card's check or menu selects it, and the list mustn't move under the press).
   useEffect(() => {
     if (!selectedThreadKey || !scrollRef.current) return;
     const element = cardRefs.current[selectedThreadKey];
     if (!element) return;
     const container = scrollRef.current;
+    const card = element.getBoundingClientRect();
+    const view = container.getBoundingClientRect();
+    if (card.top >= view.top && card.bottom <= view.bottom) return;
     const top =
       element.offsetTop -
       container.clientHeight / 2 +
@@ -93,15 +107,18 @@ export function CommentsPanel() {
     container.scrollTo({ top, behavior: 'smooth' });
   }, [selectedThreadKey]);
 
+  /** Press a card's check or menu: the card's annotation is what they act on. */
+  const pick = (view: CommentThreadView) => anno.selection.select([view.root.ref]);
+
   /** Click a card: select the annotation and fly the camera to it. */
   const goTo = (view: CommentThreadView) => {
-    anno.selection.set([view.root.ref]);
+    anno.selection.select([view.root.ref]);
     if (view.pageIndex < 0) return;
     // Anchor values are viewport fractions (0–1), not percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
     stage?.reveal(view.pageIndex, {
       rect: view.root.rect,
-      anchor: { x: 'center', y: 0.35 },
+      align: { x: 'center', y: 0.35 },
       behavior: 'smooth',
     });
   };
@@ -117,66 +134,65 @@ export function CommentsPanel() {
     return [...groups.entries()].sort((left, right) => left[0] - right[0]);
   }, [threads]);
 
-  if (status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
-  if (status === 'forbidden') return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
+  if (status === 'loading') return <Empty icon="comment" text={t('comments.loading')} />;
+  if (status === 'forbidden') return <Empty icon="lock" text={t('comments.forbidden')} />;
   if (status === 'error') {
     return (
-      <Empty icon="alertTriangle" text={t('demo.commentsError')}>
+      <Empty icon="alertTriangle" text={t('comments.error')}>
         <button
           type="button"
           onClick={() => void anno.refresh()}
           className="bg-accent text-on-accent rounded-md px-3 py-1.5 text-sm font-medium"
         >
-          {t('demo.commentsRetry')}
+          {t('comments.retry')}
         </button>
       </Empty>
     );
   }
   if (threads.length === 0) {
-    return (
-      <Empty
-        icon="comment"
-        text={t(writing ? 'demo.commentsEmpty' : 'demo.commentsEmptyReadOnly')}
-      />
-    );
+    return <Empty icon="comment" text={t(writing ? 'comments.empty' : 'comments.emptyReadOnly')} />;
   }
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex flex-col gap-5 p-3">
-        {byPage.map(([pageIndex, group]) => (
-          <div key={pageIndex} className="flex flex-col gap-2">
-            <div className="bg-surface sticky top-0 z-10">
-              <div className="border-border-subtle border-b pb-1.5">
-                <h3 className="text-fg text-sm font-semibold">
-                  {t('demo.commentsPage', { params: { page: group[0]!.pageLabel } })}
-                </h3>
-                <p className="text-fg-muted text-xs">
-                  {t(group.length === 1 ? 'demo.commentCount' : 'demo.commentCountPlural', {
-                    params: { count: String(group.length) },
-                  })}
-                </p>
+        {byPage.map(([pageIndex, group]) => {
+          const count = group.reduce((sum, view) => sum + commentCountOf(view), 0);
+          return (
+            <div key={pageIndex} className="flex flex-col gap-2">
+              <div className="bg-surface sticky top-0 z-10">
+                <div className="border-border-subtle border-b pb-1.5">
+                  <h3 className="text-fg text-sm font-semibold">
+                    {t('comments.page', { params: { page: group[0]!.pageLabel } })}
+                  </h3>
+                  {count > 0 && (
+                    <p className="text-fg-muted text-xs">
+                      {t('comments.count', { params: { count } })}
+                    </p>
+                  )}
+                </div>
               </div>
+              <ul className="flex flex-col gap-2">
+                {group.map((view) => {
+                  const key = annotationKey(view.root.ref);
+                  return (
+                    <ThreadCard
+                      key={key}
+                      view={view}
+                      writing={writing}
+                      selected={selectedThreadKey === key}
+                      onSelect={() => goTo(view)}
+                      onPick={() => pick(view)}
+                      cardRef={(element) => {
+                        cardRefs.current[key] = element;
+                      }}
+                    />
+                  );
+                })}
+              </ul>
             </div>
-            <ul className="flex flex-col gap-2">
-              {group.map((view) => {
-                const key = annotationKey(view.root.ref);
-                return (
-                  <ThreadCard
-                    key={key}
-                    view={view}
-                    writing={writing}
-                    selected={selectedThreadKey === key}
-                    onSelect={() => goTo(view)}
-                    cardRef={(element) => {
-                      cardRefs.current[key] = element;
-                    }}
-                  />
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -205,6 +221,7 @@ function ThreadCard({
   writing,
   selected,
   onSelect,
+  onPick,
   cardRef,
 }: {
   view: CommentThreadView;
@@ -212,73 +229,119 @@ function ThreadCard({
   writing: boolean;
   selected: boolean;
   onSelect: () => void;
+  /** Select the card's annotation without moving the camera: what its check and menu act on. */
+  onPick: () => void;
   cardRef: (element: HTMLLIElement | null) => void;
 }) {
   const t = useT();
   const comments = useComments();
-  const [reply, setReply] = useState('');
+  // A finger has no hover: the check and the menu show on every card.
+  const { touch } = useLayoutEnv();
+  const menuButton = useRef<HTMLSpanElement>(null);
+  const [draft, setDraft] = useState('');
   const root = view.root.ref;
+  const said = hasComment(view);
+  // The first comment is the annotation's own text where that may change, else a reply.
+  const writesText = !said && comments.canSetText(root);
   const perms = {
     canDeleteThread: writing && comments.canDeleteThread(root),
-    canSetStatus: writing && comments.canSetStatus(root),
-    canReply: writing && comments.canReply(root),
+    canSetStatus: writing && said && comments.canSetStatus(root),
+    canWrite: writing && (writesText || comments.canReply(root)),
   };
+  const hasMenu = perms.canSetStatus || perms.canDeleteThread;
   const config = commentTypeConfig(view.root);
-  const status = view.review.mine?.state ?? 'none';
-  const latest = view.review.lastChange;
+  const state = reviewStateOf(view);
+  const completed = state === 'completed';
 
-  const sendReply = () => {
-    const text = reply.trim();
+  const send = () => {
+    const text = draft.trim();
     if (!text) return;
-    setReply('');
-    void comments.reply(view.root.ref, text);
+    setDraft('');
+    void (writesText ? comments.setText(root, text) : comments.reply(root, text));
   };
 
   return (
     <li
       ref={cardRef}
       onClick={onSelect}
-      className={`bg-surface cursor-pointer rounded-lg border shadow-sm transition-all hover:shadow-md ${
+      onContextMenu={(event) => {
+        if (!hasMenu) return;
+        event.preventDefault();
+        onPick();
+        menuButton.current?.querySelector('button')?.click();
+      }}
+      className={`bg-surface group cursor-pointer rounded-lg border shadow-sm transition-all hover:shadow-md ${
         selected ? 'border-accent ring-accent/40 ring-2' : 'border-border-subtle'
       }`}
     >
       <div className="flex flex-col gap-2 p-3">
         {/* identity row: the annotation's own glyph + color is the anchor */}
         <div className="flex items-start gap-2.5">
-          <div
-            className="bg-hover mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full"
-            title={t(config.labelKey, { fallback: config.label })}
-          >
-            <Icon name={config.icon} size={18} accent={commentIconAccent(view.root)} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-fg truncate text-sm font-medium">
-                {view.root.author ?? t('demo.commentsAnonymous')}
-              </span>
-              <span className="text-fg-muted ms-auto shrink-0 text-xs">
-                {dateLabel(view.root.modifiedAt ?? view.root.createdAt)}
-              </span>
-            </div>
-            {latest && (
-              <span className="bg-accent-light text-accent mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium">
-                {statusLabel(t, latest.state)}
-                {latest.by ? ` — ${latest.by}` : ''}
-              </span>
+          <WithTooltip content={{ label: t(config.labelKey, { fallback: config.label }) }}>
+            {(tooltip) => (
+              <div
+                {...tooltip}
+                role="img"
+                aria-label={t(config.labelKey, { fallback: config.label })}
+                className="bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-full"
+              >
+                <Icon name={config.icon} size={18} accent={commentIconAccent(view.root)} />
+              </div>
             )}
+          </WithTooltip>
+          <div className="min-w-0 flex-1">
+            <div className="text-fg truncate text-sm font-medium">
+              {view.root.author ?? t('comments.anonymous')}
+            </div>
+            <div className="text-fg-muted flex items-center gap-1.5 text-xs">
+              <span>{dateLabel(view.root.modifiedAt ?? view.root.createdAt)}</span>
+              {state !== 'none' && (
+                // Who set the status, in its tooltip.
+                <WithTooltip
+                  content={
+                    view.review.lastChange?.by
+                      ? { label: `${statusLabel(t, state)} · ${view.review.lastChange.by}` }
+                      : null
+                  }
+                >
+                  {(tooltip) => (
+                    <span
+                      {...tooltip}
+                      className="bg-accent-light text-accent rounded px-1.5 text-[11px] font-medium"
+                    >
+                      {statusLabel(t, state)}
+                    </span>
+                  )}
+                </WithTooltip>
+              )}
+            </div>
           </div>
-          {perms.canDeleteThread && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                void comments.deleteThread(view.root.ref);
-              }}
-              className="text-fg-muted hover:text-fg grid h-6 w-6 shrink-0 place-items-center rounded"
-              title={t('demo.commentsDeleteThread')}
+          {(perms.canSetStatus || hasMenu) && (
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className={`flex shrink-0 items-center ${
+                selected || touch
+                  ? ''
+                  : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
+              }`}
             >
-              <Icon name="trash" size={14} />
-            </button>
+              {perms.canSetStatus && (
+                <TooltipButton
+                  label={t('comments.markCompleted')}
+                  aria-pressed={completed}
+                  part={buttonPart(completed)}
+                  onClick={() => void comments.setStatus(root, completed ? 'none' : 'completed')}
+                  className={buttonClass(completed)}
+                >
+                  <Icon name="circleCheck" size={20} />
+                </TooltipButton>
+              )}
+              {hasMenu && (
+                <span ref={menuButton} onPointerDownCapture={onPick}>
+                  <CardMenuButton />
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -297,60 +360,40 @@ function ThreadCard({
           </div>
         )}
 
-        {(perms.canSetStatus || perms.canReply) && (
-          <div className="border-border-subtle flex flex-col gap-1.5 border-t pt-2">
-            {perms.canSetStatus && (
-              <label
-                className="text-fg-muted flex items-center gap-2 text-xs"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {t('demo.commentsStatus')}
-                <select
-                  value={status}
-                  onChange={(event) => void comments.setStatus(view.root.ref, event.target.value)}
-                  className="border-border bg-surface text-fg flex-1 rounded-md border px-1.5 py-1 text-xs outline-none"
-                >
-                  {REVIEW_STATES.map((state) => (
-                    <option key={state} value={state}>
-                      {statusLabel(t, state)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {perms.canReply && (
-              <div
-                className="flex items-center gap-1.5"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <input
-                  type="text"
-                  value={reply}
-                  placeholder={
-                    view.root.contents || view.replies.length
-                      ? t('demo.commentsReplyPlaceholder')
-                      : t('demo.commentsAddPlaceholder')
-                  }
-                  onChange={(event) => setReply(event.target.value)}
-                  onKeyDown={(event) => event.key === 'Enter' && sendReply()}
-                  className="border-border bg-surface text-fg focus:border-accent w-full min-w-0 flex-1 rounded-md border px-2 py-1 text-sm outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={sendReply}
-                  disabled={!reply.trim()}
-                  className="text-accent disabled:text-fg-muted grid h-7 w-7 shrink-0 place-items-center rounded-md"
-                  title={t('demo.commentsReply')}
-                >
-                  <Icon name="arrowForwardUp" size={16} />
-                </button>
-              </div>
-            )}
+        {/* The box shows on the selected card, and stays while it holds a draft. */}
+        {perms.canWrite && (selected || draft) && (
+          <div
+            className={`flex items-center gap-1.5 ${said ? 'border-border-subtle border-t pt-2' : ''}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <input
+              type="text"
+              value={draft}
+              placeholder={t(said ? 'comments.replyPlaceholder' : 'comments.addPlaceholder')}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && send()}
+              className="border-border bg-surface text-fg focus:border-accent h-8 w-full min-w-0 flex-1 rounded-md border px-2.5 text-sm outline-none"
+            />
+            <TooltipButton
+              label={t(said ? 'comments.reply' : 'commands.comment')}
+              onClick={send}
+              disabled={!draft.trim()}
+              className="bg-accent text-on-accent grid h-8 w-8 shrink-0 place-items-center rounded-md disabled:opacity-40"
+            >
+              <Icon name="send" size={16} />
+            </TooltipButton>
           </div>
         )}
       </div>
     </li>
   );
+}
+
+/** A card's menu button: the comment commands for the selected thread. */
+function CardMenuButton() {
+  const more = useCommand('menu:comment-item');
+  if (!more.visible) return null;
+  return <CommandButton cmd={more} variant="icon" run={() => void more.run()} />;
 }
 
 function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
@@ -359,7 +402,7 @@ function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
     <div className="border-border-subtle ms-1 border-s-2 ps-2">
       <div className="flex items-baseline gap-2">
         <span className="text-fg-secondary text-xs font-medium">
-          {dto.author ?? t('demo.commentsAnonymous')}
+          {dto.author ?? t('comments.anonymous')}
         </span>
         <span className="text-fg-muted text-[11px]">
           {dateLabel(dto.modifiedAt ?? dto.createdAt)}
@@ -415,53 +458,45 @@ function CommentBody({
       />
     );
   }
-  if (!text && !perms.canEditText && !deletable) return null;
+  // No text yet: the card's box writes it.
+  if (!text && !deletable) return null;
   return (
     <div className="group/body flex items-start gap-1">
       <p className="text-fg min-w-0 flex-1 whitespace-pre-wrap text-sm">{text}</p>
       {perms.canEditText && (
-        <button
-          type="button"
+        <TooltipButton
+          label={t('comments.edit')}
           onClick={(event) => {
             event.stopPropagation();
             setDraft(text);
           }}
           className="text-fg-muted hover:text-fg grid h-5 w-5 shrink-0 place-items-center rounded opacity-0 group-hover/body:opacity-100"
-          title={t('demo.commentsEdit')}
         >
           <Icon name="pencilMarker" size={12} />
-        </button>
+        </TooltipButton>
       )}
       {deletable && perms.canDelete && (
-        <button
-          type="button"
+        <TooltipButton
+          label={t('comments.delete')}
           onClick={(event) => {
             event.stopPropagation();
             void comments.delete(annotationRef);
           }}
           className="text-fg-muted hover:text-fg grid h-5 w-5 shrink-0 place-items-center rounded opacity-0 group-hover/body:opacity-100"
-          title={t('demo.commentsDelete')}
         >
           <Icon name="trash" size={12} />
-        </button>
+        </TooltipButton>
       )}
     </div>
   );
 }
 
 function statusLabel(t: ReturnType<typeof useT>, state: string): string {
-  switch (state) {
-    case 'none':
-      return t('demo.commentsStatusNone');
-    case 'accepted':
-      return t('demo.commentsStatusAccepted');
-    case 'rejected':
-      return t('demo.commentsStatusRejected');
-    case 'cancelled':
-      return t('demo.commentsStatusCancelled');
-    case 'completed':
-      return t('demo.commentsStatusCompleted');
-    default:
-      return state; // custom vocabularies render verbatim
-  }
+  const key = REVIEW_STATE_LABEL_KEYS[state];
+  return key ? t(key) : state; // custom vocabularies render verbatim
+}
+
+/** The comments said in a thread: its annotation's text, when it has one, and each reply. */
+function commentCountOf(view: CommentThreadView): number {
+  return (view.root.contents?.trim() ? 1 : 0) + view.replies.length;
 }

@@ -22,6 +22,14 @@ room, `command` takes its place in the "More" menu: here, a command of yours tha
 choice in a dialog. Leave `command` out, and your component stays in the toolbar while other items
 make room.
 
+Here a review status from your app sits at the end of the toolbar, with `{ custom: 'status' }` and
+no `command`:
+
+<Example name="viewer/customize/components/status" />
+
+> **Try it:** pick **Approved** from the status at the top right of the toolbar: the dot beside it
+> turns green.
+
 ## Know where it sits
 
 The same component can sit in a top bar, a vertical rail or a floating bar. `useToolbarItem()` tells
@@ -43,19 +51,30 @@ To have the toolbar pick a smaller form when it's short of room, list your forms
 `{ custom: 'versions', variants: ['full', 'short'], command: 'acme:versions' }`. Draw the one
 `variant` names.
 
+To have your component take the room its bar has left, as a search field or a title does, add
+`grow: true`: `{ custom: 'title', grow: true }`. The toolbar fits it in at its own width, like any
+item, and then gives it the rest of the bar. Draw your component at `width: 100%` to fill it.
+
 ## Look like the viewer
 
-`Button`, `Menu` and `MenuItem` are the viewer's own, for your components. A menu made with them
-opens the way the viewer's menus do: away from its bar, flipped when there's no room, and up from
-the bottom on a phone.
+`Button`, `Menu`, `MenuItem` and `Icon` are the viewer's own, for your components. A menu made
+with them opens the way the viewer's menus do: away from its bar, flipped when there's no room, and
+up from the bottom on a phone.
 
 <Snippet name="viewer/components/menu" />
 
 | Component | What it is |
 | :-- | :-- |
-| `Button` | A toolbar button. `command="zoom:in"` makes it that command, with its icon, tooltip and state; or give it `icon`, `label` and a click handler. |
+| `Button` | A toolbar button. `command="zoom:in"` makes it that command, with its icon, tooltip and state; or give it `icon`, `label` and a click handler. `active` shows it pressed. |
 | `Menu` | A button that opens a menu: `icon`, `label`, and `MenuItem`s inside |
-| `MenuItem` | A row in a menu: `icon`, its text, and what happens when it's picked. `command="…"` makes it a command. |
+| `MenuItem` | A row in a menu: `icon`, its text, and what happens when it's picked. `command="…"` makes it a command. `active` shows it checked. |
+| `Icon` | One of the viewer's icons, or yours, by `name`: `size` pixels square (`20`, a toolbar button's, unless you say), in the color of the text around it. With a `label`, screen readers read it; without one, they skip it. |
+
+`active` is for a button of your own that turns something on and off: it shows pressed while it's
+on, as the viewer's own do, and screen readers hear it pressed (checked, in a menu). A command's
+button and row show their command's `active` already.
+
+<Snippet name="viewer/components/toggle" />
 
 Icons are the viewer's icons and [yours](commands#icons), by name. For anything else, the viewer's
 colors are CSS variables your styles can use: `var(--epdf-surface)`, `var(--epdf-text)`,
@@ -63,7 +82,7 @@ colors are CSS variables your styles can use: `var(--epdf-surface)`, `var(--epdf
 
 ## Use the viewer's commands and state
 
-`useCommand(id)` gives you a command as a button needs it: its `label`, `icon` and `shortcut`,
+`useCommand(id)` gives you a command as a button needs it: its `label`, `icon` and `shortcutLabel`,
 whether it's `enabled`, `active` and `visible`, and `run()`. It's always there: an id the viewer
 doesn't have is neither visible nor enabled. And every hook from the [headless
 docs](/docs/headless) works inside the viewer, so your component reads the viewer's state the same
@@ -129,7 +148,9 @@ The bar over selected annotations is `annotation`. See [Menus](menus#over-a-sele
 
 Your component lives in your page, not inside the viewer's shadow DOM. Your CSS styles it, and
 the viewer's CSS never touches it. It does inherit the viewer's font and text color and its CSS
-variables, so plain elements fit in without any styling.
+variables, so text fits in without any styling. Form controls are the exception: browsers give
+`<button>`, `<input>`, `<select>` and `<textarea>` their own font, so give them `font: inherit`
+to match.
 
 ### One id, one component
 
@@ -145,5 +166,8 @@ shortcuts never fire while focus is in a text field or a `<select>`.
 ### Plain HTML
 
 Without a framework, give the element a `slot` attribute: `item:<id>`, `panel:<id>`, or the
-region's name. The viewer's components are elements too: `<epdf-button>`, `<epdf-menu>` and
-`<epdf-menu-item>`, which fire a `select` event when picked.
+region's name. An item or a panel still needs its place in the layout (`{ custom: '<id>' }`, or
+`addPanel`), as in a framework; a region doesn't. The viewer's components are elements too:
+`<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`, which fires a `select` event when picked, and
+`<epdf-icon name="check">`.
+`active` is an attribute (`<epdf-button active>`), and the elements' `active` property sets it.

@@ -109,7 +109,7 @@ describe('applyAnnotationPatch', () => {
   });
 
   test('a patch the engine refuses without its schemas throws, as the engine does', () => {
-    expect(() => applyAnnotationPatch(square, { subtype: 'circle' } as never)).toThrow(
+    expect(() => applyAnnotationPatch(square, { subtype: 'line' } as never)).toThrow(
       expect.objectContaining({ code: 'InvalidArg' }),
     );
     expect(() => applyAnnotationPatch(square, { fontSize: 12 } as never)).toThrow(
@@ -142,6 +142,108 @@ describe('applyAnnotationPatch', () => {
         pdfAnnotationPatchOf({ ...patch, subtype: 'square' } as AnnotationPatch, page, () => page),
       ),
     ).toEqual({ subtype: 'square', color: '#00ff00' });
+  });
+});
+
+describe('a kind change', () => {
+  const quad = {
+    upperLeft: { x: 10, y: 20 },
+    upperRight: { x: 60, y: 20 },
+    lowerLeft: { x: 10, y: 32 },
+    lowerRight: { x: 60, y: 32 },
+  };
+  const highlight = {
+    ...base,
+    subtype: 'highlight',
+    rect: { x: 10, y: 20, width: 50, height: 12 },
+    color: '#ffff00',
+    opacity: 1,
+    quadPoints: [quad],
+  } as unknown as Annotation;
+  // Half of a replace-text suggestion: grouped under its caret, with its intent.
+  const replacement = {
+    ...highlight,
+    subtype: 'strikeout',
+    color: '#ff0000',
+    intent: 'strikeout-text-edit',
+    reply: { to: { ...base.ref, objectNumber: 8 }, type: 'group' },
+  } as unknown as Annotation;
+  const page = { left: 0, bottom: 0, right: 600, top: 800 };
+
+  test('a highlight becomes a squiggly line, the same annotation with every field kept', () => {
+    expect(resolveAnnotationPatch(highlight, { subtype: 'squiggly' })).toEqual({
+      subtype: 'squiggly',
+    });
+    const next = applyAnnotationPatch(highlight, { subtype: 'squiggly' });
+    expect(next).toEqual({ ...highlight, subtype: 'squiggly' });
+    expect(next.subtype === 'squiggly' && next.quadPoints).toBe(
+      highlight.subtype === 'highlight' && highlight.quadPoints,
+    );
+  });
+
+  test('other fields change with it, as the new kind takes them', () => {
+    expect(
+      applyAnnotationPatch(highlight, { subtype: 'underline', color: '#1d4ed8' }),
+    ).toMatchObject({ subtype: 'underline', color: '#1d4ed8', opacity: 1 });
+    expect(applyAnnotationPatch(square, { subtype: 'circle' })).toEqual({
+      ...square,
+      subtype: 'circle',
+    });
+  });
+
+  test('a field only the new kind has reads null', () => {
+    expect(applyAnnotationPatch(highlight, { subtype: 'strikeout' })).toMatchObject({
+      subtype: 'strikeout',
+      intent: null,
+    });
+  });
+
+  test('a kind it can’t become is refused, naming the ones it can', () => {
+    expect(() => applyAnnotationPatch(highlight, { subtype: 'ink' } as never)).toThrow(
+      expect.objectContaining({
+        code: 'InvalidArg',
+        message: 'highlight can become underline, squiggly or strikeout, not ink',
+        details: { field: 'subtype' },
+      }),
+    );
+    expect(() => applyAnnotationPatch(ink, { subtype: 'square' } as never)).toThrow(
+      expect.objectContaining({ message: 'ink has no other kind it can become' }),
+    );
+  });
+
+  test('a value the new kind can’t hold is refused, never dropped', () => {
+    expect(() => applyAnnotationPatch(replacement, { subtype: 'highlight' })).toThrow(
+      expect.objectContaining({
+        code: 'InvalidArg',
+        message:
+          "strikeout field 'intent' holds 'strikeout-text-edit', and highlight has no such field: clear it first, in the same change",
+        details: { field: 'intent' },
+      }),
+    );
+    // The new kind's patch can't name it: it is the old kind's field.
+    expect(() =>
+      applyAnnotationPatch(replacement, { subtype: 'highlight', intent: null } as never),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+    // Cleared first, as an earlier op of the same change does, it can.
+    const cleared = applyAnnotationPatch(replacement, { intent: null });
+    const next = applyAnnotationPatch(cleared, { subtype: 'highlight' });
+    expect(next).toMatchObject({ subtype: 'highlight', reply: replacement.reply });
+    expect(next).not.toHaveProperty('intent');
+  });
+
+  test('the engine checks the change against the new kind’s schema', () => {
+    const write = (patch: AnnotationPatch) =>
+      pdfResolveAnnotationPatch(
+        pdfAnnotationOf(highlight, page, () => page),
+        pdfAnnotationPatchOf(patch, page, () => page),
+      );
+    expect(write({ subtype: 'underline', color: '#1d4ed8' } as AnnotationPatch)).toEqual({
+      subtype: 'underline',
+      color: '#1d4ed8',
+    });
+    expect(() => write({ subtype: 'squiggly', opacity: 2 } as AnnotationPatch)).toThrow(
+      expect.objectContaining({ code: 'InvalidArg', details: { field: 'opacity' } }),
+    );
   });
 });
 
@@ -198,5 +300,55 @@ describe('a callout line follows its box', () => {
     expect(lineOf(kept)).toBe(stated);
     const untouched = applyAnnotationPatch(callout, { opacity: 0.5 });
     expect(lineOf(untouched)).toBe(lineOf(callout));
+  });
+
+  test('a border made dashed with its pattern left out states the default; null is none', () => {
+    expect(applyAnnotationPatch(square, { borderStyle: 'dashed' })).toMatchObject({
+      borderStyle: 'dashed',
+      dashArray: [3, 3],
+    });
+    const patterned = {
+      ...square,
+      borderStyle: 'dashed',
+      dashArray: [6, 2],
+    } as unknown as Annotation;
+    expect(applyAnnotationPatch(patterned, { dashArray: null })).toMatchObject({
+      dashArray: null,
+    });
+    // On a border with no pattern, null changes nothing: the patch makes it
+    // dashed, as one that leaves the pattern out does.
+    expect(applyAnnotationPatch(square, { borderStyle: 'dashed', dashArray: null })).toMatchObject({
+      borderStyle: 'dashed',
+      dashArray: [3, 3],
+    });
+    // A pattern stored on a solid border is kept and draws once it is dashed.
+    const kept = { ...square, dashArray: [6, 2] } as unknown as Annotation;
+    expect(applyAnnotationPatch(kept, { borderStyle: 'dashed' })).toMatchObject({
+      dashArray: [6, 2],
+    });
+    // Back to solid, or another app's dashed border without /D left alone: nothing stated.
+    expect(resolveAnnotationPatch(patterned, { borderStyle: 'solid' })).toEqual({
+      subtype: 'square',
+      borderStyle: 'solid',
+    });
+    const foreign = { ...square, borderStyle: 'dashed' } as unknown as Annotation;
+    expect(resolveAnnotationPatch(foreign, { color: '#00ff00' })).toEqual({
+      subtype: 'square',
+      color: '#00ff00',
+    });
+  });
+
+  test('an empty dash pattern is refused: a solid line is borderStyle solid', () => {
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    expect(() =>
+      pdfResolveAnnotationPatch(
+        pdfAnnotationOf(square, page, () => page),
+        pdfAnnotationPatchOf(
+          { subtype: 'square', borderStyle: 'dashed', dashArray: [] } as AnnotationPatch,
+          page,
+          () => page,
+        ),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'dashArray' } }));
   });
 });

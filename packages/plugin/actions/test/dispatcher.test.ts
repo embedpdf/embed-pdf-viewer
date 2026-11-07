@@ -14,18 +14,17 @@ import { createActionsTestContext } from './helpers/context';
 const USER: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 const LIFECYCLE: ActionContext = {
   origin: 'lifecycle',
   source: { kind: 'api' },
-  event: { scope: 'document', name: 'open' },
+  event: { type: 'document', event: 'open' },
 };
 
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
   incomplete,
-  warningFlags: 0,
   warnings: incomplete ? ['incomplete'] : [],
 });
 
@@ -185,27 +184,24 @@ describe('actions dispatcher', () => {
       payload: {
         url: 'https://home.test/x',
         fields: null,
-        flags: {
-          raw: 0,
-          exclude: false,
-          includeNoValueFields: false,
-          format: 'fdf' as const,
-          method: 'post' as const,
-          submitCoordinates: false,
-          includeAppendSaves: false,
-          includeAnnotations: false,
-          canonicalFormat: false,
-          exclNonUserAnnots: false,
-          exclFKey: false,
-          embedForm: false,
-        },
+        exclude: false,
+        includeNoValueFields: false,
+        format: 'fdf' as const,
+        method: 'post' as const,
+        submitCoordinates: false,
+        includeAppendSaves: false,
+        includeAnnotations: false,
+        canonicalFormat: false,
+        exclNonUserAnnots: false,
+        exclFKey: false,
+        embedForm: false,
       },
       next: [],
     });
     const hover = await capability.execute(payloaded, {
       origin: 'hover',
       source: { kind: 'api' },
-      event: { scope: 'annotation', name: 'cursorEnter' },
+      event: { type: 'annotation', event: 'cursorEnter' },
     });
     expect(hover.nodes[0].status).toBe('blocked');
 

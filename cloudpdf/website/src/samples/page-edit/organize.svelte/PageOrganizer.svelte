@@ -1,7 +1,7 @@
 <!-- Every page as a card. Click cards to select them; the toolbar edits every selected page at once. -->
 <script lang="ts">
   import { usePageList, type PageRef } from '@embedpdf/svelte/runtime';
-  import { usePageEdit } from '@embedpdf/svelte/page-edit';
+  import { usePageEdit, usePageEditState } from '@embedpdf/svelte/page-edit';
   import { PageView } from '@embedpdf/svelte/page-view';
   import { RenderLayer } from '@embedpdf/svelte/render';
 
@@ -9,23 +9,21 @@
 
   const pageEdit = usePageEdit();
   const pages = usePageList();
-  const canEdit = $derived(pageEdit.canEdit());
-  // The second and third pages start selected. Refs, not indexes: they still name the
-  // same pages after a reorder.
-  let selected = $state.raw(pages.current.slice(1, 3).map((page) => page.ref));
+  const state = usePageEditState();
+  const selected = $derived(state.selected);
+  const canEdit = $derived(state.canEdit);
+  // The second and third pages start selected. The selection holds refs: it names the same
+  // pages after a reorder, and a deleted page leaves it.
+  pageEdit.select([1, 2]);
 
   const isSelected = (page: PageRef) => selected.some((ref) => sameRef(ref, page));
-  const toggle = (page: PageRef) => {
-    selected = isSelected(page)
-      ? selected.filter((ref) => !sameRef(ref, page))
-      : [...selected, page];
-  };
+  const toggle = (page: PageRef) =>
+    pageEdit.select(
+      isSelected(page) ? selected.filter((ref) => !sameRef(ref, page)) : [...selected, page],
+    );
   const count = $derived(selected.length);
 
-  async function remove() {
-    await pageEdit.delete(selected);
-    selected = [];
-  }
+  const remove = () => pageEdit.delete(selected);
 </script>
 
 <div class="toolbar">

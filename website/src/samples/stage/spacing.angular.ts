@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, Component, ViewEncapsulation } from '@angular/
 import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
-import type { Gap } from '@embedpdf/angular/stage';
+import type { Gap, Padding } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -16,7 +16,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       // No responsive rules, so the padding you set applies at every width.
       withStage({ padding: 32, gap: { px: 12 }, responsive: [] }),
       withRender(),
@@ -37,10 +37,10 @@ const ebook = async (): Promise<OpenInput> => {
             type="range"
             min="0"
             max="64"
-            [value]="stage.settings().padding"
+            [value]="paddingSize(stage.settings().padding)"
             (input)="stage.updateSettings({ padding: +padding.value })"
           />
-          <output class="value">{{ stage.settings().padding }}</output>
+          <output class="value">{{ paddingSize(stage.settings().padding) }}</output>
         </label>
         <label class="label">
           Gap
@@ -95,6 +95,11 @@ const ebook = async (): Promise<OpenInput> => {
   `,
 })
 export class App {
+  // A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+  protected paddingSize(padding: Padding): number {
+    return typeof padding === 'number' ? padding : padding.top;
+  }
+
   // A number grows with the zoom; { px } stays the same on screen.
   protected onScreen(gap: Gap): boolean {
     return typeof gap !== 'number';

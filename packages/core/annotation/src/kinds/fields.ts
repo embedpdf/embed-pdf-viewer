@@ -15,17 +15,20 @@ export const OPACITY: AnnotationProperty = {
   max: 1,
   step: 0.05,
 };
+/** A shape's or a line's stroke: none keeps the fill and the stroke width. */
 export const STROKE: AnnotationProperty = {
   key: 'color',
   control: 'color',
   label: 'Stroke',
   labelKey: 'annotation.style.stroke',
+  allowsNone: true,
 };
 export const FILL: AnnotationProperty = {
   key: 'interiorColor',
   control: 'color',
   label: 'Fill',
   labelKey: 'annotation.style.fill',
+  allowsNone: true,
 };
 export const COLOR: AnnotationProperty = {
   key: 'color',
@@ -272,3 +275,28 @@ export const FLAG_PROPERTIES: readonly AnnotationProperty[] = [
   { key: 'noRotate', control: 'flag', label: 'No rotate', labelKey: 'annotation.flags.noRotate' },
   { key: 'invisible', control: 'flag', label: 'Invisible', labelKey: 'annotation.flags.invisible' },
 ];
+
+/**
+ * The kinds an annotation can become, in the order a kind choice lists them,
+ * each named as the comment list names it (`annotation.highlight`). Only
+ * siblings (`siblingKindsOf`) are ever offered together.
+ */
+const KIND_OPTIONS: readonly AnnotationOption[] = [
+  { value: 'highlight', label: 'Highlight', labelKey: 'annotation.highlight' },
+  { value: 'underline', label: 'Underline', labelKey: 'annotation.underline' },
+  { value: 'squiggly', label: 'Squiggly', labelKey: 'annotation.squiggly' },
+  { value: 'strikeout', label: 'Strikethrough', labelKey: 'annotation.strikeout' },
+  { value: 'square', label: 'Square', labelKey: 'annotation.square' },
+  { value: 'circle', label: 'Circle', labelKey: 'annotation.circle' },
+];
+
+/** The `subtype` choice over `kinds`: the kind the selected annotations become. */
+export function kindChoice(kinds: readonly string[]): AnnotationProperty {
+  return {
+    key: 'subtype',
+    control: 'choice',
+    label: 'Type',
+    labelKey: 'annotation.style.kind',
+    options: KIND_OPTIONS.filter((option) => kinds.includes(option.value)),
+  };
+}

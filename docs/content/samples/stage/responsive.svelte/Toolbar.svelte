@@ -20,7 +20,8 @@
     compact <strong>{compact.current ? 'on' : 'off'}</strong>
   </output>
   <output class="badge">
-    padding <strong>{settings.padding}</strong> · spread <strong>{settings.spread}</strong>
+    padding <strong>{typeof settings.padding === 'number' ? settings.padding : 'by side'}</strong> ·
+    spread <strong>{settings.spread}</strong>
   </output>
   <div class="pager">
     <button type="button" class="button" onclick={() => stage.previousPage()}>

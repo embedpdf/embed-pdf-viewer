@@ -24,9 +24,9 @@ const plugins = [
   redactionPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 function MarkFromCode() {
@@ -35,14 +35,14 @@ function MarkFromCode() {
   const { hasSelection } = useSelectionState();
   const currentPage = useStageState((state) => state.currentPageIndex);
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const [text, setText] = useState('EmbedPDF');
+  const [text, setText] = useState('John Warnock');
   const started = useRef(false);
 
-  // On load: every "EmbedPDF" in the document.
+  // On load: every "John Warnock" in the document.
   useEffect(() => {
     if (!ready || started.current) return;
     started.current = true;
-    void redaction.markMatches({ text: 'EmbedPDF' });
+    void redaction.markMatches({ text: 'John Warnock' });
   }, [redaction, ready]);
 
   return (
@@ -95,7 +95,7 @@ function MarkFromCode() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MarkFromCode />
         <Stage className="stage">

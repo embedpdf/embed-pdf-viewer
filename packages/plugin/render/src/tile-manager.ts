@@ -157,7 +157,7 @@ export class TileManager {
     // stretched past the budget); a lattice tolerates its band.
     const supplied = baseAskWidth(strategy, demand.desiredDeviceWidth);
     const deficit = demand.desiredDeviceWidth / supplied;
-    if (deficit <= strategy.engageAt) {
+    if (deficit <= strategy.engageRatio) {
       // Disengage drops bookkeeping immediately; resolved bytes stay in the
       // RasterStore, so a re-engage promotes from cache — and below the
       // threshold the base itself is crisp, so nothing visible is lost.

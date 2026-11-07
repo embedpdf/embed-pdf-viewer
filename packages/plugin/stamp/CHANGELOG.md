@@ -1,5 +1,98 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0
+
+### Major Changes
+
+- [#711](https://github.com/embedpdf/embed-pdf-viewer/pull/711) by [@bobsingor](https://github.com/bobsingor) – Introduces reusable PDF stamp libraries. It imports PDF pages as vector stamp assets, generates previews, supports opt-in dynamic stamps, and places selected stamps through the annotation plugin's tool flow.
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `placeAsset()` and `placeAssetOnPages()` put the stamp's middle on `center` (was `at`) and take a page as a ref or an index; a placement from code is selected only with `select: true`. Arming and placing go through the annotation plugin's `stamps` (`arm`, `isArmed`, `place`, `disarm`).
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – The stamp contract, on the kernel's `create()` hook. Reads: `listLibraries(filter?)` (was `libraries`), `getLibrary`, `listAssets({ libraryId?, kind?, category? })` (was `assets(libraryId?)`), `getAsset`, `getAssetPreview` (was `assetPreview`), new `renderAssetPreview(id, { width })`, `readAssetBytes` (was `assetBytes`; returns a copy). Libraries: `deleteLibrary` (was `removeLibrary`), `importLibrary` (was `importLibraryPdf`), `exportLibrary` is async and rejects `not-found`. Assets: `createAsset` (was `addAsset`), `createAssetFromAnnotations` (was `addAssetFromAnnotations`), `deleteAsset` (was `removeAsset`), new `moveAsset` (copy to another library, then delete) and `duplicateAsset`. Placement: `getArmedAsset` (was `armedAsset`; pure), new `placeAssetOnPages` (a `BatchResult<AnnotationRef, PageRef>`), `canPlace`, `canImport`. Events: `onLibraryCreated`/`onLibraryUpdated`/`onLibraryDeleted`, `onAssetCreated`/`onAssetUpdated`/`onAssetDeleted`, `onArmChanged`, and `onLibraryChanged` (bytes changed — what persistence subscribes to). The PDF-convention helpers (`stampKey`, `stampPieceInfo`, the PieceInfo names, …) moved to `/internal`; `DEFAULT_LIBRARY_KIND` stays public. Refusals are `PluginError`s.
+  - Internal layout: `contract` / `host-contract` / `model` / `controller` with `services`, `read` and `write` areas; `/internal` exports `createStampController` (was `createStampCapability`).
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A `fonts` setting (`StampFont`: `{ key, load }`): the fonts typed marks can be written in, each registered on the asset engine the first time a mark names it, so a typed signature is written in its font whichever engine the viewer draws with.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – `addAssetFromAnnotations(documentId, page, refs, input)` takes a `PageRef`; `StampAsset.page` identifies the asset's library page.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Publish a bundle-safe `/contract` entry for stamp-library tokens, assets, previews, configuration, and capability types without import, render, or plugin wiring.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Dynamic stamp evaluation now uses the JavaScript environment configured by `actionsPlugin({ javascript })`. `StampConfig.scripting` and `StampScriptingOptions` are removed; a form-backed asset is evaluated in an isolated detached realm that shares the target document's identity, clock, sandbox, and budget. With scripting disabled or the actions plugin absent, the template is armed unevaluated. Set `dynamic: false` to keep a template static even when scripting is enabled.
+
+  A stamp library is now a PDF in Acrobat's stamp-library format. Its `/Title` is the library name, `/Names /Pages` registers each `identifier=label` stamp, its pages contain the artwork, and `/PieceInfo` stores library metadata. `importLibraryPdf` reads Acrobat-authored libraries directly, while a plain PDF still becomes one stamp per page. Loose libraries are removed: raster assets added with `addAsset` become PDF pages, and `StampAsset.format` and `StampLibrary.storage` no longer exist. `StampLibrary` gains `locale`; `StampAsset` gains `label`; and placements write both `/Name` and `/Subj`.
+
+  The capability adds `createLibrary`, `addAssetFromAnnotations`, `updateAsset`, `exportLibrary`, `onLibraryChanged`, and `placeAsset`. `createLibrary` now resolves asynchronously. Vector hover previews render lazily at the displayed device-pixel width and are bucketed and cached so they remain sharp while zooming.
+
+  Persistence remains outside the plugin through `StampLibraryStore`. Use `indexedDbByteStore` from `@embedpdf/web` in browsers or `memoryStampStore()` for tests and SSR, then connect it with `restoreStampLibraries` and `persistStampLibraries`. The package also exports helpers for stable stamp keys and `/PieceInfo` metadata. This functionality requires an engine with `pages.setName` and `pages.removeName`.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add persistent library kinds and filtering so stamps, signatures, and custom collections can share the library system. Support renaming and recategorizing libraries, authoring marks from drawn strokes, typed text, images, or PDF pages, and querying the currently armed asset for signature-field placement.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The stamp verbs follow the contract every plugin shares. The placing verbs act on the document in scope, else the active one, or the one their options name: `armAsset(assetId, { targetWidth?, documentId? })`, `placeAsset(assetId, placement, { documentId? })`, `placeAssetOnPages(assetId, pages, placement, { documentId? })`, `createAssetFromAnnotations(page, refs, input, { documentId? })`, and `disarm(documentId?)`, `getArmedAsset(documentId?)`, `canPlace(documentId?)` (was a `documentId` first). A placing verb refuses with `permission-denied` (`error.permission: 'annotations:create'`) where `canPlace()` is false.
+
+  Create and update verbs resolve what they made: `createLibrary`, `updateLibrary` and `importLibrary` resolve `{ library }`; `createAsset`, `createAssetFromAnnotations`, `updateAsset`, `moveAsset` and `duplicateAsset` resolve `{ asset }`; `placeAsset` resolves `{ annotation }`, and `placeAssetOnPages` the placed annotations. A page argument is a ref or an index, and a page that isn't there refuses the call before anything is placed. Every async verb takes a `signal`: cancelled, it rejects `operation-cancelled` and keeps nothing.
+
+  `canCreateFromAnnotations()` is new: making a stamp from annotations copies them out, so it needs `doc.download`. `onArmChanged` carries `{ documentId, asset }` (was `assetId`), and fires whenever the armed stamp changes, also when the annotation plugin drops it. The event payloads are named after their events (`StampLibraryChangedEvent`, `StampLibraryCreatedEvent`, `StampAssetDeletedEvent`, …). `stampState` declares the state (`armedAsset`).
+
+  The settings are live: `assetEngine`, `previewWidth` and `dynamic` are read through `getSettings()`, changed with `updateSettings()` and `resetSettings()`, and announced by `onSettingsChanged` (`STAMP_DEFAULTS`). A new `assetEngine` is used from the next library operation on.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `StampState`, what `stampState` reads and `useStampState()` returns, the State table of the stamps page with a comment on each field. Published types now name it instead of spelling out its fields. The plugin's model, from `/internal` and `/contract/host`, is now `StampModel`, made by `initialStampModel()`, so `StampState` has one meaning.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `createAsset()` takes `CreateAssetInput` (was `AddAssetInput`). Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `getAssetBytes()` replaces `readAssetBytes()`: it's synchronous. `StampLibraryChangedEvent` is tagged `type` (was `reason`) and says `'asset-created'`, `'asset-deleted'` and `'deleted'`, as `onAssetCreated`, `onAssetDeleted` and `onLibraryDeleted` do. `ImportLibraryOptions.assetKind` replaces `kind`, which `CreateLibraryOptions` uses for the library's.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – When the annotation plugin drops an armed stamp on its own (a tool switch, a closed document), `getArmedAsset` readers are woken and `onArmChanged` announces the disarm.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `persistStampLibraries` and `restoreStampLibraries` take only the members they use (`exportLibrary` and `onLibraryChanged`, and `importLibrary`), so a framework's own service of the plugin works as well as the capability.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Follows the annotation contract (`canPlace` asks the document's `canCreate`).
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Internal: the controller composes through the kernel's `composeApi`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The plugin's definition takes its types from its token, state and settings instead of type arguments. It declares no settings of its own, so its definition's settings type is `NoSettings`.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Declare the optional annotation and actions dependencies the plugin resolves per document.
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Update canonical stamp-library import and append flows for the required
+  `pages.insert` and `pages.extract` engine operations, removing obsolete
+  optional-feature checks.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A typed mark (`mark: { kind: 'text' }`) is centered in its box, so it sits in the middle of its preview and of a signature field instead of in the top-left corner.
+
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `createAsset()` takes `CreateAssetInput` (was `AddAssetInput`). Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `getAssetBytes()` replaces `readAssetBytes()`: it's synchronous. `StampLibraryChangedEvent` is tagged `type` (was `reason`) and says `'asset-created'`, `'asset-deleted'` and `'deleted'`, as `onAssetCreated`, `onAssetDeleted` and `onLibraryDeleted` do. `ImportLibraryOptions.assetKind` replaces `kind`, which `CreateLibraryOptions` uses for the library's.
+
+## 3.0.0-next.22
+
+## 3.0.0-next.21
+
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A `fonts` setting (`StampFont`: `{ key, load }`): the fonts typed marks can be written in, each registered on the asset engine the first time a mark names it, so a typed signature is written in its font whichever engine the viewer draws with.
+
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `StampState`, what `stampState` reads and `useStampState()` returns, the State table of the stamps page with a comment on each field. Published types now name it instead of spelling out its fields. The plugin's model, from `/internal` and `/contract/host`, is now `StampModel`, made by `initialStampModel()`, so `StampState` has one meaning.
+
+## 3.0.0-next.16
+
 ## 3.0.0-next.15
 
 ### Minor Changes

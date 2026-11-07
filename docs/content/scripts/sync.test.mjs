@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
-import { siteFiles, sitePages, transformViewerFile } from './sync.mjs';
+import { pageExamples, siteFiles, sitePages, transformFile, transformViewerFile } from './sync.mjs';
 
 const cloud = (source, file) => transformViewerFile(source, 'cloud', file);
-const document = DEMO_DOCUMENTS.ebook.viewerCloud;
+const document = DEMO_DOCUMENTS.welcome.viewerCloud;
 
 describe('the cloud site’s copy of a viewer file', () => {
   it('names the cloud packages, but not a subpath only the local door has', () => {
@@ -85,34 +85,33 @@ describe('the cloud site’s copy of a viewer file', () => {
   });
 
   it('keeps a doc-source block’s declaration and gives it the cloud document', () => {
-    const source = `  // [!doc-source ebook]
-  readonly ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+    const source = `  // [!doc-source welcome]
+  readonly welcome = '/pdfs/welcome.pdf';
   // [!/doc-source]
 `;
-    assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly ebook = ${document};\n`);
+    assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly welcome = ${document};\n`);
     assert.equal(
       transformViewerFile(source, 'local', 'viewer/a.angular.ts'),
-      "  readonly ebook = 'https://snippet.embedpdf.com/ebook.pdf';\n",
+      "  readonly welcome = '/pdfs/welcome.pdf';\n",
     );
     assert.throws(
       () =>
         cloud(
-          "// [!doc-source ebook]\nconst ebook: string = '/x.pdf';\n// [!/doc-source]\n",
+          "// [!doc-source welcome]\nconst welcome: string = '/x.pdf';\n// [!/doc-source]\n",
           'viewer/a.react.tsx',
         ),
       /declares one document, untyped/,
     );
   });
 
-  it('takes no share grant but a demo document’s', () => {
+  it('takes no grant but a demo document’s', () => {
     assert.throws(
-      () =>
-        cloud("el.src = { shareToken: 'shr_notTheDemoGrant' };\n", 'viewer/a.cloud.vanilla.html'),
-      /isn't a demo document's share grant/,
+      () => cloud("el.src = { grant: 'grt_notTheDemoGrant' };\n", 'viewer/a.cloud.vanilla.html'),
+      /isn't a demo document's grant/,
     );
     assert.equal(
-      cloud("el.src = { shareToken: 'shr_…' };\n", 'viewer/a.vanilla.html'),
-      "el.src = { shareToken: 'shr_…' };\n",
+      cloud("el.src = { grant: 'grt_…' };\n", 'viewer/a.vanilla.html'),
+      "el.src = { grant: 'grt_…' };\n",
     );
   });
 
@@ -120,6 +119,38 @@ describe('the cloud site’s copy of a viewer file', () => {
     const source =
       'import { PDFViewer } from \'@embedpdf/viewer-react\';\n<PDFViewer src="/report.pdf" />\n';
     assert.equal(transformViewerFile(source, 'local', 'viewer/a.react.tsx'), source);
+  });
+});
+
+describe('characters of a demo document', () => {
+  const sample = (engine, source) =>
+    transformFile(source, engine, 'selection/a.vue/Select.vue', { viewer: false });
+  const { local, cloud } = DEMO_DOCUMENTS.welcome.ranges.firstWord;
+  const source = `  // [!doc-range welcome firstWord]
+  selection.select({ page, start: ${local.start}, count: ${local.count} });
+  // [!/doc-range]
+`;
+
+  it('are the site’s own copy’s', () => {
+    assert.equal(
+      sample('local', source),
+      `  selection.select({ page, start: ${local.start}, count: ${local.count} });\n`,
+    );
+    assert.equal(
+      sample('cloud', source),
+      `  selection.select({ page, start: ${cloud.start}, count: ${cloud.count} });\n`,
+    );
+  });
+
+  it('are named once, as the local copy has them', () => {
+    assert.throws(
+      () => sample('cloud', source.replace(`start: ${local.start}`, 'start: 3')),
+      /names `start: \d+, count: \d+` once/,
+    );
+    assert.throws(
+      () => sample('cloud', source.replace('firstWord', 'lastWord')),
+      /unknown doc-range 'welcome lastWord'/,
+    );
   });
 });
 
@@ -169,5 +200,18 @@ describe('a site’s pages', () => {
     const [, code] = page('cloud', 'setup').mdx.split('```');
     assert.match(code, /from '@cloudpdf\/viewer'/);
     assert.match(page('cloud', 'setup').mdx, /install\n`@embedpdf\/viewer`/);
+  });
+});
+
+describe('the examples on a page of their own', () => {
+  it('are the Examples section’s, each shown by its own page there, on both sites', () => {
+    for (const engine of ['local', 'cloud']) {
+      const examples = pageExamples(engine);
+      assert.ok(examples.length > 0, engine);
+      for (const { name, slug, source } of examples) {
+        assert.equal(name, `viewer/examples/${slug}`);
+        assert.match(source, new RegExp(`^viewer/examples/${slug}(\\.\\w+)?\\.mdx$`));
+      }
+    }
   });
 });

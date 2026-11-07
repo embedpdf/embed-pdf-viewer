@@ -8,7 +8,6 @@ import { createAnnotationHoverFeed } from '../../src/tools/hover-feed';
 const tree = {
   root: { type: 'named', subtype: 'Named', name: 'x', next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 
@@ -34,8 +33,9 @@ function createHarness(annots: Record<string, ModelAnnotation>) {
   const submitted: string[] = [];
   const actions = {
     dispatch: (trigger: ActionTrigger) => {
-      if (trigger.scope === 'annotation') {
-        const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.objectNumber : -1;
+      if (trigger.type === 'annotation') {
+        const objectNumber =
+          trigger.annotation.kind === 'objectNumber' ? trigger.annotation.objectNumber : -1;
         submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
       }
       return Promise.resolve({ status: 'executed' as const, steps: [], diagnostics: [] });
@@ -65,7 +65,7 @@ describe('annotation hover feed', () => {
       draft: annotation('draft', { actions: { cursorEnter: tree } }, { unconfirmed: true }),
       'obj:3': annotation('obj:3', {
         subtype: 'widget',
-        fieldFamily: 'text',
+        fieldKind: 'text',
         actions: { cursorEnter: tree },
       }),
       'obj:4': annotation('obj:4', { subtype: 'link', actions: { cursorEnter: tree } }),

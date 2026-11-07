@@ -19,8 +19,8 @@
  * per the layering law. The return shape is a Svelte action; the other
  * frameworks call the same two functions from their effects.
  *
- * Offsets: positions in the plain projection — paragraphs joined by `\r`,
- * runs concatenated, a hard break inside a run is a `\r` too. The same
+ * Offsets: positions in the plain projection — paragraphs joined by `\n`,
+ * runs concatenated, a hard break inside a run is a `\n` too. The same
  * arithmetic the core's run algebra uses.
  *
  * Known limits, by design: the browser's native undo stack does not span a
@@ -28,7 +28,7 @@
  * the appearance stream is the truth.
  */
 
-import { fontKeyOfWebFamily, observeWebFonts } from './web-font';
+import { observeWebFonts } from './web-font';
 import {
   firstLineShiftFor,
   lineModelFor,
@@ -77,24 +77,51 @@ export interface RichTextEditorRange {
 
 export type RichTextEditorCommand = 'bold' | 'italic' | 'underline';
 
+/** A run's face: the family, weight and italic its font is chosen by. */
+export interface RichTextEditorFace {
+  family: string;
+  weight: number;
+  italic: boolean;
+}
+
 /** What the binding needs from the plugin — structural, no plugin import. */
 export interface RichTextEditorHost {
-  /** The element's content changed by typing: here is the serialised document. */
-  onInput(doc: RichTextEditorDocument): void;
+  /**
+   * The element's content changed by typing: here is the serialised
+   * document. Returns the document the host keeps when it isn't this one (it
+   * gave the text typed at the caret a style chosen there): the element shows
+   * it before the next keystroke reads the element again.
+   */
+  onInput(doc: RichTextEditorDocument): RichTextEditorDocument | void;
   /** The selection inside the editor moved (null: the editor has none). */
   onSelectionChange(range: RichTextEditorRange | null): void;
   /** A keyboard command the host applies to the current selection. */
   onCommand(command: RichTextEditorCommand): void;
-  /** The CSS family list for a PDF family ("Helvetica" → a web stack, a
-   *  registered family → the family its face is mounted under, see `mountWebFont`). */
-  cssFontFamily(family: string): string;
+  /**
+   * The CSS family list a face is drawn with: the font program the engine
+   * draws it in, when the host knows it. Asked again on every update, so a
+   * span follows when the answer changes (a font list that arrived).
+   */
+  cssFontFamily(face: RichTextEditorFace): string;
+  /**
+   * The family a CSS family the editor drew with stands for (a program's
+   * family, the face it is): for a span the browser made itself (a span this
+   * binding draws keeps its family as data), and for the line model, which
+   * draws a standard family's lines as the engine does. Without it, a family
+   * reads back as it is.
+   */
+  familyOfCss?(cssFamily: string): string | undefined;
 }
 
 export interface RichTextEditorProps {
   document: RichTextEditorDocument;
   /** Screen px per page unit (the page scale): sizes are page points. */
   scale: number;
+  /** The face of text without its own family, weight or italic: the element's. Helvetica when absent. */
+  body?: RichTextEditorFace;
 }
+
+const DEFAULT_BODY: RichTextEditorFace = { family: 'Helvetica', weight: 400, italic: false };
 
 export interface RichTextEditorBinding {
   update(props: RichTextEditorProps): void;
@@ -129,6 +156,8 @@ export interface EditorStyle {
 export interface EditorNode {
   nodeType: number;
   nodeName: string;
+  /** An element's `data-*` attributes: a drawn span keeps its run's family in `family`. */
+  dataset?: Record<string, string | undefined>;
   nodeValue?: string | null;
   childNodes: ArrayLike<EditorNode>;
   parentNode?: EditorNode | null;
@@ -217,8 +246,13 @@ function round2(value: number): number {
 }
 
 /** The inline style declarations a span carries, as a style delta. Only what
- *  the span itself sets: an unset property means "inherit", never a value. */
-export function styleDeltaOf(style: EditorStyle | undefined, scale: number): RichTextEditorStyle {
+ *  the span itself sets: an unset property means "inherit", never a value. A
+ *  CSS family reads back through `familyOfCss`, by default as it is. */
+export function styleDeltaOf(
+  style: EditorStyle | undefined,
+  scale: number,
+  familyOfCss: (cssFamily: string) => string | undefined = (cssFamily) => cssFamily,
+): RichTextEditorStyle {
   const delta: RichTextEditorStyle = {};
   if (!style) return delta;
   const weight = style.fontWeight;
@@ -247,9 +281,9 @@ export function styleDeltaOf(style: EditorStyle | undefined, scale: number): Ric
     if (Number.isFinite(px) && scale > 0) delta.size = round2(px / scale);
   }
   if (style.fontFamily) {
-    // A registered font is drawn in the family it is mounted under; the run names its key.
-    const family = firstFamily(style.fontFamily);
-    if (family) delta.family = fontKeyOfWebFamily(family);
+    const css = firstFamily(style.fontFamily);
+    const family = css ? familyOfCss(css) : undefined;
+    if (family) delta.family = family;
   }
   if (style.letterSpacing) {
     const px = parseFloat(style.letterSpacing);
@@ -258,11 +292,24 @@ export function styleDeltaOf(style: EditorStyle | undefined, scale: number): Ric
   return delta;
 }
 
+/** The face a run draws in: its own family, weight and italic over the body's. */
+function faceOf(delta: RichTextEditorStyle, body: RichTextEditorFace): RichTextEditorFace {
+  return {
+    family: delta.family ?? body.family,
+    weight: delta.weight ?? body.weight,
+    italic: delta.italic ?? body.italic,
+  };
+}
+
+/** Whether a run names its own face: then it draws in that face's family list, not the element's. */
+const namesFace = (delta: RichTextEditorStyle): boolean =>
+  delta.family !== undefined || delta.weight !== undefined || delta.italic !== undefined;
+
 function applyStyleDelta(
   style: EditorStyle,
   delta: RichTextEditorStyle,
   scale: number,
-  cssFontFamily: (family: string) => string,
+  fonts: { body: RichTextEditorFace; cssFontFamily: (face: RichTextEditorFace) => string },
 ): void {
   if (delta.weight !== undefined) style.fontWeight = String(delta.weight);
   if (delta.italic !== undefined) style.fontStyle = delta.italic ? 'italic' : 'normal';
@@ -280,7 +327,7 @@ function applyStyleDelta(
   } else if (delta.size !== undefined) {
     style.fontSize = `${delta.size * scale}px`;
   }
-  if (delta.family !== undefined) style.fontFamily = cssFontFamily(delta.family);
+  if (namesFace(delta)) style.fontFamily = fonts.cssFontFamily(faceOf(delta, fonts.body));
   if (delta.letterSpacing !== undefined) style.letterSpacing = `${delta.letterSpacing * scale}px`;
 }
 
@@ -313,12 +360,19 @@ function sameDelta(
 
 /** Render a document into the element: one block per paragraph, one span per
  *  styled run, `<br>` for a hard break, a placeholder `<br>` at the end of a
- *  block that is empty or ends on a break so the caret has a home. */
+ *  block that is empty or ends on a break so the caret has a home. A span
+ *  keeps its run's own family as data (`data-family`, empty for none), so it
+ *  reads back as written whatever CSS draws it. */
 export function renderRichText(
   root: EditorRoot,
   doc: RichTextEditorDocument,
-  options: { scale: number; cssFontFamily: (family: string) => string },
+  options: {
+    scale: number;
+    cssFontFamily: (face: RichTextEditorFace) => string;
+    body?: RichTextEditorFace;
+  },
 ): void {
+  const fonts = { body: options.body ?? DEFAULT_BODY, cssFontFamily: options.cssFontFamily };
   const factory = root.ownerDocument;
   if (!factory) return;
   const blocks: EditorElement[] = [];
@@ -334,7 +388,9 @@ export function renderRichText(
       let container: EditorElement = block;
       if (run.style && Object.keys(run.style).length) {
         container = factory.createElement('span');
-        applyStyleDelta(container.style, run.style, options.scale, options.cssFontFamily);
+        applyStyleDelta(container.style, run.style, options.scale, fonts);
+        // Empty for a run without its own family: its CSS family is the face's, not a family.
+        if (container.dataset) container.dataset.family = run.style.family ?? '';
         block.appendChild(container);
       }
       const pieces = run.text.split(/\r\n|\r|\n/);
@@ -369,11 +425,53 @@ export function applyFirstLineShift(root: EditorNode, shift: number | undefined)
   }
 }
 
+/**
+ * Draw every span that names its own face in that face's family list again,
+ * without touching the text, the selection or a composition: the face is
+ * what the span carries (its family as data, its weight and style inline),
+ * over its ancestors' and the body's.
+ */
+export function restyleFaces(
+  root: EditorNode,
+  body: RichTextEditorFace,
+  cssFontFamily: (face: RichTextEditorFace) => string,
+): void {
+  const visit = (node: EditorNode, inherited: RichTextEditorFace): void => {
+    if (node.nodeType !== ELEMENT_NODE) return;
+    let face = inherited;
+    if (node !== root && node.style) {
+      const own = ownFaceOf(node);
+      if (namesFace(own)) {
+        face = faceOf(own, inherited);
+        const family = cssFontFamily(face);
+        if (node.style.fontFamily !== family) node.style.fontFamily = family;
+      }
+    }
+    for (let i = 0; i < node.childNodes.length; i++) visit(node.childNodes[i]!, face);
+  };
+  visit(root, body);
+}
+
+/** The face an element itself names: its family as data, its weight and style inline or by tag. */
+function ownFaceOf(node: EditorNode): RichTextEditorStyle {
+  const own: RichTextEditorStyle = {};
+  const name = node.nodeName.toUpperCase();
+  if (name === 'B' || name === 'STRONG') own.weight = 700;
+  if (name === 'I' || name === 'EM') own.italic = true;
+  const delta = styleDeltaOf(node.style, 1, () => undefined);
+  if (delta.weight !== undefined) own.weight = delta.weight;
+  if (delta.italic !== undefined) own.italic = delta.italic;
+  const family = node.dataset?.family;
+  if (family) own.family = family;
+  return own;
+}
+
 // ---- Serialise ----------------------------------------------------------------
 
 interface Walk {
   root: EditorNode;
   scale: number;
+  familyOfCss: ((cssFamily: string) => string | undefined) | undefined;
   paragraphs: RichTextEditorParagraph[];
   current: RichTextEditorParagraph | null;
 }
@@ -395,13 +493,13 @@ function pushText(walk: Walk, text: string, style: RichTextEditorStyle): void {
 
 function walkNode(node: EditorNode, inherited: RichTextEditorStyle, walk: Walk): void {
   if (node.nodeType === TEXT_NODE) {
-    const text = (node.nodeValue ?? '').replace(/\r\n|\n/g, '\r');
+    const text = (node.nodeValue ?? '').replace(/\r\n|\r/g, '\n');
     if (text) pushText(walk, text, inherited);
     return;
   }
   if (node.nodeType !== ELEMENT_NODE) return;
   if (isBreak(node)) {
-    if (!isTrailingBreak(node, walk.root)) pushText(walk, '\r', inherited);
+    if (!isTrailingBreak(node, walk.root)) pushText(walk, '\n', inherited);
     return;
   }
   const name = node.nodeName.toUpperCase();
@@ -411,7 +509,14 @@ function walkNode(node: EditorNode, inherited: RichTextEditorStyle, walk: Walk):
   if (name === 'U') style = mergeDelta(style, { decoration: ['underline'] });
   if (name === 'SUB') style = mergeDelta(style, { script: 'sub' });
   if (name === 'SUP') style = mergeDelta(style, { script: 'super' });
-  style = mergeDelta(style, styleDeltaOf(node.style, walk.scale));
+  // A span this binding drew says its family itself; CSS only for one the browser made.
+  const family = node.dataset?.family;
+  const drawn = family !== undefined;
+  style = mergeDelta(
+    style,
+    styleDeltaOf(node.style, walk.scale, drawn ? () => undefined : walk.familyOfCss),
+  );
+  if (family) style = mergeDelta(style, { family });
 
   if (isBlock(node)) {
     // A block starts a paragraph: the top-level ones by design, nested ones
@@ -431,10 +536,15 @@ function walkNode(node: EditorNode, inherited: RichTextEditorStyle, walk: Walk):
   for (let i = 0; i < node.childNodes.length; i++) walkNode(node.childNodes[i]!, style, walk);
 }
 
-/** The element's content as a document. Inline styles (and the semantic
- *  b/i/u/sub/sup tags a browser may insert) only. */
-export function serializeRichText(root: EditorNode, scale: number): RichTextEditorDocument {
-  const walk: Walk = { root, scale, paragraphs: [], current: null };
+/** The element's content as a document. Inline styles, the family a drawn
+ *  span keeps as data, and the semantic b/i/u/sub/sup tags a browser may
+ *  insert only. */
+export function serializeRichText(
+  root: EditorNode,
+  scale: number,
+  familyOfCss?: (cssFamily: string) => string | undefined,
+): RichTextEditorDocument {
+  const walk: Walk = { root, scale, familyOfCss, paragraphs: [], current: null };
   for (let i = 0; i < root.childNodes.length; i++) walkNode(root.childNodes[i]!, {}, walk);
   for (const paragraph of walk.paragraphs) {
     if (paragraph.runs.length === 0) paragraph.runs.push({ text: '' });
@@ -627,6 +737,12 @@ export function attachRichTextEditor(
   let props = initial;
   let rendered: RichTextEditorDocument | null = null;
   let composing = false;
+  // What the element reported (or showed, as the host kept it) that the host
+  // hasn't drawn back yet, oldest first. Keystrokes can come faster than the
+  // host draws: an update carrying one of these is late, and the element
+  // already shows something newer.
+  let unanswered: RichTextEditorDocument[] = [];
+  const UNANSWERED_KEPT = 64;
 
   const currentSelection = (): RichTextEditorRange | null => {
     const range = liveRange();
@@ -676,6 +792,7 @@ export function attachRichTextEditor(
     // Deduplicate measurements only within this synchronous refresh. They
     // must be measured again after fonts or their descriptors change.
     const measured = new Map<string, WebFontMetrics | null>();
+    const familyOf = (cssFamily: string) => host.familyOfCss?.(cssFamily) ?? cssFamily;
     const measureFor = (face: typeof body) => (family: string) => {
       const key = JSON.stringify([family, face.weight, face.style]);
       if (!measured.has(key)) measured.set(key, webFontMetrics(family, doc, face));
@@ -691,12 +808,15 @@ export function attachRichTextEditor(
           weight: style.fontWeight || body.weight,
           style: style.fontStyle || body.style,
         };
-        return { node, lineHeight: lineModelFor(face.family, measureFor(face)).lineHeight };
+        return {
+          node,
+          lineHeight: lineModelFor(face.family, measureFor(face), familyOf).lineHeight,
+        };
       },
     );
     const measure = measureFor(body);
-    const lineHeight = lineModelFor(body.family, measure).lineHeight;
-    const shift = firstLineShiftFor(body.family, size, measure);
+    const lineHeight = lineModelFor(body.family, measure, familyOf).lineHeight;
+    const shift = firstLineShiftFor(body.family, size, measure, familyOf);
     element.style.lineHeight = String(lineHeight);
     for (const run of runs) run.node.style.lineHeight = String(run.lineHeight);
     applyFirstLineShift(root, shift);
@@ -706,7 +826,8 @@ export function attachRichTextEditor(
     const selection = keepSelection ? currentSelection() : null;
     renderRichText(root, document, {
       scale: props.scale,
-      cssFontFamily: host.cssFontFamily,
+      cssFontFamily: (face) => host.cssFontFamily(face),
+      body: props.body,
     });
     refreshLineModel();
     rendered = document;
@@ -718,9 +839,16 @@ export function attachRichTextEditor(
     // block's shift would ride onto the new paragraph: keep it on the first
     // block alone, whatever the browser produced.
     refreshLineModel();
-    const document = serializeRichText(root, props.scale);
+    const document = serializeRichText(
+      root,
+      props.scale,
+      host.familyOfCss && ((cssFamily) => host.familyOfCss!(cssFamily) ?? cssFamily),
+    );
     rendered = document;
-    host.onInput(document);
+    const kept = host.onInput(document);
+    if (kept && !documentsEqual(kept, document)) render(kept, true);
+    unanswered.push(rendered);
+    if (unanswered.length > UNANSWERED_KEPT) unanswered.shift();
   };
 
   const onInput = () => {
@@ -732,6 +860,7 @@ export function attachRichTextEditor(
   const onCompositionEnd = () => {
     composing = false;
     serialiseAndReport();
+    onSelectionChange();
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
@@ -740,6 +869,9 @@ export function attachRichTextEditor(
       key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : null;
     if (!command) return;
     event.preventDefault();
+    // The command is for the selection as it is now: the browser may not have
+    // reported the last caret move yet (its `selectionchange` is a later task).
+    onSelectionChange();
     host.onCommand(command);
   };
   const onPaste = (event: ClipboardEvent) => {
@@ -749,8 +881,11 @@ export function attachRichTextEditor(
     // the insertion; the resulting `input` event serialises as usual.
     doc.execCommand('insertText', false, text);
   };
+  // A composition reports its text and the caret after it once, when it ends:
+  // the caret moving through it is no move of the host's (a style chosen at
+  // the caret waits for the composed text).
   const onSelectionChange = () => {
-    if (activeElement() !== element) return;
+    if (composing || activeElement() !== element) return;
     host.onSelectionChange(currentSelection());
   };
 
@@ -768,16 +903,23 @@ export function attachRichTextEditor(
     update(next: RichTextEditorProps) {
       const scaleChanged = next.scale !== props.scale;
       props = next;
-      // Our own input echoes back through the host unchanged: no re-render,
-      // the caret stays where the browser put it. Anything else (a restyle,
-      // a remote edit, a scale change) re-renders and restores the caret.
+      // Our own input echoes back through the host unchanged, maybe late: no
+      // re-render, the caret stays where the browser put it. Anything else (a
+      // restyle, a remote edit) re-renders and restores the caret, and so
+      // does a scale change, with the newest text.
       if (composing) return;
-      if (!rendered || scaleChanged || !documentsEqual(next.document, rendered)) {
-        render(next.document, activeElement() === element);
+      const echo = unanswered.findIndex((document) => documentsEqual(next.document, document));
+      if (echo >= 0) unanswered = unanswered.slice(echo + 1);
+      const changed = echo < 0 && (!rendered || !documentsEqual(next.document, rendered));
+      if (changed || scaleChanged) {
+        if (changed) unanswered = [];
+        render(changed ? next.document : rendered!, activeElement() === element);
         return;
       }
-      // The element's font may have changed under an unchanged document (a
-      // body restyle): the line model follows it without touching the DOM text.
+      // The fonts may have changed under an unchanged document (a body
+      // restyle, a font list that arrived): the spans' families and the line
+      // model follow without touching the DOM text.
+      restyleFaces(root, props.body ?? DEFAULT_BODY, (face) => host.cssFontFamily(face));
       refreshLineModel();
     },
     selection: currentSelection,

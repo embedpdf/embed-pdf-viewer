@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LayoutData } from '../src/layout';
+import { panelOf, type LayoutData } from '../src/layout';
 import {
   FLOAT_POSITIONS,
   barsAt,
   barsFloating,
   barsInMode,
+  barsInPanel,
   barsOnEdge,
   barsWith,
   compileBar,
@@ -13,6 +14,7 @@ import {
   edgeStackOf,
   floatOf,
   floatStackOf,
+  hideWhenIdleOf,
   menuOf,
   modesOf,
   omittedCommandsOf,
@@ -50,6 +52,8 @@ const data: LayoutData = {
     pager: { place: { float: 'bottom' }, center: [[{ custom: 'page-number' }]] },
     selection: { place: { at: 'selection' }, center: [['selection:copy']] },
     annotation: { place: { at: 'annotation' }, center: [['annotation:delete']] },
+    pages: { place: { panel: 'thumbnails' }, start: [['page:delete']] },
+    pageHistory: { place: { panel: 'thumbnails' }, end: [['history:undo']] },
   },
   menus: {
     document: [['document:download', 'document:print'], [], ['view:fullscreen']],
@@ -108,10 +112,17 @@ describe('places', () => {
     expect(barsOnEdge(stacked, 'top')).toEqual(['main', 'lost']);
   });
 
-  it('lists the bars along a bar, over a selection, and in a mode', () => {
+  it('lists the bars along a bar, over a selection, in a panel, and in a mode', () => {
     expect(barsWith(data, 'main')).toEqual(['annotate', 'shapes']);
     expect(barsAt(data, 'selection')).toEqual(['selection']);
     expect(barsAt(data, 'annotation')).toEqual(['annotation']);
+    expect(barsInPanel(data, 'thumbnails')).toEqual(['pages', 'pageHistory']);
+    expect(barsInPanel(data, 'outline')).toEqual([]);
+    expect(panelOf(data.bars!.pages!.place)).toBe('thumbnails');
+    expect(panelOf(data.bars!.main!.place)).toBeNull();
+    // A panel's bar is on no edge and floats nowhere.
+    expect(edgeOf(data.bars!.pages!.place)).toBeNull();
+    expect(floatOf(data.bars!.pages!.place)).toBeNull();
     expect(modesOf(data)).toEqual(['annotate', 'shapes']);
     expect(barsInMode(data, 'shapes')).toEqual(['shapes']);
   });
@@ -196,6 +207,58 @@ describe('compileBar', () => {
     expect(pager.sections.center).toEqual([{ id: 'center-0', items: [{ slot: 'page-number' }] }]);
     const unit = normalizeBar(pager).sections[0]!.groups[0]!.units[0]!;
     expect(unit).toMatchObject({ kind: 'custom', terminal: null, importance: 5 });
+  });
+
+  it('keeps grow on your own component, and only when it is true', () => {
+    const bar = compileBar(
+      {
+        bars: {
+          top: {
+            place: 'top',
+            start: [
+              [
+                { custom: 'title', grow: true },
+                { custom: 'status', grow: false },
+              ],
+            ],
+          },
+        },
+      },
+      'top',
+    )!;
+    expect(bar.sections.start![0]!.items).toEqual([
+      { slot: 'title', grow: true },
+      { slot: 'status' },
+    ]);
+  });
+
+  it("keeps a command's emphasis, primary only, and the fit treats it like any item", () => {
+    const bar = compileBar(
+      {
+        bars: {
+          review: {
+            place: 'top',
+            end: [
+              [
+                { command: 'acme:approve', emphasis: 'primary', variants: ['icon+label', 'icon'] },
+                { command: 'acme:reject', emphasis: 'loud' as 'primary' },
+              ],
+            ],
+          },
+        },
+      },
+      'review',
+    )!;
+    expect(bar.sections.end![0]!.items).toEqual([
+      { command: 'acme:approve', variants: ['icon+label', 'icon'], emphasis: 'primary' },
+      { command: 'acme:reject' },
+    ]);
+    expect(normalizeBar(bar).sections[0]!.groups[0]!.units[0]).toMatchObject({
+      kind: 'command',
+      command: 'acme:approve',
+      variants: ['icon+label', 'icon'],
+      importance: 3,
+    });
   });
 
   it('shows an item once per group, and gives a repeated group id a new one', () => {
@@ -289,6 +352,26 @@ describe('floating bars', () => {
     expect(floatStackOf(floating, 'top')).toEqual([]);
     // A floating bar is on no edge.
     expect(edgeStackOf(floating, 'bottom')).toEqual([]);
+  });
+
+  it('reads whether a bar hides while nothing moves: its own place, or its host’s', () => {
+    const floating: LayoutData = {
+      bars: {
+        pager: { place: { float: 'bottom', hideWhenIdle: true } },
+        notes: { place: { with: 'pager' } },
+        zoom: { place: { float: 'bottom-end', hideWhenIdle: false } },
+        corner: { place: { float: 'top-start' } },
+        main: { place: 'top' },
+        loop: { place: { with: 'loop' } },
+      },
+    };
+    expect(hideWhenIdleOf(floating, 'pager')).toBe(true);
+    expect(hideWhenIdleOf(floating, 'notes')).toBe(true);
+    expect(hideWhenIdleOf(floating, 'zoom')).toBe(false);
+    expect(hideWhenIdleOf(floating, 'corner')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'main')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'loop')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'nothing')).toBeUndefined();
   });
 });
 

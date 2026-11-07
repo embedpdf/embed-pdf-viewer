@@ -7,7 +7,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
 
 <template>
   <PDFViewer
-    :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }"
+    :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
     theme="system"
     :disable="disable"
     style="height: 100vh"

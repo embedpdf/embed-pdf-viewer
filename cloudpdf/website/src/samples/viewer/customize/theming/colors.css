@@ -1,0 +1,46 @@
+/* Your app: a bar with the switch, and the viewer under it */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  --bar: #fbfaf7;
+  --bar-text: #111827;
+  --bar-line: #d1d5db;
+  --bar-accent: #0f6e56;
+}
+
+.app.dark {
+  --bar: #16201c;
+  --bar-text: #f9fafb;
+  --bar-line: #33433c;
+  --bar-accent: #4fbf98;
+  color-scheme: dark;
+}
+
+.bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bar-line);
+  background: var(--bar);
+  color: var(--bar-text);
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.bar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.bar input {
+  margin: 0;
+  accent-color: var(--bar-accent);
+}
+
+.viewer {
+  flex: 1;
+  min-height: 0;
+}

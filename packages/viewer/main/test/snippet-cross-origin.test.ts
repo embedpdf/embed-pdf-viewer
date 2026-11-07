@@ -265,9 +265,7 @@ describe('snippet from a foreign origin', () => {
     try {
       await page.waitForFunction(
         () =>
-          /Page 1 of \d+/.test(
-            document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? '',
-          ),
+          /1 \/ \d+/.test(document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? ''),
         null,
         { timeout: 60_000 },
       );

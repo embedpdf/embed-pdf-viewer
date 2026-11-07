@@ -25,6 +25,13 @@ open it from a button: a command with `menu` instead of `run`.
 Each row is a command, so it shows its icon, label and shortcut, is disabled when the command
 can't run, and is gone when the command isn't visible.
 
+This menu goes to the document's chapters, with a line before its last row:
+
+<Example name="viewer/customize/menus/chapters" />
+
+> **Try it:** open **Chapters**, the book at the end of the toolbar, and pick **Timeline** to go
+> to the timeline on page 3. **Back to the cover**, under the line, goes back to the title page.
+
 ## Where a menu opens
 
 You don't choose. A menu opens away from the edge its bar sits on, toward the pages:
@@ -43,7 +50,8 @@ sheet from the bottom of the viewer.
 
 ## Change a built-in menu
 
-The built-in menus are `document`, `view` and `zoom`. Add to them and remove from them like a bar:
+The built-in menus are `document`, `view`, `zoom`, `outline-item`, `attachment-item`, `comment-item` and `page`. Add to them and remove
+from them like a bar:
 
 ```js
 layout
@@ -54,8 +62,12 @@ layout
 | Menu | Its button | What's in it |
 | :-- | :-- | :-- |
 | `document` | `menu:document` | Open (with the local engine), download, print; full screen |
-| `view` | `menu:view` | One page, two pages, cover page; vertical or horizontal scrolling; rotate the view; full screen |
-| `zoom` | `menu:zoom` | 50% to 400%; zoom in and out; fit page, fit width, automatic |
+| `view` | `menu:view` | One page, two pages, cover page; vertical or horizontal scrolling, or page by page; rotate the view; full screen |
+| `zoom` | `menu:zoom` | 50% to 400%; zoom in and out, and the marquee zoom tool; fit page, fit width, automatic |
+| `outline-item` | `menu:outline-item`, on each row of the outline panel, and a right-click on the row | Add an item after or inside; rename, set the destination, properties; delete |
+| `attachment-item` | `menu:attachment-item`, on each file of the attachments panel, and a right-click on the file | Save, go to a page's file; delete |
+| `comment-item` | `menu:comment-item`, on each card of the comments panel, and a right-click on the card | The thread's status: accepted, rejected, cancelled, completed or none; delete the thread |
+| `page` | `menu:page`, on each page of the thumbnails panel and in its header, a right-click and a long press on a page | Rotate either way; insert a blank page or a PDF, duplicate; extract; delete |
 
 ## Sections with a title
 
@@ -86,12 +98,13 @@ is always marked.
 
 ## Over a selection
 
-Two bars appear over what's selected:
+Three bars appear over what's selected:
 
 | Bar | Appears over | What's in it |
 | :-- | :-- | :-- |
 | `selection` | Selected text | Copy, highlight, underline, strike out |
-| `annotation` | Selected annotations | Comment, style, link, group, delete |
+| `annotation` | Selected annotations | Comment, style, link, group, apply redaction, delete |
+| `snapshot` | The box the [snapshot tool](../documents#take-a-snapshot) holds | Copy, save image |
 
 They're bars, so the same edits work. Add your own action, or remove one:
 
@@ -101,10 +114,12 @@ layout
   .remove(['annotation:group', 'annotation:ungroup'], { from: 'annotation' });
 ```
 
-A selection bar appears when the selection is made, not while the mouse is still dragging. It sits
-above the selection, flips below it when there's no room, and on a touch screen keeps clear of the
-handles. Each item is shown only for a selection it works on: **Comment** isn't offered on a link,
-and **Group** only when more than one annotation is selected.
+A selection bar appears when the selection is made, not while the mouse is still dragging. The bar
+for text sits above it, and the bars for annotations and the snapshot below them. Each flips to the other side when
+there's no room, and on a touch screen the text bar keeps clear of the handles. Each item is shown
+only for a selection it works on: **Comment** isn't offered on a link, **Group** only when more
+than one annotation is selected, and **Apply Redaction** only when every selected annotation is a
+redaction mark.
 
 ## The "More" menu
 

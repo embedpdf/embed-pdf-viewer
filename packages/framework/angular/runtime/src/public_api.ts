@@ -14,8 +14,8 @@
 // The core's types and helpers, so app code has one import for the viewer.
 export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
-// and a font the engine draws with, for text you draw yourself.
-export { mountWebFont, saveFile } from '@embedpdf/web';
+// an image to the clipboard, and a font the engine draws with, for text you draw yourself.
+export { copyImage, saveFile } from '@embedpdf/web';
 export * from './errors';
 export * from './config';
 export * from './tokens';
@@ -29,5 +29,6 @@ export * from './scope';
 export * from './page-context';
 export * from './page-layers';
 export * from './svg-shapes';
+export * from './font-mounts';
 export * from './dev';
 export * from './theme';

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createSurfaceFocusFollower } from '../src/surface-focus';
 
@@ -69,6 +69,14 @@ describe('createSurfaceFocusFollower', () => {
     field.blur();
     follower.follow(field, null, 0);
     follower.follow(field, { document: 'b' }, 1);
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('focuses without scrolling the boxes around it', () => {
+    const field = page();
+    const focus = vi.spyOn(field, 'focus');
+    createSurfaceFocusFollower().follow(field, {}, 1);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(document.activeElement).toBe(field);
   });
 

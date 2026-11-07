@@ -37,10 +37,10 @@ export interface SearchConformanceOptions extends Omit<ConformanceOptions, 'fixt
 
 export function runSearchConformance(
   runner: ConformanceTestRunner,
-  opts: SearchConformanceOptions,
+  options: SearchConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const fixture = opts.fixture;
+  const fixture = options.fixture;
 
   /** Drive the cursor loop to exhaustion; assert each slice parses. */
   async function collectAll(
@@ -60,11 +60,11 @@ export function runSearchConformance(
     }
   }
 
-  describe(`search conformance: ${opts.label}`, () => {
+  describe(`search conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -72,7 +72,7 @@ export function runSearchConformance(
     });
 
     test('finds the present literal with sane matches', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const { matches } = await collectAll(doc, {
           text: fixture.presentLiteral,
@@ -113,7 +113,7 @@ export function runSearchConformance(
     });
 
     test('matching is case-insensitive by default', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const lower = await collectAll(doc, {
           text: fixture.presentLiteral.toLowerCase(),
@@ -129,7 +129,7 @@ export function runSearchConformance(
     });
 
     test('snippets carry the matched text; without them a match has none', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const withSnippets = await collectAll(doc, {
           text: fixture.presentLiteral,
@@ -154,7 +154,7 @@ export function runSearchConformance(
     });
 
     test('the absent literal exhausts with zero matches', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const { matches, slices } = await collectAll(doc, {
           text: fixture.absentLiteral,
@@ -169,7 +169,7 @@ export function runSearchConformance(
     });
 
     test('a one-page limit walks the whole document via the cursor', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const whole = await collectAll(doc, {
           text: fixture.presentLiteral,
@@ -188,7 +188,7 @@ export function runSearchConformance(
     });
 
     test('from rotates the scan order (viewport-first)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const slice = await doc.search.query({
           text: fixture.presentLiteral,
@@ -203,7 +203,7 @@ export function runSearchConformance(
     });
 
     test('a cursor replayed against a different query is rejected', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const first = await doc.search.query({
           text: fixture.presentLiteral,
@@ -226,7 +226,7 @@ export function runSearchConformance(
     });
 
     test('a malformed cursor is rejected', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         let caught: unknown;
         try {
@@ -244,7 +244,7 @@ export function runSearchConformance(
     });
 
     test('regex queries match with offsets and rects', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const { matches } = await collectAll(doc, {
           text: fixture.presentRegex,
@@ -261,7 +261,7 @@ export function runSearchConformance(
     });
 
     test('regex flags are restrictions: matchCase and wholeWord return subsets', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const all = await collectAll(doc, {
           text: fixture.presentRegex,
@@ -286,7 +286,7 @@ export function runSearchConformance(
     });
 
     test('ignoreWhitespace keeps every default hit and finds the space-free needle', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
         const plain = await collectAll(doc, { text: fixture.presentLiteral });
@@ -310,7 +310,7 @@ export function runSearchConformance(
     });
 
     test('regex + matchDiacritics / ignoreWhitespace are rejected with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         for (const flags of [{ matchDiacritics: true }, { ignoreWhitespace: true }]) {
           let caught: unknown;
@@ -331,7 +331,7 @@ export function runSearchConformance(
     });
 
     test('dialect violations are rejected with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         for (const pattern of ['(a)\\1', '(?=x)y', '(']) {
           let caught: unknown;
@@ -348,7 +348,7 @@ export function runSearchConformance(
     });
 
     test('an empty needle returns an exhausted, empty slice', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const slice = await doc.search.query({ text: '   ' });
         expect(slice.matches.length).toBe(0);
@@ -359,7 +359,7 @@ export function runSearchConformance(
     });
 
     test('abort() on query rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const p = doc.search.query({ text: fixture.presentLiteral });
         p.abort('test');
@@ -370,7 +370,7 @@ export function runSearchConformance(
     });
 
     test('query after close throws DocNotOpen', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       await doc.close();
       let caught: unknown;
       try {

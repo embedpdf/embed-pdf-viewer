@@ -6,7 +6,7 @@ import {
   beginScaleChange,
   clearLoadError,
   endScaleChange,
-  initialMeasurementState,
+  initialMeasurementModel,
   pageScaleOf,
   recordLoadError,
   selectPageScale,
@@ -32,7 +32,7 @@ const viewport = (owned: boolean, measure = owned ? OWNED : FOREIGN): PageMeasur
 
 describe('measurement transitions', () => {
   it('counts scale changes in flight and never below zero', () => {
-    const idle = initialMeasurementState();
+    const idle = initialMeasurementModel();
     const busy = beginScaleChange(beginScaleChange(idle));
     expect(busy.pending).toBe(2);
     expect(endScaleChange(endScaleChange(busy)).pending).toBe(0);
@@ -40,7 +40,7 @@ describe('measurement transitions', () => {
   });
 
   it('sets the calibration request and the reports, keeping the state when nothing changes', () => {
-    const idle = initialMeasurementState();
+    const idle = initialMeasurementModel();
     expect(setCalibration(idle, null)).toBe(idle);
     const request = {
       page: toPageRef(1),
@@ -55,7 +55,7 @@ describe('measurement transitions', () => {
   });
 
   it('records and clears a page load error', () => {
-    const idle = initialMeasurementState();
+    const idle = initialMeasurementModel();
     const failed = recordLoadError(idle, 3, ERROR);
     expect(failed.loadErrors[3]).toBe(ERROR);
     expect(clearLoadError(failed, 3).loadErrors).toEqual({});
@@ -63,7 +63,7 @@ describe('measurement transitions', () => {
   });
 
   it('keeps session-only viewports per page', () => {
-    const local = setLocalViewports(initialMeasurementState(), 3, [viewport(true)]);
+    const local = setLocalViewports(initialMeasurementModel(), 3, [viewport(true)]);
     expect(local.localViewports[3]).toEqual([viewport(true)]);
   });
 });

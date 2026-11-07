@@ -56,7 +56,7 @@ describe('code example pipeline', () => {
       name: 'Example',
       attributes: [
         { type: 'mdxJsxAttribute', name: 'name', value: 'viewer/quick-start/customized' },
-        { type: 'mdxJsxAttribute', name: 'size', value: 'wide' },
+        { type: 'mdxJsxAttribute', name: 'size', value: 'tall' },
       ],
       children: [],
     };
@@ -64,7 +64,7 @@ describe('code example pipeline', () => {
     remarkCodeExample()(tree);
     await rehypeCodeExample({ panelsDir })(tree);
 
-    expect(node.attributes.find((attr) => attr.name === 'size')?.value).toBe('wide');
+    expect(node.attributes.find((attr) => attr.name === 'size')?.value).toBe('tall');
   }, 30_000);
 
   it('stores every Viewer integration of a Viewer snippet', async () => {

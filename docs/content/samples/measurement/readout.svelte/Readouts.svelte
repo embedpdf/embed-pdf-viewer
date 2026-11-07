@@ -6,11 +6,11 @@
   const isMeasurement = (annotation: Annotation) =>
     'intent' in annotation && !!annotation.intent?.endsWith('-dimension');
 
-  const cover = useAnnotationList({ pages: [0] });
-  const measurements = $derived(cover.current.filter(isMeasurement));
+  const onPlan = useAnnotationList({ pages: [0] });
+  const measurements = $derived(onPlan.current.filter(isMeasurement));
 </script>
 
-<ul class="readouts" aria-label="Measurements on the cover">
+<ul class="readouts" aria-label="Measurements on the plan">
   {#each measurements as annotation (annotationKey(annotation.ref))}
     <Readout {annotation} />
   {/each}

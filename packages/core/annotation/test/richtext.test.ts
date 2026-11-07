@@ -12,9 +12,12 @@ import {
   plainTextOf,
   rangeHasStyle,
   richDocOf,
+  restyleRuns,
   richTextLength,
   splitRunsAt,
   styleAt,
+  typeWithStyle,
+  withoutStyle,
 } from '../src/richtext';
 import type { TextStyle } from '../src/types';
 
@@ -28,7 +31,7 @@ const doc = () => ({
 describe('rich text algebra', () => {
   it('measures the plain projection with the paragraph separator', () => {
     expect(richTextLength(doc())).toBe('Hello bold world'.length + 1 + 'second'.length);
-    expect(plainTextOf(doc())).toBe('Hello bold world\rsecond');
+    expect(plainTextOf(doc())).toBe('Hello bold world\nsecond');
   });
 
   it('locates offsets, giving the separator to the earlier paragraph', () => {
@@ -83,6 +86,74 @@ describe('rich text algebra', () => {
     expect(styleAt(doc(), 10)).toEqual({ weight: 700 });
     expect(styleAt(doc(), 6)).toEqual({});
     expect(styleAt(doc(), 0)).toEqual({});
+  });
+
+  it('gives the text typed at a caret the style chosen there, and the caret after it', () => {
+    const before = doc();
+    // "Hello bold| world": a regular "t" typed after the bold word.
+    const typed = {
+      paragraphs: [
+        {
+          runs: [{ text: 'Hello ' }, { text: 'boldt', style: { weight: 700 } }, { text: ' world' }],
+        },
+        { runs: [{ text: 'second' }] },
+      ],
+    };
+    expect(typeWithStyle(before, typed, 10, { weight: 400 })).toEqual({
+      doc: {
+        paragraphs: [
+          {
+            runs: [
+              { text: 'Hello ' },
+              { text: 'bold', style: { weight: 700 } },
+              { text: 't', style: { weight: 400 } },
+              { text: ' world' },
+            ],
+          },
+          { runs: [{ text: 'second' }] },
+        ],
+      },
+      caret: 11,
+    });
+  });
+
+  it('carries the chosen style past a line break, and drops it for any other edit', () => {
+    const before = doc();
+    const broken = {
+      paragraphs: [
+        { runs: [{ text: 'Hello ' }, { text: 'bold', style: { weight: 700 } }] },
+        { runs: [{ text: ' world' }] },
+        { runs: [{ text: 'second' }] },
+      ],
+    };
+    expect(typeWithStyle(before, broken, 10, { italic: true })).toEqual({
+      doc: broken,
+      caret: 11,
+      style: { italic: true },
+    });
+    // A deletion, text typed somewhere else, and a replacement are no typing at the caret.
+    const deleted = {
+      paragraphs: [{ runs: [{ text: 'Hello bold worl' }] }, ...before.paragraphs.slice(1)],
+    };
+    expect(typeWithStyle(before, deleted, 10, { italic: true })).toBeNull();
+    const elsewhere = {
+      paragraphs: [{ runs: [{ text: 'Hello bold worlds' }] }, ...before.paragraphs.slice(1)],
+    };
+    expect(typeWithStyle(before, elsewhere, 10, { italic: true })).toBeNull();
+    const replaced = {
+      paragraphs: [{ runs: [{ text: 'Hello bald world!' }] }, ...before.paragraphs.slice(1)],
+    };
+    expect(typeWithStyle(before, replaced, 10, { italic: true })).toBeNull();
+  });
+
+  it('restyles runs, or gives back the same document when no run changes', () => {
+    const input = doc();
+    expect(restyleRuns(input, (style) => withoutStyle(style, ['color']))).toBe(input);
+    // A word that stops naming its own weight follows the body, and merges with its neighbours.
+    expect(restyleRuns(input, (style) => withoutStyle(style, ['weight'])).paragraphs).toEqual([
+      { runs: [{ text: 'Hello bold world' }] },
+      { runs: [{ text: 'second' }] },
+    ]);
   });
 
   it('tests a range for a style', () => {
@@ -170,7 +241,7 @@ describe('a free text’s document', () => {
     });
     const annotation = {
       subtype: 'free-text',
-      contents: 'a\rb',
+      contents: 'a\nb',
       ...text,
     } as unknown as Annotation;
     const doc = richDocOf(annotation);

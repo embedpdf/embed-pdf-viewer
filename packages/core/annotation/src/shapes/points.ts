@@ -26,8 +26,16 @@ import {
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
+import { bezierAt, bezierTurns } from '../bezier';
 import { cloudyPolyBounds, cloudyPolyOutline, cloudyPolyPath } from '../cloudy';
 import { endingNodes, endingPieces } from '../endings';
+import {
+  fitInkStroke,
+  INK_DOT_RADIUS,
+  inkCurvesPath,
+  inkCurvesPolyline,
+  type InkStrokeCurves,
+} from '../ink-curves';
 import type { PaintedPiece } from '../painted';
 import {
   expandRect,
@@ -310,8 +318,8 @@ export const MITER_LIMIT = 10;
  * offsets already bound it). `unionRect` of these is the tight, asymmetric visual
  * box: a pointy join grows the box only on the side it actually spikes.
  *
- * Miter kinds only (line / polyline / polygon). Ink is round-capped/round-joined,
- * never spikes, and is bounded elsewhere by a plain half-width grow.
+ * Miter kinds only (line / polyline / polygon). Ink draws curves, bounded by
+ * {@link inkOutlinePoints}.
  */
 function strokeOutlinePoints(points: Point[], closed: boolean, strokeWidth: number): Point[] {
   const halfWidth = strokeWidth / 2;
@@ -400,7 +408,100 @@ export function strokedOutlineOf(nodes: readonly RenderNode[], strokeWidth: numb
   });
 }
 
+const fitted = new WeakMap<Point[][], InkStrokeCurves[]>();
+
+/** Each drawn ink stroke as Acrobat draws it (`ink-curves.ts`). The same lists for the same strokes. */
+function inkCurvesOf(strokes: Point[][]): InkStrokeCurves[] {
+  const cached = fitted.get(strokes);
+  if (cached) return cached;
+  const out = strokes.flatMap((stroke) => fitInkStroke(stroke) ?? []);
+  fitted.set(strokes, out);
+  return out;
+}
+
+/** The unit direction from `from` to the first of `points` apart from it; none when all sit on it. */
+function firstDirection(from: Point, points: Point[]): Point | null {
+  for (const point of points) {
+    const length = Math.hypot(point.x - from.x, point.y - from.y);
+    if (length >= 1e-9) return { x: (point.x - from.x) / length, y: (point.y - from.y) / length };
+  }
+  return null;
+}
+
+/**
+ * The points a fitted ink stroke's box is made of, as the runtime measures
+ * what its appearance paints: the curves (their ends and where they turn)
+ * and, with a width, the pen around them. That is half the width across each
+ * curve's ends, round caps at the stroke's two ends, half the width past each
+ * turn, and the miter where two curves meet in a corner, within
+ * {@link MITER_LIMIT} (only where the stroke turns straight back: elsewhere
+ * they meet smoothly). A dot reaches its radius and half the width.
+ */
+function inkOutlinePoints(curves: InkStrokeCurves, strokeWidth: number): Point[] {
+  const half = strokeWidth / 2;
+  if (curves.kind === 'dot') {
+    const { x, y } = curves.center;
+    const reach = INK_DOT_RADIUS + half;
+    return [
+      { x: x - reach, y: y - reach },
+      { x: x + reach, y: y + reach },
+    ];
+  }
+  const out: Point[] = [curves.start];
+  const turns: Array<{ at: Point; acrossX: boolean }> = [];
+  const pieces: Array<{ from: Point; to: Point; leaving: Point; arriving: Point }> = [];
+  let from = curves.start;
+  for (const { control1, control2, end } of curves.cubics) {
+    out.push(end);
+    for (const t of bezierTurns(from.x, control1.x, control2.x, end.x))
+      turns.push({ at: bezierAt(from, control1, control2, end, t), acrossX: true });
+    for (const t of bezierTurns(from.y, control1.y, control2.y, end.y))
+      turns.push({ at: bezierAt(from, control1, control2, end, t), acrossX: false });
+    const leaving = firstDirection(from, [control1, control2, end]);
+    const back = firstDirection(end, [control2, control1, from]);
+    if (leaving && back)
+      pieces.push({ from, to: end, leaving, arriving: { x: -back.x, y: -back.y } });
+    from = end;
+  }
+  out.push(...turns.map(({ at }) => at));
+  if (half <= 0 || pieces.length === 0) return out;
+
+  const across = (at: Point, direction: Point): Point[] => [
+    { x: at.x - direction.y * half, y: at.y + direction.x * half },
+    { x: at.x + direction.y * half, y: at.y - direction.x * half },
+  ];
+  const pen = (at: Point): Point[] => [
+    { x: at.x - half, y: at.y },
+    { x: at.x + half, y: at.y },
+    { x: at.x, y: at.y - half },
+    { x: at.x, y: at.y + half },
+  ];
+  for (const piece of pieces)
+    out.push(...across(piece.from, piece.leaving), ...across(piece.to, piece.arriving));
+  for (let k = 0; k + 1 < pieces.length; k++) {
+    const { to: at, arriving } = pieces[k]!;
+    const { leaving } = pieces[k + 1]!;
+    const sum = Math.hypot(arriving.x + leaving.x, arriving.y + leaving.y);
+    const outward = { x: arriving.x - leaving.x, y: arriving.y - leaving.y };
+    const outwardLength = Math.hypot(outward.x, outward.y);
+    // One over the sine of half the angle between them; past the limit the join is beveled.
+    if (sum < 1e-9 || outwardLength < 1e-9 || 2 / sum > MITER_LIMIT) continue;
+    const reach = (half * (2 / sum)) / outwardLength;
+    out.push({ x: at.x + outward.x * reach, y: at.y + outward.y * reach });
+  }
+  out.push(...pen(pieces[0]!.from), ...pen(pieces[pieces.length - 1]!.to));
+  for (const { at, acrossX } of turns)
+    out.push(
+      acrossX ? { x: at.x - half, y: at.y } : { x: at.x, y: at.y - half },
+      acrossX ? { x: at.x + half, y: at.y } : { x: at.x, y: at.y + half },
+    );
+  return out;
+}
+
 type EndingSeg = { tip: Point; angle: number; ending: LineEnding | undefined };
+
+/** The width a line's endings are sized by: a hairline (width 0) has a 1 pt line's, as the engine draws them. */
+const endingWidth = (strokeWidth: number): number => (strokeWidth > 0 ? strokeWidth : 1);
 
 /** The start/end tips of a line / open poly as drawn, each with the segment angle
  *  pointing out of the body into the tip (so an arrowhead opens back toward the line). */
@@ -429,23 +530,28 @@ function endingSegs(shape: PointsShape): EndingSeg[] {
 }
 
 /**
- * What the shape draws, as the engine's `rect` takes it in. Ink is round-capped
- * and round-joined, so its strokes grow by half the width. A line or poly wraps
- * its actual stroke outline (per join, and each ending's own outline), so a
- * mitred arrowhead tip is enclosed exactly. A closed poly's cloud reaches past
- * its vertices by the cloud's extent.
+ * What the shape draws, as the engine's `rect` takes it in. Ink is its points
+ * and the box around what its curves paint ({@link inkOutlinePoints}), as the
+ * runtime frames it. A line or poly wraps its actual stroke outline (per join,
+ * and each ending's own outline), so a mitred arrowhead tip is enclosed
+ * exactly. A closed poly's cloud reaches past its vertices by the cloud's
+ * extent.
  */
 function pointsDrawnBounds(shape: PointsShape, stroke: Stroke): Rect {
   const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
-  if (shape.kind === 'ink') return expandRect(unionRect(strokes.flat()), strokeWidth / 2);
+  if (shape.kind === 'ink')
+    return unionRect([
+      ...strokes.flat(),
+      ...inkCurvesOf(strokes).flatMap((curves) => inkOutlinePoints(curves, strokeWidth)),
+    ]);
   const points = strokes[0]!;
   const closed = shape.kind === 'poly' && shape.closed;
   if (closed && cloudyIntensity) return cloudyPolyBounds(points, cloudyIntensity, strokeWidth);
   // Arrowheads, diamonds and squares are stroked polys whose sharp corners
   // miter like the body; a circle ending grows by half the stroke.
   const endings = endingSegs(shape).flatMap((seg) =>
-    endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth),
+    endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)),
   );
   return unionRect([
     ...strokeOutlinePoints(points, closed, strokeWidth),
@@ -473,12 +579,27 @@ function pointsCorners(shape: PointsShape, stroke: Stroke): [Point, Point, Point
 /**
  * What the shape paints: each drawn stroke's ink, a filled polygon's inside,
  * and the endings. A cloudy polygon's ink runs along its cloud's curves, and
- * filled, it paints the polygon and the ring its curves close.
+ * filled, it paints the polygon and the ring its curves close. Ink runs along
+ * its fitted curves, and a stroke of one point is a filled dot.
  */
 function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): PaintedPiece[] {
   const { strokeWidth, cloudyIntensity } = stroke;
   const halfWidth = strokeWidth / 2;
   const strokes = drawnStrokesOf(shape);
+  if (shape.kind === 'ink')
+    return inkCurvesOf(strokes).map((curves) =>
+      curves.kind === 'dot'
+        ? {
+            kind: 'oval',
+            center: curves.center,
+            rx: INK_DOT_RADIUS,
+            ry: INK_DOT_RADIUS,
+            rotation: 0,
+            halfWidth,
+            filled: true,
+          }
+        : { kind: 'stroke', points: inkCurvesPolyline(curves), closed: false, halfWidth },
+    );
   const closed = shape.kind === 'poly' && shape.closed;
   const outline = strokes[0];
   const pieces: PaintedPiece[] = [];
@@ -495,7 +616,10 @@ function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): Pai
   for (const points of strokes) pieces.push({ kind: 'stroke', points, closed, halfWidth });
   for (const seg of endingSegs(shape))
     pieces.push(
-      ...endingPieces(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), strokeWidth),
+      ...endingPieces(
+        endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)),
+        strokeWidth,
+      ),
     );
   return pieces;
 }
@@ -503,13 +627,26 @@ function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): Pai
 /**
  * What the shape draws, where it is drawn: a line, a poly (a closed one's
  * cloud as PDFium bakes it: curls on the vertex path, reaching out), each
- * ink stroke as an open polyline, and the endings.
+ * ink stroke as the curves Acrobat draws it with (a stroke of one point as a
+ * dot), and the endings.
  */
 function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
   const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
   if (shape.kind === 'ink')
-    return strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
+    return inkCurvesOf(strokes).map((curves) =>
+      curves.kind === 'dot'
+        ? {
+            kind: 'ellipse',
+            rect: {
+              x: curves.center.x - INK_DOT_RADIUS,
+              y: curves.center.y - INK_DOT_RADIUS,
+              width: 2 * INK_DOT_RADIUS,
+              height: 2 * INK_DOT_RADIUS,
+            },
+          }
+        : { kind: 'path', d: inkCurvesPath(curves) },
+    );
   const points = strokes[0]!;
   if (shape.kind === 'poly' && shape.closed && cloudyIntensity && points.length >= 3)
     return [{ kind: 'path', d: cloudyPolyPath(points, cloudyIntensity, strokeWidth) }];
@@ -518,7 +655,7 @@ function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
       ? [{ kind: 'line', a: points[0]!, b: points[1]! }]
       : [{ kind: 'poly', points, closed: shape.closed }];
   for (const seg of endingSegs(shape))
-    nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
+    nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)));
   return nodes;
 }
 

@@ -37,6 +37,10 @@ export const StorageKeys = {
   basePdf(tenantId: string, docId: string): string {
     return `${tenantId}/docs/${shard(docId)}/${docId}/base.pdf`;
   },
+  /** Everything a layer stores: its artifacts, renders and change captures. */
+  layerRoot(tenantId: string, docId: string, layerName: string): string {
+    return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(layerName)}/`;
+  },
   /**
    * Layer artifact. `version` is a 1-based monotonic integer stored
    * zero-padded for lexical sort and human readability. Padding is not
@@ -47,15 +51,16 @@ export const StorageKeys = {
     return layerArtifactKey(tenantId, docId, layerName, version);
   },
   /**
-   * An immutable base version (migration 030). Version 1 keeps living at
-   * `basePdf()` (its catalog row has no storage key); every version a
-   * signature publishes is sha-addressed here.
+   * An immutable base version a signature made in a layer (migrations 030,
+   * 044): sha-addressed under the layer, so it goes with the layer. Version
+   * 1, the upload, keeps living at `basePdf()` (its catalog row has no
+   * storage key).
    */
-  baseVersionPdf(tenantId: string, docId: string, sha256: string): string {
+  layerVersionPdf(tenantId: string, docId: string, layerName: string, sha256: string): string {
     if (!/^[0-9a-f]{64}$/.test(sha256)) {
-      throw new Error(`baseVersionPdf: bad sha256 "${sha256}"`);
+      throw new Error(`layerVersionPdf: bad sha256 "${sha256}"`);
     }
-    return `${tenantId}/docs/${shard(docId)}/${docId}/versions/${sha256}.pdf`;
+    return `${StorageKeys.layerRoot(tenantId, docId, layerName)}versions/${sha256}.pdf`;
   },
   /**
    * The bytes of a signing candidate past its base: small, and swept with

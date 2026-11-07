@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin, useInteraction, useInteractionState } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
@@ -20,7 +20,7 @@ const plugins = [
   formPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 
 const FIELD_TOOLS = [
   ['form-text', 'Text'],
@@ -31,19 +31,16 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
-/** Start on the ebook's last page, which has room for a form, with the text tool picked. */
+/** Start with the text tool picked: the printed form has boxes, but no fields yet. */
 function useStartDesigning() {
   const interaction = useInteraction();
-  const stage = useStage();
-  const page = usePageList().at(-1)?.ref;
   const started = useRef(false);
 
   useEffect(() => {
-    if (!page || started.current) return;
+    if (started.current) return;
     started.current = true;
-    stage.goToPage(page);
     interaction.activateTool('form-text');
-  }, [interaction, stage, page]);
+  }, [interaction]);
 }
 
 function FieldPalette() {
@@ -89,7 +86,7 @@ function FieldPalette() {
         </button>
       ))}
       <output className="readout">
-        {fields.length === 0 ? 'Click the page to place a field' : `${fields.length} fields`}
+        {fields.length} fields: click the page to place another
       </output>
     </div>
   );
@@ -97,7 +94,7 @@ function FieldPalette() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: registration }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FieldPalette />
         <Stage className="stage">

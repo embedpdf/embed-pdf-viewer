@@ -28,6 +28,24 @@ dialog in a viewer that fills half your page covers that half, not your page. Me
 may reach past its edge, like a menu in any app. They open in the browser's top layer, so they're
 never hidden behind your page's own headers, and no `z-index` on your page is needed.
 
+### Full screen
+
+**Full Screen** (`view:fullscreen`) fills the screen with the viewer's box, not your page. The
+viewer stays where your page put it, and nothing on your page moves or changes, however the
+elements around it are styled.
+
+- **In a frame**, the frame needs `allow="fullscreen"`: `<iframe src="…" allow="fullscreen">`.
+  Without it the browser lets nothing in the frame go full screen, so the viewer has no Full
+  Screen there.
+- **On an iPhone**, where Safari has full screen only for video, the viewer covers the whole
+  window instead, until the button or Escape ends it. A viewer that already is the whole window
+  has no Full Screen there.
+- **From your own code**, `requestFullscreen()` on the `<embedpdf-viewer>` element does the same,
+  and the button shows it. On an element of yours around the viewer, with your own header say,
+  the viewer's Full Screen still fills the screen with just the viewer, and ending it goes back to
+  yours. To make the button do that, give `view:fullscreen` your own `run`: see
+  [Change what a built-in button does](../customize/commands#change-what-a-built-in-button-does).
+
 ## Your components stay yours
 
 When you put [your own component](../customize/components) in the viewer, it isn't moved into the

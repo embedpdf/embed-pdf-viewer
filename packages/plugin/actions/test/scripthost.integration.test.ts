@@ -10,7 +10,7 @@ import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/eng
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/host-contract';
-import type { ActionsHostCapability, AnnotCommitEntry } from '../src/host-contract';
+import type { ActionsHostCapability, AnnotationCommitEntry } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -28,7 +28,6 @@ const fixturePath = resolve(
 const tree = (root: PdfActionNode): PdfActionTree => ({
   root,
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
@@ -60,7 +59,7 @@ async function boot(identity?: { name: string; corporation?: string }) {
   const bytes = new Uint8Array(await readFile(fixturePath));
   await kernel.documents.open({ kind: 'bytes', id: 'scripthost', bytes });
   const actions = kernel.capability(ActionsToken) as ActionsHostCapability;
-  const committed: AnnotCommitEntry[] = [];
+  const committed: AnnotationCommitEntry[] = [];
   actions.registerAnnotCommitSink(async (entries) => {
     committed.push(...entries);
     return {
@@ -87,7 +86,7 @@ const hoverContext = {
     annotation: { kind: 'objectNumber' as const, page: toPageRef(3), objectNumber: 5 },
     page: toPageRef(3),
   },
-  event: { scope: 'annotation' as const, name: 'cursorEnter' as const },
+  event: { type: 'annotation' as const, event: 'cursorEnter' as const },
 };
 
 describe('the ScriptHost executor (real VM, real engine world)', () => {

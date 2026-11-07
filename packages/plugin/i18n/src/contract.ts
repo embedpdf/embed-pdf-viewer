@@ -26,6 +26,21 @@ export interface TranslationDictionary {
   readonly [key: string]: string | TranslationDictionary;
 }
 
+/**
+ * A string with its `{name}` slots filled from `params`: what `t()` does to the strings it finds,
+ * for text that has no translation, such as a command's `label` without the i18n plugin. A slot
+ * without a value stays as it is, so it shows while testing.
+ */
+export function interpolate(
+  text: string,
+  params?: Readonly<Record<string, string | number>>,
+): string {
+  if (!params) return text;
+  return text.replace(/\{(\w+)\}/g, (match, slot: string) =>
+    params[slot] !== undefined ? String(params[slot]) : match,
+  );
+}
+
 /** How a language reads. */
 export type TextDirection = 'ltr' | 'rtl';
 
@@ -46,23 +61,29 @@ export type LocaleLoader = () => Promise<Locale>;
 /**
  * The i18n plugin's settings. `i18nPlugin(config)` registers them over
  * {@link I18N_DEFAULTS}, and `updateSettings()` changes them while the app runs: a new `locale`
- * switches to it, new `locales` are registered, and `fallbackLocale` and `loaders` apply to the
- * next lookup and the next switch.
+ * switches to it, new `locales` are registered, a new `fallbackLocale` loads when it's in
+ * `loaders`, and `fallbackLocale` and `loaders` apply to the next lookup and the next switch.
  */
 export interface I18nSettings {
   /**
    * The language to start with; `null` starts with `fallbackLocale`. Pick it outside the plugin,
-   * which never reads the browser: `negotiateLocale(codes, navigator.languages)`. A language in
-   * `loaders` shows the fallback language until it has loaded.
+   * which never reads the browser: `negotiateLocale(codes, navigator.languages)`. It shows once it
+   * and the fallback language have loaded; until then the fallback language shows, or, while
+   * that loads too, the first language in `locales`.
    */
   readonly locale: string | null;
-  /** The language to use for a string another language doesn't have. */
+  /**
+   * The language to use for a string another language doesn't have. One in `loaders` loads at
+   * the start, and no language shows before it has.
+   */
   readonly fallbackLocale: string;
   /** Languages loaded from the start. */
   readonly locales: readonly Locale[];
   /**
-   * Languages loaded the first time someone switches to them, by code. Until then a language
-   * picker shows the code as the name.
+   * Languages loaded the first time someone switches to them, or at the start for the fallback
+   * language, by code. Until one loads, a language picker shows its code as the name. A language
+   * in `locales` too shows those strings until its loader has run, and the loader's language
+   * replaces them.
    */
   readonly loaders: Readonly<Record<string, LocaleLoader>>;
 }
@@ -92,7 +113,7 @@ export interface TranslateOptions {
    * t('pages', { params: { count: 1 } }) // '1 page'
    * ```
    */
-  params?: Record<string, string | number>;
+  params?: Readonly<Record<string, string | number>>;
   /**
    * Another key, read in each language that has no string for the key, before the fallback
    * language is: a specific key in front of a general one.
@@ -147,10 +168,11 @@ export interface I18nCapability extends SettingsApi<I18nSettings> {
   getDirection(): TextDirection;
   /** Every language you can switch to, loaded or not, in the order they were added. The same array until one changes. */
   listLocales(): readonly LocaleInfo[];
-  /** The code of the language being loaded, or `null`. */
+  /** The code of the language on its way, or `null`: it shows once it and the fallback language have loaded. */
   getLoadingLocale(): string | null;
   /**
-   * Switch the language, loading it first when it's in `loaders`. Resolves once it shows, and
+   * Switch the language, loading it first when it's in `loaders`, and waiting for the fallback
+   * language while that loads. Resolves once it shows, and
    * fires `onLocaleChanged`. Rejects `not-found` for a code that is neither loaded nor in
    * `loaders`, `operation-failed` when it can't load (and fires `onLocaleLoadFailed`), and
    * `operation-cancelled` when the signal fires or a newer call replaces it.

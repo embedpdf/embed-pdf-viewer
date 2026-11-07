@@ -1,6 +1,6 @@
 import type { PluginClock } from '@embedpdf/core';
 import type { KindName, Point } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type {
   InteractionHostCapability,
@@ -80,7 +80,7 @@ export function createPlaceHandler(
     priority: ANNOTATION_PLACE_PRIORITY,
     enabledFor: (tool) =>
       tool.enables.has('annotation-place') || tool.enables.has('annotation-stamp'),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page) return false;
       // The click sample's display rotation drives the tool's `upright` policy —
       // the placement lands reading horizontally on a rotated page/view.
@@ -91,8 +91,8 @@ export function createPlaceHandler(
         sample.page.zoom,
       );
     },
-    onUp: () => anno.clearGhost(),
-    onCancel: () => anno.clearGhost(),
+    onPointerUp: () => anno.clearGhost(),
+    onPointerCancel: () => anno.clearGhost(),
     onHover: (sample) => followGhost(anno, interaction, sample),
   };
 }
@@ -132,11 +132,11 @@ export function createEditHandler(
         sample.page.rotation,
         sample.page.zoom,
       ),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page) return false;
       // The final distance-placement click belongs to its creation draft even
       // when it lands over an existing annotation.
-      if (anno.distanceCreationPage?.() != null) return false;
+      if (anno.getDistanceCreationPage?.() != null) return false;
       const touch = sample.pointerType === 'touch';
       // While a free-text box is being edited it owns its own pointer events, so a
       // down that reaches the hub at all is a click outside the editor — commit and
@@ -199,7 +199,7 @@ export function createEditHandler(
       };
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       if (!origin) return;
       const point = pointOn(sample, origin.page);
       if (!point) return;
@@ -217,7 +217,7 @@ export function createEditHandler(
         origin.touch,
       );
     },
-    onUp: (sample) => {
+    onPointerUp: (sample) => {
       if (!origin) return;
       // Always close the gesture — a release over a page gap or outside the
       // window must still commit (a dangling draft leaves a ghost that snaps
@@ -234,7 +234,7 @@ export function createEditHandler(
       );
       origin = null;
     },
-    onCancel: () => {
+    onPointerCancel: () => {
       if (!origin) return;
       // Aborted (second finger → pinch): Revert, don't commit — replay the
       // gesture back to its own down point (every transform is delta-from-
@@ -293,12 +293,12 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 
   // The marquee page's view env at the down sample — the `up` intersects
   // screen-anchored annotations at their effective footprint with it.
-  let view: { scale?: number; rotation?: PageRotation; zoom?: number } = {};
+  let view: { scale?: number; rotation?: Rotation; zoom?: number } = {};
   return {
     id: 'annotation-marquee',
     priority: ANNOTATION_MARQUEE_PRIORITY,
     enabledFor: (tool) => tool.enables.has('annotation-marquee'),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page) return false;
       anchor = {
         page: sample.page.ref,
@@ -312,7 +312,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       dragging = false;
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       if (!anchor) return;
       // Anchored to the page the drag started on; the projected point keeps the
       // marquee growing along the page edge when the cursor overshoots (the
@@ -348,7 +348,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
         view.zoom,
       );
     },
-    onUp: () => {
+    onPointerUp: () => {
       if (dragging && anchor && last) {
         anno.marqueePointer(
           'up',
@@ -364,7 +364,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       last = null;
       dragging = false;
     },
-    onCancel: () => {
+    onPointerCancel: () => {
       // Abort without committing a selection; the core's cancel message clears
       // the marquee draft so no rectangle lingers. (Touch can't currently
       // reach the marquee — this is symmetry and future-proofing.)
@@ -442,10 +442,10 @@ export function createDrawHandler(
     // (square/ink/arrow…) never co-enable text-select, so they are unaffected.
     priority: ANNOTATION_DRAW_PRIORITY,
     enabledFor: (tool) => tool.enables.has('annotation-draw'),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       const tool = toolId();
       const st = subtypeOf(tool);
-      const distancePage = anno.distanceCreationPage?.();
+      const distancePage = anno.getDistanceCreationPage?.();
       if (distancePage != null) {
         const point = pointOn(sample, distancePage);
         if (point) {
@@ -500,7 +500,7 @@ export function createDrawHandler(
       );
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       const tool = toolId();
       const st = subtypeOf(tool);
       // Drag-moves (button down): rect/line/ink/free-text size their box, and a
@@ -512,7 +512,7 @@ export function createDrawHandler(
       origin.point = point;
       anno.createPointer(tool, 'move', origin.page, point);
     },
-    onUp: (sample) => {
+    onPointerUp: (sample) => {
       const tool = toolId();
       const st = subtypeOf(tool);
       if (origin && !isPolyTool(st)) {
@@ -533,7 +533,7 @@ export function createDrawHandler(
       origin = null;
       anno.clearGhost();
     },
-    onCancel: () => {
+    onPointerCancel: () => {
       // Aborted (second finger → pinch, or a system cancel): the draft dies,
       // nothing commits — without this, the up-fallback would commit a shape
       // whose final point teleports to the second finger. For an ink group
@@ -554,7 +554,7 @@ export function createDrawHandler(
       followGhost(anno, interaction, sample);
       const tool = toolId();
       const st = subtypeOf(tool);
-      const distancePage = anno.distanceCreationPage?.();
+      const distancePage = anno.getDistanceCreationPage?.();
       if (distancePage != null) {
         const point = pointOn(sample, distancePage);
         if (point) {

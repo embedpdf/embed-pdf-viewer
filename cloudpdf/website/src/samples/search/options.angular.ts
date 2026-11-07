@@ -14,7 +14,7 @@ import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/searc
 import type { SearchQuery } from '@embedpdf/angular/search';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-search-with-options',
@@ -85,7 +85,7 @@ export class SearchWithOptions {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withSearch(),

@@ -28,20 +28,23 @@ import { NO_VIEWER_COMMANDS, type ViewerCommands } from './config/viewer-command
 import type { ViewerSignatureSettings, ViewerStampSettings } from './plugin-settings';
 
 /**
- * A font beyond the standard 14, for the engine: what `engine.fonts` lists. The style panel
- * offers it for text boxes, once it's registered on the engine and mounted for the live editor.
+ * A font of the app's, beyond the standard 14 (the viewer's `fonts` setting): registered on a
+ * local engine under its key, which the style panel then offers for text boxes, form fields and
+ * redaction labels.
  */
 export interface ViewerFont {
-  /** The id a free-text `fontFamily` carries, and the engine's key for it. Not one of the 14 standard names. */
+  /** What a `fontFamily` names it by, and the engine's key for it. Not one of the 14 standard names. */
   readonly key: string;
   /** Where the TTF or OTF file comes from (same-origin or CORS-enabled). */
   readonly url?: string;
   /** The file's bytes, in place of `url`. */
   readonly data?: Uint8Array | ArrayBuffer;
-  /** The family's name, which the style panel shows (else the key); inferred from the file when left out. */
+  /** The family's name, written into the PDF and matched by rich text; inferred from the file when left out. */
   readonly familyName?: string;
   readonly weight?: number;
   readonly italic?: boolean;
+  /** What the style panel calls it; else its family's name. */
+  readonly label?: string;
 }
 
 /** What `onPanelResize` hears: the panel, and the width the user gave it. */
@@ -55,6 +58,10 @@ export interface PanelResizeEvent {
 export interface ResolvedViewerConfig {
   /** The `layout` option as given: the default without one. */
   readonly layout?: LayoutOption;
+  /** The `size` option as given: what the env's size is, or `'auto'` (or nothing) to measure. */
+  readonly size?: unknown;
+  /** The `touch` option as given: what the env's touch is, or `'auto'` (or nothing) to ask. */
+  readonly touch?: unknown;
   /** User-registered icons — additive over the built-in set. */
   readonly icons: Readonly<Record<string, IconDef>>;
   /** Your commands over the built-in ones, for the commands the layout brings too. */
@@ -65,6 +72,8 @@ export interface ResolvedViewerConfig {
   readonly signature: ViewerSignatureSettings;
   /** The engine's fonts the style panel offers (see {@link ViewerFont}). */
   readonly fonts: readonly ViewerFont[];
+  /** Whether leaving the page asks first while a document has unsaved changes. */
+  readonly warnBeforeLeaving: boolean;
   /** Hears each width the user gives a panel, by dragging its edge or with its keys. */
   readonly onPanelResize?: (event: PanelResizeEvent) => void;
 }
@@ -75,6 +84,7 @@ const DEFAULT_CONFIG: ResolvedViewerConfig = {
   stamp: {},
   signature: {},
   fonts: [],
+  warnBeforeLeaving: true,
 };
 
 const ViewerConfigContext = createContext<ResolvedViewerConfig>(DEFAULT_CONFIG);
@@ -84,6 +94,17 @@ export const ViewerConfigProvider = ViewerConfigContext.Provider;
 /** The `layout` option, for <LayoutRoot> to resolve at the viewer's size. */
 export function useLayoutOption(): LayoutOption | undefined {
   return useContext(ViewerConfigContext).layout;
+}
+
+/** The `size` and `touch` options as given, for <LayoutRoot> to read into the env. */
+export function useEnvOptions(): { readonly size: unknown; readonly touch: unknown } {
+  const { size, touch } = useContext(ViewerConfigContext);
+  return { size, touch };
+}
+
+/** Whether leaving the page asks first while a document has unsaved changes. */
+export function useWarnBeforeLeaving(): boolean {
+  return useContext(ViewerConfigContext).warnBeforeLeaving;
 }
 
 /** Tells the app a panel's new width: what the panel frame calls once the user has resized it. */

@@ -45,6 +45,15 @@ The line is drawn inside `box`, so a thick border doesn't make the shape bigger.
 `rect`: where the shape sits on the page, the upright box around all it draws. The engine works
 it out; see [The shape's rect](#the-shapes-rect).
 
+Both take the same fields, so a rectangle can become an ellipse and back. It stays the same
+annotation, with its `box`, its style and its replies:
+
+```ts
+await page.annotations.update(square.ref, { subtype: 'circle' });
+```
+
+The other shapes keep their kind; see [Change the kind](/docs/engine/annotations#change-the-kind).
+
 ## Lines and arrows
 
 A `line` goes from one point to another, with an optional ending at each end:
@@ -142,8 +151,10 @@ await page.annotations.create({
 | `intent`      | `'ink-highlight'` labels it as a freehand highlighter.                        | none    |
 | `rotation`    | Turns the drawing, in degrees clockwise; see [Turned shapes](#turned-shapes). | none    |
 
-Ink has no fill, and its strokes have round ends. An `inkList` without strokes, or with a stroke
-without points, fails with `InvalidArg`. For a highlighter pen, combine
+Ink has no fill. The engine draws each stroke as Acrobat does: smooth curves fitted to its points,
+never more than about 1.4 points from any of them, with round ends, and a stroke of one point as
+a dot. A drawing looks the same whichever of the two draws it. An `inkList` without strokes, or
+with a stroke without points, fails with `InvalidArg`. For a highlighter pen, combine
 `intent: 'ink-highlight'` with a wide `strokeWidth`, a light `color` and `blendMode: 'multiply'`,
 so the text under it stays readable.
 
@@ -169,6 +180,31 @@ The closed ones (`'closed-arrow'`, `'r-closed-arrow'`, `'square'`, `'circle'`, `
 filled with `interiorColor` when you set one, and outlined when you don't. Endings grow with the
 line: an arrowhead is 9 times the `strokeWidth` long.
 
+## Without a line
+
+`color: null` draws a shape with no line around it: a fill on its own, or a line's filled
+endings without the line between them.
+
+```ts
+await page.annotations.create({
+  subtype: 'square',
+  box: { x: 72, y: 92, width: 200, height: 100 },
+  color: null,
+  interiorColor: '#ffeb96',
+  strokeWidth: 4,
+});
+```
+
+The shape keeps its `strokeWidth`, so it looks the same apart from the missing line: the fill
+stops where the middle of the line would be (2 points inside `box` here), endings and cloudy bumps
+keep their size, and setting a `color` again brings the line back as it was. Ink is nothing but
+its line, so ink with `color: null` draws nothing.
+
+A shape from another PDF app reads `color: null` when the file gives it no line color, and the
+engine draws it without a line, as Acrobat does. `strokeWidth: 0` is not the same: Acrobat draws
+no line around a square, circle or polygon at width `0`, but a hairline for a line, a polyline
+or ink, and so does the engine.
+
 ## Dashed lines
 
 Set `borderStyle: 'dashed'`, and the pattern in `dashArray` if you want your own: lengths in
@@ -178,8 +214,11 @@ points, of line then gap.
 await page.annotations.update(shape.ref, { borderStyle: 'dashed', dashArray: [6, 3] });
 ```
 
-`[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, dashes are 3 points
-on, 3 off. A `dashArray` on a `'solid'` border is kept, and draws when the border becomes dashed.
+`[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, the border gets the
+default, `[3, 3]`: 3 points on, 3 off, written into the file so every PDF app draws it dashed.
+`dashArray: null` writes no pattern: the engine draws the same default, but Acrobat draws such a
+border solid. A pattern needs at least one length; for a solid line, set `borderStyle: 'solid'`. A
+`dashArray` on a `'solid'` border is kept, and draws when the border becomes dashed.
 
 ## Cloudy borders
 
@@ -287,7 +326,9 @@ unchanged; a write that sets one fails with `InvalidArg`. A cloudy border is nev
 
 For readers who know PDF: `linePoints` is `/L`, `vertices` is `/Vertices`, `inkList` is
 `/InkList`, `lineEndings` is `/LE`, `interiorColor` is `/IC` and `cloudyIntensity` is the
-intensity of a `/BE` cloudy border effect. For a cloudy shape the PDF's own `/Rect` takes in the
+intensity of a `/BE` cloudy border effect. `color: null` is written as `/C []`, the empty color
+ISO 32000 defines as no color, which every PDF app draws without a line; a `/C` left out reads
+as `null` too. For a cloudy shape the PDF's own `/Rect` takes in the
 bumps and `/RD` says where the shape is inside it, as Acrobat writes it; the engine writes both
 from `box`. A turned shape keeps its box in `/EMBD_Metadata`, and its drawing is turned inside its
 `/Rect`, so every PDF app shows it turned.

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import type { PdfActionNode } from '../../src/dto/PdfAction';
-import { decodeSubmitFormFlags } from '../../src/dto/PdfAction';
+import { decodeSubmitFormFlags, encodeSubmitFormFlags } from '../../src/dto/PdfAction';
 import { DocumentActionsSnapshotSchema, PdfActionTreeSchema } from '../../src/dto/PdfAction.schema';
 
 /** One explicit fixture per union arm — the round-trip spec for the node
@@ -58,7 +58,7 @@ const ARM_FIXTURES: PdfActionNode[] = [
         { kind: 'name', name: 'billing' },
         { kind: 'objectNumber', objectNumber: 12 },
       ],
-      flags: decodeSubmitFormFlags(0b100010),
+      ...decodeSubmitFormFlags(0b100010),
       charSet: 'utf-8',
     },
     next: [],
@@ -69,7 +69,7 @@ const ARM_FIXTURES: PdfActionNode[] = [
     payload: {
       url: 'https://example.test/all',
       fields: null,
-      flags: decodeSubmitFormFlags(0),
+      ...decodeSubmitFormFlags(0),
     },
     next: [],
   },
@@ -95,7 +95,6 @@ describe('PDF action schemas', () => {
         next: ARM_FIXTURES,
       },
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
     };
     expect(PdfActionTreeSchema.parse(tree)).toEqual(tree);
@@ -110,7 +109,7 @@ describe('PDF action schemas', () => {
       { type: 'reset-form', subtype: 'ResetForm', next: [] },
       { type: 'javascript', subtype: 'JavaScript', next: [] },
     ]) {
-      const tree = { root: bare, incomplete: false, warningFlags: 0, warnings: [] };
+      const tree = { root: bare, incomplete: false, warnings: [] };
       expect(PdfActionTreeSchema.safeParse(tree).success).toBe(false);
     }
   });
@@ -120,7 +119,6 @@ describe('PDF action schemas', () => {
 
     // Default word: FDF via POST, include mode, nothing else.
     expect(decodeSubmitFormFlags(0)).toEqual({
-      raw: 0,
       exclude: false,
       includeNoValueFields: false,
       format: 'fdf',
@@ -151,12 +149,12 @@ describe('PDF action schemas', () => {
     // The two easily-missed positions, pinned against ISO 32000-2:2020:
     // bit 12 is ExclFKey; bit 13 is reserved; EmbedForm is bit 14 (8192).
     expect(decodeSubmitFormFlags(bit(12)).exclFKey).toBe(true);
-    // Reserved bit 13: raw is carried, semantics are untouched.
-    expect({ ...decodeSubmitFormFlags(bit(13)), raw: 0 }).toEqual(decodeSubmitFormFlags(0));
+    // Reserved bit 13: nothing names it.
+    expect(decodeSubmitFormFlags(bit(13))).toEqual(decodeSubmitFormFlags(0));
     expect(decodeSubmitFormFlags(bit(14)).embedForm).toBe(true);
     expect(decodeSubmitFormFlags(8192).embedForm).toBe(true);
 
-    // Exclude is derived from bit 1 — the raw word is the single source.
+    // Exclude is bit 1.
     const excluding = decodeSubmitFormFlags(
       bit(1) | bit(2) | bit(5) | bit(7) | bit(8) | bit(10) | bit(11),
     );
@@ -169,36 +167,45 @@ describe('PDF action schemas', () => {
     expect(excluding.exclNonUserAnnots).toBe(true);
   });
 
+  test('encodeSubmitFormFlags writes back the word the names came from', () => {
+    const bit = (n: number) => 1 << (n - 1);
+    for (const word of [0, bit(1) | bit(2), bit(3) | bit(4), bit(6), bit(9) | bit(4), bit(14)]) {
+      expect(encodeSubmitFormFlags(decodeSubmitFormFlags(word))).toBe(word);
+    }
+    // Left out is off, FDF and POST.
+    expect(encodeSubmitFormFlags({})).toBe(0);
+    expect(encodeSubmitFormFlags({ exclude: true, format: 'html', method: 'get' })).toBe(
+      bit(1) | bit(3) | bit(4),
+    );
+  });
+
   test('a half submit payload is unrepresentable', () => {
     for (const partial of [
       { url: 'https://example.test' }, // no fields/flags
-      { fields: null, flags: decodeSubmitFormFlags(0) }, // no url
+      { fields: null, ...decodeSubmitFormFlags(0) }, // no url
     ]) {
       const tree = {
         root: { type: 'submit-form', subtype: 'SubmitForm', payload: partial, next: [] },
         incomplete: false,
-        warningFlags: 0,
         warnings: [],
       };
       expect(PdfActionTreeSchema.safeParse(tree).success).toBe(false);
     }
   });
 
-  test('accepts an incomplete model with a null root and raw warning flags', () => {
+  test('accepts an incomplete model with a null root and its warnings', () => {
     const tree = {
       root: null,
       incomplete: true,
-      warningFlags: 0x8000_0004,
       warnings: ['incomplete' as const, 'payload-dropped' as const],
     };
     expect(PdfActionTreeSchema.parse(tree)).toEqual(tree);
   });
 
-  test('catalog snapshot keeps name-tree order and defaults openDestination', () => {
+  test('catalog snapshot keeps name-tree order and always says openDestination', () => {
     const action = {
       root: { type: 'javascript' as const, subtype: 'JavaScript', script: '', next: [] },
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
     };
     const snapshot = {
@@ -207,13 +214,12 @@ describe('PDF action schemas', () => {
         { name: 'second', action },
       ],
       openAction: null,
+      openDestination: null,
       willSave: action,
     };
-    // A pre-payload response (no openDestination key) parses and gains the key.
-    expect(DocumentActionsSnapshotSchema.parse(snapshot)).toEqual({
-      ...snapshot,
-      openDestination: null,
-    });
+    expect(DocumentActionsSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    const { openDestination: _left, ...without } = snapshot;
+    expect(DocumentActionsSnapshotSchema.safeParse(without).success).toBe(false);
   });
 
   test('carries a destination-form OpenAction and rejects both forms at once', () => {
@@ -236,7 +242,6 @@ describe('PDF action schemas', () => {
       openAction: {
         root: { type: 'javascript' as const, subtype: 'JavaScript', script: '', next: [] },
         incomplete: false,
-        warningFlags: 0,
         warnings: [],
       },
       openDestination: destination,

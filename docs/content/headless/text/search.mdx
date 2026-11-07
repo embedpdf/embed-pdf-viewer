@@ -150,7 +150,7 @@ Everything `useSearch()` gives you.
 | `canSearch({ snippets? })`                 | Whether searching is allowed; with `snippets: true`, whether matches carry the words around them. [Permissions](#permissions)                                                      |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSearchSettings()`. [Settings](#settings) |
 
-`reveal` is `{ anchor, behavior }`, the [`reveal` setting](#settings) for one call. Every method that
+`reveal` is `{ align, behavior }`, the [`reveal` setting](#settings) for one call. Every method that
 returns a promise also takes a `signal` in its options, to cancel it.
 
 ## State
@@ -178,7 +178,7 @@ Set them when you register the plugin, and change them while the app runs with
 
 | Setting                 | What it does                                                      | Default                       | From CSS                         |
 | :---------------------- | :---------------------------------------------------------------- | :---------------------------- | :------------------------------- |
-| `reveal.anchor`         | Where a match lands in the view when you move to it               | `{ y: 0.35 }`, like a browser | —                                |
+| `reveal.align`          | Where a match lands in the view when you move to it               | `{ y: 0.35 }`, like a browser | —                                |
 | `reveal.behavior`       | Glide there (`'smooth'`) or jump (`'instant'`)                    | `'smooth'`                    | —                                |
 | `highlight.color`       | The highlight of every match                                      | `'#ffd500'`                   | `--epdf-search-highlight`        |
 | `highlight.activeColor` | The highlight of the active match                                 | `'#ff9632'`                   | `--epdf-search-highlight-active` |
@@ -197,7 +197,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `onFailed`           | A search failed                                         | `error`                   |
 | `onActiveHitChanged` | Another match became the active one                     | `index`, `hit`            |
 | `onCleared`          | The search was cleared                                  | —                         |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 ## Permissions
 
@@ -207,7 +207,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `doc.text.copy`   | The words around each match (`snippet`)               | `search.canSearch({ snippets: true })` |
 
 Without `doc.text.copy`, search still finds and highlights every match, but a match has no
-snippet.
+snippet. `findAll(query, { snippets: true })` asks for snippets outright, so without it that call
+is refused.
 
 ## Good to know
 

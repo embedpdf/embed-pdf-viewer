@@ -3,6 +3,7 @@ import { Viewer, DocumentGate, saveFile } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
 import {
@@ -28,11 +29,12 @@ const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
+  selectionPlugin(),
   annotationPlugin(),
   stampPlugin({ assetEngine }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'grant', grant: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // Where the libraries live between visits: this browser's IndexedDB.
 const store = indexedDbByteStore('embedpdf-stamp-example');
@@ -126,13 +128,14 @@ function Libraries() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: approvals }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Libraries />
         <Stage className="stage">
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

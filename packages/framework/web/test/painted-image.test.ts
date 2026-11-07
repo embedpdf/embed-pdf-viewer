@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { bindPaintedImage } from '../src/painted-image';
+import { bindPaintedImage, whenPresented } from '../src/painted-image';
 
 /** An image source like an engine image's: `objectUrl()` follows a signal. */
 function source(url: PromiseLike<{ url: string; revoke(): void }>) {
@@ -130,5 +130,59 @@ describe('bindPaintedImage', () => {
 
     expect(image.src).toBe('');
     expect(revoke).toHaveBeenCalledOnce();
+  });
+});
+
+describe('whenPresented', () => {
+  class LoadingImage extends FakeImage {
+    complete = false;
+    naturalWidth = 0;
+  }
+
+  it('runs once the image loaded and a frame presented it, and only once', () => {
+    const frames = frameHarness();
+    const image = new LoadingImage();
+    const run = vi.fn();
+    whenPresented(image as unknown as HTMLImageElement, run);
+
+    frames.flush();
+    expect(run).not.toHaveBeenCalled();
+    image.load();
+    frames.flush();
+    expect(run).not.toHaveBeenCalled();
+    frames.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+
+    image.load();
+    frames.flush();
+    frames.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the next picture, not one the image holds already (the last page’s)', () => {
+    const frames = frameHarness();
+    const image = Object.assign(new LoadingImage(), { complete: true, naturalWidth: 100 });
+    const run = vi.fn();
+    whenPresented(image as unknown as HTMLImageElement, run);
+    frames.flush();
+    frames.flush();
+    expect(run).not.toHaveBeenCalled();
+    image.load();
+    frames.flush();
+    frames.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs nothing once cancelled', () => {
+    const frames = frameHarness();
+    const image = new LoadingImage();
+    const run = vi.fn();
+    const cancel = whenPresented(image as unknown as HTMLImageElement, run);
+    image.load();
+    cancel();
+    frames.flush();
+    frames.flush();
+    expect(run).not.toHaveBeenCalled();
+    expect(frames.pending()).toBe(0);
   });
 });

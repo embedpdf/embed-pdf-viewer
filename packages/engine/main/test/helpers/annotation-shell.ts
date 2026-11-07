@@ -13,14 +13,14 @@ import {
 } from '../../../../plugin/annotation/src/contract';
 import { createAnnotationController } from '../../../../plugin/annotation/src/controller';
 import {
-  initialAnnotationState,
-  type AnnotationState,
+  initialAnnotationModel,
+  type AnnotationModel,
 } from '../../../../plugin/annotation/src/model';
 
 export async function annotationShell(doc: DocumentHandle, pages: readonly PageLayout[]) {
-  const ctx = createTestContext<AnnotationState, AnnotationSettings>({
+  const ctx = createTestContext<AnnotationModel, AnnotationSettings>({
     id: 'annotation',
-    state: initialAnnotationState(),
+    state: initialAnnotationModel(),
     documentId: doc.id,
     pages: pages.map((page) => ({
       ref: page.ref,

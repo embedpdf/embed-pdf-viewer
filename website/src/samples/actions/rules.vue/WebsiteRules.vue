@@ -14,11 +14,16 @@ import type {
   PdfActionTree,
 } from '@embedpdf/vue/actions';
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
-  root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+  root: {
+    type: 'uri',
+    subtype: 'URI',
+    uri: 'https://www.w3.org/TR/WCAG22/',
+    isMap: false,
+    next: [],
+  },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 
@@ -26,14 +31,14 @@ const websiteLink: PdfActionTree = {
 const STARTS: ReadonlyArray<{ label: string; context: ActionContext }> = [
   {
     label: 'A click',
-    context: { origin: 'user', source: { kind: 'api' }, event: { scope: 'activate' } },
+    context: { origin: 'user', source: { kind: 'api' }, event: { type: 'activate' } },
   },
   {
     label: 'The pointer over it',
     context: {
       origin: 'hover',
       source: { kind: 'api' },
-      event: { scope: 'annotation', name: 'cursorEnter' },
+      event: { type: 'annotation', event: 'cursorEnter' },
     },
   },
   {
@@ -41,7 +46,7 @@ const STARTS: ReadonlyArray<{ label: string; context: ActionContext }> = [
     context: {
       origin: 'lifecycle',
       source: { kind: 'api' },
-      event: { scope: 'document', name: 'open' },
+      event: { type: 'document', event: 'open' },
     },
   },
 ];

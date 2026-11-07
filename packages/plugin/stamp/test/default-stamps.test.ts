@@ -16,7 +16,7 @@ import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps
 
 import { STAMP_DEFAULTS } from '../src/contract';
 import { createStampController } from '../src/controller';
-import { initialStampState } from '../src/model';
+import { initialStampModel } from '../src/model';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The release consume gate (`tooling/consume-fixtures`) supplies the extracted npm tarball, so missing
@@ -261,7 +261,7 @@ function nodeAssetEngine(engine: Engine): LocalEngine {
                   get(targetRender, renderProperty) {
                     if (renderProperty === 'image') {
                       return async () => ({
-                        contentType: 'image/png',
+                        mimeType: 'image/png',
                         source: { kind: 'bytes', bytes: pngBytes() },
                       });
                     }
@@ -282,7 +282,7 @@ function nodeAssetEngine(engine: Engine): LocalEngine {
 function makeStamp(engine: LocalEngine) {
   const ctx = createTestContext({
     id: 'stamp',
-    state: initialStampState(),
+    state: initialStampModel(),
     settings: {
       defaults: STAMP_DEFAULTS,
       registered: { assetEngine: engine },
@@ -363,7 +363,7 @@ describe('@embedpdf/default-stamps', () => {
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);
         expect(asset.size.height).toBeGreaterThan(0);
-        expect(stamp.readAssetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
+        expect(stamp.getAssetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
       }
     });
   }

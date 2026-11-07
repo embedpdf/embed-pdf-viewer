@@ -1,7 +1,8 @@
 /**
  * The app's own headless services inside the viewer (`pages/hooks.ts`): a search box of the
  * app's, in a toolbar item, searches with `inject(EpdfSearch)` and follows its signals, and the
- * viewer's own search plugin, highlights and panel hold the same search.
+ * viewer's own search plugin, highlights and panel hold the same search. The services of the
+ * plugins that read on demand (metadata, outline, attachments, fonts) read the viewer's document.
  */
 import type { Browser, Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -43,6 +44,23 @@ describe('headless services inside the viewer', () => {
         () => document.querySelector('[data-check="search"]')?.closest('[slot]')?.slot,
       ),
     ).toBe('item:app-search');
+  });
+
+  it("gives the metadata, outline, attachment and fonts services the viewer's document", async () => {
+    const statuses = await page
+      .waitForFunction(
+        () => {
+          const read = (name: string) =>
+            document.querySelector(`[data-check="${name}"]`)?.textContent?.trim() ?? '';
+          const statuses = ['metadata', 'outline', 'attachment', 'fonts'].map(read);
+          return statuses.every((status) => status === 'ready') ? statuses : null;
+        },
+        null,
+        { timeout: 15_000 },
+      )
+      .then((handle) => handle.jsonValue());
+    expect(statuses).toEqual(['ready', 'ready', 'ready', 'ready']);
+    expect(seen.errors).toEqual([]);
   });
 
   it('searches from the app, and the viewer holds, paints and lists the same search', async () => {

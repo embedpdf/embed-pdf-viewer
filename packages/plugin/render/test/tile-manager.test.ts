@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { timerClock, type PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
-import { resolveRenderOptions, type TilesOptions } from '../src/paint-plan';
+import { resolveRenderOptions, type TilesSettings } from '../src/paint-plan';
 import { RasterStore } from '../src/raster-store';
 import { TileManager } from '../src/tile-manager';
 
@@ -22,7 +22,7 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
+function createHarness(options?: { policy?: unknown; tiling?: TilesSettings }) {
   const store = new RasterStore(256);
   const pending: Array<{
     view: string;
@@ -38,7 +38,7 @@ function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
   let epoch = 0;
 
   // bleed 0 keeps the geometry assertions exact; bleed has its own tests.
-  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } });
+  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleedPx: 0, ...options?.tiling } });
   const tileManager = new TileManager({
     store,
     getOptions: () => resolved,
@@ -136,7 +136,7 @@ describe('TileManager', () => {
 
   it('continuous below the budget never engages — the base is exact there', () => {
     const harness = createHarness({ policy: { kind: 'continuous' } });
-    // 600 ≤ 640 budget: base renders exactly 600 — deficit 1, engageAt 1.0.
+    // 600 ≤ 640 budget: base renders exactly 600 — deficit 1, engageRatio 1.0.
     const plan = harness.manager.plan(1, { desiredDeviceWidth: 600 }, true);
     expect(plan.engaged).toBe(false);
     expect(harness.pending).toHaveLength(0);
@@ -344,7 +344,7 @@ describe('TileManager', () => {
   });
 
   it('bleed: paint and fetch rects overlap neighbors by the bleed; retention math stays logical', async () => {
-    const harness = createHarness({ tiling: { bleed: 1, prefetch: { margin: 0 } } });
+    const harness = createHarness({ tiling: { bleedPx: 1, prefetch: { margin: 0 } } });
     harness.manager.plan(1, DEEP, true); // level 8 — bleed is 1/8 pt per side
     // The fetched region is bled: interior tiles ask for span + 2×(1/8) pt.
     const interior = harness.pending.find((request) => request.rect.x > 0)!;

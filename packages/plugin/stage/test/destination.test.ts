@@ -11,14 +11,14 @@ describe('a destination as a reveal', () => {
   test('xyz: a point from the top-left, with its zoom', () => {
     expect(revealOfDestination({ kind: 'xyz', page, x: 100, y: 92, zoom: 1.5 }, letter)).toEqual({
       rect: { x: 100, y: 92, width: 0, height: 0 },
-      anchor: { x: 'start', y: 'start' },
+      align: { x: 'start', y: 'start' },
       zoom: { level: 1.5 },
     });
   });
 
   test('xyz: a null axis keeps its place; a zoom of 0 keeps the zoom', () => {
     const reveal = revealOfDestination({ kind: 'xyz', page, x: null, y: 92, zoom: 0 }, letter);
-    expect(reveal.anchor).toEqual({ x: 'keep', y: 'start' });
+    expect(reveal.align).toEqual({ x: 'keep', y: 'start' });
     expect(reveal.zoom).toBe('keep');
   });
 
@@ -30,16 +30,18 @@ describe('a destination as a reveal', () => {
     expect(revealOfDestination({ kind: 'fitH', page, y: 92 }, letter)).toEqual({
       rect: { x: 0, y: 92, width: 612, height: 0 },
       zoom: 'fit-width',
-      anchor: { y: 'start' },
+      align: { y: 'start' },
     });
-    expect(revealOfDestination({ kind: 'fitH', page }, letter).anchor).toEqual({ y: 'keep' });
+    expect(revealOfDestination({ kind: 'fitH', page, y: null }, letter).align).toEqual({
+      y: 'keep',
+    });
   });
 
   test('fitV: a page-high strip at x, fit to height', () => {
     expect(revealOfDestination({ kind: 'fitV', page, x: 150 }, letter)).toEqual({
       rect: { x: 150, y: 0, width: 0, height: 792 },
       zoom: 'fit-height',
-      anchor: { x: 'start' },
+      align: { x: 'start' },
     });
   });
 
@@ -60,6 +62,8 @@ describe('a destination as a reveal', () => {
       width: 612,
       height: 0,
     });
-    expect(revealOfDestination({ kind: 'fitBV', page }, letter).anchor).toEqual({ x: 'keep' });
+    expect(revealOfDestination({ kind: 'fitBV', page, x: null }, letter).align).toEqual({
+      x: 'keep',
+    });
   });
 });

@@ -25,7 +25,7 @@ export function prepareCreate(
   // popup's `parent` beside the draft.
   const resolved = pdfResolveAnnotationDraft(draft, {
     linked: ['reply', 'parent'],
-    describeFont: ctx.describeRegisteredFont,
+    describeFont: ctx.describeFont,
   });
   assertAnnotationResources(resolved.subtype, resources, 'create');
   preflightDraft(resolved, ctx);

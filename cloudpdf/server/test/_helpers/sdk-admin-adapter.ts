@@ -40,11 +40,13 @@ class DocumentsAdapter {
       this.client.uploads.create({
         tenantId: this.tenantId,
         source: input.bytes,
+        name: input['name'] as string | undefined,
+        folderId: input['folderId'] as string | undefined,
         metadata: input['metadata'] as Record<string, unknown> | undefined,
         idempotencyKey: input['idempotencyKey'] as string | undefined,
         dedupMode: input['dedupMode'] as 'always-create' | 'reuse-existing' | undefined,
         docId: input['docId'] as string | undefined,
-        uploadTtlSec: input['uploadTtlSec'] as number | undefined,
+        uploadTtlSeconds: input['uploadTtlSeconds'] as number | undefined,
         uploadPreference: input['uploadPreference'] as 'auto' | 'presigned' | 'proxy' | undefined,
         signal: input['signal'] as AbortSignal | undefined,
         onProgress: input['onProgress'] as ((loaded: number, total: number) => void) | undefined,
@@ -61,7 +63,7 @@ class DocumentsAdapter {
       this.client.documents.uploadProxy({
         file: input.body,
         tenantId: this.tenantId,
-        id: input.docId,
+        docId: input.docId,
       }),
     );
   }
@@ -70,14 +72,14 @@ class DocumentsAdapter {
     return call(
       this.client.documents.commit({
         tenantId: this.tenantId,
-        id: input.docId,
+        docId: input.docId,
         sha256: input.sha256,
       }),
     );
   }
 
   async get(docId: string): Promise<any> {
-    return (await call(this.client.documents.get({ tenantId: this.tenantId, id: docId }))).document;
+    return (await call(this.client.documents.get({ tenantId: this.tenantId, docId }))).document;
   }
 
   async list(options: Record<string, unknown> = {}): Promise<any> {
@@ -96,15 +98,53 @@ class DocumentsAdapter {
     } while (cursor !== undefined);
   }
 
+  async rename(docId: string, name: string): Promise<any> {
+    return (await call(this.client.documents.update({ tenantId: this.tenantId, docId, name })))
+      .document;
+  }
+
   async delete(docId: string): Promise<void> {
-    await call(this.client.documents.delete({ tenantId: this.tenantId, id: docId }));
+    await call(this.client.documents.delete({ tenantId: this.tenantId, docId }));
   }
 
   async download(docId: string): Promise<Uint8Array> {
-    const response = await call(
-      this.client.documents.download({ tenantId: this.tenantId, id: docId }),
-    );
+    const response = await call(this.client.documents.download({ tenantId: this.tenantId, docId }));
     return response.bytes();
+  }
+}
+
+class FoldersAdapter {
+  constructor(
+    private readonly client: CloudPDFClient,
+    private readonly tenantId: string,
+  ) {}
+
+  async create(input: { name: string; parentId?: string }): Promise<any> {
+    return (await call(this.client.folders.create({ tenantId: this.tenantId, ...input }))).folder;
+  }
+
+  list(options: Record<string, unknown> = {}): Promise<any> {
+    return call(this.client.folders.list({ tenantId: this.tenantId, ...options } as never));
+  }
+
+  get(folderId: string): Promise<any> {
+    return call(this.client.folders.get({ tenantId: this.tenantId, folderId }));
+  }
+
+  async rename(folderId: string, name: string): Promise<any> {
+    return (await call(this.client.folders.update({ tenantId: this.tenantId, folderId, name })))
+      .folder;
+  }
+
+  async moveInto(
+    folderId: string,
+    input: { documentIds?: string[]; folderIds?: string[] },
+  ): Promise<void> {
+    await call(this.client.folders.moveInto({ tenantId: this.tenantId, folderId, ...input }));
+  }
+
+  async delete(folderId: string, options: { recursive?: boolean } = {}): Promise<void> {
+    await call(this.client.folders.delete({ tenantId: this.tenantId, folderId, ...options }));
   }
 }
 
@@ -133,18 +173,18 @@ class TokensAdapter {
   }
 
   async revoke(jti: string, options: Record<string, unknown> = {}): Promise<void> {
-    await call(
-      this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never),
-    );
+    await call(this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never));
   }
 }
 
 class TenantAdapter {
   readonly documents: DocumentsAdapter;
+  readonly folders: FoldersAdapter;
   readonly tokens: TokensAdapter;
 
   constructor(client: CloudPDFClient, tenantId: string) {
     this.documents = new DocumentsAdapter(client, tenantId);
+    this.folders = new FoldersAdapter(client, tenantId);
     this.tokens = new TokensAdapter(client, tenantId);
   }
 }

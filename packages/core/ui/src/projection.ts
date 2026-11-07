@@ -21,9 +21,9 @@ import type { FitResult } from './solver';
 
 export type OverflowRow =
   /** A plain command row. The renderer resolves label/icon/active from the registry. */
-  | { readonly type: 'command'; readonly command: string }
+  | { readonly kind: 'command'; readonly command: string }
   /** A command that opens a menu — renders as `label ▸` nesting that menu. */
-  | { readonly type: 'submenu'; readonly command: string; readonly menu: string };
+  | { readonly kind: 'submenu'; readonly command: string; readonly menu: string };
 
 export interface OverflowSection {
   /** From the group's labelKey — render as a section title or a nested submenu. */
@@ -45,7 +45,7 @@ function projectUnit(unit: NormalizedUnit, resolve: ResolveMenuTarget): Overflow
   const command = commandOfUnit(unit);
   if (command === null) return [];
   const menu = resolve(command)?.menu;
-  return [menu ? { type: 'submenu', command, menu } : { type: 'command', command }];
+  return [menu ? { kind: 'submenu', command, menu } : { kind: 'command', command }];
 }
 
 export function projectOverflow(

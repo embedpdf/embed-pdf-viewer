@@ -5,10 +5,18 @@
  */
 import { defineState } from '@embedpdf/core';
 
-import { ShellToken } from './contract';
+import { ShellToken, type SurfaceState } from './contract';
+
+/** The open surfaces and the open menus. */
+export interface ShellState {
+  /** The open surfaces. */
+  readonly openSurfaces: readonly SurfaceState[];
+  /** The open menus, in the order they opened (the last one on top). */
+  readonly openMenus: readonly string[];
+}
 
 export const shellState = defineState(ShellToken, {
-  read: (shell) => ({
+  read: (shell): ShellState => ({
     openSurfaces: shell.listOpenSurfaces(),
     openMenus: shell.listOpenMenus(),
   }),

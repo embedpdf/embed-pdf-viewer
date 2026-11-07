@@ -23,23 +23,26 @@ describe("SignaturesClient", () => {
                     filter: "filter",
                     subFilter: "subFilter",
                     byteRange: [],
-                    contentsSize: 1,
+                    contentsSizeBytes: 1,
                     coverage: "whole-revision",
                     revisionIndex: 1,
                     signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
-                    docMdp: 1.1,
+                    docMdp: 1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },
                     lock: { action: "all", fields: ["fields"] },
                     seedValue: {
-                        requiredFlags: 1,
-                        presentFlags: 1,
-                        version: null,
+                        parserVersion: null,
+                        parserVersionRequired: true,
                         mdp: null,
                         filter: null,
+                        filterRequired: true,
                         subFilters: ["subFilters"],
+                        subFiltersRequired: true,
                         digestMethods: ["digestMethods"],
+                        digestMethodsRequired: true,
                         reasons: ["reasons"],
+                        reasonsRequired: true,
                         unsupportedRequired: true,
                     },
                 },
@@ -47,8 +50,8 @@ describe("SignaturesClient", () => {
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                certification: { signatureIndex: 1, permission: 1 },
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
         };
@@ -72,7 +75,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -116,7 +119,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -155,7 +158,7 @@ describe("SignaturesClient", () => {
                 filter: "filter",
                 subFilter: "subFilter",
                 byteRange: [{ key: "value" }],
-                contentsSize: 1,
+                contentsSizeBytes: 1,
                 coverage: "whole-revision",
                 revisionIndex: 1,
                 signer: {
@@ -165,29 +168,32 @@ describe("SignaturesClient", () => {
                     contactInfo: "contactInfo",
                     signedAt: "2024-01-15T09:30:00Z",
                 },
-                docMdp: 1.1,
+                docMdp: 1,
                 catalogCertification: true,
-                fieldMdp: { action: "all", fields: ["fields"], permission: 1.1 },
-                lock: { action: "all", fields: ["fields"], permission: 1.1 },
+                fieldMdp: { action: "all", fields: ["fields"], permission: 1 },
+                lock: { action: "all", fields: ["fields"], permission: 1 },
                 seedValue: {
-                    requiredFlags: 1,
-                    presentFlags: 1,
-                    version: 1,
-                    mdp: 1.1,
+                    parserVersion: 1,
+                    parserVersionRequired: true,
+                    mdp: 1,
                     filter: "filter",
+                    filterRequired: true,
                     subFilters: ["subFilters"],
+                    subFiltersRequired: true,
                     digestMethods: ["digestMethods"],
+                    digestMethodsRequired: true,
                     reasons: ["reasons"],
+                    reasonsRequired: true,
                     unsupportedRequired: true,
                 },
             },
-            version: { sha256: "sha256", byteLength: 1 },
+            version: { sha256: "sha256", sizeBytes: 1 },
             previous: { baseSha256: "baseSha256", editsVersion: 1 },
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                certification: { signatureIndex: 1, permission: 1 },
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
             meta: {
@@ -200,6 +206,9 @@ describe("SignaturesClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -211,6 +220,7 @@ describe("SignaturesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -240,7 +250,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { cms: "cms", expectedVersion: { baseSha256: "baseSha256", editsVersion: 1 } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -269,7 +279,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { cms: "cms", expectedVersion: { baseSha256: "baseSha256", editsVersion: 1 } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -298,7 +308,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { cms: "cms", expectedVersion: { baseSha256: "baseSha256", editsVersion: 1 } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -330,7 +340,7 @@ describe("SignaturesClient", () => {
         const rawResponseBody = {
             mode: "authoritative",
             policyVersion: 1,
-            basis: { version: { sha256: "sha256", byteLength: 1 }, editsVersion: 1, source: "persisted" },
+            basis: { version: { sha256: "sha256", sizeBytes: 1 }, editsVersion: 1, source: "persisted" },
             since: { revisionIndex: 1, signatureIndex: 1 },
             until: { revisionIndex: 1 },
             restrictions: [
@@ -339,7 +349,7 @@ describe("SignaturesClient", () => {
                     revisionIndex: 1,
                     source: "docmdp",
                     own: true,
-                    permission: 1.1,
+                    permission: 1,
                     fields: { key: "value" },
                 },
             ],
@@ -374,7 +384,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -396,7 +406,7 @@ describe("SignaturesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

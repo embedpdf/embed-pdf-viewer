@@ -29,7 +29,7 @@ import {
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormFieldDTO, FormFieldFamily } from '../forms/field';
+import type { FormField, FormFieldKind } from '../forms/field';
 import { FormFieldDraftSchema } from '../forms/schema';
 import { fieldValueOf, type FormFieldValue } from '../forms/value';
 import { annotationKey } from '../identity/annotationKey';
@@ -63,11 +63,11 @@ export interface FormImportPlan {
  * it leaves out. Nothing here touches a document, so an import refuses
  * before its first write:
  *
- * - `InvalidArg` when a field's data isn't valid for its family, or when a
+ * - `InvalidArg` when a field's data isn't valid for its kind, or when a
  *   page a widget is on or points at maps to no target page;
  * - `NotFound` when a page list maps to a page the target doesn't have.
  *
- * Left out, in bundle order: a field of an unknown family, a field whose
+ * Left out, in bundle order: a field of an unknown kind, a field whose
  * name is taken (`nameTaken`, for the document as it is before the
  * import), a widget whose field isn't in the bundle, and each action that
  * is a script, a submit or a link when `mayScript` is false
@@ -104,8 +104,8 @@ export function planFormImport(input: {
       return row === undefined ? [] : [row];
     });
     for (const row of rows) owned.add(row);
-    if (field.family === 'unknown') {
-      dropped.push({ ref: field.ref, reason: 'unsupported-family' });
+    if (field.kind === 'unknown') {
+      dropped.push({ ref: field.ref, reason: 'unsupported-kind' });
       return;
     }
     if (claimed.has(field.name) || input.nameTaken(field.name)) {
@@ -150,7 +150,7 @@ export function planFormImport(input: {
 export interface FormValuesImportTarget {
   readonly ref: FormFieldRef;
   readonly name: string;
-  readonly family: FormFieldFamily;
+  readonly kind: FormFieldKind;
 }
 
 /** One value a values import writes. */
@@ -166,7 +166,7 @@ export interface PlannedValueWrite<T extends FormValuesImportTarget = FormValues
  * What a values import of `bundle` writes into a form whose fields are
  * `target`: each field the bundle holds a value for gets it, matched by full
  * name. Left out, in bundle order: a field the document doesn't have
- * (`no-field`), one of another family (`wrong-family`), and one `refusal`
+ * (`no-field`), one of another kind (`wrong-kind`), and one `refusal`
  * names a reason for: a value the field can't take, a field a signature
  * locked, a field the session may not fill in. So everything is decided
  * before the first write.
@@ -195,8 +195,8 @@ export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
     );
     if (!target) {
       dropped.push({ ref: field.ref, reason: 'no-field' });
-    } else if (target.family !== field.family) {
-      dropped.push({ ref: field.ref, reason: 'wrong-family' });
+    } else if (target.kind !== field.kind) {
+      dropped.push({ ref: field.ref, reason: 'wrong-kind' });
     } else {
       const refused = input.refusal?.(target, value);
       if (refused) dropped.push({ ref: field.ref, reason: refused });
@@ -207,20 +207,20 @@ export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
 }
 
 /** Whether a field read holds a value a write can set. */
-function holdsValue(field: FormFieldDTO): boolean {
+function holdsValue(field: FormField): boolean {
   return field.valueEntry.kind === 'scalar' || field.valueEntry.kind === 'array';
 }
 
 /** A field's scripts as a create writes them; each left out is reported. */
 function fieldActionsOf(
-  field: FormFieldDTO,
+  field: FormField,
   mayScript: boolean,
   dropped: FormImportDrop[],
 ): FieldActionsPatch {
   const actions: FieldActionsPatch = {};
   for (const [event, tree] of Object.entries(field.actions ?? {}) as [
     FieldScriptEvent,
-    NonNullable<FormFieldDTO['actions']>[FieldScriptEvent],
+    NonNullable<FormField['actions']>[FieldScriptEvent],
   ][]) {
     if (!tree) continue;
     const script = fieldScriptOf(tree);
@@ -235,7 +235,7 @@ function fieldActionsOf(
 
 /** A widget row as a create places it: on its mapped page, with its look and actions. */
 function placementOf(
-  field: FormFieldDTO,
+  field: FormField,
   row: WidgetAnnotation,
   mapPage: (page: PageRef) => PageRef,
   mayScript: boolean,
@@ -253,7 +253,7 @@ function placementOf(
     else actions[event] = mapPageRefs(write, mapPage);
   }
   const toggle =
-    field.family === 'checkbox' || field.family === 'radio'
+    field.kind === 'checkbox' || field.kind === 'radio'
       ? field.widgets.find(
           (widget) => widget.ref && annotationKey(widget.ref) === annotationKey(row.ref),
         )
@@ -264,7 +264,7 @@ function placementOf(
     fontFamily: row.fontFamily,
     fontSize: row.fontSize,
     fontColor: row.fontColor,
-    caption: field.family === 'pushbutton' ? row.caption : null,
+    caption: field.kind === 'pushbutton' ? row.caption : null,
   };
   return {
     page: mapPage(row.page),
@@ -286,7 +286,7 @@ function flagsOf(row: WidgetAnnotation): WidgetFlags {
 
 /** The create a field row becomes, checked against the create schema. */
 function draftOf(
-  field: FormFieldDTO,
+  field: FormField,
   actions: FieldActionsPatch,
   widgets: WidgetPlacement[],
   index: number,
@@ -307,11 +307,11 @@ function draftOf(
   const options = (list: readonly { label: string; value: string }[]) =>
     list.map(({ label, value }) => ({ label, value }));
   let draft: FormFieldDraft;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       draft = {
         ...base,
-        family: 'text',
+        kind: 'text',
         ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
         ...(field.maxLength !== null ? { maxLength: field.maxLength } : {}),
         multiline: field.multiline,
@@ -322,7 +322,7 @@ function draftOf(
     case 'radio':
       draft = {
         ...base,
-        family: 'radio',
+        kind: 'radio',
         radiosInUnison: field.radiosInUnison,
         noToggleToOff: field.noToggleToOff,
       };
@@ -330,7 +330,7 @@ function draftOf(
     case 'combobox':
       draft = {
         ...base,
-        family: 'combobox',
+        kind: 'combobox',
         edit: field.edit,
         options: options(field.options),
         ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
@@ -339,7 +339,7 @@ function draftOf(
     case 'listbox':
       draft = {
         ...base,
-        family: 'listbox',
+        kind: 'listbox',
         multiSelect: field.multiSelect,
         options: options(field.options),
         ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
@@ -348,7 +348,7 @@ function draftOf(
     case 'checkbox':
     case 'pushbutton':
     case 'signature':
-      draft = { ...base, family: field.family };
+      draft = { ...base, kind: field.kind };
       break;
     default:
       throw new EngineError(EngineErrorCode.InvalidArg, `import: field ${index} has no family`);

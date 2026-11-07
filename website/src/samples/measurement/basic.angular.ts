@@ -15,9 +15,9 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfMeasurement, withMeasurement } from '@embedpdf/angular/measurement';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const TOOLS = [
@@ -52,7 +52,7 @@ export class MeasureToolbar {
   protected readonly interaction = inject(EpdfInteraction);
   private readonly measurement = inject(EpdfMeasurement);
   protected readonly tools = TOOLS;
-  private readonly scale = this.measurement.scaleOf(0); // the cover's scale
+  private readonly scale = this.measurement.scaleOf(0); // the floor plan's scale
   protected readonly ratio = computed(() => {
     const measure = this.scale().measure;
     return measure?.subtype === 'rectilinear' ? measure.ratio : '…';
@@ -60,7 +60,7 @@ export class MeasureToolbar {
   private started = false;
 
   constructor() {
-    // On load: the cover at 1:100, its width measured along the top, and the distance tool on.
+    // On load: the floor plan at 1:100, the building's width measured, and the distance tool on.
     effect(() => {
       if (!this.scale().ready || this.started) return;
       this.started = true;
@@ -71,8 +71,8 @@ export class MeasureToolbar {
             kind: 'distance',
             page: 0,
             points: [
-              { x: 30, y: 28 },
-              { x: 582, y: 28 },
+              { x: 62, y: 150 },
+              { x: 550, y: 150 },
             ],
           }),
         )
@@ -93,7 +93,7 @@ export class MeasureToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

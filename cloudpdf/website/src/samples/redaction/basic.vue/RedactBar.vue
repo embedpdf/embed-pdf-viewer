@@ -5,8 +5,8 @@ import { useInteraction, useInteractionState } from '@embedpdf/vue/interaction';
 import { useAnnotationState } from '@embedpdf/vue/annotation';
 import { useRedaction, useRedactionState } from '@embedpdf/vue/redaction';
 
-// The author's name on the cover, in page coordinates.
-const AUTHOR = { x: 100, y: 508, width: 172, height: 50 };
+// The cover's subtitle, in page coordinates.
+const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };
 
 const interaction = useInteraction();
 const { activeToolId } = useInteractionState();
@@ -15,14 +15,14 @@ const redaction = useRedaction();
 const { pendingCount, applying } = useRedactionState();
 const ready = useAnnotationState((state) => state.status === 'ready');
 
-// On load: the author's name marked, and the redact tool on.
+// On load: the cover's subtitle marked, and the redact tool on.
 let started = false;
 watch(
   ready,
   (isReady) => {
     if (!isReady || started) return;
     started = true;
-    void redaction.markArea(0, AUTHOR).then(() => stage.reveal(0, { rect: AUTHOR }));
+    void redaction.markArea(0, SUBTITLE).then(() => stage.reveal(0, { rect: SUBTITLE }));
     interaction.activateTool('redact');
   },
   { immediate: true },

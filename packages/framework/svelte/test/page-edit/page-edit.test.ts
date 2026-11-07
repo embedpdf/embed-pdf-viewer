@@ -1,7 +1,13 @@
 import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
-import { pageEditPlugin, usePageEdit } from '../../src/page-edit';
-import { bytesInput } from '../fixtures/counter-plugin';
+import {
+  pageEditPlugin,
+  pageEditState,
+  PageEditToken,
+  usePageEdit,
+  usePageEditState,
+} from '../../src/page-edit';
+import { bytesInput, testPage } from '../fixtures/counter-plugin';
 import { metadataEngine } from '../fixtures/metadata-engine';
 import Probes from '../fixtures/Probes.svelte';
 import { latest, viewerWith } from '../fixtures/viewer';
@@ -45,5 +51,28 @@ describe('usePageEdit', () => {
     await kernel.documents.open(bytesInput('doc'));
     flushSync();
     expect(latest(canEdit.seen)).toBe(true);
+  });
+});
+
+describe('usePageEditState', () => {
+  it("has the page's State fields, and follows the selection", async () => {
+    const state = {
+      read: () => usePageEditState(),
+      pick: (record: unknown) => ({ ...(record as object) }),
+      seen: [] as unknown[],
+    };
+    const { kernel } = await viewerWith(plugins, Probes, { probes: [state] }, metadataEngine);
+    expect(latest(state.seen)).toEqual(pageEditState.empty);
+
+    await kernel.documents.open(bytesInput('doc'));
+    flushSync();
+    expect(latest(state.seen)).toEqual({ selected: [], canEdit: true, canExtract: true });
+    kernel.capability(PageEditToken).select([0]);
+    flushSync();
+    expect(latest(state.seen)).toEqual({
+      selected: [testPage.ref],
+      canEdit: true,
+      canExtract: true,
+    });
   });
 });

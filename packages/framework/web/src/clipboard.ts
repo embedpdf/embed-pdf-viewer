@@ -1,5 +1,6 @@
 /**
- * Clipboard wiring for text selection — the environmental half of copy.
+ * Clipboard wiring for text selection — the environmental half of copy — and
+ * copying an image, such as a snapshot's picture ({@link copyImage}).
  *
  * The selection plugin is deliberately DOM-free: its public capability ends
  * at `readText()` (data). Everything that touches `navigator.clipboard` or
@@ -177,4 +178,22 @@ export async function copySelection(
   const text = await selection.readText();
   if (text !== '') await navigator.clipboard.writeText(text);
   return text;
+}
+
+/** An image the clipboard can take: a rendered page picture (`PageImage`) has this shape. */
+export interface ClipboardImageSource {
+  blob(): PromiseLike<Blob>;
+}
+
+/**
+ * Copy an image to the clipboard as PNG, such as a snapshot's picture. Call
+ * it in the click or the key itself, before any `await`: Safari lets a page
+ * write to the clipboard only while it handles one, so the write starts at
+ * once and the image follows when it's there.
+ */
+export async function copyImage(
+  image: ClipboardImageSource | PromiseLike<ClipboardImageSource>,
+): Promise<void> {
+  const blob = Promise.resolve(image).then((picture) => picture.blob());
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }

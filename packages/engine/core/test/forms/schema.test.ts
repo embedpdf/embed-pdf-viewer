@@ -4,8 +4,9 @@ import {
   FormFieldDTOSchema,
   FormFieldValueSchema,
   FormSnapshotSchema,
+  WidgetPlacementSchema,
 } from '../../src/forms/schema';
-import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
+import type { FormField, FormSnapshot } from '../../src/shared';
 
 const BASE = {
   origin: 'acroform',
@@ -23,11 +24,11 @@ const BASE = {
   importedBy: null,
 } as const;
 
-const RADIO: FormFieldDTO = {
+const RADIO: FormField = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 6 },
   name: 'gender',
-  family: 'radio',
+  kind: 'radio',
   valueEntry: { kind: 'scalar', value: 'male' },
   defaultValueEntry: { kind: 'none' },
   value: 'male',
@@ -61,11 +62,11 @@ const RADIO: FormFieldDTO = {
   ],
 };
 
-const LISTBOX: FormFieldDTO = {
+const LISTBOX: FormField = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'fruits',
-  family: 'listbox',
+  kind: 'listbox',
   valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
   defaultValueEntry: { kind: 'array', values: ['Apple'] },
   selectedValues: ['Apple', 'Cherry'],
@@ -99,7 +100,7 @@ describe('form schemas', () => {
   test('family discriminant rejects cross-family members', () => {
     // A listbox payload claiming to be text must fail: no `value` string,
     // and `selectedValues` is not part of the text member.
-    const bad = { ...LISTBOX, family: 'text' };
+    const bad = { ...LISTBOX, kind: 'text' };
     expect(() => FormFieldDTOSchema.parse(bad)).toThrow();
   });
 
@@ -124,5 +125,16 @@ describe('form schemas', () => {
     expect(() => FormFieldValueSchema.parse({ type: 'text', value: 'A' })).toThrow();
     expect(() => FormFieldValueSchema.parse({ value: 'A', checked: true })).toThrow();
     expect(() => FormFieldValueSchema.parse({ selectedValues: 'A' })).toThrow();
+  });
+
+  test('a widget placement takes a dash pattern of at least one length', () => {
+    const placement = {
+      page: { kind: 'objectNumber', objectNumber: 3 },
+      rect: { x: 72, y: 72, width: 120, height: 24 },
+      borderStyle: 'dashed',
+    };
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [6, 3] }).success).toBe(true);
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: null }).success).toBe(true);
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [] }).success).toBe(false);
   });
 });

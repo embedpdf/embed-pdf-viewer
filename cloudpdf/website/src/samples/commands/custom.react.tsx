@@ -10,7 +10,7 @@ import {
   useCommands,
   useCommandsSettings,
 } from '@embedpdf/react/commands';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './custom.css';
@@ -18,7 +18,7 @@ import './custom.css';
 const engine = cloudEngine();
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],
@@ -35,7 +35,7 @@ const plugins = [
   commandsPlugin({ commands: [...standardCommands, twoPages] }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
@@ -46,7 +46,7 @@ function CommandButton({ id }: { id: string }) {
       type="button"
       className="button"
       disabled={!command.enabled}
-      aria-pressed={command.active}
+      aria-pressed={command.pressable ? command.active : undefined}
       onClick={command.run}
     >
       {command.label}
@@ -101,7 +101,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

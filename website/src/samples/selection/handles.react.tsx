@@ -19,9 +19,9 @@ import './handles.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 function CopyButton() {
@@ -39,13 +39,13 @@ function CopyButton() {
   );
 }
 
-// A word selected on load, as a long-press selects one: "Viewers", on the cover.
+// A word selected on load, as a long-press selects one: "Documents", on the cover.
 function SelectWord() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 14, count: 7 });
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
   }, [selection, cover]);
 
   return null;
@@ -53,7 +53,7 @@ function SelectWord() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectWord />
         <Stage

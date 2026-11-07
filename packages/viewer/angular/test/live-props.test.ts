@@ -74,9 +74,10 @@ describe('<epdf-pdf-viewer> live inputs', () => {
     const spanish = await until(
       page,
       () =>
-        /Página 1 de \d+/.test(
-          document.querySelector('embedpdf-viewer')!.shadowRoot!.textContent ?? '',
-        ),
+        // The pager's next page button, in Spanish.
+        document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
       { timeout: 15_000 },
     );
     expect(spanish).toBe(true);

@@ -11,9 +11,10 @@ import {
   type PageRenderImage,
   type PageRenderOptions,
   type PageRenderRaster,
-  type LocalPageRenderService as LocalPageRenderServiceContract,
+  type RawPageRenderService,
   type PageRef,
   checkImageQuality,
+  checkRenderUsage,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 
@@ -27,7 +28,7 @@ interface DocClosedView {
   isClosed(): boolean;
 }
 
-export class LocalPageRenderService implements LocalPageRenderServiceContract {
+export class LocalPageRenderService implements RawPageRenderService {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
@@ -44,23 +45,32 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Cloud parity: /render gates on `doc.render` (the session-level
-    // rendering capability), and a picture draws the annotations and form
-    // fields the caller may read. image() flows through raw() so the checks
-    // here cover both.
+    // Cloud parity: each kind of picture needs its own right and no other
+    // (`doc.render` on screen, `doc.render.thumbnail` for a thumbnail, the
+    // print right of its DPI for print), and a picture draws the annotations
+    // and form fields the caller may read. image() flows through raw() so the
+    // checks here cover both.
     // Deployment render policy (localEngine({ renderPolicy })): an
     // enforced lattice rejects off-lattice full-page renders exactly like
     // the enforcing server, and the policy's pixel budget rides into the
     // worker either way. Both are the identity under the default
-    // `continuous` policy.
+    // `continuous` policy. Print pictures and thumbnails have their own
+    // sizes, off the lattice, as on the server.
     let layers: ReturnType<typeof resolvePageLayers>;
     try {
-      this.guard.assertCapability('doc.render');
+      checkRenderUsage(options, {
+        render: this.guard.can('doc.render'),
+        thumbnail: this.guard.can('doc.render.thumbnail'),
+        print: this.guard.can('doc.print'),
+        printHigh: this.guard.can('doc.print.high'),
+      });
       layers = resolvePageLayers(options, {
         annotations: this.guard.can('doc.annotate.read'),
         formFields: this.guard.can('doc.forms.read'),
       });
-      assertFullPageOnLattice(this.policy, options);
+      if (options?.usage !== 'print' && options?.viewport?.kind !== 'thumbnail') {
+        assertFullPageOnLattice(this.policy, options);
+      }
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
@@ -118,7 +128,7 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       const handle = createPageImageHandle(result, {
         async blob() {
           return new Blob([copyToExactArrayBuffer(bytes)], {
-            type: result.contentType,
+            type: result.mimeType,
           });
         },
       });

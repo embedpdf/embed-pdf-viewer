@@ -1,7 +1,6 @@
 <!-- The bundle as one JSON text: what you'd store in your own database. -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
+import { ref, watch } from 'vue';
 import {
   AnnotationTransfer,
   useAnnotation,
@@ -11,8 +10,6 @@ import {
 
 const annotation = useAnnotation();
 const ready = useAnnotationState((state) => state.status === 'ready');
-const pages = usePageList();
-const cover = computed(() => pages.value[0]?.ref);
 const annotations = useAnnotationList();
 const text = ref('');
 const status = ref('');
@@ -39,27 +36,14 @@ async function importText() {
   }
 }
 
-// On load: a note and a rectangle on the cover, exported at once.
+// On load: everything in the document, exported at once.
 let started = false;
 watch(
-  [ready, cover],
-  ([isReady, page]) => {
-    if (!isReady || !page || started) return;
+  ready,
+  (isReady) => {
+    if (!isReady || started) return;
     started = true;
-    void Promise.all([
-      annotation.create(page, {
-        subtype: 'text',
-        rect: { x: 470, y: 232, width: 20, height: 20 },
-        contents: 'Can we shorten the title?',
-        color: '#facc15',
-      }),
-      annotation.create(page, {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        strokeWidth: 3,
-      }),
-    ]).then(exportAll);
+    void exportAll();
   },
   { immediate: true },
 );

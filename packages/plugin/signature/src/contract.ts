@@ -28,7 +28,7 @@ import type {
   FormFieldRef,
   FormWidget,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSignerInput,
   SignatureSnapshot,
@@ -46,7 +46,7 @@ export type {
   FieldLockSpec,
   FormFieldRef,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -66,7 +66,7 @@ export type {
 export type SignatureMode = 'sign' | 'visual' | 'ask';
 
 /** The key that signs: a signer port, or a function that returns one when someone signs. */
-export type SignatureKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
+export type SigningKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
 
 /**
  * The signature plugin's settings. `signaturePlugin(config)` registers them
@@ -76,7 +76,7 @@ export type SignatureKey = SignerPort | (() => SignerPort | Promise<SignerPort>)
  */
 export interface SignatureSettings {
   /** The key: a raw signer (the CMS is built here) or a CMS signer (a service builds it); `null` for none. */
-  readonly key: SignatureKey | null;
+  readonly signingKey: SigningKey | null;
   /** What a mark does in a field; `null` is `'sign'` with a key, else `'visual'`. */
   readonly mode: SignatureMode | null;
   /** The certificates you trust, for checking signatures. Without them a verdict is at best `valid-untrusted`. */
@@ -87,7 +87,7 @@ export interface SignatureSettings {
 
 /** What the signature settings are when the app registers none. */
 export const SIGNATURE_DEFAULTS: SignatureSettings = {
-  key: null,
+  signingKey: null,
   mode: null,
   trust: null,
   allowCertify: false,
@@ -101,7 +101,7 @@ export type Mark = { assetId: string } | { source: BinarySource };
 
 /**
  * How a signature field is addressed: its field ref, or its widget, by
- * annotation ref or as a signature names it (`SignatureDTO.widget`).
+ * annotation ref or as a signature names it (`Signature.widget`).
  */
 export type SignatureFieldAddress = FormFieldRef | AnnotationRef | FormWidget;
 
@@ -109,7 +109,7 @@ export interface SignFieldInput {
   field: FormFieldRef;
   mark: Mark;
   /** A per-call key; the `key` setting otherwise. */
-  key?: SignatureKey;
+  signingKey?: SigningKey;
   /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
   signer?: SignatureSignerInput;
   /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
@@ -129,9 +129,6 @@ export interface PrepareSignatureInput {
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
 }
-
-/** The parked half of a two-phase signing (`prepareSignature` → `completeSignature`). */
-export type PreparedSignature = SignaturePrepared;
 
 /** The stamp-library kind that holds people's marks: one library per person. */
 export const SIGNATURES_LIBRARY_KIND = 'signatures';
@@ -185,17 +182,17 @@ export interface SignaturePending {
   readonly field: FormFieldRef;
 }
 
-/** A signed field's facts, with its verdict from the last check (`null` until one ran). */
-export interface SignatureInfo extends SignatureDTO {
+/** A signature field's facts, with its verdict from the last check (`null` until one ran, or for an unsigned field). */
+export interface SignatureInfo extends Signature {
   readonly verdict: SignatureVerdict | null;
 }
 
 /** What `placeMark` did: sealed, drawn, handed to the chrome (mode `ask`), or placed as a stamp. */
 export type PlaceMarkResult =
-  | { kind: 'signed'; field: FormFieldRef; result: SignatureCompleteResult }
-  | { kind: 'filled'; field: FormFieldRef }
-  | { kind: 'requested'; field: FormFieldRef }
-  | { kind: 'placed'; annotation: AnnotationRef };
+  | { status: 'signed'; field: FormFieldRef; result: SignatureCompleteResult }
+  | { status: 'filled'; field: FormFieldRef }
+  | { status: 'requested'; field: FormFieldRef }
+  | { status: 'placed'; annotation: AnnotationRef };
 
 // ── events ──
 /** A signing completed, in this session or another: the confirmed `signatures.completed` fact. */
@@ -240,7 +237,7 @@ export interface SignatureInspectionRequestedEvent {
 /** Options for `validate()` and `validateField()`. */
 export interface SignatureValidateOptions extends OperationOptions {
   /** The moment the certificates are judged at; now by default. */
-  readonly at?: ValidationTime;
+  readonly validationTime?: ValidationTime;
   /** `'persisted'` checks the file as it was opened; `'working-copy'` (the default) counts unsaved changes. */
   readonly until?: 'persisted' | 'working-copy';
 }
@@ -260,8 +257,8 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   listSignatures(): readonly SignatureInfo[];
   /** Signature fields still to sign, in document order. The same array until one changes. */
   listUnsignedFields(): readonly FormFieldRef[];
-  /** One signature field's facts, signed or not, by its ref or its widget's, or `null`. */
-  getSignature(field: SignatureFieldAddress): SignatureDTO | null;
+  /** One signature field's facts and verdict, signed or not, by its ref or its widget's, or `null`. */
+  getSignature(field: SignatureFieldAddress): SignatureInfo | null;
   /** Every verdict from the last check; `null` before the first. */
   listVerdicts(): readonly SignatureVerdict[] | null;
   /** One signed field's verdict from the last check, or `null`. */
@@ -295,7 +292,7 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   prepareSignature(
     input: PrepareSignatureInput,
     options?: OperationOptions,
-  ): Promise<PreparedSignature>;
+  ): Promise<SignaturePrepared>;
   /** Signing in two steps, the second: the key's CMS seals the document. Fires `onSigned`. Rejects `not-found` for a signing this session didn't prepare. */
   completeSignature(
     signingId: string,
@@ -328,8 +325,8 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   requestInspection(field: FormFieldRef): void;
 
   // ── checking ──
-  /** Read the signatures again; resolves the snapshot. */
-  refresh(options?: OperationOptions): Promise<SignatureSnapshot | null>;
+  /** Read the signatures again. */
+  refresh(options?: OperationOptions): Promise<void>;
   /**
    * Check every signature again and resolve the verdicts. Unsaved changes
    * count, so the verdict is the one the downloaded file will get;

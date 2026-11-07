@@ -7,6 +7,7 @@ import {
   DEFAULT_SETTINGS,
   stagePlugin,
   stageState,
+  type StageState,
   StageScope,
   StageToken,
   useStageSettings,
@@ -36,7 +37,7 @@ function StateProbe<Selected>({
   token,
   renders,
 }: {
-  select?: (state: typeof stageState.empty) => Selected;
+  select?: (state: StageState) => Selected;
   token?: CapabilityToken<StageCapability>;
   renders: unknown[];
 }) {

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   EngineError,
   EngineErrorCode,
+  type DocumentManifest,
   type CustomMetadataPatch,
   type MetadataPatch,
 } from '@embedpdf/engine-core/runtime';
@@ -22,6 +23,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   setImmutableCache,
   setNoStore,
   type SchemaLike,
@@ -101,15 +103,16 @@ export async function registerMetadataRoutes(
       const { docId, token } = req.params as { docId: string; token: string };
       const ctx = await requireSharedDocRead(req, service, docId, half.docResource, ['metadata']);
       const requested = parseTokenOrInvalidArg(decodeMetadataToken, token, 'metadataVersion token');
-      const manifest = await service.getManifest(ctx, docId);
-      if (requested !== manifest.metadataVersion) {
-        setNoStore(reply);
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
-        );
-      }
-      const body = await half.read(ctx, docId, undefined, abortSignalOf(reply));
+      const body = await readAtPins({
+        documentService: service,
+        reply,
+        docId,
+        layerName: undefined,
+        assertCurrent: async () =>
+          assertMetadataCurrent(requested, await service.getManifest(ctx, docId)),
+        read: () => half.read(ctx, docId, undefined, abortSignalOf(reply)),
+        token: { kind: 'metadata', pin: requested.pin },
+      });
       setImmutableCache(reply);
       return body;
     });
@@ -121,18 +124,23 @@ export async function registerMetadataRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, permissionFlags);
       const requested = parseTokenOrInvalidArg(decodeMetadataToken, token, 'metadataVersion token');
-      const manifest = await service.getLayerManifest(ctx, docId, layerName);
-      if (requested !== manifest.metadataVersion) {
-        setNoStore(reply);
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
-        );
-      }
-      const body = await half.read(ctx, docId, layerName, abortSignalOf(reply));
+      const body = await readAtPins({
+        documentService: service,
+        reply,
+        docId,
+        layerName,
+        assertCurrent: async () =>
+          assertMetadataCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
+        read: () => half.read(ctx, docId, layerName, abortSignalOf(reply)),
+        token: { kind: 'metadata', pin: requested.pin },
+      });
       setImmutableCache(reply);
       return body;
     });
@@ -143,8 +151,12 @@ export async function registerMetadataRoutes(
         layerName: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, permissionFlags);
       const body = await half.read(ctx, docId, layerName, abortSignalOf(reply));
       setNoStore(reply);
       return body;
@@ -156,10 +168,32 @@ export async function registerMetadataRoutes(
         layerName: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.metadata.modify', pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.metadata.modify',
+        permissionFlags,
+      );
       setNoStore(reply);
       return half.write(ctx, { docId, layerName, body: req.body }, abortSignalOf(reply));
     });
   }
+}
+
+/** A pinned read answers only at the manifest's current `metadataVersion`; a stale one is a 404. */
+function assertMetadataCurrent(
+  requested: { metadataVersion: number },
+  manifest: DocumentManifest,
+): void {
+  if (requested.metadataVersion === manifest.metadataVersion) return;
+  throw new EngineError(
+    EngineErrorCode.NotFound,
+    `metadata version ${requested.metadataVersion} no longer current (current=${manifest.metadataVersion})`,
+  );
 }

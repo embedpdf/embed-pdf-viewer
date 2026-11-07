@@ -15,7 +15,7 @@
  *   gate is upstream in the plugin and not overridable.
  * - Alert: document-open nags (lifecycle origin, boot phase) never reach
  *   `window.alert` — the boot-nag gap, closed.
- * - gotoPage: delegates to the binding-supplied navigator (the stage).
+ * - goToPage: delegates to the binding-supplied navigator (the stage).
  */
 import { sanitizeExternalUri } from './external-uri';
 
@@ -33,7 +33,7 @@ export interface ActionsUiAdapterShape {
   openUri(uri: string, options: { isMap: boolean; origin: ActionsUiOrigin }): void;
   print(options?: ActionsUiEffectContext): void;
   alert?(message: string, options: ActionsUiEffectContext & { icon: number; title?: string }): void;
-  gotoPage?(page: number, options: ActionsUiEffectContext): void;
+  goToPage?(pageIndex: number, options: ActionsUiEffectContext): void;
 }
 
 export interface DefaultActionsUiAdapterOptions {
@@ -44,7 +44,7 @@ export interface DefaultActionsUiAdapterOptions {
    */
   overrides?: Partial<ActionsUiAdapterShape> | (() => Partial<ActionsUiAdapterShape> | undefined);
   /** Navigation default for script `this.pageNum = n` requests. */
-  goToPage?: (page: number) => void;
+  goToPage?: (pageIndex: number) => void;
 }
 
 export const createDefaultActionsUiAdapter = (
@@ -79,10 +79,10 @@ export const createDefaultActionsUiAdapter = (
         // never alert by default — the boot-nag gap, closed.
       } else if (typeof globalThis.alert === 'function') globalThis.alert(message);
     },
-    gotoPage: (page, effectContext) => {
+    goToPage: (pageIndex, effectContext) => {
       const current = overridesOf();
-      if (current?.gotoPage) current.gotoPage(page, effectContext);
-      else options.goToPage?.(page);
+      if (current?.goToPage) current.goToPage(pageIndex, effectContext);
+      else options.goToPage?.(pageIndex);
     },
   };
 };

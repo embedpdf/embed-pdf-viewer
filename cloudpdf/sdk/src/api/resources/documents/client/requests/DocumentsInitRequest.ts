@@ -4,20 +4,24 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         contentLength: 1.1,
+ *         sizeBytes: 1,
  *         contentSha256: "contentSha256"
  *     }
  */
 export interface DocumentsInitRequest {
     tenantId: string;
-    contentLength: number;
+    sizeBytes: number;
     contentSha256: string;
+    /** What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique. */
+    name?: string;
+    /** A folder id, or root for the top level. */
+    folderId?: string;
     metadata?: Record<string, unknown>;
     idempotencyKey?: string;
     /** always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice. */
     dedupMode?: DocumentsInitRequest.DedupMode;
     docId?: string;
-    uploadTtlSec?: number;
+    uploadTtlSeconds?: number;
     uploadPreference?: DocumentsInitRequest.UploadPreference;
 }
 

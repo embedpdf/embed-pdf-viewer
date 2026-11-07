@@ -41,9 +41,6 @@ export const REFERENCE = [
       'headless/documents/tabs.mdx',
       'headless/documents/saving.mdx',
     ],
-    pending: {
-      print: 'no print pipeline yet: printing is decided after phase 3 (K9)',
-    },
   },
   {
     capability: 'plugin/view-manager/src/contract.ts#ViewManagerCapability',
@@ -57,6 +54,18 @@ export const REFERENCE = [
   {
     capability: 'plugin/metadata/src/contract.ts#MetadataCapability',
     pages: ['headless/documents/metadata.mdx'],
+  },
+  {
+    capability: 'plugin/outline/src/contract.ts#OutlineCapability',
+    pages: ['headless/documents/outline.mdx'],
+  },
+  {
+    capability: 'plugin/fonts/src/contract.ts#FontsCapability',
+    pages: ['headless/documents/fonts.mdx'],
+  },
+  {
+    capability: 'plugin/attachment/src/contract.ts#AttachmentCapability',
+    pages: ['headless/documents/attachments.mdx'],
   },
   {
     capability: 'plugin/actions/src/contract.ts#ActionsCapability',

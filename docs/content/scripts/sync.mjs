@@ -11,8 +11,10 @@
  *
  * Samples emit per flavor: the engine import/factory lines swap from
  * `engines.mjs`, each `// [!doc-source <key>]` block swaps to the
- * flavor's form from `documents.mjs`, and a `// [!asset-engine]` block (the
- * browser-side engine a stamp library opens on) swaps to the flavor's
+ * flavor's form from `documents.mjs`, each `// [!doc-range <key> <name>]`
+ * block gets the flavor's characters of that document (`swapDocRanges`), and
+ * a `// [!asset-engine]` block (the browser-side engine a stamp library opens
+ * on) swaps to the flavor's
  * `assetEngine` — the document's own engine locally, a local engine beside
  * the cloud one on the cloud site. Sample files carry NO marker (they are
  * displayed verbatim in docs code panels); the drift check is their guard.
@@ -231,6 +233,39 @@ export function sitePages(section, engine) {
   }));
 }
 
+// ── examples on a page of their own ─────────────────────────────────────────
+
+/** Where a site serves the examples' screenshots (`docs/content/screenshots/build.mjs`). */
+export const SCREENSHOTS_DIR = 'public/screenshots';
+
+/**
+ * The examples a flavor's viewer pages show as a screenshot (`<Example name size="page">`), as
+ * `{ name, slug, source }`. Such an example is an app that needs the whole window: it opens on a
+ * page of its own, `/examples/<slug>`, and its docs page shows a picture of it that links there.
+ * It's one of the Examples section's, `viewer/examples/<slug>`, shown by that section's page of
+ * the same name.
+ */
+export function pageExamples(engine) {
+  const examples = [];
+  for (const page of sitePages('viewer', engine)) {
+    for (const [tag] of page.mdx.matchAll(/<Example\b[^>]*>/g)) {
+      const attributes = Object.fromEntries(
+        [...tag.matchAll(/(\w+)="([^"]*)"/g)].map(([, key, value]) => [key, value]),
+      );
+      if (attributes.size !== 'page') continue;
+      const slug = attributes.name?.match(/^viewer\/examples\/([\w-]+)$/)?.[1];
+      if (!slug || page.name !== `examples/${slug}`) {
+        throw new Error(
+          `${page.source}: <Example name="${attributes.name}" size="page"> is an example of the ` +
+            'Examples section (viewer/examples/<slug>), shown by its page there',
+        );
+      }
+      examples.push({ name: attributes.name, slug, source: page.source });
+    }
+  }
+  return examples;
+}
+
 // ── engine lines (headless samples, engine pages) ───────────────────────────
 
 /**
@@ -330,9 +365,36 @@ function swapDocSources(source, relative, replace) {
   });
 }
 
+/**
+ * Every `// [!doc-range <key> <name>]` … `// [!/doc-range]` block: code that names characters of
+ * a demo document by index. Each site has its own copy of a document whose text differs (the
+ * welcome names its own brand), so the same words can start at another index there. The block
+ * names the document's local range from `documents.mjs` once, as `start: …, count: …`; a flavor's
+ * copy gets that flavor's range in its place. Both marker lines are consumed, as a doc-source
+ * block's are.
+ */
+function swapDocRanges(source, engine, relative) {
+  const marker =
+    /^[ \t]*\/\/ \[!doc-range (\w+) (\w+)\]\n([\s\S]*?)^[ \t]*\/\/ \[!\/doc-range\]\n/gm;
+  return source.replace(marker, (whole, key, name, body) => {
+    const ranges = DEMO_DOCUMENTS[key]?.ranges?.[name];
+    if (!ranges) {
+      throw new Error(`${relative}: unknown doc-range '${key} ${name}' (documents.mjs)`);
+    }
+    const local = rangeCode(ranges.local);
+    if (body.split(local).length !== 2) {
+      throw new Error(`${relative}: a doc-range '${key} ${name}' block names \`${local}\` once`);
+    }
+    return body.replace(local, rangeCode(ranges[engine]));
+  });
+}
+
+/** A range as a sample writes it in an object: `start: 28, count: 9`. */
+const rangeCode = ({ start, count }) => `start: ${start}, count: ${count}`;
+
 // ── the ready-made viewer ───────────────────────────────────────────────────
 
-/** A viewer document's declaration, up to its value: `const ebook = `, `readonly ebook = `. */
+/** A viewer document's declaration, up to its value: `const welcome = `, `readonly welcome = `. */
 const DECLARATION =
   /^([ \t]*(?:(?:export|public|protected|private|static|readonly|const|let|var)\s+)+[A-Za-z_$][\w$]*\s*=\s*)/;
 
@@ -411,7 +473,7 @@ export function transformViewerFile(source, engine, relative) {
     if (!declaration || !/;\s*$/.test(body)) {
       throw new Error(
         `${relative}: a viewer doc-source block declares one document, untyped: ` +
-          '`const ebook = …;`',
+          '`const welcome = …;`',
       );
     }
     const value = DEMO_DOCUMENTS[key].viewerCloud;
@@ -422,18 +484,18 @@ export function transformViewerFile(source, engine, relative) {
   const swapped = swapViewerDocuments(swapViewerNames(output, engine), engine, integration);
   // A per-site file writes the demo document as its site shows it; when the grant changes in
   // documents.mjs, a copy of the old one would still open nothing.
-  for (const [, token] of swapped.matchAll(/\bshareToken:\s*['"](shr_[\w-]+)['"]/g)) {
-    if (!DEMO_SHARE_TOKENS.has(token)) {
-      throw new Error(`${relative}: ${token} isn't a demo document's share grant (documents.mjs)`);
+  for (const [, grant] of swapped.matchAll(/\bgrant:\s*['"]((?:grt|shr)_[\w-]+)['"]/g)) {
+    if (!DEMO_GRANTS.has(grant)) {
+      throw new Error(`${relative}: ${grant} isn't a demo document's grant (documents.mjs)`);
     }
   }
   return swapped;
 }
 
-/** The share grants of the demo documents, as their `viewerCloud` forms name them. */
-const DEMO_SHARE_TOKENS = new Set(
+/** The grants of the demo documents, as their `viewerCloud` forms name them. */
+const DEMO_GRANTS = new Set(
   Object.values(DEMO_DOCUMENTS).flatMap(
-    ({ viewerCloud = '' }) => viewerCloud.match(/shr_[\w-]+/g) ?? [],
+    ({ viewerCloud = '' }) => viewerCloud.match(/(?:grt|shr)_[\w-]+/g) ?? [],
   ),
 );
 
@@ -461,11 +523,12 @@ function swapViewerCode(mdx, engine) {
 }
 
 /** A sample or snippet as a flavor's site gets it. */
-function transformFile(source, engine, relative, { viewer }) {
+export function transformFile(source, engine, relative, { viewer }) {
   if (!integrationOf(relative)) return source; // an example's stylesheet: engine-neutral
+  const ranged = swapDocRanges(source, engine, relative);
   return viewer
-    ? transformViewerFile(source, engine, relative)
-    : transformSample(source, engine, relative);
+    ? transformViewerFile(ranged, engine, relative)
+    : transformSample(ranged, engine, relative);
 }
 
 // ── the site's copy ─────────────────────────────────────────────────────────
@@ -558,6 +621,15 @@ async function main() {
         console.error(`- ${file}`);
       }
       console.error('Run: pnpm docs:sync');
+      process.exit(1);
+    }
+    const unpictured = pageExamples(args.engine).filter(
+      ({ name }) => !fs.existsSync(path.join(args.target, SCREENSHOTS_DIR, `${name}.webp`)),
+    );
+    if (unpictured.length) {
+      console.error('Examples on a page of their own with no screenshot:');
+      for (const { name } of unpictured) console.error(`- ${SCREENSHOTS_DIR}/${name}.webp`);
+      console.error('Run: pnpm --filter @embedpdf/docs-content screenshots');
       process.exit(1);
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);

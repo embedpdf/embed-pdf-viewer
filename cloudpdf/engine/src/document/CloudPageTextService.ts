@@ -4,7 +4,6 @@ import {
   EngineError,
   EngineErrorCode,
   sliceText,
-  type DocumentManifest,
   type PageRef,
   type PageTextService,
   type PageTextSnapshot,
@@ -15,7 +14,9 @@ import {
   PageGeometrySnapshotSchema,
   PageTextSnapshotSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
+import type { CloudManifest } from './CloudDocumentHandle';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -74,7 +75,7 @@ export class CloudPageTextService implements PageTextService {
     );
   }
 
-  private leafPath(leaf: 'text' | 'geometry', manifest: DocumentManifest): string {
+  private leafPath(leaf: 'text' | 'geometry', manifest: CloudManifest): string {
     const pageObjectNumber = this.pageRef.objectNumber;
     const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
     if (!page) {
@@ -87,13 +88,14 @@ export class CloudPageTextService implements PageTextService {
     // Plane-scope rule: text and geometry depend on the `content` plane —
     // while it is inherited, every visitor's layer reads one doc-level URL
     // (and the base worker session at the origin).
+    const pin = tokenPinOf(leaf, manifest.engine);
     if (planesInherited(manifest, ['content'])) {
       return leaf === 'text'
-        ? wirePaths.docPageText(this.docId, this.pageRef, version)
-        : wirePaths.docPageGeometry(this.docId, this.pageRef, version);
+        ? wirePaths.docPageText(this.docId, this.pageRef, version, pin)
+        : wirePaths.docPageGeometry(this.docId, this.pageRef, version, pin);
     }
     return leaf === 'text'
-      ? wirePaths.layerPageText(this.docId, this.layerName, this.pageRef, version)
-      : wirePaths.layerPageGeometry(this.docId, this.layerName, this.pageRef, version);
+      ? wirePaths.layerPageText(this.docId, this.layerName, this.pageRef, version, pin)
+      : wirePaths.layerPageGeometry(this.docId, this.layerName, this.pageRef, version, pin);
   }
 }

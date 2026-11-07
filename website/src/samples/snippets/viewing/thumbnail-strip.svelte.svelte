@@ -19,7 +19,7 @@
       onclick={() => main.goToPage(page.ref)}
       aria-current={page.pageIndex === state.currentPageIndex}
     >
-      <RenderLayer />
+      <RenderLayer thumbnail />
     </button>
   {/snippet}
   {#snippet pageChrome(page)}

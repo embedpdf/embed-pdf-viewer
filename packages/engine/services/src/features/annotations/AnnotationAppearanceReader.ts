@@ -6,7 +6,7 @@ import type {
   AnnotationAppearancesResult,
   PageObjectNumber,
   PageRaster,
-  PageRenderViewport,
+  PageScreenViewport,
   PdfCoordinates,
   PdfRect,
   PdfRotation,
@@ -349,7 +349,7 @@ function statesOf(
  * the page as `rotation` turns it.
  */
 function viewportScale(
-  viewport: PageRenderViewport | undefined,
+  viewport: PageScreenViewport | undefined,
   page: { width: number; height: number },
   rotation: PdfRotation,
 ): number {

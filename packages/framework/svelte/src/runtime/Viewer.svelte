@@ -14,7 +14,7 @@
   import { untrack } from 'svelte';
   import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
   import type { Engine, EngineFactory, Kernel, ViewerSettings } from '@embedpdf/core';
-  import { browserClock } from '@embedpdf/web';
+  import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
   import { KernelBinding, setKernelHolder } from './binding.svelte';
   import { isDev } from './dev';
   import type { ViewerProps } from './props';
@@ -28,6 +28,7 @@
     scope,
     accent,
     page,
+    fetch: ownFetch,
     fallback,
     error: renderError,
     children,
@@ -57,7 +58,20 @@
       if (isLocalEngine(created)) created.warmup();
       let kernel: Kernel;
       try {
-        kernel = createKernel({ engine: created, plugins, settings, clock: browserClock() });
+        kernel = createKernel({
+          engine: created,
+          plugins,
+          settings,
+          clock: browserClock(),
+          printer: browserPrinter(),
+          measurer: browserTextMeasurer(),
+          // Each download calls the latest prop.
+          fetch: (url, init) => {
+            // A plain call: the browser's own `fetch` refuses any other `this`.
+            const download = ownFetch ?? globalThis.fetch;
+            return download(url, init);
+          },
+        });
       } catch (error) {
         // A plugin graph that can't be built shows `error`, not an exception mid-render.
         boot = { phase: 'error', error };
@@ -83,7 +97,7 @@
       );
       return () => {
         alive = false;
-        binding.dispose();
+        binding.destroy();
         // The kernel first (it closes every document handle), then the engine we own.
         void kernel.destroy().then(() => {
           if (ownsEngine) void created.destroy();

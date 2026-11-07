@@ -13,10 +13,10 @@ const command = useCommand(() => props.id);
     class="button"
     :title="command.label"
     :disabled="!command.enabled"
-    :aria-pressed="command.active"
+    :aria-pressed="command.pressable ? command.active : undefined"
     @click="command.run()"
   >
     {{ command.label }}
-    <kbd v-if="command.shortcut" class="shortcut">{{ command.shortcut }}</kbd>
+    <kbd v-if="command.shortcutLabel" class="shortcut">{{ command.shortcutLabel }}</kbd>
   </button>
 </template>

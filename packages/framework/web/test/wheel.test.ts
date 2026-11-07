@@ -22,7 +22,7 @@ describe('wheelZoomFactor — one feel per input class', () => {
     ).toBeCloseTo(1, 9);
   });
 
-  it('mouse notches step 1.2 — the zoom-button ratio, never the pinch mapping', () => {
+  it('mouse notches step 1.2, never the pinch mapping', () => {
     // Chrome/Edge px notches (±100/±120)
     expect(wheelZoomFactor(px(-120, { ctrl: true }))).toBeCloseTo(1.2, 6);
     expect(wheelZoomFactor(px(100, { ctrl: true }))).toBeCloseTo(1 / 1.2, 6);

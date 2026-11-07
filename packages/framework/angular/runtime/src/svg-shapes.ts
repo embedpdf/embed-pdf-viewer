@@ -3,19 +3,17 @@
  * element each, a clipping `svg` with its children. The annotation and form layers draw their
  * scenes through `<svg:g [epdfSvgShapes]>` inside an `<svg>`.
  */
-import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   Directive,
   effect,
   ElementRef,
   inject,
   input,
-  PLATFORM_ID,
 } from '@angular/core';
-import { createFontMounts, type SvgShape } from '@embedpdf/web';
+import type { SvgShape } from '@embedpdf/web';
+import { injectFontMounts } from './font-mounts';
 
 /**
  * An SVG element's attributes from a record of SVG names (`stroke-width`), as `@embedpdf/web`
@@ -53,45 +51,36 @@ export class EpdfSvgAttributes {
     @for (shape of shapes(); track $index) {
       @switch (shape.tag) {
         @case ('rect') {
-          <svg:rect
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:rect>
+          <svg:rect [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:rect>
         }
         @case ('ellipse') {
           <svg:ellipse
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:ellipse>
         }
         @case ('line') {
-          <svg:line
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:line>
+          <svg:line [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:line>
         }
         @case ('path') {
-          <svg:path
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:path>
+          <svg:path [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:path>
         }
         @case ('polygon') {
           <svg:polygon
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:polygon>
         }
         @case ('polyline') {
           <svg:polyline
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:polyline>
         }
         @case ('text') {
           <svg:text
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
             [textContent]="shape.text ?? ''"
           ></svg:text>
         }
@@ -108,12 +97,9 @@ export class EpdfSvgShapes {
   readonly shapes = input.required<readonly SvgShape[]>({ alias: 'epdfSvgShapes' });
 
   constructor() {
-    if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     // The faces of this level's text, while it shows: a clipping `svg` mounts its children's.
-    const mounts = createFontMounts();
-    inject(DestroyRef).onDestroy(() => mounts.release());
-    effect(() =>
-      mounts.mount(this.shapes().flatMap((shape) => (shape.program ? [shape.program] : []))),
+    injectFontMounts(() =>
+      this.shapes().flatMap((shape) => (shape.program ? [shape.program] : [])),
     );
   }
 }

@@ -24,8 +24,17 @@ agree. Add one of yours, then put it in the [layout](layout):
 }
 ```
 
-The button has a tooltip with its shortcut, moves into the "More" menu when the toolbar is full,
-and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
+The button's tooltip says its label and its shortcut the way the platform writes it: `Ctrl+Enter`,
+or `⌘↩` on a Mac. The button moves into the "More" menu when the toolbar is full, and `Ctrl`+`Enter`
+(`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
+
+Here **Approve** writes to a status line of your app, above the viewer:
+
+<Example name="viewer/customize/commands/approve" />
+
+> **Try it:** click the cover page, press `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) and watch the
+> status line, then click the check mark at the end of the toolbar. Press `?` to find **Approve**
+> among the viewer's shortcuts.
 
 ## Define a command
 
@@ -33,6 +42,7 @@ and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
 | :-- | :-- |
 | `id` | A unique name. Start yours with your own prefix, such as `acme:`. |
 | `label` | What people see, or `labelKey` for a [translated](translations) label |
+| `labelParams` | The values for its label's `{name}` slots, such as a count: see [A label with a value](#a-label-with-a-value) |
 | `icon` | An icon's name: the viewer's or [your own](#icons) |
 | `shortcut` | A key, such as `'Mod+Shift+S'`, or a list of keys. `Mod` is `Cmd` on a Mac and `Ctrl` elsewhere. |
 | `shortcutInTextFields` | `true`: its shortcut works in a text field in the viewer too, as Find's does |
@@ -50,9 +60,9 @@ shortcuts](/docs/headless/ui/commands#define-a-command).
 
 ## Enabled, active and visible
 
-`enabled`, `active` and `visible` are functions of the viewer's state. They get `get`, which gives
-you any plugin by its name, and the viewer asks them again whenever something changes, so a
-button is always right:
+`enabled`, `active` and `visible` say how a command's button looks now. They get `get`, which gives
+you any plugin by its name, and `appState`, your app's own state. The viewer asks them again
+whenever either changes, and after the command runs, so a button is always right:
 
 ```js
 {
@@ -60,12 +70,65 @@ button is always right:
   label: 'Flag for review',
   icon: 'eye',
   enabled: ({ get }) => get('selection').hasSelection(),
-  active: ({ documentId }) => flagged.has(documentId),
-  run: ({ documentId }) => toggleFlag(documentId),
+  active: ({ appState, documentId }) => appState.flagged.includes(documentId),
+  run: ({ appState, documentId }) => appState.toggleFlag(documentId),
 }
 ```
 
-`run` gets the same: `get`, the `viewer`, and the `documentId` of the document it runs for.
+`run` gets the same: `get`, `appState`, the `viewer`, and the `documentId` of the document it runs
+for.
+
+An `enabled`, `active` or `visible` that throws, because what it reads isn't there yet, such as a
+plugin of a document while none is open, counts as `false`: the button is greyed out, not pressed,
+or hidden until it answers.
+
+### Your app's state
+
+Give the viewer what your commands read as `appState`: values, and functions that change them. It
+follows its prop like `theme` does: give it a new value, and every button asks its command again.
+Here **Approve** stays greyed out until every item of the app's checklist is ticked, and shows as
+pressed once the document is approved:
+
+<Snippet name="viewer/commands/app-state" />
+
+Because the commands read your state from `appState`, never from a variable they closed over, they
+can be a constant outside your component and never see an old value. Give it a new value when
+something changes, as you do with any prop: the viewer sees a new object, not a change inside the
+one it has (`[...done, item]`, not `done.push(item)`). In TypeScript, `ViewerConfig<AppState>` gives
+`appState` its type in every command.
+
+## A label with a value
+
+`labelParams` gives the values for the `{name}` slots in a label, such as how many pages are
+selected:
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:extract',
+      labelKey: 'acme.extract',
+      label: 'Extract {count} pages',
+      icon: 'download',
+      labelParams: ({ get }) => ({ count: get('pageEdit').getSelected().length }),
+      enabled: ({ get }) => get('pageEdit').getSelected().length > 0,
+      run: extract,
+    },
+  ],
+  strings: {
+    en: { 'acme.extract': { one: 'Extract {count} page', other: 'Extract {count} pages' } },
+    nl: { 'acme.extract': { one: '{count} pagina extraheren', other: "{count} pagina's extraheren" } },
+  },
+}
+```
+
+It gets what `enabled` gets, and the viewer asks it again whenever a plugin's state or `appState`
+changes, so the label is always right. A number `count` also picks the plural form: `one` and
+`other`, and the other forms a language has, such as `few` and `many` in Polish. The values go into
+`label`, into the words under `labelKey` in each language, and into a string under the command's
+id. The label shows with them everywhere the command does: its button, a menu, the tooltip, and the
+sentence that says why it isn't allowed. A `labelParams` that throws gives no values, and the slots
+show as they are.
 
 ## Change what a built-in button does
 
@@ -126,6 +189,10 @@ changes the editing tools are gone, and with `notAllowed: 'disable'` they show g
 with the reason in their tooltip. To leave a command out for everyone, [disable](../features/turning-off)
 it instead: `disable: ['acme:approve']`.
 
+A command whose setting a plugin [locks](/docs/headless/viewing/stage#lock-a-setting) for the
+document, such as the facing-pages choices while a plugin shows one page at a time, shows greyed
+out with the plugin's reason, and its current choice still checked.
+
 ## Keyboard shortcuts
 
 A command's `shortcut` works while focus is anywhere inside the viewer, except in a text field,
@@ -148,15 +215,17 @@ can't run now.
 
 | Commands | What they do |
 | :-- | :-- |
-| `document:open`, `document:download`, `document:print` | Open another file, download, print |
+| `document:open`, `document:download`, `document:print` | Open another file, download, open the Print dialog |
 | `menu:document`, `menu:view`, `menu:zoom` | Open a built-in [menu](menus) |
 | `zoom:in`, `zoom:out`, `zoom:fit-width`, `zoom:fit-page`, `zoom:automatic` | Zoom |
 | `zoom:50`, `zoom:100`, `zoom:150`, `zoom:200`, `zoom:400` | Zoom to a level |
-| `page:next`, `page:previous`, `page:first`, `page:last`, `page:go-to` | Move through pages |
+| `page:next`, `page:previous`, `page:first`, `page:last`, `page:go-to` | Move through pages; the first four show while the document has more than one page |
 | `view:single-page`, `view:two-pages`, `view:cover-page` | Pages side by side |
-| `view:scroll-vertical`, `view:scroll-horizontal` | The scrolling direction |
-| `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view, full screen |
+| `view:scroll-vertical`, `view:scroll-horizontal`, `view:scroll-paged` | Scroll down or across, or [one page at a time](/docs/headless/viewing/stage#one-page-at-a-time) |
+| `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view; fill the screen with the viewer, not your page: see [Full screen](../concepts/how-it-works#full-screen) |
 | `tool:pointer`, `tool:pan` | Select, or drag the pages |
+| `tool:zoom` | Drag a box to zoom to it, or click to zoom in (Alt-click: out) |
+| `tool:snapshot` | Drag a box to [take that part of the page](../documents#take-a-snapshot) as a picture, or click for the whole page |
 | `tool:note`, `tool:link`, `tool:highlight`, `tool:underline`, `tool:strikeout`, `tool:squiggly` | Comment and mark up |
 | `tool:ink`, `tool:ink-highlight`, `tool:free-text`, `tool:callout`, `tool:insert-text`, `tool:replace-text` | Draw and write |
 | `tool:square`, `tool:circle`, `tool:line`, `tool:arrow`, `tool:polygon`, `tool:polyline` | Shapes |
@@ -169,8 +238,18 @@ can't run now.
 | `panel:<id>` | Open or close a [panel](panels) |
 | `search:find` | Open search with the cursor in its field (`Ctrl`/`Cmd`+`F`), with a search panel in the layout |
 | `history:undo`, `history:redo` | Undo and redo |
+| `outline:add`, `outline:add-child`, `outline:rename`, `outline:set-destination`, `outline:properties`, `outline:delete` | Change the outline: add an item after the selected one, at the place in view (`Ctrl`/`Cmd`+`B`), or inside it; rename it; point it at the place in view; edit its properties; delete it |
+| `outline:expand-all`, `outline:collapse-all`, `menu:outline-item` | Unfold or fold every outline item; open an outline row's [menu](menus) |
+| `attachment:add`, `attachment:save`, `attachment:go-to`, `attachment:delete`, `menu:attachment-item` | Attach a file (`args: { files }` attach these instead of asking); save, go to or delete the selected file; open a file's [menu](menus) |
+| `comment:status-accepted`, `comment:status-rejected`, `comment:status-cancelled`, `comment:status-completed`, `comment:status-none`, `comment:delete-thread`, `menu:comment-item` | Set the status of the selected annotation's comment thread, or delete the thread; open a comment card's [menu](menus) |
+| `page:rotate-clockwise`, `page:rotate-counterclockwise`, `page:duplicate`, `page:delete` | Act on the selected pages: turn them, copy them in right after themselves, delete them |
+| `page:insert-blank`, `page:insert-file` | Insert a blank page, or the pages of a PDF, after the selected pages, and select what came in; `args: { position, files }` say where, and which PDFs |
+| `page:extract`, `page:select-all`, `menu:page` | Save the selected pages as a new PDF; select every page; open the selected pages' [menu](menus) |
 | `selection:copy`, `selection:highlight`, `selection:underline`, `selection:strikeout` | Act on selected text |
+| `snapshot:copy`, `snapshot:save`, `snapshot:clear` | Copy the snapshot (`Ctrl`/`Cmd`+`C`), save it as a PNG, or let it go (`Escape`) |
 | `annotation:comment`, `annotation:style`, `annotation:link`, `annotation:group`, `annotation:ungroup`, `annotation:delete` | Act on selected annotations |
+| `annotation:save-file` | Save the file of a selected file attachment |
+| `annotation:apply-redaction` | Remove what's under the selected redaction marks for good, after asking, when every selected annotation is one |
 | `help:shortcuts` | Show every shortcut (`?`) |
 
 Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) gets its
@@ -178,14 +257,39 @@ Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) 
 
 ## Good to know
 
+### Tooltips
+
+Every button in a bar, every mode tab and the buttons in a panel's header have a tooltip: the
+button's label, its shortcut, and why it's greyed out when it is. A button that shows its label
+already has a tooltip only when there's more to say. A greyed-out menu row says why in a tooltip
+too. The tooltip shows when the pointer rests on the button for a moment, at once when the button
+gets focus from the keyboard, and never from a touch. Escape hides it. Screen readers read the
+shortcut and the reason with the button. Its colors are theme tokens: see
+[Theming](theming#every-color).
+
+Every other tooltip in the viewer is the same one, with the same timing: those of the buttons in
+panels and dialogs, and a name too long for its row, such as an attachment's or an outline item's,
+which shows whole while it's cut short.
+
 ### The viewer's icons
 
-`area`, `bold`, `book`, `calibrate`, `callout`, `check`, `circle`, `comment`, `copy`, `distance`,
-`dots`, `download`, `eye`, `file`, `fullscreen`, `group`, `hand`, `highlight`, `italic`, `line`,
-`link`, `lock`, `menu`, `message`, `palette`, `paperclip`, `perimeter`, `photo`, `plus`,
-`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `settings`, `sidebar`,
-`signature`, `square`, `squiggly`, `strikethrough`, `text`, `trash`, `underline`, `ungroup`,
-`unlock`, `x`, `zigzag`.
+Every icon the viewer has, by name:
+
+`alertTriangle`, `alignBottom`, `alignCenter`, `alignLeft`, `alignMiddle`, `alignRight`, `alignTop`,
+`area`, `arrowBackUp`, `arrowForwardUp`, `bold`, `book`, `book2`, `calibrate`, `callout`, `check`,
+`chevronDown`, `chevronLeft`, `chevronRight`, `chevronsDown`, `chevronsUp`, `circle`, `circleCheck`,
+`comment`, `copy`, `deviceFloppy`, `distance`, `dots`, `doublePage`, `download`, `externalLink`,
+`eye`, `file`, `fileExport`, `fileImport`, `filePlus`, `fitToPage`, `fitToWidth`, `formButton`,
+`formCheckbox`, `formDesign`, `formListbox`, `formRadio`, `formSelect`, `formTextfield`, `freeText`,
+`fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `horizontal`, `inkHighlighter`,
+`insertText`, `italic`, `line`, `lineArrow`, `link`, `linkOff`, `listTree`, `lock`, `marqueeSelect`,
+`menu`, `message`, `pageByPage`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`,
+`paperclip`, `pencilMarker`, `perimeter`, `photo`, `plus`, `pointer`, `polygon`, `print`, `redact`, `redactArea`,
+`redactCombined`, `redactionSidebar`, `replaceText`, `rotateClockwise`, `rotateCounterClockwise`,
+`rubberStamp`, `rubberStampPlus`, `ruler`, `save`, `screenshot`, `search`, `send`, `settings`,
+`sidebar`, `signature`, `singlePage`, `square`, `squares`, `squiggly`, `strikethrough`, `text`,
+`trash`, `underline`, `ungroup`, `unlock`, `updateScale`, `vertical`, `viewSettings`, `widgetEdit`,
+`x`, `zigzag`, `zoomIn`, `zoomInArea`, `zoomOut`.
 
 ### Enabled is for now, permissions are for good
 

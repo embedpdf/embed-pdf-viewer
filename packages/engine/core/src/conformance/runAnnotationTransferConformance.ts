@@ -63,15 +63,15 @@ const STAMPED = ['author', 'createdAt', 'modifiedAt', 'userId', 'createdBy', 'mo
  */
 export function runAnnotationTransferConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationTransferConformanceOptions,
+  options: AnnotationTransferConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation transfer conformance: ${opts.label}`, () => {
+  describe(`annotation transfer conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -80,7 +80,7 @@ export function runAnnotationTransferConformance(
 
     /** Open the source document and export its annotations. */
     const exported = async (fixture: string) => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       if (fixture === 'authoring') await fill(doc);
       return { doc, bundle: await doc.annotations.export() };
     };
@@ -91,7 +91,7 @@ export function runAnnotationTransferConformance(
      * kept are returned, so an export of the copy can leave them out.
      */
     const bare = async (fixture: string) => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       const kept = new Set<string>();
       const pages = (await doc.pages.list()).pages.map((entry) =>
         toPageRef(entry.ref.objectNumber),
@@ -179,7 +179,7 @@ export function runAnnotationTransferConformance(
       }
     };
 
-    for (const fixture of opts.fixtures) {
+    for (const fixture of options.fixtures) {
       describe(fixture, () => {
         test('R1–R4: a restoring import exports as its source, as far as the import took it', async () => {
           await roundTrip(fixture, 'restore', async ({ bundle, result, again }) => {
@@ -413,7 +413,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
       if (attribution === 'stamp') for (const field of STAMPED) delete fields[field];
       if (data.subtype === 'file-attachment' && data.file) {
         // A file's dates are facts about the file: they travel in either mode.
-        const { size: _size, checksum: _checksum, ...file } = data.file;
+        const { sizeBytes: _size, md5: _checksum, ...file } = data.file;
         fields.file = file;
       }
       return { data: pages(fields), resources };

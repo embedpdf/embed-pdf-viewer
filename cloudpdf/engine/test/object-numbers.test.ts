@@ -129,6 +129,22 @@ describe('object numbers on the cloud', () => {
     await read.engine.destroy();
   });
 
+  test("an editor's open makes no layer; its first create lands at a number it held and makes it", async () => {
+    const { engine, doc, docId, page } = await openFresh(instrumentedFetch().fetch);
+    expect(doc.objectNumbers.held).toBe(8);
+    const layers = () =>
+      fx!.db.selectFrom('layers').select('current_version').where('doc_id', '=', docId).execute();
+    expect(await layers()).toEqual([]);
+
+    const objectNumber = doc.objectNumbers.take()!;
+    const created = await doc
+      .page(page)
+      .annotations.create({ subtype: 'square', box: box(20) }, { objectNumber });
+    expect(created.annotation.ref).toEqual({ kind: 'objectNumber', page, objectNumber });
+    expect(await layers()).toEqual([{ current_version: 1 }]);
+    await engine.destroy();
+  });
+
   test('writes fired without waiting go out one at a time and land in order at their numbers', async () => {
     const slow = instrumentedFetch({ delayMs: 150 });
     const { engine, doc, page } = await openFresh(slow.fetch);
@@ -197,15 +213,10 @@ describe('object numbers on the cloud', () => {
     const before = Array.from({ length: doc.objectNumbers.held }, () => doc.objectNumbers.take()!);
     expect(before).toHaveLength(8);
     // Another session took this one's block (its session had expired).
-    const layer = await fx!.db
-      .selectFrom('layers')
-      .select('id')
-      .where('doc_id', '=', docId)
-      .executeTakeFirstOrThrow();
     await fx!.db
       .updateTable('object_number_blocks')
       .set({ session_id: 'cloud:other' })
-      .where('layer_id', '=', layer.id)
+      .where('doc_id', '=', docId)
       .execute();
     const lost = new Promise<{ numbers: readonly number[]; reason: string }>((resolve) =>
       doc.objectNumbers.onLost(resolve),

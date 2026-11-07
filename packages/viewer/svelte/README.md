@@ -40,8 +40,8 @@ state, your CSS:
 </PDFViewer>
 ```
 
-`useToolbarItem()` tells it where it sits, and `Button`, `Menu` and `MenuItem`
-are the viewer's own, for yours.
+`useToolbarItem()` tells it where it sits, and `Button`, `Menu`, `MenuItem` and
+`Icon` are the viewer's own, for yours.
 
 ## Driving the viewer
 
@@ -59,8 +59,8 @@ functions of `@embedpdf/svelte` work there too. `ondocumentchange` and
 a panel. When the viewer unmounts, its `viewer` is done: its listeners stop and
 its calls refuse.
 
-`src`, `theme`, `locale`, `disable` and `readOnly` follow their props while the
-viewer runs; every other prop is read once, so wrap the viewer in `{#key}` to
+`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their props
+while the viewer runs; every other prop is read once, so wrap the viewer in `{#key}` to
 start over with a changed one.
 
 ## Server-side rendering

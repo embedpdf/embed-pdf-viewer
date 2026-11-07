@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
-  import { useStage } from '@embedpdf/svelte/stage';
+  import { onMount } from 'svelte';
   import { useInteraction, useInteractionState } from '@embedpdf/svelte/interaction';
   import { useForm, useFormState } from '@embedpdf/svelte/form';
 
@@ -18,21 +16,12 @@
   const interactionState = useInteractionState();
   const form = useForm();
   const formState = useFormState();
-  const stage = useStage();
-  const pages = usePageList();
   // The pointer fills the form in; every other tool here designs it.
   const filling = $derived(interactionState.activeToolId === 'pointer');
 
-  // Start on the ebook's last page, which has room for a form, with the text tool picked.
-  let started = false;
-  $effect(() => {
-    const page = pages.current.at(-1)?.ref;
-    if (!page || started) return;
-    started = true;
-    untrack(() => {
-      stage.goToPage(page);
-      interaction.activateTool('form-text');
-    });
+  // Start with the text tool picked: the printed form has boxes, but no fields yet.
+  onMount(() => {
+    interaction.activateTool('form-text');
   });
 </script>
 
@@ -69,9 +58,7 @@
       </button>
     {/each}
     <output class="readout">
-      {formState.fields.length === 0
-        ? 'Click the page to place a field'
-        : `${formState.fields.length} fields`}
+      {formState.fields.length} fields: click the page to place another
     </output>
   </div>
 {/if}

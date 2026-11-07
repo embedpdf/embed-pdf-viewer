@@ -10,7 +10,13 @@ import {
   useMetadata,
   useMetadataState,
 } from '../src/metadata';
-import { pageEditPlugin, usePageEdit } from '../src/page-edit';
+import {
+  pageEditPlugin,
+  pageEditState,
+  PageEditToken,
+  usePageEdit,
+  usePageEditState,
+} from '../src/page-edit';
 import {
   ACTIONS_DEFAULTS,
   actionsPlugin,
@@ -66,8 +72,8 @@ const engine = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
+      pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       metadata: {
         get: () => Promise.resolve(METADATA),
@@ -83,6 +89,32 @@ const plugins = [pageEditPlugin(), metadataPlugin(), actionsPlugin({ openSequenc
 const latest = <Value>(values: Value[]) => values[values.length - 1];
 
 enableAutoUnmount(afterEach);
+
+describe('usePageEditState', () => {
+  it("has exactly the page's State fields as refs, and follows the selection", async () => {
+    const states: unknown[] = [];
+    const Probe = probe(() => {
+      const { selected, canEdit, canExtract } = usePageEditState();
+      return () => {
+        states.push({
+          selected: selected.value,
+          canEdit: canEdit.value,
+          canExtract: canExtract.value,
+        });
+        return null;
+      };
+    });
+    const { kernel } = await viewerWith(plugins, () => h(Probe), engine);
+    expect(latest(states)).toEqual(pageEditState.empty);
+
+    await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
+    await settle();
+    expect(latest(states)).toEqual({ selected: [], canEdit: true, canExtract: true });
+    kernel.capability(PageEditToken).select([0]);
+    await settle();
+    expect(latest(states)).toEqual({ selected: [toPageRef(1)], canEdit: true, canExtract: true });
+  });
+});
 
 describe('useMetadataState', () => {
   it("has exactly the page's State fields as refs: empty with no document, the document's once it loads", async () => {
@@ -208,13 +240,12 @@ describe('useActionsUiAdapter', () => {
   const websiteLink: PdfActionTree = {
     root: { type: 'uri', subtype: 'URI', uri: 'https://example.com', isMap: false, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   it('installs the adapter for the document, reads the handlers late, and removes it on unmount', async () => {

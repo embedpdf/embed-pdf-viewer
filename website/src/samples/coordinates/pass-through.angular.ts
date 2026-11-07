@@ -13,9 +13,9 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -23,7 +23,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfSearchLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withSearch(),
@@ -42,7 +42,7 @@ const ebook = async (): Promise<OpenInput> => {
               <button
                 type="button"
                 class="hit"
-                (click)="stage.reveal(hit.page, { rect: bounds, anchor: { y: 0.35 } })"
+                (click)="stage.reveal(hit.page, { rect: bounds, align: { y: 0.35 } })"
               >
                 <span class="where">page {{ hit.pageIndex + 1 }}</span>
                 <code class="rect">x {{ round(bounds.x) }}, y {{ round(bounds.y) }}</code>

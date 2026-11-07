@@ -63,8 +63,8 @@ export async function requireSharedDocRead(
   planes: readonly LayerScopePlane[],
 ): Promise<SharedReadCtx> {
   const accessCtx = requireDocAccessOnly(req, docId);
-  const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-  const ctx = requireResource(req, docId, resource, pdfBits);
+  const permissionFlags = await documentService.getEffectivePermissionFlags(accessCtx, docId);
+  const ctx = requireResource(req, docId, resource, permissionFlags);
   await assertPlanesVisible(ctx, documentService, docId, planes);
   return ctx;
 }

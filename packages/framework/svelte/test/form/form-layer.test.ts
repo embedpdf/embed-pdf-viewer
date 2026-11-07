@@ -82,12 +82,14 @@ describe('<FormLayer> over fields made from code', () => {
         await form.refresh();
         const ref = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
-          widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' }],
+          widgets: [
+            { page: ref, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' },
+          ],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page: ref, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });
@@ -102,9 +104,15 @@ describe('<FormLayer> over fields made from code', () => {
           expect(form.getValue(toFieldRef('name'))).toEqual({ value: 'Ada Lovelace' }),
         );
 
+        const host = kernel.capability(FormHostToken);
         const checkbox = await waitFor(() => view.getByRole('checkbox', { name: 'agree' }));
+        // A click toggles, and once the value is written runs the widget's action (Acrobat's
+        // order): wait for that too, or it outlives the document.
+        const activated = vi.spyOn(host, 'activateWidget');
         await fireEvent.click(checkbox);
         await waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
+        await waitFor(() => expect(activated).toHaveBeenCalled());
+        await activated.mock.results[0]!.value;
 
         // The checkbox has no border of its own: the layer draws its edge in the setting's color.
         expect(checkbox.style.boxShadow).toContain('#ea580c');
@@ -113,7 +121,6 @@ describe('<FormLayer> over fields made from code', () => {
 
         // A press on a field stops at its box, before the page below sees it, and still reaches
         // the field's PDF actions as "mouse down" (the box's native listener sends it).
-        const host = kernel.capability(FormHostToken);
         const events: string[] = [];
         vi.spyOn(host, 'notifyWidgetEvent').mockImplementation((_field, _widget, event) => {
           events.push(event);
@@ -156,7 +163,7 @@ describe('a dropdown in the form layer', () => {
       await form.refresh();
       const ref = kernel.documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'combobox',
+        kind: 'combobox',
         name: 'country',
         options: [
           { label: 'Netherlands', value: 'NL' },
@@ -282,12 +289,12 @@ describe('<FormLayer> field pictures', () => {
         await form.refresh();
         const ref = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
           widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 } }],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page: ref, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });

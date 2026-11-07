@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { sql } from 'kysely';
 import { createPostgresDb } from '../src/db/drivers/postgres';
 import { migrate } from '../src/db/migrator/runner';
@@ -91,6 +91,35 @@ describe.runIf(RUN_PG)('postgres conformance', () => {
     destroyDb: async (db) => {
       await db.destroy();
     },
+  });
+});
+
+describe.runIf(RUN_PG)('postgres driver', () => {
+  // A database restart, a failover or `pg_terminate_backend` ends an idle
+  // pooled connection with error 57P01. The pool re-emits that on itself,
+  // and with no listener there it is an uncaught exception: it crashes a
+  // server, or fails a vitest run whose container stops while a pool is
+  // still closing.
+  test('an idle connection the database ends is reported, and the next query reconnects', async () => {
+    const errors: Error[] = [];
+    const db = createPostgresDb({
+      connectionString,
+      poolMax: 1,
+      onIdleConnectionError: (err) => errors.push(err),
+    });
+    const admin = createPostgresDb({ connectionString, poolMax: 1 });
+    try {
+      const before = await sql<{ pid: number }>`SELECT pg_backend_pid() AS pid`.execute(db);
+      await sql`SELECT pg_terminate_backend(${before.rows[0]!.pid})`.execute(admin);
+      await vi.waitFor(() => expect(errors).toHaveLength(1));
+      expect(errors[0]).toMatchObject({ code: '57P01' });
+
+      const after = await sql<{ pid: number }>`SELECT pg_backend_pid() AS pid`.execute(db);
+      expect(after.rows[0]!.pid).not.toBe(before.rows[0]!.pid);
+    } finally {
+      await admin.destroy();
+      await db.destroy();
+    }
   });
 });
 

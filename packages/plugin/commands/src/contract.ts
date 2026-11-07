@@ -14,6 +14,7 @@ import type {
   OperationOptions,
   Permission,
   PluginErrorInfo,
+  SettingLock,
   SettingsApi,
   Unsubscribe,
 } from '@embedpdf/core';
@@ -25,11 +26,13 @@ export type CommandId = string;
 
 /**
  * What a command's derivations and `run` see: capabilities resolved for the command's document
- * (the one named, else the document in scope, else the active one).
+ * (the one named, else the document in scope, else the active one), and your app's state.
  */
-export interface CommandContext {
+export interface CommandContext<AppState = any> {
   /** The command's document, or `null` when none is open. */
   readonly documentId: string | null;
+  /** Your app's state, as the `appState` setting has it now: `any` until you give its type. */
+  readonly appState: AppState;
   /** What the caller passed: `execute(id, { args })`. */
   readonly args?: unknown;
   /** Fires when the caller cancels `execute()`: pass it on to the calls `run` makes. */
@@ -51,21 +54,28 @@ export interface IconAccent {
   readonly secondary?: string;
 }
 
-/** One command, as you define it. */
-export interface CommandDef {
+/**
+ * One command, as you define it. Its functions get your app's state as `AppState`; they're
+ * methods, so a command typed for your state (`CommandDefinition<Review>`) goes wherever a command does.
+ */
+export interface CommandDefinition<AppState = any> {
   /** A unique name, by convention `area:action`: `'zoom:in'`, `'review:approve'`. */
   readonly id: string;
-  /** What the user sees. With `labelKey` too, it's what shows when no language has the key. */
+  /**
+   * What the user sees. With `labelKey` too, it's what shows when no language has the key. Its
+   * `{name}` slots take the values `labelParams` gives.
+   */
   readonly label?: string;
   /**
    * A translation key for the label, read through the i18n plugin. Without the plugin, or a
-   * string for the key, the command shows `label`, else the key.
+   * string for the key, the command shows `label`, else the key. The string's `{name}` slots
+   * take the values `labelParams` gives, and a number `count` picks its plural form.
    */
   readonly labelKey?: string;
   /** Your icon's name; your buttons turn it into an icon. */
   readonly icon?: string;
   /** Colors for the icon, read from live state like `active`. */
-  readonly iconAccent?: (context: CommandContext) => IconAccent | null;
+  iconAccent?(context: CommandContext<AppState>): IconAccent | null;
   /** A key such as `'Mod+K'` (`Mod` is Cmd on a Mac, Ctrl elsewhere), or a list of them. */
   readonly shortcut?: string | readonly string[];
   /**
@@ -92,13 +102,22 @@ export interface CommandDef {
    * says no, the command isn't allowed, as with `requires`. Asked only while a document is
    * open; one that throws allows it.
    */
-  readonly allowed?: (context: CommandContext) => boolean;
+  allowed?(context: CommandContext<AppState>): boolean;
   /**
    * The translation key of the sentence that says why `allowed` refused it, with `{label}` for
    * its label: `'commands.notAllowed.doc-print'`. Without it, or a string for it,
    * `commands.notAllowed.default`.
    */
   readonly notAllowedKey?: string;
+  /**
+   * The lock on the setting it changes, for a command that changes one
+   * (`(context) => context.get(StageToken).getLock('spread')`), or `null`.
+   * While a lock holds, it shows disabled, whatever the `notAllowed` setting
+   * says, with the sentence under the lock's `reasonKey` (else
+   * `commands.locked.default`) as its `disabledReason`; it stays `active` for
+   * its own value. One that throws counts as unlocked.
+   */
+  locked?(context: CommandContext<AppState>): SettingLock | null;
 
   // ── what the command opens ───────────────────────────────────────────────
   // A command that opens a panel, menu or dialog says so instead of opening
@@ -116,16 +135,22 @@ export interface CommandDef {
   /** Opens and closes a dialog; one dialog is open at a time. */
   readonly modal?: string;
 
-  // ── read from live state, again whenever anything changes ────────────────
-  /** When it can run. Default: always. */
-  readonly enabled?: (context: CommandContext) => boolean;
-  /** When it shows as pressed, such as the current tool. */
-  readonly active?: (context: CommandContext) => boolean;
-  /** When it shows at all. Default: always. */
-  readonly visible?: (context: CommandContext) => boolean;
+  // ── read from live state and your app's, again whenever either changes ──
+  /** When it can run. Default: always. One that throws counts as false. */
+  enabled?(context: CommandContext<AppState>): boolean;
+  /** When it shows as pressed, such as the current tool. One that throws counts as false. */
+  active?(context: CommandContext<AppState>): boolean;
+  /** When it shows at all. Default: always. One that throws counts as false. */
+  visible?(context: CommandContext<AppState>): boolean;
+  /**
+   * The values for its label's `{name}` slots, such as how many pages are selected:
+   * `({ count: pageEdit.getSelected().length })`. A number `count` also picks the plural form of a
+   * translated label. One that throws gives none, and the slots show as they are.
+   */
+  labelParams?(context: CommandContext<AppState>): Readonly<Record<string, string | number>>;
 
   /** What it does; `execute()` resolves once it has. Not needed for a `menu`, `panel` or `modal`. */
-  readonly run?: (context: CommandContext) => void | Promise<unknown>;
+  run?(context: CommandContext<AppState>): void | Promise<unknown>;
 }
 
 /**
@@ -139,7 +164,7 @@ export interface CommandFamily {
   /** The names the command's document has, in order. Return the same array while nothing changed. */
   readonly names: (context: CommandContext) => readonly string[];
   /** The command for one name. A family's commands have no shortcuts. */
-  readonly command: (name: string) => Omit<CommandDef, 'id' | 'shortcut'>;
+  readonly command: (name: string) => Omit<CommandDefinition, 'id' | 'shortcut'>;
 }
 
 /** A command as a button shows it: everything read for its document. */
@@ -152,22 +177,29 @@ export interface ResolvedCommand {
   readonly menu?: string;
   readonly enabled: boolean;
   readonly active: boolean;
+  /**
+   * Whether it's a toggle, pressed while `active`: it has an `active` of its own, or opens a panel.
+   * Its button says `aria-pressed`, true or false; another button leaves it off. A command that
+   * opens a menu or a dialog isn't one.
+   */
+  readonly pressable: boolean;
   readonly visible: boolean;
   readonly categories: readonly string[];
   /**
    * Why it's disabled, as a sentence for its tooltip: set when the scope doesn't allow it and
-   * the `notAllowed` setting is `'disable'`.
+   * the `notAllowed` setting is `'disable'`, or when a lock holds the setting it changes.
    */
   readonly disabledReason?: string;
 }
 
 /**
  * Why a command won't run whatever the moment: it's turned off in this viewer
- * (`disabledCategories`, `disabledCommands`), or the scope doesn't allow it (`requires`).
- * A command that only can't run right now (`enabled`, `visible`) has no refusal.
+ * (`disabledCategories`, `disabledCommands`), the scope doesn't allow it (`requires`), or a lock
+ * holds the setting it changes (`locked`). A command that only can't run right now (`enabled`,
+ * `visible`) has no refusal.
  */
 export interface CommandRefusal {
-  readonly reason: 'turned-off' | 'not-allowed';
+  readonly reason: 'turned-off' | 'not-allowed' | 'locked';
   /** A sentence for the user, translated through the i18n plugin when it's there. */
   readonly message: string;
 }
@@ -191,6 +223,7 @@ export const resolvedCommandsEqual = (
     left.menu === right.menu &&
     left.enabled === right.enabled &&
     left.active === right.active &&
+    left.pressable === right.pressable &&
     left.visible === right.visible &&
     left.disabledReason === right.disabledReason &&
     left.shortcuts.length === right.shortcuts.length &&
@@ -208,6 +241,7 @@ export const unregisteredCommand = (id: CommandId): ResolvedCommand => ({
   shortcuts: [],
   enabled: false,
   active: false,
+  pressable: false,
   visible: false,
   categories: [],
 });
@@ -221,13 +255,13 @@ export interface BoundCommand extends ResolvedCommand {
   /** Run the command for the document it was read for. */
   readonly run: () => Promise<ExecuteResult>;
   /** Its first shortcut, formatted for the platform (`'⌘K'` on a Mac, `'Ctrl+K'` elsewhere), or `null`. */
-  readonly shortcut: string | null;
+  readonly shortcutLabel: string | null;
 }
 
 /**
- * A resolved command, bound for a button: `run` executes it through `execute`, and `shortcut` is
- * its first shortcut formatted for the platform. Which platform is the caller's to know
- * (`isMacPlatform()` in `@embedpdf/web`).
+ * A resolved command, bound for a button: `run` executes it through `execute`, and
+ * `shortcutLabel` is its first shortcut formatted for the platform. Which platform is the
+ * caller's to know (`isMacPlatform()` in `@embedpdf/web`).
  */
 export function boundCommandOf(
   command: ResolvedCommand,
@@ -238,7 +272,7 @@ export function boundCommandOf(
   return {
     ...command,
     run: () => execute(command.id),
-    shortcut: first === undefined ? null : formatShortcut(first, { isMac: options.isMac }),
+    shortcutLabel: first === undefined ? null : formatShortcut(first, { isMac: options.isMac }),
   };
 }
 
@@ -248,7 +282,12 @@ export function boundCommandOf(
  */
 export interface CommandsSettings {
   /** The commands your viewer has. A later definition with an id that's taken replaces the earlier one. */
-  readonly commands: readonly (CommandDef | CommandFamily)[];
+  readonly commands: readonly (CommandDefinition | CommandFamily)[];
+  /**
+   * Your app's state, which every command's functions get as `appState`: values, and functions
+   * that change them. A new value replaces the old one whole, and every command is asked again.
+   */
+  readonly appState: unknown;
   /**
    * Categories turned off, with every category under them: their commands are hidden and
    * refused wherever they appear.
@@ -269,13 +308,20 @@ export type NotAllowedMode = 'hide' | 'disable';
 /** What the commands settings are when the app registers none. */
 export const COMMANDS_DEFAULTS: CommandsSettings = {
   commands: [],
+  appState: undefined,
   disabledCategories: [],
   disabledCommands: [],
   notAllowed: 'hide',
 };
 
 /** What `commandsPlugin(config)` takes: any of the settings, merged over the defaults. */
-export type CommandsConfig = DeepPartial<CommandsSettings>;
+export type CommandsConfig<AppState = any> = Omit<
+  DeepPartial<CommandsSettings>,
+  'commands' | 'appState'
+> & {
+  readonly commands?: readonly (CommandDefinition<AppState> | CommandFamily)[];
+  readonly appState?: AppState;
+};
 
 export interface RegisterCommandOptions {
   /** Replace a command with the same id; without it, a taken id throws `conflict`. */
@@ -317,16 +363,16 @@ export interface CommandsCapability extends SettingsApi<CommandsSettings> {
    * Add a command while the app runs, and get a function that removes it. A taken id throws
    * `conflict` unless `replace`.
    */
-  registerCommand(definition: CommandDef, options?: RegisterCommandOptions): Unsubscribe;
+  registerCommand(definition: CommandDefinition, options?: RegisterCommandOptions): Unsubscribe;
   /** `registerCommand` for several definitions; the function removes all of them. */
   registerCommands(
-    definitions: readonly CommandDef[],
+    definitions: readonly CommandDefinition[],
     options?: RegisterCommandOptions,
   ): Unsubscribe;
   /** Whether a command has this id; with a family, every id that starts with its prefix does. */
   hasCommand(id: CommandId): boolean;
   /** A command as you defined it, or `null`. */
-  getCommand(id: CommandId): CommandDef | null;
+  getCommand(id: CommandId): CommandDefinition | null;
   /** Every command's id for the active document, in the order they were added. The same array until one changes. */
   listCommandIds(): readonly CommandId[];
 

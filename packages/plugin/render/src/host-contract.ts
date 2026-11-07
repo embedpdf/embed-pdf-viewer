@@ -17,10 +17,12 @@ import {
   type PageRenderViewport,
   type PluginErrorInfo,
 } from '@embedpdf/core';
+import type { Rect } from '@embedpdf/core-geometry';
 import {
   RenderToken as PublicRenderToken,
   type PageImage,
   type PageLayerOptions,
+  type PictureReport,
   type RenderCapability,
 } from './contract';
 import type { PageViewDemand, TilePaintPlan } from './paint-plan';
@@ -35,8 +37,13 @@ export interface PaintSettings {
 }
 
 export interface RenderSourceOptions extends PageLayerOptions {
-  /** Device px per PDF point (the page transform's `renderScale`). */
+  /** Device px per PDF point (the page transform's `renderScale`). A thumbnail ignores it. */
   scale: number;
+  /**
+   * The page's thumbnail instead: the whole page at the engine's thumbnail
+   * size, which needs only `doc.render.thumbnail` (a thumbnail rail's layer).
+   */
+  thumbnail?: boolean;
   /**
    * The view the picture is for (the page context's `view`): the engine ranks
    * the render by where the page is in that view (`doc.with({ view })`).
@@ -55,7 +62,7 @@ export interface RenderSourceOptions extends PageLayerOptions {
  * same object until the demand, an epoch, or a tile arrival changes it, so
  * layers subscribe with plain `Object.is`). Handles are reference-stable per
  * view id and reference-counted: every `createViewDemand` pairs with one
- * `dispose`.
+ * `destroy`.
  */
 export interface ViewDemand {
   /** What this view wants for a page right now. Idempotent; schedules the want set. */
@@ -70,7 +77,7 @@ export interface ViewDemand {
    *  fetches, drop its own bookkeeping (resolved bytes stay cached). */
   release(page: PageRef): void;
   /** Release every page of this view and drop the handle's reference. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /** Whose pictures: a page's annotations, or its form widgets. */
@@ -95,6 +102,11 @@ export interface AppearancesOptions extends OperationOptions {
 /** The engine's picture of an item in one of its states, and the version of the item it shows. */
 export interface AppearancePicture extends AnnotationAppearanceImage {
   readonly version: number;
+}
+
+/** A report a page layer keeps on the page it paints: `close()` it when the layer goes. */
+export interface OpenPictureReport extends PictureReport {
+  close(): void;
 }
 
 export interface RenderCompletedEvent {
@@ -133,8 +145,14 @@ export interface RenderHostCapability extends RenderCapability {
    * ask for the other. The same object until a right changes.
    */
   getLayerRights(): PageLayerRights;
-  /** This view's tile surface. Stable per view id; pair with `dispose`. */
+  /** This view's tile surface. Stable per view id; pair with `destroy`. */
   createViewDemand(viewId: string): ViewDemand;
+  /**
+   * Report on a page's picture in a view: the page is `loading` from now until `shown()`, and
+   * `idle` again once every report on it closed. A page layer opens one when it mounts and
+   * closes it when it unmounts; the box it lends a painter opens one and hands it to `paint`.
+   */
+  reportPicture(view: string, page: PageRef): OpenPictureReport;
   /**
    * The engine's pictures of the owner's items on a page (`family`): each
    * item's look at rest, in every state it stores, each labelled with its
@@ -153,12 +171,19 @@ export interface RenderHostCapability extends RenderCapability {
    * An item's last pictures, every state, kept a while after it left its page:
    * an undo that brings it back shows them at once. Empty for one never drawn.
    */
-  keptAppearances(family: AppearanceFamily, item: AnnotationRef): readonly AppearancePicture[];
+  getKeptAppearances(family: AppearanceFamily, item: AnnotationRef): readonly AppearancePicture[];
   /** The appearance scale a render scale conforms to under the deployment's policy. */
   getAppearanceScale(renderScale: number): number;
   /** A base raster resolved / failed (the conforming and exact doors alike). */
   readonly onRenderCompleted: EventHook<RenderCompletedEvent>;
   readonly onRenderFailed: EventHook<RenderFailedEvent>;
+  /**
+   * The snapshot tool's box on `page`, in page space, for a page layer to
+   * draw: while it is dragged and while it is held. Null on every other page,
+   * and for a drag still too small to be a box. The same object while it
+   * doesn't change.
+   */
+  getSnapshotBox(page: PageRef): Rect | null;
 }
 
 export const RenderToken = createHostToken<RenderHostCapability>(PublicRenderToken);

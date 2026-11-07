@@ -33,7 +33,7 @@ import { FormLayer } from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { LinkLayer } from '@embedpdf/react/link';
 import { useMeasurementState } from '@embedpdf/react/measurement';
-import { RenderLayer } from '@embedpdf/react/render';
+import { RenderLayer, SnapshotLayer } from '@embedpdf/react/render';
 import { DocumentGate, useDocument, useDocumentId } from '@embedpdf/react/runtime';
 import { SearchLayer } from '@embedpdf/react/search';
 import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
@@ -41,21 +41,25 @@ import { useSurface } from '@embedpdf/react/shell';
 import { Scrollbar, Stage } from '@embedpdf/react/stage';
 import { useRef, type ReactNode } from 'react';
 
+import { OUTLINE_PROPERTIES_DIALOG } from './config/outline';
 import { useLayoutEnv, useResolvedLayout } from './config-context';
 import { LayoutRoot } from './layout-root';
 import { EdgeBars, FloatingBars } from './places';
-import { AnnotationFontsProvider } from './ui/annotation-fonts';
+import { AppFonts } from './ui/app-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 import { DropToOpen } from './ui/drop-to-open';
 import { GoToPageDialog } from './ui/go-to-page';
 import { FeaturePrefetch, lazyComponent } from './ui/lazy';
+import { PageLoading } from './ui/page-loading';
 import { SidePanel } from './ui/panels';
 import { PlacedComponentsHost, type PlacedComponents } from './ui/placed-components';
 import { useRefusalNotice } from './ui/refusal-notice';
 import { RotationBadge } from './ui/rotation-badge';
 import { SelectionStrip } from './ui/selection-strip';
+import { SnapshotStrip } from './ui/snapshot-strip';
 import { ShortcutsSheet } from './ui/shortcuts-sheet';
+import { SidebarReads } from './ui/sidebar-reads';
 import { SignatureBridge } from './ui/signature-bridge';
 import { StampLibraryStore } from './ui/stamp-store';
 import { TabBar } from './ui/tab-bar';
@@ -68,6 +72,7 @@ const useCalibrating = () => useMeasurementState((state) => state.calibrationReq
 const useSignDialogOpen = () => useSurface('signature-sign').isOpen;
 const useSignatureMakerOpen = () => useSurface('signature-maker').isOpen;
 const useSignatureInspectorOpen = () => useSurface('signature-inspector').isOpen;
+const usePrintDialogOpen = () => useSurface('print').isOpen;
 const RedactConfirmModal = lazyComponent(
   () => import('./ui/redact-confirm').then((ui) => ui.RedactConfirmModal),
   { shownWhile: useRedactConfirmOpen },
@@ -86,6 +91,24 @@ const SignatureMakerModal = lazyComponent(
 const SignatureInspector = lazyComponent(
   () => import('./ui/signature-inspector').then((ui) => ui.SignatureInspector),
   { shownWhile: useSignatureInspectorOpen },
+);
+const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) => ui.PrintDialog), {
+  shownWhile: usePrintDialogOpen,
+});
+const useOutlinePropertiesOpen = () => useSurface(OUTLINE_PROPERTIES_DIALOG).isOpen;
+// A grant's passphrase or questions: only documents from grants ask, so these load
+// when they first show, never in the background.
+const GrantPrompt = lazyComponent(() => import('./ui/grant-prompt').then((ui) => ui.GrantPrompt), {
+  prefetch: false,
+});
+const useIdentityAsked = () => useDocument((document) => document.identityRequest !== undefined);
+const VisitorIdentityDialog = lazyComponent(
+  () => import('./ui/grant-prompt').then((ui) => ui.VisitorIdentityDialog),
+  { shownWhile: useIdentityAsked, prefetch: false },
+);
+const OutlinePropertiesDialog = lazyComponent(
+  () => import('./ui/outline-properties').then((ui) => ui.OutlinePropertiesDialog),
+  { shownWhile: useOutlinePropertiesOpen },
 );
 
 /** The document tabs, as the layout says: always, while more than one document is open, or never. */
@@ -116,13 +139,16 @@ function OpeningDocuments() {
 /**
  * The document area's lifecycle switch. With no document open it shows the
  * `empty` region, or nothing. A `locked` tab shows its password prompt, an
- * `error` tab its error pane — per tab (keyed by document), so several can
- * coexist and tab switching stays free. Everything else is the ready-gated
- * Stage; the gate's fallback covers `loading`.
+ * `error` tab its error pane, or the grant's passphrase or questions it
+ * waits for — per tab (keyed by document), so several can coexist and tab
+ * switching stays free. Everything else is the ready-gated Stage; the gate's
+ * fallback covers `loading`. A ready document whose grant asks again shows its
+ * passphrase or questions over the Stage.
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
   const status = useDocument((document) => document.status);
+  const grantAsks = useDocument((document) => document.openRequest !== undefined);
   if (docId === null) {
     return (
       <div className="min-w-0 flex-1 overflow-auto">
@@ -131,8 +157,21 @@ function DocumentArea({ children }: { children: ReactNode }) {
     );
   }
   if (status === 'locked') return <PasswordPrompt key={docId} />;
-  if (status === 'error') return <DocumentError key={docId} />;
-  return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
+  if (status === 'error') {
+    return grantAsks ? <GrantPrompt key={docId} /> : <DocumentError key={docId} />;
+  }
+  return (
+    <DocumentGate fallback={<OpeningDocuments />}>
+      {children}
+      {/* a passphrase or questions the grant got after the document opened: over the document,
+      which goes on once they're given */}
+      {grantAsks && (
+        <div className="absolute inset-0 z-40">
+          <GrantPrompt key={docId} />
+        </div>
+      )}
+    </DocumentGate>
+  );
 }
 
 /**
@@ -174,7 +213,9 @@ export function Shell({ components }: { components?: PlacedComponents }) {
   // with zero config, and sit outside the gate: they render before any
   // document. The root measures the viewer for the layout (layout-root.tsx).
   return (
-    <AnnotationFontsProvider>
+    <>
+      {/* the app's fonts, registered once on a local engine */}
+      <AppFonts />
       <LayoutRoot rootRef={root} className="bg-app text-fg flex h-full flex-col outline-none">
         {/* the viewer's own components in the page (<epdf-button>, <epdf-menu>), each drawn
           in its own shadow root */}
@@ -218,6 +259,8 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       {/* the angle a selection is being turned to, by the pointer */}
                       <RotationBadge />
                       <SelectionStrip />
+                      {/* copy or save the box the snapshot tool holds */}
+                      <SnapshotStrip />
                       {/* a signed field's facts, anchored at its widget */}
                       <SignatureInspector />
                       {/* touch: draggable start/end selection handles (long-press
@@ -239,6 +282,9 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       the base budget supplies — the thumbnail rail's demand
                       never does, so it mounts the same layer for free. */}
                       <RenderLayer />
+                      {/* a spinner while the page's picture is slow to come, a sentence
+                      when it can't */}
+                      <PageLoading />
                       <SelectionLayer />
                       <SearchLayer />
                       {/* Clickable links (nav plane): anchors under the default
@@ -255,6 +301,8 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       leaves the fields to it, as it leaves the annotations
                       to the annotation layer. */}
                       <FormLayer />
+                      {/* The snapshot tool's box, over everything on the page. */}
+                      <SnapshotLayer />
                     </>
                   )}
                 </Stage>
@@ -263,13 +311,18 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <RedactConfirmModal />
               <CalibrationDialog />
               <GoToPageDialog />
+              <PrintDialog />
+              <OutlinePropertiesDialog />
               <ShortcutsSheet />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
               <SignatureBridge />
+              {/* the outline and the attachments, read so their panels' buttons know */}
+              <SidebarReads />
               {/* once a document shows: the features' panels and dialogs, fetched while idle */}
               <FeaturePrefetch />
               <SignDialog />
               <SignatureMakerModal />
+              <VisitorIdentityDialog />
             </DocumentArea>
           </DropToOpen>
           <EdgeBars edge="end" />
@@ -280,6 +333,6 @@ export function Shell({ components }: { components?: PlacedComponents }) {
         {/* The footer socket: below everything, empty until a child fills it. */}
         <slot name="footer" />
       </LayoutRoot>
-    </AnnotationFontsProvider>
+    </>
   );
 }

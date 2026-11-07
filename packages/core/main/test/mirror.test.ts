@@ -40,9 +40,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const origin = (serverId: number | null, kind: 'local' | 'remote' = 'remote') => ({
   kind,
   sessionId: kind === 'local' ? 'me' : 'them',
-  sub: null,
-  ts: 0,
-  serverId,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: serverId,
 });
 const upserted = (id: string, title: string, serverId: number | null = null) =>
   ({
@@ -52,7 +52,11 @@ const upserted = (id: string, title: string, serverId: number | null = null) =>
   }) as unknown as DocumentEvent;
 const deleted = (id: string, serverId: number | null = null) =>
   ({ type: 'annotations.deleted', id, origin: origin(serverId) }) as unknown as DocumentEvent;
-const desynced = { type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 } as DocumentEvent;
+const desynced = {
+  type: 'stream.desynced',
+  reason: 'backlog-overflow',
+  at: new Date(0).toISOString(),
+} as DocumentEvent;
 const versioned = {
   type: 'document.versioned',
   version: {},
@@ -76,7 +80,7 @@ const foldRecords = (value: Records, event: DocumentEvent): Records => {
 };
 
 function setup(options: {
-  loads?: Deferred<{ value: Records; cursor?: number | null }>[];
+  loads?: Deferred<{ value: Records; cursor?: number }>[];
   readable?: () => boolean;
   fold?: (value: Records, event: DocumentEvent) => Records | ReturnType<typeof reload>;
   loadPages?: () => Promise<(value: Records) => Records>;
@@ -98,7 +102,7 @@ function setup(options: {
     fold: options.fold ?? foldRecords,
     loadPages: options.loadPages,
     onDemand: options.onDemand,
-    changed: (change) => changes.push(change),
+    onChanged: (change) => changes.push(change),
   });
   return { ctx, mirror, load, changes };
 }

@@ -1,0 +1,30 @@
+<link rel="stylesheet" href="./approve.css" />
+
+<div class="app" style="height: 100%">
+  <p class="status">Status: <strong id="status">Waiting for approval</strong></p>
+  <embedpdf-viewer id="viewer" class="viewer"></embedpdf-viewer>
+</div>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  const welcome = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+  const status = document.getElementById('status');
+
+  document.getElementById('viewer').config = {
+    src: welcome,
+    commands: [
+      {
+        id: 'acme:approve',
+        label: 'Approve',
+        icon: 'check',
+        shortcut: 'Mod+Enter',
+        run: () => {
+          status.textContent = `Approved at ${new Date().toLocaleTimeString()}`;
+        },
+      },
+    ],
+    layout: (layout) => layout.add('acme:approve', { to: 'main', section: 'end' }),
+  };
+</script>

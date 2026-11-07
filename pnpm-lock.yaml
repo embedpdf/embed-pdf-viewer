@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@changesets/assemble-release-plan@6.0.9':
-    hash: 1bc53c741da20baad9cdeb674c599225dcf9fe6aa7b0de16ff87e63f12a97b24
+    hash: f292f23a86ba2e56560b860f1a85f22624cf2e9a3757649247a73399653fc04f
     path: patches/@changesets__assemble-release-plan@6.0.9.patch
 
 importers:
@@ -145,6 +145,55 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  cloudpdf/framework/web:
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      happy-dom:
+        specifier: ^20.11.0
+        version: 20.11.0
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  cloudpdf/plugin/protected-display:
+    dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../../packages/core/main
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../../../packages/plugin/render
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../../../packages/plugin/stage
+    devDependencies:
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../../packages/core/geometry
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   cloudpdf/sdk:
     devDependencies:
       '@biomejs/biome':
@@ -174,9 +223,15 @@ importers:
       '@cloudpdf/contract':
         specifier: workspace:*
         version: link:../contract
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../packages/core/fonts
       '@embedpdf/core-signature':
         specifier: workspace:*
         version: link:../../packages/core/signature
+      '@embedpdf/default-fallback-fonts':
+        specifier: workspace:*
+        version: link:../../packages/default-fallback-fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../packages/engine/core
@@ -294,6 +349,34 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
+  cloudpdf/server-modules:
+    dependencies:
+      '@cloudpdf/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../packages/engine/core
+    devDependencies:
+      '@cloudpdf/server':
+        specifier: workspace:*
+        version: link:../server
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../tooling/build
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   cloudpdf/viewer/angular:
     dependencies:
       '@angular/forms':
@@ -342,6 +425,12 @@ importers:
       '@cloudpdf/engine':
         specifier: workspace:*
         version: link:../../engine
+      '@cloudpdf/plugin-protected-display':
+        specifier: workspace:*
+        version: link:../../plugin/protected-display
+      '@cloudpdf/web':
+        specifier: workspace:*
+        version: link:../../framework/web
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../../../packages/engine/main
@@ -588,7 +677,26 @@ importers:
         specifier: ^3.5.13
         version: 3.5.40(typescript@5.9.3)
 
-  docs/content: {}
+  docs/content:
+    devDependencies:
+      '@cloudpdf/sdk':
+        specifier: workspace:*
+        version: link:../../cloudpdf/sdk
+      '@embedpdf/core-signature':
+        specifier: workspace:*
+        version: link:../../packages/core/signature
+      '@embedpdf/default-stamps':
+        specifier: workspace:*
+        version: link:../../packages/default-stamps
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine/main
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
 
   docs/kit:
     dependencies:
@@ -997,6 +1105,9 @@ importers:
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../geometry
+      '@embedpdf/core-text':
+        specifier: workspace:*
+        version: link:../text
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1035,6 +1146,9 @@ importers:
       '@embedpdf/core-fonts':
         specifier: workspace:*
         version: link:../fonts
+      '@embedpdf/core-text':
+        specifier: workspace:*
+        version: link:../text
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1067,14 +1181,14 @@ importers:
         specifier: workspace:*
         version: link:../acrojs
       '@jitl/quickjs-singlefile-browser-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       '@jitl/quickjs-wasmfile-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       quickjs-emscripten-core:
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
     devDependencies:
       '@embedpdf/engine':
         specifier: workspace:*
@@ -1149,6 +1263,28 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/core/text:
+    dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../fonts
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      bidi-js:
+        specifier: 1.1.0
+        version: 1.1.0
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   packages/core/ui:
     devDependencies:
       '@embedpdf/tooling-build':
@@ -1160,6 +1296,12 @@ importers:
       vitest:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/default-fallback-fonts:
+    devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
 
   packages/default-signature-fonts:
     devDependencies:
@@ -1194,6 +1336,12 @@ importers:
 
   packages/engine/main:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
+      '@embedpdf/default-fallback-fonts':
+        specifier: workspace:*
+        version: link:../../default-fallback-fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../core
@@ -1210,9 +1358,15 @@ importers:
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
+      '@swc/core':
+        specifier: 1.16.2
+        version: 1.16.2(@swc/helpers@0.5.18)
       esbuild:
         specifier: ^0.28.1
         version: 0.28.1
+      harfbuzzjs:
+        specifier: 1.6.2
+        version: 1.6.2
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -1317,6 +1471,9 @@ importers:
 
   packages/engine/services:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../core
@@ -1360,9 +1517,15 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1384,6 +1547,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1490,9 +1656,15 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1514,6 +1686,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1611,9 +1786,15 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1635,6 +1816,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1732,9 +1916,15 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1756,6 +1946,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1875,6 +2068,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry
@@ -1884,6 +2080,9 @@ importers:
       '@embedpdf/plugin-actions':
         specifier: workspace:*
         version: link:../actions
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../fonts
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
@@ -1904,6 +2103,40 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/plugin/attachment:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../annotation
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../interaction
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   packages/plugin/commands:
     dependencies:
       '@embedpdf/core':
@@ -1912,9 +2145,6 @@ importers:
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
-      '@embedpdf/plugin-actions':
-        specifier: workspace:*
-        version: link:../actions
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
@@ -1924,6 +2154,9 @@ importers:
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../render
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../selection
@@ -1933,6 +2166,31 @@ importers:
       '@embedpdf/plugin-stage':
         specifier: workspace:*
         version: link:../stage
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/plugin/fonts:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
+      '@embedpdf/core-text':
+        specifier: workspace:*
+        version: link:../../core/text
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
     devDependencies:
       '@embedpdf/tooling-build':
         specifier: workspace:*
@@ -1955,6 +2213,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-form':
         specifier: workspace:*
         version: link:../../core/form
@@ -1973,12 +2234,18 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../fonts
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
       '@embedpdf/plugin-render':
         specifier: workspace:*
         version: link:../render
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
     devDependencies:
       '@embedpdf/engine':
         specifier: workspace:*
@@ -2140,12 +2407,61 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/plugin/outline:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
+      '@embedpdf/plugin-i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@embedpdf/plugin-link':
+        specifier: workspace:*
+        version: link:../link
+      '@embedpdf/plugin-selection':
+        specifier: workspace:*
+        version: link:../selection
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   packages/plugin/page-edit:
     dependencies:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -2195,6 +2511,9 @@ importers:
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../interaction
     devDependencies:
       '@embedpdf/tooling-build':
         specifier: workspace:*
@@ -2462,6 +2781,9 @@ importers:
 
   packages/viewer/chrome:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
@@ -2508,6 +2830,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
@@ -2529,9 +2854,15 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -2553,6 +2884,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -2960,7 +3294,7 @@ importers:
         version: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
-        version: 4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
+        version: 4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
       npm-to-yarn:
         specifier: ^3.0.1
         version: 3.0.1
@@ -5174,14 +5508,14 @@ packages:
     resolution: {integrity: sha512-ZXRY4jNvVgSVQ8DL3LTcakaAtXwTVUxE81hslsyD2AtoXW/wVob10HkOJ1X/pAlcI7D+2YoZKg5do8G/w6RYgA==}
     engines: {node: '>=8'}
 
-  '@jitl/quickjs-ffi-types@0.32.0':
-    resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
+  '@jitl/quickjs-ffi-types@0.31.0':
+    resolution: {integrity: sha512-1yrgvXlmXH2oNj3eFTrkwacGJbmM0crwipA3ohCrjv52gBeDaD7PsTvFYinlAnqU8iPME3LGP437yk05a2oejw==}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
-    resolution: {integrity: sha512-Hfdl7rh8dzxNWFRiYAYNbhn0RMF1/tO6SMH2mUW0aTibqwaAtqPRbi4WkwaIDlhNz8Z4dksJi1Zjl1R54Jsc/Q==}
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
+    resolution: {integrity: sha512-JctBiLmRpxEp83gJWhDcBuFqm5X7T683OLmncN9g0chAHkC8+y5cJmgknaAk5Rb/ANDR3pXMMnGdnGXDdysfBQ==}
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
-    resolution: {integrity: sha512-BKNDI/TPBfGlLNGYpLrhcDGXmIk4xHm4MRAisOBnOzpXVn9HZWsfmMAc9WMBrAHjvvds6HOikKeaOBKdPdpVrg==}
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
+    resolution: {integrity: sha512-hYduecOByj9AsAfsJhZh5nA6exokmuFC8cls39+lYmTCGY51bgjJJJwReEu7Ff7vBWaQCL6TeDdVlnp2WYz0jw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -8782,6 +9116,9 @@ packages:
     resolution: {integrity: sha512-CyzaZRQKyHkB2ZInfTTl2nvT33EbDpjkLEbE8/Zck3Ll6O0qqvuGdrJ45HgtH+HykRg88ITY3AdreBGN70aBSQ==}
     engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
 
+  bidi-js@1.1.0:
+    resolution: {integrity: sha512-fX1Onk0tdVPC7obPWB5EbJ1z7NVhLq4m2xZLq2YXBkxzMXIGRpNMU88n0EPgWseKl12J7zXs7qrDxPK4sRs2fg==}
+
   bignumber.js@9.3.1:
     resolution: {integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==}
 
@@ -10596,6 +10933,9 @@ packages:
   happy-dom@20.11.0:
     resolution: {integrity: sha512-XogN4asPd1a56di9prVG6bZxteNcXsZxxKmAvcEfc5Px5Ca2hMyMgk8wvqK2K1V8zXg40j9VANXsDaJYh9DeNA==}
     engines: {node: '>=20.0.0'}
+
+  harfbuzzjs@1.6.2:
+    resolution: {integrity: sha512-95c1vWuzoHjM19d5fQgPbz1wcv1pTa0UM9dZrdPgSMUEVuSwuzeVPkq6UhHHw3jLOkE9AYzzTP8XQkRBpPYpEg==}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -12923,8 +13263,8 @@ packages:
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
-  quickjs-emscripten-core@0.32.0:
-    resolution: {integrity: sha512-QFnPfjFey8EqknSrSxe1hZrf1/8z7/6s1QzGOmKo6++02r7QRRX7ZoyNaZh7JuVjWsVW87KnQrbZqnHkOAzUyg==}
+  quickjs-emscripten-core@0.31.0:
+    resolution: {integrity: sha512-oQz8p0SiKDBc1TC7ZBK2fr0GoSHZKA0jZIeXxsnCyCs4y32FStzCW4d1h6E1sE0uHDMbGITbk2zhNaytaoJwXQ==}
 
   railroad-diagrams@1.0.0:
     resolution: {integrity: sha512-cz93DjNeLY0idrCNOH6PviZGRN9GJhsdm9hpn1YCS879fj4W+x5IFJhhkRZcwVgMmFF7R82UA/7Oh+R8lLZg6A==}
@@ -16366,7 +16706,7 @@ snapshots:
       resolve-from: 5.0.0
       semver: 7.7.4
 
-  '@changesets/assemble-release-plan@6.0.9(patch_hash=1bc53c741da20baad9cdeb674c599225dcf9fe6aa7b0de16ff87e63f12a97b24)':
+  '@changesets/assemble-release-plan@6.0.9(patch_hash=f292f23a86ba2e56560b860f1a85f22624cf2e9a3757649247a73399653fc04f)':
     dependencies:
       '@changesets/errors': 0.2.0
       '@changesets/get-dependents-graph': 2.1.3
@@ -16382,7 +16722,7 @@ snapshots:
   '@changesets/cli@2.29.8(@types/node@22.19.11)':
     dependencies:
       '@changesets/apply-release-plan': 7.0.14
-      '@changesets/assemble-release-plan': 6.0.9(patch_hash=1bc53c741da20baad9cdeb674c599225dcf9fe6aa7b0de16ff87e63f12a97b24)
+      '@changesets/assemble-release-plan': 6.0.9(patch_hash=f292f23a86ba2e56560b860f1a85f22624cf2e9a3757649247a73399653fc04f)
       '@changesets/changelog-git': 0.2.1
       '@changesets/config': 3.1.2
       '@changesets/errors': 0.2.0
@@ -16442,7 +16782,7 @@ snapshots:
 
   '@changesets/get-release-plan@4.0.14':
     dependencies:
-      '@changesets/assemble-release-plan': 6.0.9(patch_hash=1bc53c741da20baad9cdeb674c599225dcf9fe6aa7b0de16ff87e63f12a97b24)
+      '@changesets/assemble-release-plan': 6.0.9(patch_hash=f292f23a86ba2e56560b860f1a85f22624cf2e9a3757649247a73399653fc04f)
       '@changesets/config': 3.1.2
       '@changesets/pre': 2.0.2
       '@changesets/read': 0.6.6
@@ -17425,15 +17765,15 @@ snapshots:
 
   '@istanbuljs/schema@0.1.3': {}
 
-  '@jitl/quickjs-ffi-types@0.32.0': {}
+  '@jitl/quickjs-ffi-types@0.31.0': {}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -21344,6 +21684,10 @@ snapshots:
       bindings: 1.5.0
       prebuild-install: 7.1.3
 
+  bidi-js@1.1.0:
+    dependencies:
+      require-from-string: 2.0.2
+
   bignumber.js@9.3.1:
     optional: true
 
@@ -23690,6 +24034,8 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  harfbuzzjs@1.6.2: {}
+
   has-bigints@1.1.0: {}
 
   has-flag@4.0.0: {}
@@ -25605,13 +25951,13 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@mdx-js/mdx': 3.1.1
       '@napi-rs/simple-git': 0.1.22
-      '@shikijs/twoslash': 3.22.0(typescript@5.9.3)
+      '@shikijs/twoslash': 3.22.0(typescript@5.8.3)
       '@theguild/remark-mermaid': 0.3.0(react@18.3.1)
       '@theguild/remark-npm2yarn': 0.3.3
       better-react-mathjax: 2.3.0(react@18.3.1)
@@ -25653,13 +25999,13 @@ snapshots:
       - supports-color
       - typescript
 
-  nextra@4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@mdx-js/mdx': 3.1.1
       '@napi-rs/simple-git': 0.1.22
-      '@shikijs/twoslash': 3.22.0(typescript@5.8.3)
+      '@shikijs/twoslash': 3.22.0(typescript@5.9.3)
       '@theguild/remark-mermaid': 0.3.0(react@18.3.1)
       '@theguild/remark-npm2yarn': 0.3.3
       better-react-mathjax: 2.3.0(react@18.3.1)
@@ -26555,9 +26901,9 @@ snapshots:
 
   quick-format-unescaped@4.0.4: {}
 
-  quickjs-emscripten-core@0.32.0:
+  quickjs-emscripten-core@0.31.0:
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   railroad-diagrams@1.0.0: {}
 

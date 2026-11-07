@@ -1,14 +1,15 @@
 /**
  * Opening documents: every input kind opens a locked file locked, a wrong
  * password says so on the prompt, the owner password lifts the file's own
- * restrictions, and the refusals name what they refuse.
+ * restrictions, the refusals name what they refuse, and an aborted open leaves
+ * its id free to open again.
  * `encrypted.pdf` is PDFium's: user password `1234` (no copy, no print),
  * owner password `5678`.
  */
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
-import type { DocumentHandle, OpenInput } from '@embedpdf/engine-core/runtime';
+import { isAbortError, type DocumentHandle, type OpenInput } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, EngineError, EngineErrorCode } from '../src/index';
 
 const fixture = (name: string) => resolve(__dirname, 'fixtures', name);
@@ -101,6 +102,27 @@ describe('the file’s own restrictions', () => {
       await doc.security.unlock({ password: '5678' });
       expect(doc.security.allows('doc.text.copy')).toBe(true);
       await doc.close();
+    });
+  });
+});
+
+describe("a plugin's own permission", () => {
+  test('holds where the scope names it, or *, and the core never grants one', async () => {
+    await withEngine(async (engine) => {
+      const allows = async (scope: string[], permission: string) => {
+        const doc = await engine.open({ kind: 'bytes', bytes: await plain() }, { scope });
+        try {
+          return doc.security.allows(permission as never);
+        } finally {
+          await doc.close();
+        }
+      };
+      expect(await allows(['doc.open', 'reading-progress.track'], 'reading-progress.track')).toBe(
+        true,
+      );
+      expect(await allows(['*'], 'reading-progress.track')).toBe(true);
+      expect(await allows(['doc.open', 'doc.render'], 'reading-progress.track')).toBe(false);
+      expect(await allows(['doc.open', 'reading-progress.track'], 'doc.render')).toBe(false);
     });
   });
 });
@@ -220,6 +242,41 @@ describe('opening', () => {
         { kind: 'bytes', bytes: await plain() },
         { scope: ['pdf.permissions'] },
       );
+      expect((await doc.pages.list()).pageCount).toBe(1);
+      await doc.close();
+    });
+  });
+
+  // The worker can't stop an open once it runs, so an open its caller aborted
+  // may still open the file there. Its id must be free to open again.
+  test.each([
+    ['bytes', (id: string, bytes: Uint8Array): OpenInput => ({ kind: 'bytes', id, bytes })],
+    [
+      'layerBytes',
+      (id: string, bytes: Uint8Array): OpenInput => ({ kind: 'layerBytes', id, baseBytes: bytes }),
+    ],
+  ])('an open of %s aborted after it was sent leaves its id free', async (_kind, input) => {
+    await withEngine(async (engine) => {
+      const bytes = await plain();
+      const left = engine.open(input('welcome', bytes));
+      left.abort('left');
+      expect(isAbortError(await rejection(left))).toBe(true);
+
+      const doc = await engine.open(input('welcome', bytes));
+      expect((await doc.pages.list()).pageCount).toBe(1);
+      await doc.close();
+    });
+  });
+
+  test('opening the same id again before the worker answers the aborted open', async () => {
+    await withEngine(async (engine) => {
+      const bytes = await plain();
+      const left = engine.open({ kind: 'bytes', id: 'welcome', bytes });
+      left.abort('left');
+      const again = engine.open({ kind: 'bytes', id: 'welcome', bytes });
+      expect(isAbortError(await rejection(left))).toBe(true);
+
+      const doc = await again;
       expect((await doc.pages.list()).pageCount).toBe(1);
       await doc.close();
     });

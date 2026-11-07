@@ -15,5 +15,5 @@ export interface AnnotationListMutationMeta extends MutationMeta {
    * deleted alike; the per-mutation result types pin down which is which
    * (see `AnnotationCreateResult` etc.).
    */
-  changed: AnnotationRef[];
+  changedRefs: AnnotationRef[];
 }

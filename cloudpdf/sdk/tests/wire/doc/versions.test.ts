@@ -10,23 +10,23 @@ describe("VersionsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            head: "head",
+            baseSha256: "baseSha256",
             versions: [
                 {
                     sha256: "sha256",
-                    byteLength: 1,
+                    sizeBytes: 1,
                     number: 1,
                     parentSha256: "parentSha256",
                     producer: "upload",
                     signingId: "signingId",
-                    createdAt: 1,
+                    createdAt: "2024-01-15T09:30:00Z",
                 },
             ],
         };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions")
+            .get("/v1/docs/docId/layers/layerName/versions")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -34,6 +34,7 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.list({
             docId: "docId",
+            layerName: "layerName",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -42,11 +43,11 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions")
+            .get("/v1/docs/docId/layers/layerName/versions")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -55,6 +56,7 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.list({
                 docId: "docId",
+                layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -66,7 +68,7 @@ describe("VersionsClient", () => {
         const rawResponseBody = {
             mode: "authoritative",
             policyVersion: 1,
-            basis: { version: { sha256: "sha256", byteLength: 1 }, editsVersion: 1, source: "persisted" },
+            basis: { version: { sha256: "sha256", sizeBytes: 1 }, editsVersion: 1, source: "persisted" },
             since: { revisionIndex: 1, signatureIndex: 1 },
             until: { revisionIndex: 1 },
             restrictions: [
@@ -75,7 +77,7 @@ describe("VersionsClient", () => {
                     revisionIndex: 1,
                     source: "docmdp",
                     own: true,
-                    permission: 1.1,
+                    permission: 1,
                     fields: { key: "value" },
                 },
             ],
@@ -93,7 +95,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha256")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -101,7 +103,8 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.analysis({
             docId: "docId",
-            sha: "sha",
+            layerName: "layerName",
+            sha256: "sha256",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -110,11 +113,11 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha256")
             .respondWith()
             .statusCode(400)
             .jsonBody(rawResponseBody)
@@ -123,7 +126,8 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.analysis({
                 docId: "docId",
-                sha: "sha",
+                layerName: "layerName",
+                sha256: "sha256",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
@@ -132,11 +136,11 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha256")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -145,7 +149,8 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.analysis({
                 docId: "docId",
-                sha: "sha",
+                layerName: "layerName",
+                sha256: "sha256",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -168,23 +173,26 @@ describe("VersionsClient", () => {
                     filter: "filter",
                     subFilter: "subFilter",
                     byteRange: [],
-                    contentsSize: 1,
+                    contentsSizeBytes: 1,
                     coverage: "whole-revision",
                     revisionIndex: 1,
                     signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
-                    docMdp: 1.1,
+                    docMdp: 1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },
                     lock: { action: "all", fields: ["fields"] },
                     seedValue: {
-                        requiredFlags: 1,
-                        presentFlags: 1,
-                        version: null,
+                        parserVersion: null,
+                        parserVersionRequired: true,
                         mdp: null,
                         filter: null,
+                        filterRequired: true,
                         subFilters: ["subFilters"],
+                        subFiltersRequired: true,
                         digestMethods: ["digestMethods"],
+                        digestMethodsRequired: true,
                         reasons: ["reasons"],
+                        reasonsRequired: true,
                         unsupportedRequired: true,
                     },
                 },
@@ -192,15 +200,15 @@ describe("VersionsClient", () => {
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                certification: { signatureIndex: 1, permission: 1 },
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
         };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/signatures/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/signatures/sha256")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -208,7 +216,8 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.signatures({
             docId: "docId",
-            sha: "sha",
+            layerName: "layerName",
+            sha256: "sha256",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -217,11 +226,11 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/signatures/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/signatures/sha256")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -230,7 +239,8 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.signatures({
                 docId: "docId",
-                sha: "sha",
+                layerName: "layerName",
+                sha256: "sha256",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

@@ -1,0 +1,109 @@
+{
+  "formKind": "acroform",
+  "needsAppearances": false,
+  "fields": [
+    {
+      "origin": "acroform",
+      "readOnly": false,
+      "required": false,
+      "noExport": false,
+      "alternateName": null,
+      "mappingName": null,
+      "groupId": null,
+      "createdBy": null,
+      "createdAt": null,
+      "filledBy": null,
+      "filledByName": null,
+      "filledAt": null,
+      "importedBy": null,
+      "ref": {
+        "kind": "objectNumber",
+        "objectNumber": 20
+      },
+      "name": "Comments",
+      "kind": "text",
+      "valueEntry": {
+        "kind": "rich-text",
+        "html": "<p>Hello</p>"
+      },
+      "defaultValueEntry": {
+        "kind": "none"
+      },
+      "value": "Hello",
+      "defaultValue": "",
+      "maxLength": null,
+      "multiline": true,
+      "password": false,
+      "comb": false,
+      "widgets": [
+        {
+          "ref": {
+            "kind": "objectNumber",
+            "page": {
+              "kind": "objectNumber",
+              "objectNumber": 3
+            },
+            "objectNumber": 21
+          },
+          "objectNumber": 21,
+          "page": {
+            "kind": "objectNumber",
+            "objectNumber": 3
+          }
+        }
+      ]
+    },
+    {
+      "origin": "acroform",
+      "readOnly": false,
+      "required": false,
+      "noExport": false,
+      "alternateName": null,
+      "mappingName": null,
+      "groupId": null,
+      "createdBy": null,
+      "createdAt": "2026-11-04T10:00:00Z",
+      "filledBy": null,
+      "filledByName": null,
+      "filledAt": "2026-11-04T10:30:00Z",
+      "importedBy": null,
+      "ref": {
+        "kind": "objectNumber",
+        "objectNumber": 22
+      },
+      "name": "Ticket",
+      "kind": "barcode",
+      "valueEntry": {
+        "kind": "scalar",
+        "value": "ABC123"
+      },
+      "defaultValueEntry": {
+        "kind": "none"
+      },
+      "value": "ABC123",
+      "symbology": "qr",
+      "widgets": [
+        {
+          "ref": {
+            "kind": "objectNumber",
+            "page": {
+              "kind": "objectNumber",
+              "objectNumber": 3
+            },
+            "objectNumber": 23
+          },
+          "objectNumber": 23,
+          "page": {
+            "kind": "objectNumber",
+            "objectNumber": 3
+          }
+        }
+      ]
+    }
+  ],
+  "widgets": [],
+  "calculationOrder": [],
+  "fieldFromANewerServer": {
+    "addedIn": "3.1"
+  }
+}

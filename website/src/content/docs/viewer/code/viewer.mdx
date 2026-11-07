@@ -14,17 +14,28 @@ feature's plugin, and follow what happens. Inside the viewer, any component of y
 <Snippet name="viewer/code/get-viewer" />
 
 `onReady` fires once the viewer is live, before any document has opened. Until then there's no
-`viewer`.
+`viewer`, and until a document opens, most of its plugins aren't there yet: see
+[Plugins come with the document](#plugins-come-with-the-document).
+
+The bar above this viewer is the app's own. Its **Print** button waits for `onReady`, and its page
+number follows `stage` with [`watch()`](#follow-a-value), which waits for the document to open, since
+`stage` belongs to the document:
+
+<Example name="viewer/code/viewer/on-ready" />
+
+> **Try it:** scroll to the second page, and the page number in the bar follows. **Print** opens
+> the viewer's print dialog.
 
 ## What it gives you
 
 | Member | What it is |
 | :-- | :-- |
 | `get(name)` | A plugin's API, by its name: `viewer.get('search')`. The same API its headless hook gives you; after the viewer is gone, its calls fail. |
+| `tryGet(name)` | The same, or `null` where `get()` would throw: before a document has opened, or once the viewer is gone. |
 | `documents` | The documents plugin: open, close, switch, download. See [Documents](../documents). |
 | `commands` | The commands plugin: run a command, check one, turn features on and off. See [Buttons & commands](../customize/commands). |
-| `watch(read, onChange)` | Calls `onChange` whenever what `read` returns changes. Returns a function that stops it. |
-| `forDocument(id)` | The same `get` for one document, whichever is active |
+| `watch(read, onChange, options)` | Calls `onChange` whenever what `read` returns changes; with `{ immediate: true }`, with what it returns first too. Returns a function that stops it. |
+| `forDocument(id)` | The same `get` and `tryGet` for one document, whichever is active |
 
 ## Use a plugin
 
@@ -40,6 +51,18 @@ const values = await viewer.get('form').exportValues();
 The names, and the page that lists each plugin's methods, are on [Plugins](plugins#every-plugin).
 A plugin's token works too, `viewer.get(SearchToken)`, for code shared with a headless app.
 
+### Plugins come with the document
+
+Most plugins work on a document: every one but `documents`, `commands`, `stamp` and `i18n`.
+They're there once a document has opened, so in `onReady`, before one has, `get()` throws a
+`not-ready` error for them. Start from the document instead:
+
+```js
+viewer.documents.onOpened(() => viewer.get('stage').goToPage(4));
+```
+
+`tryGet()` gives `null` instead of throwing, and `watch()` waits for the document by itself.
+
 ## Run a command
 
 A command does what a button does, with the same checks: a command that's disabled doesn't run.
@@ -50,14 +73,22 @@ const { status } = await viewer.commands.execute('zoom:fit-width');
 
 ## Follow a value
 
-`watch()` follows anything you can read, and calls you when it changes:
+`watch()` follows anything you can read, and calls you when it changes. With
+`{ immediate: true }` it calls you with the first value it reads too, so the label is right from
+the start:
 
 ```js
 const stop = viewer.watch(
   () => viewer.get('stage').getCurrentPageIndex(),
   (index) => (pageLabel.textContent = `Page ${index + 1}`),
+  { immediate: true },
 );
 ```
+
+It works in `onReady`: while `read` throws `not-ready`, because no document has opened yet,
+`watch()` waits, and starts once it reads. When the document closes, it waits again for the next
+one. Two values count as the same by `Object.is`; give `isEqual` in the options to compare them
+your way.
 
 In a component, use the plugin's state hook instead, such as `useStageState()`: see
 [Plugins](plugins#in-your-components).

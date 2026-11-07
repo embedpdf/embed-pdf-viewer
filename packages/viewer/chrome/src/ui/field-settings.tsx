@@ -1,12 +1,12 @@
 /**
  * A field's settings, as the form plugin describes them (`getFieldSettings`),
  * written with `form.update()`: the form designer's sidebar shows them for the
- * selected field. Nothing here knows a field family: the description says what
+ * selected field. Nothing here knows a field kind: the description says what
  * to draw.
  */
 import {
   FormToken,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldSetting,
 } from '@embedpdf/react/form';
@@ -15,6 +15,7 @@ import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runt
 import { useEffect, useState } from 'react';
 
 import { useLabel } from './labels';
+import { TooltipButton } from './tooltip';
 
 const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm';
 
@@ -25,7 +26,7 @@ interface Option {
 }
 
 /** The field's settings, each with the control its description names. */
-export function FieldSettings({ field }: { field: FormFieldDTO }) {
+export function FieldSettings({ field }: { field: FormField }) {
   const form = useOptionalCapability(FormToken);
   const settings = useOptionalSelector(
     FormToken,
@@ -233,14 +234,13 @@ function OptionsEditor({
             value={row.value}
             onCommit={(value) => replace(at, { ...row, value })}
           />
-          <button
-            type="button"
-            title={t('demo.fieldOptionRemove')}
+          <TooltipButton
+            label={t('demo.fieldOptionRemove')}
             className="text-fg-muted hover:text-fg px-1"
             onClick={() => replace(at, null)}
           >
             ×
-          </button>
+          </TooltipButton>
         </div>
       ))}
       <button

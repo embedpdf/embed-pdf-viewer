@@ -46,8 +46,8 @@ export function scriptColorToCss(color: ScriptColorArray): string | null {
   return rgb === null ? null : `#${hex(rgb.r)}${hex(rgb.g)}${hex(rgb.b)}`;
 }
 
-/** CSS hex (#rgb/#rrggbb) → Acrobat RGB array; null/undefined → transparent. */
-export function cssToScriptColor(css: string | null | undefined): ScriptColorArray {
+/** CSS hex (#rgb/#rrggbb) → Acrobat RGB array; `null` → transparent. */
+export function cssToScriptColor(css: string | null): ScriptColorArray {
   if (!css) return ['T'];
   const raw = css.trim().replace(/^#/, '');
   const long =

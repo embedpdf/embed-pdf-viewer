@@ -11,6 +11,7 @@ export { AbortablePromise } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 
 // Local engine.
 export { isLocalEngine } from './engine/LocalEngine';
@@ -21,12 +22,18 @@ export { isLocalPage } from './engine/LocalPageHandle';
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
 export { OBJECT_NUMBER_CEILING } from './identity/ObjectNumbers';
 export { toFieldRef } from './identity/FormFieldRef';
+export { toOutlineItemRef, outlineItemRefsEqual } from './identity/OutlineItemRef';
 export { toAttachmentRef } from './dto/Attachment';
 export { annotationKey } from './identity/annotationKey';
 
 // Positions: where rows go in their list (a reorder, an insert).
 export { anchorOf, reorderedList } from './mutation/ListPosition';
-export type { AnnotationPosition, ListPosition, PagePosition } from './mutation/ListPosition';
+export type {
+  AnnotationPosition,
+  ListPosition,
+  OutlinePosition,
+  PagePosition,
+} from './mutation/ListPosition';
 
 // Permissions.
 export { caps, collab } from './auth/scope/builders';
@@ -75,11 +82,15 @@ export {
 } from './geometry/pageSpace';
 export { pageDestinationOf, pdfDestinationOf } from './pageSpace/destinations';
 
+// Pages: the order Tab visits their annotations in.
+export { compareStructurePositions, tabOrderOf } from './pages/tabOrder';
+
 export type {
   // Engine and handles.
   Engine,
   EngineFactory,
   DocumentHandle,
+  DocumentGrant,
   PageHandle,
   LocalEngine,
   LocalDocumentHandle,
@@ -90,7 +101,11 @@ export type {
   OpenInputLayerFile,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
+  OpenInputGrant,
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityField,
+  VisitorIdentityRequest,
   OpenOptions,
   TokenSource,
   Identity,
@@ -102,13 +117,15 @@ export type {
   // Services.
   MetadataService,
   CustomMetadataService,
+  DocumentOutlineService,
+  OutlineCreateOptions,
   DocumentPagesService,
   DocumentAnnotationsService,
   PageAnnotationsService,
   LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
-  LocalPageRenderService,
+  RawPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
   DocumentUnlockInput,
@@ -128,7 +145,7 @@ export type {
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   FormFieldCreateOptions,
   FormWidgetAddOptions,
   ObjectNumberPool,
@@ -137,6 +154,9 @@ export type {
   // Data.
   PageRef,
   PageLayout,
+  PageTabOrder,
+  TabOrderItem,
+  TabOrderPage,
   PageListSnapshot,
   PageDestination,
   PdfDestination,
@@ -158,6 +178,7 @@ export type {
   SearchSnippet,
   PageRenderOptions,
   PageImageOptions,
+  PrintDpi,
   PageImageHandle,
   ImageSource,
   PageRaster,
@@ -191,13 +212,41 @@ export type {
   MeasurementFormatOptions,
   MeasureFromRatioOptions,
   FormFieldRef,
-  FormFieldDTO,
+  FormField,
   FormBundle,
   FormImportResult,
   FormValuesImportResult,
   Attachment,
   AttachmentList,
   AttachmentRef,
+  DocumentOutline,
+  CodePointRange,
+  Font,
+  FontFormat,
+  FontList,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontResolveRun,
+  FontRestriction,
+  FontSource,
+  ResolvedFontRun,
+  DocumentFontsService,
+  LocalDocumentFontsService,
+  FontEmbeddingPolicy,
+  OutlineItem,
+  OutlineItemDraft,
+  OutlineItemPatch,
+  OutlineItemRef,
+  OutlineCreateResult,
+  OutlineUpdateResult,
+  OutlineMoveResult,
+  OutlineDeleteResult,
+  OutlineRestoreResult,
+  OutlineOrder,
+  OutlineMutationMeta,
   DocumentEvent,
   DocumentEventOf,
   DocumentEventType,

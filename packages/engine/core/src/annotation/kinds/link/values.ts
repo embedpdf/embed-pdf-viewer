@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PdfDestination } from '../../../dto/PdfDestination';
 import { PageDestinationSchema, PdfDestinationSchema } from '../../../dto/PdfDestination.schema';
 import type { PdfLinkTarget, PdfLinkTargetWritable } from '../../../dto/PdfLinkTarget';
+import { withCatchAll } from '../../../wire/reading';
 
 export { PdfDestinationSchema };
 
@@ -10,15 +11,22 @@ export { PdfDestinationSchema };
 function linkTargetSchemasFor<Destination>(destination: z.ZodType<Destination>) {
   const goto = z.object({ kind: z.literal('goto'), destination });
   const uri = z.object({ kind: z.literal('uri'), uri: z.string() });
-  const read = z.discriminatedUnion('kind', [
-    goto,
-    uri,
-    z.object({ kind: z.literal('goto-remote'), file: z.string() }),
-    z.object({ kind: z.literal('launch'), path: z.string() }),
-    z.object({ kind: z.literal('javascript') }),
-    z.object({ kind: z.literal('named'), name: z.string() }),
-    z.object({ kind: z.literal('unsupported') }),
-  ]) as unknown as z.ZodType<PdfLinkTarget<Destination>>;
+  /** A target of a kind this client doesn't know reads as `unsupported`. */
+  const read = withCatchAll(
+    z.discriminatedUnion('kind', [
+      goto,
+      uri,
+      z.object({ kind: z.literal('goto-remote'), file: z.string() }),
+      z.object({ kind: z.literal('launch'), path: z.string() }),
+      z.object({ kind: z.literal('javascript') }),
+      z.object({ kind: z.literal('named'), name: z.string() }),
+      z.object({ kind: z.literal('unsupported') }),
+    ]) as unknown as z.ZodType<PdfLinkTarget<Destination>>,
+    'unsupported',
+  ).describe(
+    'Where a link goes, by its `kind`. A newer server can add kinds: read one your client ' +
+      "doesn't know as `unsupported`.",
+  );
   /** Drafts and patches author `goto`, `uri` and the standard named verbs; see {@link PdfLinkTargetWritable}. */
   const named = z.object({
     kind: z.literal('named'),

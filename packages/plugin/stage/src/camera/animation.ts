@@ -177,14 +177,14 @@ export function createAnimation(
     const axisX = axisState(
       start.x,
       startClamped.x,
-      axisTravels(startBounds.x, startBounds.width, startViewport.width, zoom)
+      axisTravels('x', startBounds.x, startBounds.width, startViewport.width, zoom)
         ? fingerVelocityX
         : 0,
     );
     const axisY = axisState(
       start.y,
       startClamped.y,
-      axisTravels(startBounds.y, startBounds.height, startViewport.height, zoom)
+      axisTravels('y', startBounds.y, startBounds.height, startViewport.height, zoom)
         ? fingerVelocityY
         : 0,
     );
@@ -259,7 +259,6 @@ export function createAnimation(
     animateZoomAnchored,
     startCameraPhysics,
     api: {
-      fling: (velocityX, velocityY) => startCameraPhysics(velocityX, velocityY),
       isMoving: () => cancelFrame !== null,
       stopMotion: () => {
         if (!cancelFrame) return;

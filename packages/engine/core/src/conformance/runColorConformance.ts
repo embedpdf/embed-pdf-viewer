@@ -36,15 +36,15 @@ function lastArray(text: string, key: string): number[] | null {
  */
 export function runColorConformance(
   runner: ConformanceTestRunner,
-  opts: ColorConformanceOptions,
+  options: ColorConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`color conformance: ${opts.label}`, () => {
+  describe(`color conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -61,7 +61,7 @@ export function runColorConformance(
     };
 
     test('a gray or CMYK color reads as its sRGB value, lowercase', async () => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { square } = await squareOf(doc);
         expect(square.color).toMatch(/^#([0-9a-f]{2})\1\1$/);
@@ -72,13 +72,13 @@ export function runColorConformance(
     });
 
     test('a color sent back unchanged stays as the file stores it', async () => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { page, square } = await squareOf(doc);
         // The whole read sent back, the colors in the other case, with one change.
         await page.annotations.update(square.ref, {
           ...square,
-          color: square.color.toUpperCase(),
+          color: square.color?.toUpperCase() ?? null,
           interiorColor: square.interiorColor?.toUpperCase() ?? null,
           contents: 'kept',
         });
@@ -94,7 +94,7 @@ export function runColorConformance(
     });
 
     test('a new color is written as given, in either case, and reads back lowercase', async () => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { page, square } = await squareOf(doc);
         const { annotation } = await page.annotations.update(square.ref, { color: '#1A2B3C' });

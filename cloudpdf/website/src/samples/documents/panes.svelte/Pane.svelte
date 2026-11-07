@@ -50,7 +50,7 @@
       type="button"
       class="button"
       disabled={!canRemove}
-      onclick={() => views.removePane(pane.id)}
+      onclick={() => views.deletePane(pane.id)}
     >
       Close pane
     </button>

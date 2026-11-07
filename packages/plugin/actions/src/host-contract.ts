@@ -62,19 +62,21 @@ export interface PageStateReport {
 /** One annotation-effect commit entry. `page` may be absent for bare Hide
  *  object-number targets: the sink resolves it from its model (`obj:N` is a
  *  cross-page key there), and entries it cannot resolve fail. */
-export interface AnnotCommitEntry {
+export interface AnnotationCommitEntry {
   annotObjectNumber: number;
   page?: PageRef;
   patch: ScriptAnnotEffect['patch'];
 }
-export interface AnnotCommitResult {
+export interface AnnotationCommitResult {
   results: Array<{
     annotObjectNumber: number;
     status: 'applied' | 'failed' | 'skipped';
     error?: string;
   }>;
 }
-export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
+export type AnnotationCommitSink = (
+  entries: AnnotationCommitEntry[],
+) => Promise<AnnotationCommitResult>;
 
 /**
  * What the form plugin's commit did: `applied`, the effects are one change on its way (shown at
@@ -87,6 +89,12 @@ export interface FormCommitSinkResult {
 }
 /** The form plugin's document commit: a script run's form effects, written as one change. */
 export type FormCommitSink = (effects: FormEffect[]) => Promise<FormCommitSinkResult>;
+
+/**
+ * The form plugin's cursor: put it in the field with this full name, as a script's
+ * `field.setFocus()` asks. `false` when the form can't (no such field, or one the user can't fill in).
+ */
+export type FormFocus = (field: string) => boolean;
 
 /**
  * The form as the user sees it: the form plugin's fields and widgets with this session's pending
@@ -156,7 +164,7 @@ export interface ScriptRealmPort {
 
 /** A detached realm: the caller owns its lifetime. */
 export interface DetachedScriptRealm extends ScriptRealmPort {
-  dispose(): void;
+  destroy(): void;
 }
 
 /** The form plugin's dataset resolver, registered on the host lens.
@@ -173,11 +181,13 @@ export type SubmitResolver = (
  *  `@embedpdf/plugin-actions/contract/host`, never from application code. */
 export interface ActionsHostCapability extends ActionsCapability {
   /** The annotation plugin's commit sink for script and Hide annotation effects. Identity-safe. */
-  registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
+  registerAnnotCommitSink(sink: AnnotationCommitSink): Unsubscribe;
   /** The form plugin's commit sink for script and Hide form effects. Identity-safe. */
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
   /** The form plugin's form, which scripts and dispatch read; without one they read the engine. Identity-safe. */
   registerFormReader(reader: FormReader): Unsubscribe;
+  /** The form plugin's cursor, for a script's `field.setFocus()`. Identity-safe. */
+  registerFormFocus(focus: FormFocus): Unsubscribe;
   /**
    * This document's realm, present only when `javascript.enabled` (its
    * presence is the form plugin's "scripting on" signal).

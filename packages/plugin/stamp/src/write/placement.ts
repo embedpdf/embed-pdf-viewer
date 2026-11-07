@@ -192,8 +192,8 @@ export function createPlacement(
       });
       return { bytes, preview: imageToPreview(image) };
     } finally {
-      scripting?.dispose();
-      realm?.dispose();
+      scripting?.destroy();
+      realm?.destroy();
       await doc.close();
     }
   };

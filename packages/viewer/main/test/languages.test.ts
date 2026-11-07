@@ -127,12 +127,11 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('languages', () => {
     const tab = await open('/arabic.html', 'ar');
     expect(await directionOf(tab)).toBe('rtl');
 
-    // The pager reads in Arabic.
-    const text = await tab.evaluate(() => window.element.shadowRoot!.textContent ?? '');
-    const pageOne = stringOf(ar.translations, 'demo.page')
-      .replace('{current}', '1')
-      .split('{total}')[0]!;
-    expect(text).toContain(pageOne);
+    // The pager reads in Arabic, its next page button on the left.
+    const next = await buttonOf(tab, stringOf(ar.translations, 'commands.page.next'));
+    const previous = await buttonOf(tab, stringOf(ar.translations, 'commands.page.previous'));
+    expect(next, 'the next page button, labelled in Arabic').not.toBeNull();
+    expect(next!.right).toBeLessThan(previous!.left);
 
     // The main bar's start (the document menu) is on the right, its end (search) on the left.
     const menu = await buttonOf(tab, stringOf(ar.translations, 'commands.menu'));

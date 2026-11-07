@@ -1,3 +1,4 @@
+import { actionTreeOf } from '../../dto/PdfLinkTarget';
 import {
   DEFAULT_RICH_TEXT_BODY,
   type RichTextBody,
@@ -10,7 +11,7 @@ import { annotationDefaultsOf } from '../defaults';
 import type { DescribeFont } from '../fontFaces';
 import { kindFactsOf } from '../kind-facts';
 import type { AnnotationDraft, Annotation } from '../kinds';
-import { actionTreeOf, readValueOf } from './applyAnnotationPatch';
+import { readValueOf } from './applyAnnotationPatch';
 
 /** Who the engine stamps as creating an annotation, and when. */
 export type DraftAttribution = Readonly<
@@ -27,9 +28,9 @@ export interface DraftContext<Box = unknown> {
   /** The ref the read names it by. */
   readonly ref: AnnotationRef;
   /**
-   * The name the engine gives it when the draft has no `nm`: a fresh UUIDv7
-   * the engine mints. Left out, the prediction says `null` until the engine
-   * answers.
+   * The name the engine gives it when the draft leaves `nm` out: a fresh
+   * UUIDv7 the engine mints. Left out, the prediction says `null` until the
+   * engine answers. A draft's `nm: null` asks for no name.
    */
   readonly nm?: string;
   /** Who creates it and when, as the engine stamps it. Left out, a read says `null`. */
@@ -39,7 +40,7 @@ export interface DraftContext<Box = unknown> {
    * works out (a shape, a line, text markup). Left out: its `box`.
    */
   readonly rect?: Box;
-  /** Looks up a registered font, for a free text in one. */
+  /** Looks up a font a box can name (a registered key, a document font's name), for a free text in one. */
   readonly describeFont?: DescribeFont;
 }
 
@@ -87,7 +88,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
       read[name] = null;
     }
   }
-  if (read.nm === null && context.nm !== undefined) read.nm = context.nm;
+  if (given.nm === undefined && context.nm !== undefined) read.nm = context.nm;
   read.ref = context.ref;
   read.page = context.ref.page;
   read.hasAppearance = !UNBAKED_KINDS.has(subtype);
@@ -103,7 +104,8 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   }
   if (subtype === 'widget') {
     // A widget created on its own belongs to no field (`field: null`) until a form adopts it.
-    read.fieldFamily = 'unknown';
+    read.fieldKind = 'unknown';
+    read.hasMark = false;
   }
   return read as unknown as Annotation<C>;
 }

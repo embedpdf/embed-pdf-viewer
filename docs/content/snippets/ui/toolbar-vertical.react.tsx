@@ -17,7 +17,12 @@ export function ToolRail() {
       aria-label="Tools"
       style={{ height: '100%' }}
       renderCommand={(command, _variant, run) => (
-        <button onClick={run} disabled={!command.enabled} aria-pressed={command.active} title={command.label}>
+        <button
+          onClick={run}
+          disabled={!command.enabled}
+          aria-pressed={command.pressable ? command.active : undefined}
+          title={command.label}
+        >
           <Icon name={command.icon} />
         </button>
       )}

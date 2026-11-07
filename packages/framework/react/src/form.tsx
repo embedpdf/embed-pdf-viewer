@@ -37,6 +37,7 @@ import { annotationKey, type EventHook } from '@embedpdf/core';
 import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import {
   FormToken,
   formState,
@@ -50,6 +51,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  bindFieldFocus,
   createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
@@ -179,13 +181,16 @@ interface ControlProps<C extends FormWidgetItem['control']> {
 /**
  * The positioned box every control sits in: the widget's event surface, and
  * the edge a field without a border of its own gets, so people see where to
- * fill in.
+ * fill in. It's also where the form's cursor reaches the control: `focus()`
+ * and Tab go through the form, in the document's order (`bindFieldFocus`),
+ * unless the box has nothing to focus (`focusable`).
  */
 function WidgetBox({
   item,
   page,
   colors,
   edge = true,
+  focusable = true,
   onClick,
   children,
   ...rest
@@ -194,12 +199,24 @@ function WidgetBox({
   page: PageContextValue;
   colors: FormColors;
   edge?: boolean;
+  focusable?: boolean;
   onClick?: () => void;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'>) {
+  const form = useCapability(FormHostToken);
   const { onPress, ...events } = useWidgetEvents(item.fieldRef, item.annotationRef);
   const wrap = useIsolated<HTMLDivElement>(onPress);
   const frame = rectInPixels(item.box, page.transform);
+  const widget = item.annotationRef;
+  const takesCursor = focusable && !item.disabled;
+  const radio = item.control === 'toggle' && item.kind === 'radio';
+  useEffect(
+    () =>
+      wrap.current && widget && takesCursor
+        ? bindFieldFocus(wrap.current, form, widget, { radio })
+        : undefined,
+    [wrap, form, widget, takesCursor, radio],
+  );
   return (
     <div
       ref={wrap}
@@ -245,9 +262,10 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   useEffect(() => editor.setValue(item.value), [editor, item.value]);
 
   const frame = rectInPixels(item.box, page.transform);
-  // The text being typed, where the engine will draw it, in its face.
+  // The text being typed, where the engine will draw it, in its fonts: again once they're found.
+  useOptionalSelector(FontsToken, (fonts) => fonts.getPaintFontsEpoch(), 0);
   const layout = item.annotationRef ? form.getTextEditorLayout(item.annotationRef, draft) : null;
-  useFontMounts(layout ? [layout.program] : NO_PROGRAMS);
+  useFontMounts(layout ? layout.programs : NO_PROGRAMS);
   const editorProps = {
     value: draft,
     maxLength: item.maxLength ?? undefined,
@@ -349,6 +367,11 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
   const frame = rectInPixels(item.box, page.transform);
+  // The rows in the widget's font, as the engine picks it: again once the document's fonts are read.
+  const font = useSelector(FormHostToken, (host) =>
+    item.annotationRef ? host.getWidgetFontCss(item.annotationRef) : null,
+  );
+  useFontMounts(font ? font.programs : NO_PROGRAMS);
   return (
     <WidgetBox item={item} page={page} colors={colors} edge={false} onClick={activate}>
       <NativeListBox
@@ -362,7 +385,7 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
         onSelect={async (values) => {
           await form.setValue(item.fieldRef, { selectedValues: values });
         }}
-        style={listBoxControlStyleOf(item, frame, colors)}
+        style={listBoxControlStyleOf(item, frame, colors, font)}
       />
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
@@ -420,6 +443,7 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
       item={item}
       page={page}
       colors={colors}
+      focusable={actionable}
       style={{ cursor: actionable ? 'pointer' : 'default' }}
     >
       {actionable ? (

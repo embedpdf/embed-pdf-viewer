@@ -54,7 +54,32 @@ export namespace PdfActionWrite {
         type: "submit-form";
         url: string;
         fields: CloudPDF.PdfActionTargetRef[] | null;
-        flags?: number | undefined;
+        exclude?: boolean | undefined;
+        includeNoValueFields?: boolean | undefined;
+        format?: PdfActionWriteSubmitForm.Format | undefined;
+        method?: PdfActionWriteSubmitForm.Method | undefined;
+        submitCoordinates?: boolean | undefined;
+        includeAppendSaves?: boolean | undefined;
+        includeAnnotations?: boolean | undefined;
+        canonicalFormat?: boolean | undefined;
+        exclNonUserAnnots?: boolean | undefined;
+        exclFKey?: boolean | undefined;
+        embedForm?: boolean | undefined;
         next?: unknown[] | undefined;
+    }
+
+    export namespace PdfActionWriteSubmitForm {
+        export const Format = {
+            Fdf: "fdf",
+            Html: "html",
+            Xfdf: "xfdf",
+            Pdf: "pdf",
+        } as const;
+        export type Format = (typeof Format)[keyof typeof Format];
+        export const Method = {
+            Post: "post",
+            Get: "get",
+        } as const;
+        export type Method = (typeof Method)[keyof typeof Method];
     }
 }

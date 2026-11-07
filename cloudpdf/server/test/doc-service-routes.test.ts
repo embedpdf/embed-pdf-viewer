@@ -18,6 +18,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { ENGINE } from './_helpers/pins';
 
 const TEST_K = Number(process.env['CLOUDPDF_TEST_SHARDS'] ?? '1');
 
@@ -244,13 +245,13 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toMatchObject({
       id: docId,
-      baseSha: seed.sha,
+      baseSha256: seed.sha,
       docVersion: 1,
       state: 'ready',
       encryption: { state: 'unknown', requiresPassword: null },
       permissions: {
         known: false,
-        bits: null,
+        flags: null,
         allAllowed: null,
         openedAs: null,
         securityHandlerRevision: null,
@@ -392,9 +393,12 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/manifest@dN', () => {
     const docId = 'docmmm111';
     await seedDocument(fx, tenantId, docId, { pageCount: 4 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       docVersion: number;
@@ -417,9 +421,12 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/manifest@dN', () => {
     const docId = 'docstal111';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=2`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=2,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(res.status).toBe(404);
     expect(res.headers.get('cache-control')).toBe('private, no-store');
   });
@@ -429,9 +436,12 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/manifest@dN', () => {
     const docId = 'docbad1111';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=XX`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=XX,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(res.status).toBe(400);
   });
 });
@@ -711,9 +721,12 @@ describe('Phase 6 access route — POST /v1/access', () => {
     });
     const token = docToken(tenantId, docId, { layer: 'default' });
 
-    const blocked = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const blocked = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(blocked.status).toBe(422);
     const blockedBody = (await blocked.json()) as { error?: { code?: string } };
     expect(blockedBody.error?.code).toBe('DocPasswordRequired');
@@ -728,9 +741,12 @@ describe('Phase 6 access route — POST /v1/access', () => {
     });
     expect(access.status, await access.clone().text()).toBe(200);
 
-    const allowed = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const allowed = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(allowed.status).toBe(200);
   });
 
@@ -1024,15 +1040,21 @@ describe('Phase 3 doc routes — concurrency', () => {
     await seedDocument(fx, tenantId, docA, { pageCount: 1 });
     await seedDocument(fx, tenantId, docB, { pageCount: 2 });
 
-    const resA = await fetch(`${fx.baseUrl}/v1/docs/${docA}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docA)}` },
-    });
+    const resA = await fetch(
+      `${fx.baseUrl}/v1/docs/${docA}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docA)}` },
+      },
+    );
     expect(resA.status).toBe(200);
     expect(fx.bundle.baseFileCache!.stats().refcounted).toBe(1);
 
-    const resB = await fetch(`${fx.baseUrl}/v1/docs/${docB}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docB)}` },
-    });
+    const resB = await fetch(
+      `${fx.baseUrl}/v1/docs/${docB}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docB)}` },
+      },
+    );
     expect(resB.status).toBe(200);
 
     expect(fx.bundle.baseFileCache!.stats().refcounted).toBe(1);

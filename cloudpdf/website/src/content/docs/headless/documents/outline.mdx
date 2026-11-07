@@ -1,0 +1,158 @@
+---
+title: Outline
+description: "Show a document's outline (its bookmarks) as a tree, follow its items, mark where the reader is, and let people add, rename, move and delete items."
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Outline
+
+A document's outline is its table of contents: titled items, nested, each going to a place in the
+document. Acrobat calls the items bookmarks. Register `outlinePlugin()` to show it in your UI:
+
+<Snippet name="documents/outline-list" />
+
+What `useOutlineState()` gives you updates by itself: after your own changes, and on a shared
+document, after someone else's. Nothing is read when a document opens: the outline loads the first
+time something asks for it, so a document nobody shows the outline of costs nothing.
+
+## Show the outline
+
+`rows` are the rows a tree shows: every item whose parents are all expanded, depth first. Each row
+has the `item`, its `depth` (0 at the top level), `hasChildren`, and whether it's `expanded`.
+`items` is every item, folded or not, when you'd rather build the tree yourself.
+
+`toggle(ref)` folds or unfolds an item; `expand(ref)`, `collapse(ref)`, `expandAll()` and
+`collapseAll()` do one of them. The items the file opens start expanded, and from then on what's
+expanded is the reader's: it doesn't change the document.
+
+An item has its `title`, its `color` (`null` when the file sets none, so draw your own text
+colour), and whether it's `bold` or `italic`. `status` says whether the outline hasn't been asked
+for yet (`'idle'`), is loading, is there (`'ready'`), or couldn't be read. `incomplete` is `true`
+when part of the outline couldn't be read, such as a loop in a damaged file; what could be read is
+listed.
+
+## Follow an item
+
+`activate(ref)` goes where the item goes, as a click does: a page moves the view, a website opens,
+and an item that runs a script runs it, through the [actions plugin](/docs/headless/documents/actions)
+when you've registered it. It returns what happened at once, so a website can still open from the
+reader's click.
+
+`current` is the item for where the reader is: the last item, in reading order, that goes to a place
+at or above the top of the view. Mark its row, and the reader always sees where they are in the
+outline:
+
+```ts
+const isCurrent = row.item.ref.objectNumber === current?.objectNumber;
+```
+
+<Example name="outline/bookmarks" />
+
+## Change the outline
+
+`create()` adds an item. Leave out where it goes and it goes to the place in view; leave out its
+title and it takes the selected text, or "Untitled" in the viewer's language. It shows at once, and
+`select: true` selects it and unfolds the items it sits under, so it's ready to rename:
+
+```ts
+await outline.create({ parent: chapter.ref, position: 'end' }, { select: true });
+```
+
+`update(ref, changes)` changes the fields you pass: a `title`, a `target`, a `color`, `bold`,
+`italic`, or `open` (whether it's expanded when the document opens). `null` removes a target or a
+colour. `move(refs, parent, position)` moves items, with the items under them, to their new place,
+and `delete(refs)` deletes items with the items under them.
+
+Each of these shows at once, is one step to undo, and resolves once the engine has it. A place is
+a neighbour, not a number: `'start'`, `'end'`, `{ before: ref }` or `{ after: ref }` among the
+parent's children.
+
+<Example name="outline/nesting" />
+
+## Select items
+
+`select(refs)` makes items the selection, and `selected` lists them. The selection is the
+reader's, like what's expanded: show it, and act on it with your own buttons.
+
+```ts
+outline.select([row.item.ref]);
+await outline.delete(selected);
+```
+
+## Methods
+
+Everything `useOutline()` gives you.
+
+| Method                              | What it does                                                                                                                     |
+| :---------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| `get(ref)`                          | One item, or `null`.                                                                                                             |
+| `getChildren(parent)`               | An item's children in order, or the top level's for `null`.                                                                      |
+| `isExpanded(ref)`                   | Whether an item's children show. [Show the outline](#show-the-outline)                                                           |
+| `toggle(ref)`                       | Folds an expanded item, unfolds a folded one.                                                                                    |
+| `expand(ref)`, `collapse(ref)`      | Unfolds or folds one item.                                                                                                       |
+| `expandAll()`, `collapseAll()`      | Unfolds or folds every item.                                                                                                     |
+| `reveal(ref)`                       | Unfolds every item `ref` sits under, so its row shows.                                                                           |
+| `select(refs)`                      | Makes these items the selection; `[]` clears it. [Select items](#select-items)                                                   |
+| `activate(ref)`                     | Goes where the item goes, as a click does, and returns what happened. [Follow an item](#follow-an-item)                          |
+| `getCurrentViewTarget()`            | Where the view is, as a target: the page at its top and the spot at its top-left. What a new item goes to.                       |
+| `create(item, options)`             | Adds an item; `select: true` selects it. Resolves `{ item }`. [Change the outline](#change-the-outline)                          |
+| `update(ref, changes)`              | Changes the fields you pass; `null` removes a target or a colour. Resolves `{ item }`.                                           |
+| `move(refs, parent, position)`      | Moves items, with the items under them, to their new place.                                                                      |
+| `delete(refs)`                      | Deletes items with the items under them, as one change.                                                                          |
+| `ensureLoaded()`                    | Reads the outline from the file, unless it's loaded or loading. Resolves once it's there.                                        |
+| `refresh()`                         | Reads the outline again. Rarely needed: it stays up to date by itself.                                                           |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useOutlineState()" />
+
+| Field        | What it is                                                                                           | Read once           |
+| :----------- | :--------------------------------------------------------------------------------------------------- | :------------------ |
+| `items`      | Every item, depth first, with your changes shown before the engine answers                           | `list()`            |
+| `rows`       | The rows a tree shows: `item`, `depth`, `hasChildren`, `expanded`                                    | `listRows()`        |
+| `current`    | The item for where the reader is, or `null`                                                          | `getCurrentItem()`  |
+| `selected`   | The selected items, in the order they were selected                                                  | `getSelected()`     |
+| `status`     | `'idle'` until something asks for it, then `'loading'`, `'ready'`, `'forbidden'` or `'error'`        | `getStatus()`       |
+| `incomplete` | Part of the outline couldn't be read                                                                 | `isIncomplete()`    |
+| `canEdit`    | Whether changing the outline is allowed                                                              | `canEdit()`         |
+
+## Events
+
+<Snippet name="documents/outline-changed" />
+
+| Event        | Fires when                                                                                             | Carries                    |
+| :----------- | :----------------------------------------------------------------------------------------------------- | :------------------------- |
+| `onChanged`  | Items were created, updated, moved, deleted or restored, by you or by someone else                     | `type`, `items`, `origin`  |
+| `onResynced` | The outline was read from the file: the first time it's asked for, after `refresh()`, or to catch up after a lost connection | `outline` |
+
+`type` is `'created'`, `'updated'`, `'moved'`, `'deleted'` or `'restored'`, and `items` names the
+items it touched; for a delete, the item first, then the items under it.
+
+## Permissions
+
+| Permission           | What it allows                                 | Check                |
+| :------------------- | :--------------------------------------------- | :------------------- |
+| `doc.open`           | Reading the outline                            | none: it opened      |
+| `doc.outline.modify` | Adding, changing, moving and deleting items    | `outline.canEdit()`  |
+
+## Good to know
+
+### Expanded, and open
+
+What's expanded is the reader's view, not the document: folding an item doesn't change the file.
+An item's `open` is the file's own setting, whether its children show when the document opens, and
+the outline starts from it. Change it with `update(ref, { open })`.
+
+### Pages that are gone
+
+Deleting a page doesn't delete the items that go to it: their target reads `unsupported`, and
+`activate()` reports it rather than going anywhere. See
+[Outline](/docs/engine/documents/outline#pages-that-are-gone).
+
+### The ready-made viewer
+
+The viewer's Outline panel is built on this plugin. See
+[Panels](/docs/viewer/customize/panels).

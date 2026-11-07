@@ -11,17 +11,26 @@
 
 import {
   AnnotationWireComponents,
+  apiVersionOf,
+  AttachmentWireComponents,
   ChangeWireComponents,
   DocumentWireComponents,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
+  ErrorResponseSchema,
+  FontWireComponents,
   FormWireComponents,
+  OutlineWireComponents,
   PdfActionWireComponents,
+  SignatureWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
 import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
-  AdminErrorPayloadSchema,
+  ModuleManifestSchema,
+  ModuleMeterSchema,
+  ModulePermissionSchema,
+  TenantFeatureSchema,
   allOperations,
   docsGroups,
   type AdminCredential,
@@ -32,6 +41,7 @@ import {
 
 const STATUS_TEXT: Record<number, string> = {
   200: 'OK',
+  202: 'Accepted',
   204: 'No content',
   400: 'Bad request',
   401: 'Unauthorized',
@@ -39,35 +49,72 @@ const STATUS_TEXT: Record<number, string> = {
   404: 'Not found',
   409: 'Conflict',
   410: 'Gone',
+  413: 'Payload too large',
   422: 'Unprocessable',
+  501: 'Not implemented',
+  502: 'Bad gateway',
 };
 
 const SECURITY_SCHEME: Record<AdminCredential, string> = {
   'api-token': 'apiToken',
   'tenant-jwt': 'tenantToken',
   'doc-jwt': 'docToken',
+  'upload-jwt': 'uploadToken',
 };
 
-const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
-const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
+const ERROR_RESPONSE_REF = '#/components/schemas/ErrorResponse';
 
 /**
  * Models with a stable public name: wherever a schema embeds one, the
  * projection refers to the component instead of inlining it, so SDK
  * generators make one type per model, not one per place it appears.
  */
-const SHARED_COMPONENT_SCHEMAS = sharedComponents([
-  { AdminErrorPayload: AdminErrorPayloadSchema, EngineErrorPayload: EngineErrorPayloadSchema },
+export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
+  {
+    ErrorResponse: ErrorResponseSchema,
+    EngineError: EngineErrorSchema,
+    TenantFeature: TenantFeatureSchema,
+    ModuleManifest: ModuleManifestSchema,
+    ModulePermission: ModulePermissionSchema,
+    ModuleMeter: ModuleMeterSchema,
+  },
   DocumentWireComponents,
   PdfActionWireComponents,
   AnnotationWireComponents,
   FormWireComponents,
+  OutlineWireComponents,
+  AttachmentWireComponents,
   ChangeWireComponents,
+  FontWireComponents,
+  SignatureWireComponents,
 ]);
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
   Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),
 );
+/**
+ * A response ignores fields it doesn't know and a request refuses them, so
+ * the model a request names can be the response model's `.strict()` twin:
+ * the same object, so the same component.
+ */
+const SHARED_OBJECT_COMPONENT_BY_SHAPE = new Map<unknown, string>(
+  Object.entries(SHARED_COMPONENT_SCHEMAS).flatMap(([name, schema]) => {
+    const definition = schema._def as Partial<z.ZodObjectDef>;
+    return definition.typeName === z.ZodFirstPartyTypeKind.ZodObject
+      ? [[definition.shape, name] as const]
+      : [];
+  }),
+);
+
+function sharedComponentOf(definition: z.ZodTypeDef): string | undefined {
+  const shared = SHARED_COMPONENT_BY_DEFINITION.get(definition);
+  if (shared) return shared;
+  const object = definition as Partial<z.ZodObjectDef>;
+  return object.typeName === z.ZodFirstPartyTypeKind.ZodObject && object.unknownKeys === 'strict'
+    ? SHARED_OBJECT_COMPONENT_BY_SHAPE.get(object.shape)
+    : undefined;
+}
+
 const SHARED_COMPONENT_REFS = new Set(
   Object.keys(SHARED_COMPONENT_SCHEMAS).map((name) => `#/components/schemas/${name}`),
 );
@@ -106,6 +153,7 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
     entry[method] = operationObject(op, schemas);
   }
 
+  const apiVersion = apiVersionOf(opts.version);
   return {
     openapi: '3.1.0',
     info: {
@@ -119,6 +167,21 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
         'API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.',
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },
     },
+    // CloudPDF SaaS, so the SDKs reach it when given no address, as the
+    // browser engine does (`CLOUDPDF_SAAS_URL`). A self-hosted server is
+    // the address a client is given.
+    servers: [
+      {
+        url: 'https://engine.cloudpdf.com',
+        description: 'CloudPDF SaaS',
+        'x-fern-server-name': 'Saas',
+      },
+    ],
+    // The SDKs send `EmbedPDF-Version` on every request: the version of the
+    // release they were generated from (docs/conventions/api-evolution.md).
+    // A literal header, which every generator sends; not every generator
+    // reads `x-fern-version`.
+    'x-fern-global-headers': [{ header: 'EmbedPDF-Version', type: `literal<"${apiVersion}">` }],
     paths: sortKeys(paths),
     // Docs navigation manifest: section titles and URL slugs for the API
     // reference, in sidebar order (see `docsGroups` in the registry).
@@ -138,7 +201,12 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           bearerFormat: 'JWT',
           'x-docs-title': 'Tenant token',
           description:
-            "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route.",
+            'Delegated tenant JWT, valid only for its own tenant: under /v1/tenants/{tenantId}/ ' +
+            "the path tenant must equal the token's tenant_id, and on /v1/docs/{docId} the " +
+            "document must belong to that tenant and the token's scope must hold the operation's " +
+            'document permissions, as a document token does. ' +
+            'For servers; browsers get document tokens. Doc-scoped viewer tokens are rejected on ' +
+            'every admin route.',
         },
         docToken: {
           type: 'http',
@@ -148,6 +216,17 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           description:
             'Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by ' +
             "the capability scopes it carries (each operation's x-required-capability).",
+        },
+        uploadToken: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          'x-docs-title': 'Upload token',
+          description:
+            "Upload-only JWT for a browser, made by tokens.issue with kind upload: valid on its own tenant's " +
+            'documents.init, documents.commit and documents.uploadProxy, and nowhere else. It uploads ' +
+            'into its folder with its metadata, up to maxFiles documents within maxBytes each, and ' +
+            'commits only the documents it started.',
         },
       },
       schemas,
@@ -319,33 +398,35 @@ function responses(
   schemas: Record<string, Record<string, unknown>>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const typedResponses = Object.values(op.responses).filter((response) => response.schema).length;
+  const typedResponses = Object.values(op.responses).filter(
+    (response) => response.schema && response.schema !== ErrorResponseSchema,
+  ).length;
   for (const [status, response] of Object.entries(op.responses) as Array<
     [string, AdminOperationResponse]
   >) {
-    const schema = response.schema
-      ? registerSchema(
-          schemas,
-          `${sdkTypeName(op.operationId)}${typedResponses > 1 ? status : ''}Response`,
-          response.schema,
-        )
-      : undefined;
+    // Every error answers with the one error body: the response points to
+    // it, so no operation gets a type of its own for it.
+    const schema =
+      response.schema === ErrorResponseSchema
+        ? { $ref: ERROR_RESPONSE_REF }
+        : response.schema
+          ? registerSchema(
+              schemas,
+              `${sdkTypeName(op.operationId)}${typedResponses > 1 ? status : ''}Response`,
+              response.schema,
+            )
+          : undefined;
     out[status] = {
       description: STATUS_TEXT[Number(status)] ?? 'Response',
       ...(response.contentType ? { content: contentObject(response.contentType, schema) } : {}),
     };
   }
-  // Every operation can additionally fail with its plane's standard
-  // error envelope (401 from the auth hook, 403 from scope/capability
-  // checks, licensing 403s, 5xx). Admin surfaces speak the admin
-  // envelope; the doc plane speaks the engine's.
+  // Every operation can also fail in ways it doesn't list (401 from the
+  // auth hook, 403 from scope and capability checks, licensing, 5xx), with
+  // the same error body.
   out['default'] = {
     description: 'Error',
-    content: {
-      'application/json': {
-        schema: { $ref: op.credentials.includes('doc-jwt') ? ENGINE_ERROR_REF : ADMIN_ERROR_REF },
-      },
-    },
+    content: { 'application/json': { schema: { $ref: ERROR_RESPONSE_REF } } },
   };
   return out;
 }
@@ -382,14 +463,28 @@ function registerSchema(
 ): Record<string, unknown> {
   if (schemas[name]) throw new Error(`Duplicate OpenAPI schema name: ${name}`);
   const componentPath = ['components', 'schemas', name];
+  // Where a nullable's schema was first written, and where a schema that
+  // isn't nullable points at one of those: see `withoutBorrowedNull`.
+  const nullableAt = new Set<string>();
+  const borrowsNull = new Set<string>();
   const referenced = zodToJsonSchema(schema, {
     target: 'openApi3',
+    // A `Date` a write takes in process arrives over HTTP as its ISO string.
+    dateStrategy: 'format:date-time',
     $refStrategy: 'root',
     basePath: ['#', ...componentPath],
-    override: (definition) => {
-      const sharedName = SHARED_COMPONENT_BY_DEFINITION.get(definition);
-      if (!sharedName || sharedName === name) return ignoreOverride;
-      return { $ref: `#/components/schemas/${sharedName}` };
+    override: (definition, refs, seen) => {
+      const sharedName = sharedComponentOf(definition);
+      if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
+      const nullable =
+        (definition as { typeName?: string }).typeName === z.ZodFirstPartyTypeKind.ZodNullable;
+      if (nullable && !seen) nullableAt.add(refs.currentPath.join('/'));
+      // A place that is nullable itself says so beside the reference.
+      const at = refs.currentPath.join('/');
+      if (!nullable && seen && nullableAt.has(seen.path.join('/')) && !nullableAt.has(at)) {
+        borrowsNull.add(at);
+      }
+      return wholeNumberEnumOf(definition) ?? ignoreOverride;
     },
   }) as Record<string, unknown>;
   // Fern's OpenAPI importer currently expands property-level recursive refs
@@ -397,7 +492,14 @@ function registerSchema(
   // replace only the recursive back-edge with the same valid open schema (`{}`)
   // that zod-to-json-schema uses for its non-reference strategy.
   const canonical = collapseSharedReferenceAliases(referenced, referenced, componentPath);
-  schemas[name] = breakAncestorReferences(canonical, componentPath) as Record<string, unknown>;
+  const owned = withoutBorrowedNull(
+    canonical,
+    canonical,
+    componentPath,
+    componentPath,
+    borrowsNull,
+  );
+  schemas[name] = breakAncestorReferences(owned, componentPath) as Record<string, unknown>;
   return { $ref: `#/components/schemas/${name}` };
 }
 
@@ -438,6 +540,52 @@ function collapseSharedReferenceAliases(
       collapseSharedReferenceAliases(child, component, componentPath),
     ]),
   );
+}
+
+/**
+ * zod-to-json-schema writes a schema a model reuses once, at its first place,
+ * and points the others at it. When that first place is a nullable's, the
+ * schema is written there with the `nullable`, and every place that reuses
+ * the schema itself (not the nullable) took the `nullable` along: a grant's
+ * `createdAt` pointed at its `archivedAt` and read as nullable in every SDK.
+ * Those places (`borrowsNull`, found as the schema was written) get the
+ * schema without the `nullable`. A place that reuses the nullable itself
+ * keeps pointing at it.
+ */
+function withoutBorrowedNull(
+  value: unknown,
+  component: unknown,
+  componentPath: string[],
+  path: string[],
+  borrowsNull: ReadonlySet<string>,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((child, index) =>
+      withoutBorrowedNull(child, component, componentPath, [...path, String(index)], borrowsNull),
+    );
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.$ref === 'string' && borrowsNull.has(['#', ...path].join('/'))) {
+    const target = resolveComponentReference(component, record.$ref, componentPath);
+    if (isRecord(target) && target.nullable === true) {
+      const { nullable: _borrowed, ...own } = target;
+      const { $ref: _ref, ...beside } = record;
+      return { ...own, ...beside };
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, child]) => [
+      key,
+      withoutBorrowedNull(child, component, componentPath, [...path, key], borrowsNull),
+    ]),
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function resolveComponentReference(
@@ -485,6 +633,22 @@ function breakAncestorReferences(value: unknown, path: string[]): unknown {
       breakAncestorReferences(child, [...path, key]),
     ]),
   );
+}
+
+/**
+ * A union of whole-number literals (a rotation, a DocMDP level) is one
+ * integer enum, not an `anyOf` of one-value enums: every SDK reads it as an
+ * integer, and a named one keeps its name.
+ */
+function wholeNumberEnumOf(definition: z.ZodTypeDef): Record<string, unknown> | undefined {
+  const union = definition as Partial<z.ZodUnionDef>;
+  if (union.typeName !== z.ZodFirstPartyTypeKind.ZodUnion || !union.options) return undefined;
+  const values = union.options.map((option) =>
+    option instanceof z.ZodLiteral ? (option.value as unknown) : undefined,
+  );
+  return values.every((value) => Number.isInteger(value))
+    ? { type: 'integer', enum: values }
+    : undefined;
 }
 
 function inlineSchemaOf(schema: z.ZodTypeAny): Record<string, unknown> {

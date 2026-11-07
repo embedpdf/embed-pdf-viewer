@@ -87,7 +87,11 @@ describe('useDocument and useDocumentsState', () => {
       h(Probe),
       h(DocumentScope, { id: 'a' }, () => h(Scoped)),
     ]);
-    expect(latest(documents)).toMatchObject({ id: '', status: 'loading', hasUnsavedChanges: false });
+    expect(latest(documents)).toMatchObject({
+      id: '',
+      status: 'loading',
+      hasUnsavedChanges: false,
+    });
     expect(latest(states)).toEqual({ documents: [], activeId: null });
 
     await kernel.documents.open(bytesInput('a'), { name: 'Contract' });
@@ -149,7 +153,7 @@ describe('DocumentGate', () => {
         ? Promise.reject(new Error('corrupt file'))
         : Promise.resolve({
             id: input.id,
-            events: { subscribe: () => () => {}, lastServerId: () => null },
+            events: { subscribe: () => () => {}, lastServerSequence: () => null },
             security: {
               allows: () => true,
               passwordPrompt: { state: 'required', incorrect: true },
@@ -201,8 +205,8 @@ describe('the Viewer’s own settings', () => {
       open: vi.fn((input: { id: string }, _options?: object) =>
         Promise.resolve({
           id: input.id,
-          events: { subscribe: () => () => {}, lastServerId: () => null },
-          pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
+          events: { subscribe: () => () => {}, lastServerSequence: () => null },
+          pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
           security: { allows: () => true },
           // Calls' facts and working sets change nothing here: the same document.
           with() {

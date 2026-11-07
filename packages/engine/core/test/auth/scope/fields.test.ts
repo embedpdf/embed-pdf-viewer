@@ -9,7 +9,7 @@ import {
 } from '../../../src/auth/scope/authority';
 import { collab } from '../../../src/auth/scope/builders';
 import { InvalidScope, PermissionDenied } from '../../../src/auth/scope/errors';
-import { decodePdfBits, PDF_BITS } from '../../../src/auth/scope/pdf-bits';
+import { permissionFlagsOf, PDF_BITS } from '../../../src/auth/scope/permission-flags';
 import { parseScope } from '../../../src/auth/scope/parser';
 import {
   checkAnyFieldAction,
@@ -19,7 +19,7 @@ import {
   expandRawScope,
 } from '../../../src/auth/scope/resolver';
 
-const NO_BITS = decodePdfBits(0);
+const NO_BITS = permissionFlagsOf(0);
 
 describe('fields: scopes', () => {
   it('parse with fill, sign, set-group and *, by all or group', () => {
@@ -90,7 +90,7 @@ describe('filling and signing a field', () => {
   });
 
   it('pdf.permissions stays what the file allows: design is never narrowed', () => {
-    const bits = decodePdfBits(PDF_BITS.MODIFY | PDF_BITS.ANNOTATE_FILL);
+    const bits = permissionFlagsOf(PDF_BITS.MODIFY | PDF_BITS.ANNOTATE_FILL);
     const scope = ['pdf.permissions', 'fields:*:group=buyer'];
     expect(checkFieldAction('fill', 'buyer', scope, bits)).toBe(true);
     expect(checkFieldAction('fill', 'seller', scope, bits)).toBe(false);
@@ -107,7 +107,7 @@ describe('filling and signing a field', () => {
   it('the authority names the scope a refused field would take', () => {
     const authority: ChangeAuthority = {
       identity: {},
-      grants: { scope: buyer, pdfBits: NO_BITS },
+      grants: { scope: buyer, permissionFlags: NO_BITS },
       protection: null,
     };
     expect(allowsFieldWrite(authority, 'buyer', 'fill')).toBe(true);
@@ -142,7 +142,7 @@ describe('putting a field in a group', () => {
   it('the authority refuses another group without the scope', () => {
     const authority: ChangeAuthority = {
       identity: { groupId: 'legal' },
-      grants: { scope: ['doc.forms.modify'], pdfBits: NO_BITS },
+      grants: { scope: ['doc.forms.modify'], permissionFlags: NO_BITS },
       protection: null,
     };
     expect(() => authorizeFieldGroup(authority, 'legal')).not.toThrow();

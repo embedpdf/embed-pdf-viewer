@@ -18,7 +18,7 @@ import {
   reorderPart,
   type AnnotationRef,
   type DocumentEvent,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormSnapshot,
   type FormWidget,
@@ -120,7 +120,7 @@ export const pictureVersionOf = (index: FieldIndex, annotObjectNumber: number): 
   index.pictureVersions[annotObjectNumber] ?? 0;
 
 /** Replace a field by key, or append it when it is new. */
-export function upsertFields(index: FieldIndex, fields: readonly FormFieldDTO[]): FieldIndex {
+export function upsertFields(index: FieldIndex, fields: readonly FormField[]): FieldIndex {
   if (!index.snapshot || fields.length === 0) return index;
   const next = index.snapshot.fields.slice();
   for (const field of fields) {
@@ -235,7 +235,7 @@ function withRedrawnPictures(index: FieldIndex, redrawn: readonly PlacedWidget[]
  * A merged field split as it took a second widget: its widget half moved to a new number (one
  * of the event's widgets), and the row at the field's own number is gone with it.
  */
-function withoutSplitRow(index: FieldIndex, field: FormFieldDTO): FieldIndex {
+function withoutSplitRow(index: FieldIndex, field: FormField): FieldIndex {
   if (field.ref.kind !== 'objectNumber') return index;
   const own = field.ref.objectNumber;
   if (field.widgets.some((widget) => widget.objectNumber === own)) return index;
@@ -288,11 +288,12 @@ function foldFormFacts(index: FieldIndex, event: DocumentEvent): FieldIndex | Mi
             event.calculationOrder,
           )
         : reload();
-    // A repair reports only counts; the others remove pages, or paint their
+    // A repair reports only counts; the others add or remove pages, or paint their
     // widgets into the content.
     case 'forms.repaired':
     case 'pages.deleted':
     case 'pages.inserted':
+    case 'pages.restored':
     case 'pages.flattened':
     case 'annotations.flattened':
     case 'redaction.applied':
@@ -319,13 +320,13 @@ export function withCalculationOrder(
   return reindex(index, { ...index.snapshot, calculationOrder: [...order] });
 }
 
-export const fieldByKey = (index: FieldIndex, key: FieldKey): FormFieldDTO | null => {
+export const fieldByKey = (index: FieldIndex, key: FieldKey): FormField | null => {
   const position = index.byKey[key];
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 };
 
 /** The field a ref names: by object number, or by full name for `toFieldRef(name)`. */
-export function fieldByRef(index: FieldIndex, ref: FormFieldRef): FormFieldDTO | null {
+export function fieldByRef(index: FieldIndex, ref: FormFieldRef): FormField | null {
   const position = ref.kind === 'fqn' ? index.byName[ref.name] : index.byKey[fieldKeyOfRef(ref)];
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 }
@@ -336,23 +337,20 @@ export const canonicalKey = (index: FieldIndex, ref: FormFieldRef): FieldKey => 
   return field ? fieldKeyOf(field) : fieldKeyOfRef(ref);
 };
 
-export const fieldForWidget = (
-  index: FieldIndex,
-  annotObjectNumber: number,
-): FormFieldDTO | null => {
+export const fieldForWidget = (index: FieldIndex, annotObjectNumber: number): FormField | null => {
   const position = index.byWidget[annotObjectNumber];
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 };
 
 /** The fields whose value entry differs between two indexes (new fields included). */
-export function fieldsWithChangedValues(previous: FieldIndex, next: FieldIndex): FormFieldDTO[] {
+export function fieldsWithChangedValues(previous: FieldIndex, next: FieldIndex): FormField[] {
   return (next.snapshot?.fields ?? []).filter((field) => {
     const before = fieldByKey(previous, fieldKeyOf(field));
     return !before || JSON.stringify(valueEntryOf(before)) !== JSON.stringify(valueEntryOf(field));
   });
 }
 
-const valueEntryOf = (field: FormFieldDTO): unknown =>
+const valueEntryOf = (field: FormField): unknown =>
   'valueEntry' in field ? field.valueEntry : null;
 
 // ── widgets (each page's, from the index's widget rows) ──────────────────────
@@ -372,7 +370,10 @@ export interface FormWidgetLook {
   readonly background: string | null;
   /** The text color (`/DA`), or `null` when the field names none. */
   readonly color: string | null;
-  /** One of the 14 standard PDF fonts, such as `'helvetica'`, or `null` when the field names none. */
+  /**
+   * The font the field names (a standard font such as `'helvetica'`, or another the document or
+   * the engine has), or `null` when it names none. How a browser draws it: `getWidgetFontCss`.
+   */
   readonly fontFamily: string | null;
   /** The font size in points; `0` or `null` sizes the text to the box. */
   readonly fontSize: number | null;
@@ -464,7 +465,7 @@ export function widgetRowOf(index: FieldIndex, annotObjectNumber: number): Widge
 /** A widget hit: the annotation under the point and the field it belongs to. */
 export interface WidgetHit {
   readonly annotObjectNumber: number;
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   /** The widget's page-space box. */
   readonly box: Box;
 }
@@ -497,7 +498,15 @@ export function widgetAt(
 
 // ── session state ────────────────────────────────────────────────────────────
 
-/** The plugin's session state: nothing yet; a write in flight shows in the mirror's view. */
-export type FormState = Readonly<Record<string, never>>;
+/** The box the cursor is in: its field and its annotation object number. */
+export interface FocusedWidget {
+  readonly field: FieldKey;
+  readonly widget: number;
+}
 
-export const initialFormState = (): FormState => ({});
+/** The plugin's session state: the box the cursor is in; a write in flight shows in the mirror's view. */
+export interface FormModel {
+  readonly focused: FocusedWidget | null;
+}
+
+export const initialFormModel = (): FormModel => ({ focused: null });

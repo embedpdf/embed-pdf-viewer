@@ -25,15 +25,15 @@ import { AnnotationTransfer } from '../transfer/AnnotationTransfer';
  */
 export function runAnnotationExportConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationResourceConformanceOptions,
+  options: AnnotationResourceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation export conformance: ${opts.label}`, () => {
+  describe(`annotation export conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -44,7 +44,7 @@ export function runAnnotationExportConformance(
       fixture: AnnotationResourceFixture,
       run: (page: PageHandle, doc: DocumentHandle, pageRef: PageRef) => Promise<void>,
     ): Promise<void> => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       try {
         const { pages } = await doc.pages.list();
         const pageRef = toPageRef(pages[0]!.ref.objectNumber);
@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': '8e7b1ade219fe9c78e355e8c282a46e9b8131f76a2c98b70331d909830fff9b6',
-        'acrobat-rewrapped': '4cead3c1918229234fad1651b082aa0b09b49325d6e462177eae30f049939b11',
+        'acrobat-stamps': '612f68c76bcdbd06f9ff0d4b2f9e975a9cb6042e060ac301acceb9018874fc9c',
+        'acrobat-rewrapped': '370f5e29cd89ae185060bb71fffaae82fa4a94804aa0d5c635d29bdb93e27b44',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {

@@ -1,3 +1,4 @@
+import type { PageExtractOptions } from '../dto/PageExtract';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
@@ -12,7 +13,7 @@ import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageFlattenResult } from '../mutation/PageFlattenResult';
 import type {
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   WriteOptions,
 } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
@@ -22,13 +23,17 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  *
  * Mirrors the shape of `DocumentAnnotationsService` so that anything
  * touching "many things at the document level" lives in one place: the
- * structure verbs (`reorder`, `rotate`, `delete`, `insert`, `insertBlank`),
+ * structure verbs (`reorder`, `rotate`, `delete`, `insert`, `insertBlank`, `copy`),
  * `extract`, `flatten` and the page names.
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
  * number) everywhere except `list()`, which exposes display order through
  * `PageLayout.index`. Structure verbs never change the names of the
  * annotations on surviving pages.
+ *
+ * Each structure verb is a one-op change through `doc.apply` (`pageVerbs`):
+ * its `opId` undoes it, and an undo of a delete brings the same pages back
+ * (`pages.restored`).
  */
 export interface DocumentPagesService {
   /**
@@ -107,18 +112,30 @@ export interface DocumentPagesService {
    * resource. Gated by `doc.download` (it egresses content), not
    * `doc.pages.assemble`.
    *
+   * With `flatten`, the copy is the pages as they draw for its `usage`: the
+   * annotations and form fields painted in, nothing interactive left, layers
+   * in their state for `usage` (`{ usage: 'print' }` is a print copy). It
+   * takes `doc.download` or `doc.download.flattened`, and paints only what
+   * the caller may read; `includeAnnotations` and `includeFormFields` choose
+   * what it paints, and are refused without `flatten`. The copy keeps the
+   * document's title.
+   *
    * Required-parity, delivered: the local engine runs it in the worker,
    * the cloud engine as POST /pages/extract.
    */
-  extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
+  extract(pages: PageRef[], options?: PageExtractOptions): AbortablePromise<Uint8Array>;
 
   /**
    * Insert every page of a standalone PDF (`bytes`) at `position`
    * (default `'end'`). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
    * argument (the same law as annotation binaries): the local engine
-   * transfers them to its worker, the cloud engine ships them as a
-   * multipart mutation (POST /pages/insert).
+   * transfers them to its worker, the cloud engine ships them as a part of
+   * its change request.
+   *
+   * `options.objectNumbers` names the new pages, one number per page of
+   * `bytes` in order, as `insertBlank`'s do; a count other than the PDF's
+   * page count is refused.
    *
    * Required-parity, delivered — a cloud viewer must be able to add pages,
    * so this is a mandatory member: any engine implements it or is not a
@@ -127,16 +144,16 @@ export interface DocumentPagesService {
   insert(
     bytes: Uint8Array | ArrayBuffer,
     position?: PagePosition,
-    options?: WriteOptions,
+    options?: PageInsertOptions,
   ): AbortablePromise<PageInsertResult>;
 
   /**
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
    * at `position` (default `'end'`). The blank-page sibling of `insert`:
    * same gate (`doc.pages.assemble`), same result shape, same
-   * `pages.inserted` event — it is a separate verb because its wire is pure
-   * parameters where `insert`'s is a binary payload (cloud: JSON
-   * POST /pages/insert-blank). Every pre-existing page keeps its identity.
+   * `pages.inserted` event — it is a separate verb because it takes pure
+   * parameters where `insert` takes a binary payload. Every pre-existing
+   * page keeps its identity.
    * Mandatory, like `insert`.
    *
    * `options.objectNumbers` names the new pages, one number per page in
@@ -148,6 +165,24 @@ export interface DocumentPagesService {
   insertBlank(
     spec: PageInsertBlankSpec,
     position?: PagePosition,
-    options?: PageInsertBlankOptions,
+    options?: PageInsertOptions,
+  ): AbortablePromise<PageInsertResult>;
+
+  /**
+   * Copy `pages`, in the order given, to `position` (default `'end'`): the
+   * copies draw as the pages do and bring their annotations, and their form
+   * fields as fields of their own (a name the document already uses gets the
+   * first free `name_2`, `name_3`, as an insert's do). The same gate
+   * (`doc.pages.assemble`), result shape and `pages.inserted` event as
+   * `insert`, without the pages' bytes leaving the engine. A page named twice
+   * is copied twice. Mandatory, like `insert`.
+   *
+   * `options.objectNumbers` names the copies, one number per page in order,
+   * as `insertBlank`'s do.
+   */
+  copy(
+    pages: PageRef[],
+    position?: PagePosition,
+    options?: PageInsertOptions,
   ): AbortablePromise<PageInsertResult>;
 }

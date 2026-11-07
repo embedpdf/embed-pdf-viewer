@@ -10,6 +10,7 @@
 import type { ChangeQueue } from './changes';
 import type { PluginClock } from './clock';
 import type { EventHook } from './event-hook';
+import type { HostTextMeasurer } from './measurer';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
 import type { SerialQueue } from './serial-queue';
@@ -21,6 +22,7 @@ import type {
   EngineFactory,
   OpenInput,
   OpenOptions,
+  PageLabelSection,
   PageLayout,
   PageRef,
   PageObjectNumber,
@@ -33,6 +35,7 @@ import type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -46,10 +49,26 @@ import type {
   PageDestination,
   PdfDestination,
   Identity,
+  PrintDpi,
+  Font,
+  FontList,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
 export type {
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityRequest,
   DocumentHandle,
   Engine,
   EngineFactory,
@@ -68,6 +87,7 @@ export type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -75,18 +95,31 @@ export type {
   CustomMetadata,
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
+  /** The fonts that can be named in a document, what each allows, and their programs (`doc.fonts`). */
+  FontList,
+  Font,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   DocumentEvent,
   /** Who the user is: the author of what they make, and whom `:self` and `:group` permissions are checked against. */
   Identity,
   /**
    * Where a confirmed document change came from, on every fact event a plugin
    * emits: `kind` (`'local'` for this engine instance, `'remote'` for another
-   * session), `sessionId`, `sub` (the signed-in user on the cloud, null
-   * locally), `ts`, `serverId` and `tx`. Always the engine event's own
+   * session), `sessionId`, `subject` (the signed-in user on the cloud, null
+   * locally), `at`, `serverSequence` and `transaction`. Always the engine event's own
    * `origin`, passed on as it is, never built by hand.
    */
   EventOrigin,
 };
+// Re-exported straight from engine-core, where `allows()` reads it, so a plugin's
+// `declare module '@embedpdf/core' { interface PluginPermissions { … } }` merges into it.
+export type { PluginPermissions } from '@embedpdf/engine-core/runtime';
 
 export type Unsubscribe = () => void;
 
@@ -111,12 +144,13 @@ export interface BatchResult<T, R = unknown> {
 
 /**
  * A permission a verb can need, named as the engine names it: a document
- * capability (`'doc.forms.fill'`), or `'annotations:create'`. Creating is the
- * one annotation action that needs no target: whether the session may change
- * or delete an annotation depends on whose it is, so the annotation plugin
- * asks that per annotation (`doc.security.allowsAnnotation`).
+ * capability (`'doc.forms.fill'`), `'annotations:create'`, or a plugin's own
+ * permission, declared in `PluginPermissions` (`'protected-display.view'`).
+ * Creating is the one annotation action that needs no target: whether the
+ * session may change or delete an annotation depends on whose it is, so the
+ * annotation plugin asks that per annotation (`doc.security.allowsAnnotation`).
  */
-export type Permission = DocCapability | 'annotations:create';
+export type Permission = DocCapability | 'annotations:create' | PluginPermission;
 
 /** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
 export type Subscribable<T> =
@@ -181,10 +215,21 @@ export type PromiseMemberOf<Capability> =
 export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Capability>]: true };
 
 /**
- * What the kernel knows about an open document — the page registry captured at open.
- * `pages` is the engine's own snapshot (`PageLayout`: index, ref, size,
- * rotation, label, boxes). `ref` (the page's `PageRef`) is the durable
- * per-page identity; the array index is only display order.
+ * Where a page the engine doesn't have yet gets its look until the engine has
+ * it: a blank insert is a white page of its size (`blank`); a deleted page an
+ * undo brings back has the pictures it had (`own`); a copy draws as the page
+ * it copies (`copy`).
+ */
+export type PendingPage =
+  | { readonly kind: 'blank' }
+  | { readonly kind: 'own' }
+  | { readonly kind: 'copy'; readonly of: PageRef };
+
+/**
+ * What the kernel knows about an open document: its pages as the user sees
+ * them (`PageLayout`: index, ref, size, rotation, label, boxes). `ref` (the
+ * page's `PageRef`) is the durable per-page identity; the array index is only
+ * display order.
  */
 export interface DocumentMeta {
   readonly id: string;
@@ -196,14 +241,32 @@ export interface DocumentMeta {
   readonly instanceId: string;
   readonly name?: string;
   readonly pageCount: number;
+  /**
+   * The pages as the user sees them: the engine's, with this session's page
+   * changes that are on their way on top (a rotate, a move, a delete, a blank
+   * insert, an undo of one), so an edit shows before the engine answers. An
+   * index a verb takes names a page of this list.
+   */
   readonly pages: readonly PageLayout[];
   /**
-   * Bumps every time the page registry is replaced by a document mutation
-   * event (rotate/move/delete). The registry's monotonic version: anything
-   * caching a derivation of `pages` (e.g. the Stage's laid-out scene) keys
-   * on it so a same-`pageCount` change — like a rotation — still invalidates.
+   * The page label sections of `pages` (`PageListSnapshot.labels`), as they
+   * move with the changes on their way: each page's `label` is read from
+   * them. Empty when the document has none.
    */
-  readonly revision: number;
+  readonly pageLabels: readonly PageLabelSection[];
+  /**
+   * The pages of `pages` the engine doesn't have yet, by object number: a
+   * change on its way makes them. Code that asks the engine about a page
+   * (render, page mirrors) waits for these; everything else reads `pages`.
+   */
+  readonly pendingPages: ReadonlyMap<PageObjectNumber, PendingPage>;
+  /**
+   * Moves every time `pages` does: an edit shown, or the engine's pages
+   * changing other than shown. Anything caching a derivation of `pages` (the
+   * Stage's laid-out scene) keys on it, so a change that keeps the page count
+   * (a rotation) still invalidates.
+   */
+  readonly pagesSequence: number;
   /**
    * The deployment render policy the document's engine advertises — a
    * document fact like `pages`, materialized by the kernel at open (before
@@ -221,6 +284,16 @@ export interface DocumentMeta {
    * as it's made.
    */
   readonly hasUnsavedChanges: boolean;
+  /**
+   * A change waits for the visitor's answers to what the grant asks before the first
+   * change: answer with `documents.identify()`, or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
+  /**
+   * The grant asks before the document goes on (a passphrase, or questions on open, it got
+   * after the document opened): give it with `documents.retry()`.
+   */
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /**
@@ -239,6 +312,8 @@ export interface PendingMeta {
   readonly passwordProvided?: boolean;
   /** `error` only: what the open rejected with. Never carries a password. */
   readonly error?: unknown;
+  /** `error` only: the grant's passphrase or questions the open waits for. */
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /** The document registry — what document scope is built on. */
@@ -266,7 +341,7 @@ export type PluginScope = 'workspace' | 'document';
  * `S` is the plugin's session state and `T` its settings, `NoSettings` for a
  * plugin that declares none.
  */
-export interface PluginContext<S = unknown, T extends object = NoSettings> {
+export interface PluginContext<State = unknown, PluginSettings extends object = NoSettings> {
   // ── identity ──
   readonly id: string;
   /** Unique per open of this document (workspace plugins: `workspace:<id>`). */
@@ -344,7 +419,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
 
   // ── state ──
   /** This instance's session state, changed only through pure transitions. */
-  readonly state: StateCell<S>;
+  readonly state: StateCell<State>;
 
   // ── settings ──
   /**
@@ -356,7 +431,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * `onSettingsChanged` listeners go when it closes. The merge rules are in `settings.ts`.
    * A plugin whose definition declares no settings has none to read: calling it throws.
    */
-  readonly settings: () => Settings<T>;
+  readonly settings: () => Settings<PluginSettings>;
 
   // ── reactivity ──
   /**
@@ -397,7 +472,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   // ── events ──
   /** Mint a capability event; disposed with the instance. Expose only `.on`. */
   readonly events: {
-    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; dispose(): void };
+    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; destroy(): void };
   };
   /** Subscribe for the instance lifetime; the unsubscribe is owned by the kernel. */
   listen<T>(source: Subscribable<T>, listener: (event: T) => void): void;
@@ -418,6 +493,12 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    */
   readonly clock: PluginClock;
   /**
+   * Text measuring, from the host: how wide text is in a font program, as the
+   * browser that draws it shapes it. `null` on a host that gives none (a
+   * kernel in Node, a test): measure nothing then.
+   */
+  readonly measurer: HostTextMeasurer | null;
+  /**
    * Register what this plugin holds back from the engine, such as text typed a moment ago or
    * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole
    * document (`documents.download()`, `downloadLayer()`), the kernel calls every plugin's `flush` and
@@ -434,10 +515,18 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * others. Document-scoped plugins only; unregistered when the instance closes.
    */
   aroundDownload(wrap: (read: () => Promise<Uint8Array>) => Promise<Uint8Array>): void;
+  /**
+   * Run something of the document's own around every print of it (`documents.print()`, a
+   * prepared print's `print()`): `wrap` gets the print and resolves when it did, doing what
+   * comes before and after it. The actions plugin runs the document's print actions this way.
+   * The first registered wraps the others. Document-scoped plugins only; unregistered when the
+   * instance closes.
+   */
+  aroundPrint(wrap: (print: () => Promise<void>) => Promise<void>): void;
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
-    dispose: (resource: R) => void | Promise<void>,
+    release: (resource: R) => void | Promise<void>,
   ): Promise<R>;
   /**
    * Run an engine call the caller can cancel: when `signal` fires, the call is
@@ -461,11 +550,14 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
  * `update` applies a pure transition, and a transition that returns the
  * current value changes nothing.
  */
-export interface StateCell<S> {
-  get(): S;
-  update<Args extends unknown[]>(transition: (state: S, ...args: Args) => S, ...args: Args): void;
+export interface StateCell<State> {
+  get(): State;
+  update<Args extends unknown[]>(
+    transition: (state: State, ...args: Args) => State,
+    ...args: Args
+  ): void;
   /** Fires synchronously after every committed change of this instance's state. */
-  readonly onChange: EventHook<StateChange<S>>;
+  readonly onChange: EventHook<StateChange<State>>;
 }
 
 /** One committed state change: the value before and after. */
@@ -485,9 +577,13 @@ export interface StateChange<S> {
  * controller that returns less than the capability is a type error, not a
  * narrower capability.
  */
-export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettings> {
+export interface PluginDefinition<
+  State = unknown,
+  Capability = unknown,
+  PluginSettings extends object = NoSettings,
+> {
   readonly id: string;
-  readonly token?: CapabilityToken<C>;
+  readonly token?: CapabilityToken<Capability>;
   readonly scope?: PluginScope;
   readonly requires?: ReadonlyArray<CapabilityToken<unknown>>;
   readonly optional?: ReadonlyArray<CapabilityToken<unknown>>;
@@ -499,30 +595,32 @@ export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettin
    */
   readonly resolvesAnyCapability?: true;
   /** Initial session state, built fresh for every instance. Omit for stateless plugins. */
-  readonly state?: () => S;
+  readonly state?: () => State;
   /**
    * The plugin's settings: its defaults, and what the app registered (the factory's config).
    * The kernel builds one store per registration from it when it plans the plugin list, so the
    * settings can be read and changed before any document opens (`kernel.settingsOf(token)`).
    * The plugin reads them with `ctx.settings()`. Omit for a plugin without settings.
    */
-  readonly settings?: SettingsDeclaration<T>;
+  readonly settings?: SettingsDeclaration<PluginSettings>;
   /**
    * Build the instance's API and, optionally, the connections (subscriptions
    * to engine events and sibling capabilities) that start once every
    * dependency is constructed. Runs once per instance.
    */
-  readonly create: NoInfer<(ctx: PluginContext<S, T>) => { api: C; connect?: () => void }>;
+  readonly create: NoInfer<
+    (ctx: PluginContext<State, PluginSettings>) => { api: Capability; connect?: () => void }
+  >;
   /**
    * This capability as seen from inside a document's scope: calls that leave out the document
    * use `documentId` instead of the active one. Workspace plugins only. The kernel builds the
    * view once per document and hands it out whenever that document is named
    * (`kernel.capability(token, documentId)`, `ctx.forDocument`, a `<DocumentScope>`).
    */
-  readonly inScope?: NoInfer<(api: C, documentId: string) => C>;
+  readonly inScope?: NoInfer<(api: Capability, documentId: string) => Capability>;
 }
 
-export type AnyPlugin = PluginDef<any, any, any>;
+export type AnyPlugin = PluginDefinition<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 
@@ -550,6 +648,16 @@ export interface DocumentInfo {
   readonly passwordProvided?: boolean;
   /** `error` only: why it couldn't be opened, in the plugin error vocabulary. */
   readonly error?: PluginErrorInfo;
+  /**
+   * The grant's passphrase or questions the document waits for (`retry` with them): `error`,
+   * before it opens; `ready`, when the grant got them after it opened.
+   */
+  readonly openRequest?: GrantOpenRequest;
+  /**
+   * `ready` only: a change waits for the visitor's answers to what the grant asks before
+   * the first change. Show the questions, then `identify()` or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
 }
 
 /** A document waiting for its password. */
@@ -564,11 +672,30 @@ export interface FailedDocumentInfo extends DocumentInfo {
   readonly error: PluginErrorInfo;
 }
 
-/** A file the viewer downloads itself, with the document's cancel signal: relative to the page, or absolute. */
+/**
+ * A file the viewer downloads itself, with its `fetch` (`createKernel({ fetch })`) and the
+ * document's cancel signal: relative to the page, or absolute.
+ */
 export interface UrlSource {
   readonly kind: 'url';
   readonly url: string;
+  /** A stable id of your own for the document, as `{ kind: 'bytes' }` takes one. Generated when omitted. */
+  readonly id?: string;
 }
+
+/**
+ * How the viewer downloads a URL: `fetch`'s own shape, so the browser's `fetch` is one. `init`
+ * carries the document's cancel `signal`, to pass on. Yours adds headers or cookies, or answers
+ * from somewhere else (`new Response(blob)`).
+ */
+export type HostFetch = (
+  url: string,
+  init: { readonly signal: AbortSignal },
+) => Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
 
 /** Options for opening a document: the tab (`name`, `activate`), the engine's `OpenOptions`, and a `signal`. */
 export type OpenDocumentOptions = OpenOptions & {
@@ -601,6 +728,17 @@ export interface UnlockOptions extends OperationOptions {
   readonly password: string;
 }
 
+/** Options for `retry()`: what a document from a grant waited for (`openRequest`). */
+export interface RetryOptions extends OperationOptions {
+  /** The grant's passphrase. */
+  readonly passphrase?: string;
+  /**
+   * The visitor's answers to what the grant asks, added to who the page said the user is
+   * (`identity`); ones given before stay.
+   */
+  readonly visitorIdentity?: VisitorAnswers;
+}
+
 /** Options for `download()`. */
 export interface DownloadOptions extends OperationOptions {
   /**
@@ -608,6 +746,115 @@ export interface DownloadOptions extends OperationOptions {
    * signatures stay valid; `'rewrite'` writes a fresh file without earlier revisions.
    */
   readonly mode?: PdfSaveMode;
+}
+
+/**
+ * How a print comes out.
+ *
+ * - `'pdf'`: the printer prints a copy of the pages as they print (`pages.extract()` with
+ *   `flatten: { usage: 'print' }`): sharp text and lines. It takes `doc.print.high`, a right to
+ *   keep the copy (`doc.download` or `doc.download.flattened`: every print dialog can save it as
+ *   a file), and a printer that prints a PDF (`HostPrinter.stagePdf`).
+ * - `'images'` otherwise: pictures of the pages, drawn by the print rules, at 150 DPI with
+ *   `doc.print` or 300 DPI with `doc.print.high` (Acrobat's low and high resolution printing).
+ */
+export type PrintQuality =
+  | { readonly kind: 'pdf' }
+  | { readonly kind: 'images'; readonly dpi: PrintDpi };
+
+/** How far preparing a print got. */
+export interface PrintProgress {
+  /** Pages that are ready: one at a time as pictures, all at once as a PDF. */
+  readonly pagesRendered: number;
+  /** Pages the print has. */
+  readonly pageCount: number;
+}
+
+export interface PrintOptions extends OperationOptions {
+  /** The pages to print, in this order. Default: every page. */
+  readonly pages?: readonly PageRef[];
+  /**
+   * Print the annotations that print. Default: when the user may read them. Form fields print
+   * when the user may read the form, whatever this says.
+   */
+  readonly includeAnnotations?: boolean;
+  /** Called each time pages are ready, and once before the first. */
+  readonly onProgress?: (progress: PrintProgress) => void;
+}
+
+/**
+ * A print got ready by `documents.preparePrint()`. Everything slow already happened, so
+ * `print()` opens the print dialog at once.
+ */
+export interface PreparedPrint {
+  readonly quality: PrintQuality;
+  /** How many pages it prints. */
+  readonly pageCount: number;
+  /**
+   * Whether `print()` must run inside the user's tap or click: the printer's `needsTap`. Safari
+   * doesn't print what waited for its pages (iOS refuses the dialog, the Mac prints blank pages),
+   * so a dialog that prepared on a tap asks for another once the print is ready. When `false`,
+   * print as soon as it is ready.
+   */
+  readonly needsTap: boolean;
+  /**
+   * Open the print dialog. The document's own print actions run around it, when the actions
+   * plugin is installed; when they, or anyone, change the document after it was prepared, it is
+   * prepared again first. Resolves when the printer has the job. When the printer refuses a
+   * PDF, the same pages print as pictures. Rejects `invalid-input` once disposed,
+   * `operation-cancelled` when `signal` fires before the dialog opens.
+   */
+  print(options?: OperationOptions): Promise<void>;
+  /** Free what preparing took. Closing the document does too. */
+  destroy(): void;
+}
+
+/** One printed sheet: a picture of a page, and the page's size on paper. */
+export interface PrintSheet {
+  /** A PNG of the page, drawn by the print rules. */
+  readonly image: Blob;
+  /** The page's width in points (1/72 inch), as it prints. */
+  readonly widthPt: number;
+  /** The page's height in points. */
+  readonly heightPt: number;
+}
+
+/** What a printer got ready: `print()` opens the print dialog with it. */
+export interface StagedPrint {
+  /** Open the print dialog. Resolves once the printer has the job. */
+  print(): Promise<void>;
+  /** Free what staging took. */
+  destroy(): void;
+}
+
+/**
+ * Where prints go: the host's print dialog. A browser passes `browserPrinter()` from
+ * `@embedpdf/web`; an app with its own print path (a desktop shell, a native app) passes its
+ * own.
+ */
+export interface HostPrinter {
+  /**
+   * `true` when this printer prints only while the user's tap or click is being handled (Safari),
+   * so a print that waited for its pages needs another tap. Default `false`.
+   */
+  readonly needsTap?: boolean;
+  /**
+   * Get the sheets ready to print, so `print()` on what it returns opens the dialog at once.
+   * `name` names the print job. Rejects when `signal` fires.
+   */
+  stage(
+    sheets: readonly PrintSheet[],
+    options: { readonly name: string; readonly signal?: AbortSignal },
+  ): Promise<StagedPrint>;
+  /**
+   * Present when this printer prints a PDF file on this device: a browser whose own PDF viewer
+   * prints it, a desktop shell, a native print API. Gets `pdf`, a copy of the pages as they
+   * print, ready as `stage()` gets sheets ready. A printer without it prints pictures.
+   */
+  stagePdf?(
+    pdf: Uint8Array,
+    options: { readonly name: string; readonly signal?: AbortSignal },
+  ): Promise<StagedPrint>;
 }
 
 /**
@@ -644,7 +891,7 @@ export interface DocumentActiveChangedEvent {
 }
 export interface DocumentPagesChangedEvent {
   readonly documentId: string;
-  readonly revision: number;
+  readonly pagesSequence: number;
   readonly pages: readonly PageInfo[];
 }
 export interface DocumentUnsavedChangesChangedEvent {
@@ -674,10 +921,23 @@ export interface DocumentsCapability {
   canOpenFiles(): boolean;
   /**
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
-   * own tab: it keeps its id and its place, and the active document stays the active one.
-   * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
+   * own tab: it keeps its id and its place, and the active document stays the active one. A
+   * document from a grant that waited for its passphrase or the visitor's answers
+   * (`openRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
+   * (`openRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
+   * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
+   * a grant; `permission-denied` while the grant still asks, and `openRequest` says what.
    */
-  retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;
+  retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
+  /**
+   * Answer what the document's grant asks before the first change (`identityRequest`):
+   * the changes waiting go out. An answer once given stays. Rejects `permission-denied` while
+   * something required is missing or an answer can't be taken (its details say which), and the
+   * changes keep waiting.
+   */
+  identify(id: string, answers: VisitorAnswers): Promise<void>;
+  /** Not now: the changes waiting for the visitor's answers fail, and the next change asks again. */
+  declineIdentity(id: string): void;
   /** Change the name its tab shows; the file doesn't change. */
   rename(id: string, name: string): void;
   /**
@@ -736,7 +996,26 @@ export interface DocumentsCapability {
   downloadLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
   /** Whether the document (the one in scope without an id) may be downloaded: `doc.download`. */
   canDownload(id?: string): boolean;
-  /** Whether the document (the one in scope without an id) may be printed: `doc.print`. */
+  /**
+   * Get a print of the document ready (the one in scope without an id): wait for changes still
+   * on their way, make the pages as they print (a PDF copy or pictures, as `getPrintQuality()`
+   * says), and hand them to the host's printer. `onProgress` follows the pages. Rejects
+   * `permission-denied` without `doc.print`, `unsupported` when the host gave no printer,
+   * `not-found` for a page the document doesn't have, `invalid-input` for an empty `pages` or a
+   * page named twice, `not-ready` with no open document, `operation-cancelled` when `signal`
+   * fires.
+   */
+  preparePrint(id?: string, options?: PrintOptions): Promise<PreparedPrint>;
+  /**
+   * Prepare a print and print it: `preparePrint()`, then its `print()`. The document's own
+   * print actions run around the dialog when the actions plugin is installed. Rejects as
+   * `preparePrint()` does. A printer that `needsTap` may refuse the dialog once preparing took a
+   * while: there, prepare first and print from a tap.
+   */
+  print(id?: string, options?: PrintOptions): Promise<void>;
+  /** How a print of the document comes out for this user, or null when they can't print it. */
+  getPrintQuality(id?: string): PrintQuality | null;
+  /** Whether the document (the one in scope without an id) may be printed: `doc.print`, and the host gave a printer. */
   canPrint(id?: string): boolean;
   /**
    * The document's pages, in order (the one in scope without an id). The same array until a

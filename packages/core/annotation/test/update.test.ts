@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { modelWith, RecordInput, recordOf, restyle, step, STYLE, withAnnotation } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
+import { selectionProperties } from '../src/props';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
 import { EMPTY_CHANGE, newRecordsAtMost, update } from '../src/update';
 import { refOf, shapeOf } from '../src/record';
@@ -185,6 +186,22 @@ describe('update', () => {
     });
   });
 
+  it("a tool's defaults take a patch over them, or a replacement that drops what it leaves out", () => {
+    const defaults = { ink: { color: '#ff0000', opacity: 0.5 } };
+    const [patched] = step(modelWith([], { defaults }), {
+      type: 'setDefaults',
+      preset: 'ink',
+      patch: { strokeWidth: 3 },
+    });
+    expect(patched.defaults.ink).toEqual({ color: '#ff0000', opacity: 0.5, strokeWidth: 3 });
+    const [replaced] = step(patched, {
+      type: 'replaceDefaults',
+      preset: 'ink',
+      defaults: { color: '#00a000' },
+    });
+    expect(replaced.defaults.ink).toEqual({ color: '#00a000' });
+  });
+
   it("a free text's draft carries the tool's font defaults, and opens for typing", () => {
     const defaults = { 'free-text': { fontFamily: 'courier', fontSize: 18, textAlign: 'right' } };
     const click = (phase: 'down' | 'up'): Message => ({
@@ -261,9 +278,9 @@ describe('update', () => {
   it('typing puts the edited record and asks for a text write', () => {
     const box = textBox('obj:3');
     const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi\nthere' });
-    // As the engine reads it back: one paragraph per line, joined by `\r`.
+    // As the engine reads it back: one paragraph per line, joined by `\n`.
     expect(result.change.put[0]!.annotation).toMatchObject({
-      contents: 'Hi\rthere',
+      contents: 'Hi\nthere',
       richText: { paragraphs: [{ runs: [{ text: 'Hi' }] }, { runs: [{ text: 'there' }] }] },
     });
     expect(result.change.put[0]!.source).toBe('vector');
@@ -334,6 +351,93 @@ describe('which fields a write may change', () => {
     expect(
       update(underlined, { type: 'setTextFormat', format: 'underline', on: true }).change,
     ).toBe(EMPTY_CHANGE);
+  });
+});
+
+describe('a whole text box restyled by hand', () => {
+  /** A box reading "Paid in full", "in full" bold and blue, in a box with a regular body. */
+  const paid = (id: string): ModelAnnotation => {
+    const box = textBox(id);
+    if (box.annotation.subtype !== 'free-text') throw new Error('a free text');
+    const runs = [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700, color: '#0000FF' } }];
+    return withAnnotation(box, {
+      richText: { ...box.annotation.richText, paragraphs: [{ runs }] },
+    } as Partial<ModelAnnotation['annotation']>);
+  };
+  const richTextOf = (record: ModelAnnotation | undefined) =>
+    record?.annotation.subtype === 'free-text' ? record.annotation.richText : undefined;
+
+  it("a format is every word's: a word with its own weight follows the body", () => {
+    const model = modelWith([paid('obj:3')], { selected: ['obj:3'] });
+    const result = update(model, { type: 'setTextFormat', format: 'bold', on: false });
+    expect(richTextOf(result.change.put[0])?.body.weight).toBe(400);
+    expect(richTextOf(result.change.put[0])?.paragraphs).toEqual([
+      { runs: [{ text: 'Paid ' }, { text: 'in full', style: { color: '#0000ff' } }] },
+    ]);
+  });
+
+  it('a format the body has is still a change while a word says otherwise', () => {
+    const box = paid('obj:3');
+    const plain = richTextOf(box)!;
+    const bold = withAnnotation(box, {
+      richText: {
+        body: { ...plain.body, weight: 700 },
+        paragraphs: [{ runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 400 } }] }],
+      },
+    } as Partial<ModelAnnotation['annotation']>);
+    const model = modelWith([bold], { selected: ['obj:3'] });
+    // The body is bold, but "in full" names its own regular weight: bold on makes it bold.
+    const bolded = update(model, { type: 'setTextFormat', format: 'bold', on: true });
+    expect(richTextOf(bolded.change.put[0])?.paragraphs).toEqual([
+      { runs: [{ text: 'Paid in full' }] },
+    ]);
+    // Once every word follows the bold body, bold on again is no change.
+    const all = { ...model, byId: { 'obj:3': bolded.change.put[0]! } };
+    expect(update(all, { type: 'setTextFormat', format: 'bold', on: true }).change).toBe(
+      EMPTY_CHANGE,
+    );
+  });
+
+  it('an underline joins the lines a word draws itself', () => {
+    const box = paid('obj:3');
+    const struck = withAnnotation(box, {
+      richText: {
+        ...richTextOf(box)!,
+        paragraphs: [
+          {
+            runs: [{ text: 'Paid ' }, { text: 'in full', style: { decoration: ['line-through'] } }],
+          },
+        ],
+      },
+    } as Partial<ModelAnnotation['annotation']>);
+    const model = modelWith([struck], { selected: ['obj:3'] });
+    const result = update(model, { type: 'setTextFormat', format: 'underline', on: true });
+    expect(richTextOf(result.change.put[0])?.paragraphs).toEqual([
+      {
+        runs: [
+          { text: 'Paid ' },
+          { text: 'in full', style: { decoration: ['line-through', 'underline'] } },
+        ],
+      },
+    ]);
+  });
+
+  it("a font, size or text color is every word's: a word with its own follows the box", () => {
+    const model = modelWith([paid('obj:3')], { selected: ['obj:3'] });
+    const result = update(model, {
+      type: 'setFields',
+      patches: { 'obj:3': { fontColor: '#cc0000' } },
+    });
+    const richText = richTextOf(result.change.put[0])!;
+    expect(richText.body.color.toLowerCase()).toBe('#cc0000');
+    expect(richText.paragraphs).toEqual([
+      { runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700 } }] },
+    ]);
+    // A field that isn't about the text leaves the words alone.
+    const faded = update(model, { type: 'setFields', patches: { 'obj:3': { opacity: 0.5 } } });
+    expect(richTextOf(faded.change.put[0])?.paragraphs).toEqual(
+      richTextOf(paid('obj:3'))?.paragraphs,
+    );
   });
 });
 
@@ -417,5 +521,93 @@ describe('every record holds its annotation', () => {
       ref: { kind: 'objectNumber', objectNumber: 101 },
       reply: { to: caret!.annotation.ref, type: 'group' },
     });
+  });
+});
+
+describe('changing a kind', () => {
+  /** A confirmed mark over text, keyed `obj:<n>`. */
+  const mark = (id: string, subtype: 'highlight' | 'strikeout', intent?: string) =>
+    recordOf({
+      id,
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: Number(id.slice(4)) },
+      page: PAGE,
+      subtype,
+      geometry: {
+        kind: 'quads',
+        quadPoints: [quadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
+      },
+      style: STYLE,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      ...(intent ? { intent } : {}),
+    });
+  const setFields = (model: Model, values: Record<string, unknown>) =>
+    update(model, {
+      type: 'setFields',
+      patches: Object.fromEntries(model.order.map((id) => [id, values])),
+    });
+
+  it('a sibling kind: the patch names it, and the record is that kind, drawn live', () => {
+    const result = setFields(modelWith([mark('obj:5', 'highlight')]), { subtype: 'underline' });
+    expect(result.change.patches['obj:5']).toEqual({ subtype: 'underline' });
+    expect(result.change.put[0]!.annotation.subtype).toBe('underline');
+    expect(result.change.put[0]!.source).toBe('vector');
+
+    const circle = setFields(modelWith([square('obj:3', 100)]), {
+      subtype: 'circle',
+      color: '#00ff00',
+    });
+    expect(circle.change.patches['obj:3']).toEqual({ subtype: 'circle', color: '#00ff00' });
+  });
+
+  it('a mixed selection: the kinds that can become it do, the rest take the other fields', () => {
+    const result = setFields(modelWith([mark('obj:5', 'highlight'), square('obj:3', 100)]), {
+      subtype: 'underline',
+      opacity: 0.5,
+    });
+    expect(result.change.patches).toEqual({
+      'obj:5': { subtype: 'underline', opacity: 0.5 },
+      'obj:3': { subtype: 'square', opacity: 0.5 },
+    });
+  });
+
+  it('a replacement’s strikeout, a locked mark, or a kind people may not change keep their kind', () => {
+    const replacement = mark('obj:6', 'strikeout', 'strikeout-text-edit');
+    expect(setFields(modelWith([replacement]), { subtype: 'highlight' }).change.patches).toEqual(
+      {},
+    );
+    const locked = withAnnotation(mark('obj:5', 'highlight'), { locked: true });
+    expect(setFields(modelWith([locked]), { subtype: 'underline' }).change.patches).toEqual({});
+    const onlyHighlights = modelWith([mark('obj:5', 'highlight')], { editable: ['highlight'] });
+    expect(setFields(onlyHighlights, { subtype: 'underline' }).change.patches).toEqual({});
+  });
+
+  it('a style panel leads with the kind the selection can become', () => {
+    const kinds = (model: Model) => {
+      const [first] = selectionProperties(
+        model,
+        model.order.map((id) => model.byId[id]!.annotation),
+      );
+      return first?.key === 'subtype' && first.control === 'choice'
+        ? first.options.map((option) => option.value)
+        : null;
+    };
+    const highlight = mark('obj:5', 'highlight');
+    expect(kinds(modelWith([highlight]))).toEqual([
+      'highlight',
+      'underline',
+      'squiggly',
+      'strikeout',
+    ]);
+    expect(kinds(modelWith([square('obj:3', 100)]))).toEqual(['square', 'circle']);
+    // Kinds of two groups, or a strikeout held by its replacement: no kind to choose.
+    expect(kinds(modelWith([highlight, square('obj:3', 100)]))).toBeNull();
+    expect(kinds(modelWith([mark('obj:6', 'strikeout', 'strikeout-text-edit')]))).toBeNull();
+    // Only the kinds people may change by hand, and a choice needs two.
+    expect(kinds(modelWith([highlight], { editable: ['highlight', 'squiggly'] }))).toEqual([
+      'highlight',
+      'squiggly',
+    ]);
+    expect(kinds(modelWith([highlight], { editable: ['highlight'] }))).toBeNull();
   });
 });

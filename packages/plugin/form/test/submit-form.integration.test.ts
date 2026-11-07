@@ -103,7 +103,6 @@ describe('the Phase-4 submit gate: ISO-exact datasets to the embedder handler', 
       url: 'https://home.test/parent',
       format: 'fdf',
       method: 'post',
-      flagsRaw: 0,
       origin: 'user',
     });
     expect(request.entries).toEqual([

@@ -8,23 +8,23 @@ import {
   pageFormSnapshotOf,
   pageGeometryOf,
   pageListOf,
+  pageOutlineItemOf,
+  pageOutlineOf,
   pageSearchSliceOf,
   pageViewportsOf,
   pdfAnnotationDraftOf,
   pdfAnnotationPatchOf,
   pdfFormFieldDraftOf,
   pdfMeasureOf,
+  pdfOutlineDraftOf,
+  pdfOutlinePatchOf,
   pdfWidgetPlacementOf,
   pageWidgetOf,
   pdfRenderTargetOf,
   type Annotation,
   type AnnotationPatch,
-  type Change,
   type ChangeItem,
-  type ChangeOp,
-  type RecordedChange,
   type RecordedOp,
-  type ChangeResult,
   type PageRef,
   type WireAnnotationResources,
   type PageRenderOptions,
@@ -64,13 +64,8 @@ export function resultInPageSpace(
   switch (payload.tag) {
     case 'pages.list':
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
-    case 'pages.reorder':
-    case 'pages.rotate':
-    case 'pages.delete':
     case 'pages.setName':
     case 'pages.removeName':
-    case 'pages.insert':
-    case 'pages.insertBlank':
       return {
         ...payload,
         result: { ...payload.result, layout: pageListOf(payload.result.layout) },
@@ -91,6 +86,8 @@ export function resultInPageSpace(
     }
     case 'actions.read':
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
+    case 'outline.read':
+      return { ...payload, outline: pageOutlineOf(payload.outline, boxOf) };
     case 'annotations.list':
       return {
         ...payload,
@@ -107,16 +104,10 @@ export function resultInPageSpace(
         result: { ...payload.result, annotation: annotation(payload.result.annotation) },
       };
     case 'document.apply':
-      return { ...payload, result: changeResultInPageSpace(payload.result, boxOf) };
     case 'document.applyChanges':
-      return {
-        ...payload,
-        outcomes: payload.outcomes.map((outcome) =>
-          outcome.status === 'applied'
-            ? { ...outcome, result: changeResultInPageSpace(outcome.result, boxOf) }
-            : outcome,
-        ),
-      };
+      // In page space already: the change applier converts each item as its
+      // op runs (ChangeSpace).
+      return payload;
     case 'annotations.import':
       return {
         ...payload,
@@ -211,15 +202,11 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
     case 'forms.createField':
       return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
     case 'document.apply':
-      return { ...job, change: changeInFileSpace(job.change, boxOf) };
     case 'document.applyChanges':
-      return {
-        ...job,
-        changes: job.changes.map((entry) => ({
-          ...entry,
-          change: changeInFileSpace(entry.change, boxOf),
-        })),
-      };
+      // Each op converts right before it runs, against the document as the
+      // ops before it left it (ChangeSpace): one before it may add, remove
+      // or put back the page it names.
+      return job;
     case 'forms.addWidget':
       return { ...job, placement: pdfWidgetPlacementOf(job.placement, boxOf) };
     case 'measure.setScale':
@@ -259,24 +246,8 @@ export function renderOptionsInFileSpace(
   };
 }
 
-/** A change's ops, each place measured in the file's coordinates, as its single verb's job is. */
-function changeInFileSpace(
-  change: Change<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): Change<PdfCoordinates, WireAnnotationResources>;
-function changeInFileSpace(
-  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): RecordedChange<PdfCoordinates, WireAnnotationResources>;
-function changeInFileSpace(
-  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): RecordedChange<PdfCoordinates, WireAnnotationResources> {
-  if ('undoOf' in change) return change;
-  return { ops: change.ops.map((op) => opInFileSpace(op, boxOf)) };
-}
-
-function opInFileSpace(
+/** An op's places in the file's coordinates, as its single verb's job's are. */
+export function opInFileSpace(
   op: RecordedOp<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
 ): RecordedOp<PdfCoordinates, WireAnnotationResources> {
@@ -322,21 +293,28 @@ function opInFileSpace(
         ? { ...rest, expect: pdfWidgetPatchOf(expect, boxOf(op.widget.page), boxOf) }
         : rest;
     }
+    case 'outline.create':
+      return { ...op, data: pdfOutlineDraftOf(op.data, boxOf) };
+    case 'outline.update': {
+      const { expect, ...rest } = op;
+      return {
+        ...rest,
+        patch: pdfOutlinePatchOf(op.patch, boxOf),
+        ...(expect ? { expect: pdfOutlinePatchOf(expect, boxOf) } : {}),
+      };
+    }
+    case 'outline.delete': {
+      const { expect, ...rest } = op;
+      return expect ? { ...rest, expect: pdfOutlinePatchOf(expect, boxOf) } : rest;
+    }
     default:
-      // The rest hold no places: values, flags, names, metadata.
+      // The rest hold no places: values, flags, names, metadata, outline and page moves.
       return op;
   }
 }
 
-/** What a change did, each place in page space, as its single verbs' results are. */
-function changeResultInPageSpace(
-  result: ChangeResult<PdfCoordinates>,
-  boxOf: VisibleBoxOf,
-): ChangeResult {
-  return { ...result, items: result.items.map((item) => itemInPageSpace(item, boxOf)) };
-}
-
-function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf): ChangeItem {
+/** What an op did, each place in page space, as its single verb's result is. */
+export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf): ChangeItem {
   // An op an undo left alone holds no places.
   if (isSkippedItem(item)) return item;
   const annotation = (read: Annotation<PdfCoordinates>) =>
@@ -383,8 +361,21 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
         field: item.field && pageFormFieldOf(item.field, boxOf),
         widgets: widgets(item.widgets),
       };
+    case 'outline.create':
+    case 'outline.update':
+      return { ...item, item: pageOutlineItemOf(item.item, boxOf) } as ChangeItem;
+    case 'outline.restore':
+      return { ...item, items: item.items.map((read) => pageOutlineItemOf(read, boxOf)) };
+    case 'pages.rotate':
+    case 'pages.reorder':
+    case 'pages.delete':
+    case 'pages.insertBlank':
+    case 'pages.insert':
+    case 'pages.copy':
+    case 'pages.restore':
+      return { ...item, layout: pageListOf(item.layout) } as ChangeItem;
     default:
-      // The rest hold no places: deletes, metadata.
+      // The rest hold no places: deletes, metadata, outline moves.
       return item;
   }
 }

@@ -25,12 +25,15 @@ import type {
 import {
   addTranslations,
   endLocaleLoad,
+  followFallback,
+  isLoaded,
+  isReady,
   registerLocale,
   seedFromSettings,
   setLocale as setCurrentLocale,
   startLocaleLoad,
   unregisterLocale,
-  type I18nState,
+  type I18nModel,
 } from './model';
 import { createLoaders } from './sync/loaders';
 import { translate, type TranslationSources } from './translate';
@@ -38,7 +41,7 @@ import { translate, type TranslationSources } from './translate';
 const unknownLocale = (code: string) =>
   new PluginError('not-found', 'i18n', `unknown locale '${code}': not loaded and not in loaders`);
 
-export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>) {
+export function createI18nController(ctx: PluginContext<I18nModel, I18nSettings>) {
   const settings = ctx.settings();
   const localeChanged = ctx.events.source<LocaleChangedEvent>();
   const localeLoadFailed = ctx.events.source<LocaleLoadFailedEvent>();
@@ -85,13 +88,13 @@ export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>
 
   /** The languages a picker shows, rebuilt only when the languages or the loaders change. */
   const listLocales = memo(
-    () => [state().locales, settings.get().loaders],
-    (locales, loaders): readonly LocaleInfo[] => {
+    () => [state().locales, state().fetched, settings.get().loaders],
+    (locales, _fetched, loaders): readonly LocaleInfo[] => {
       const known: LocaleInfo[] = Object.values(locales).map((locale) => ({
         code: locale.code,
         name: locale.name,
         direction: locale.direction ?? 'ltr',
-        loaded: true,
+        loaded: isLoaded(state(), loaders, locale.code),
       }));
       for (const code of Object.keys(loaders)) {
         if (!locales[code]) known.push({ code, name: code, direction: 'ltr', loaded: false });
@@ -126,12 +129,14 @@ export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>
     if (signal?.aborted) {
       return Promise.reject(new PluginError('operation-cancelled', 'i18n', 'operation cancelled'));
     }
-    if (state().locales[code]) {
+    if (isReady(state(), settings.get().loaders, code)) {
       supersede();
       ctx.state.update(setCurrentLocale, code);
       return Promise.resolve();
     }
-    if (!settings.get().loaders[code]) return Promise.reject(unknownLocale(code));
+    if (!state().locales[code] && !settings.get().loaders[code]) {
+      return Promise.reject(unknownLocale(code));
+    }
     supersede();
     const loaded = new Promise<void>((resolve, reject) => {
       pending.set(code, { resolve, reject });
@@ -150,11 +155,14 @@ export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>
     return ctx.cancellable(signal, loaded);
   };
 
-  /** Follow a settings change: new languages register, and a new `locale` becomes current. */
+  /**
+   * Follow a settings change: new languages register, a new fallback language with a loader is
+   * fetched, and a new `locale` becomes current.
+   */
   const followSettings = (): void => {
     let previous = settings.get();
-    ctx.listen(settings.api.onSettingsChanged, ({ settings: next, changed }) => {
-      if (changed.includes('locales')) {
+    ctx.listen(settings.api.onSettingsChanged, ({ settings: next, changedKeys }) => {
+      if (changedKeys.includes('locales')) {
         for (const locale of previous.locales) {
           if (!next.locales.some((other) => other.code === locale.code)) {
             ctx.state.update(unregisterLocale, locale.code);
@@ -164,7 +172,10 @@ export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>
           if (!previous.locales.includes(locale)) ctx.state.update(registerLocale, locale);
         }
       }
-      if (changed.includes('locale')) {
+      if (changedKeys.includes('fallbackLocale') || changedKeys.includes('loaders')) {
+        ctx.state.update(followFallback, next);
+      }
+      if (changedKeys.includes('locale')) {
         const code = next.locale ?? next.fallbackLocale;
         // A failed load fires onLocaleLoadFailed; only a code nothing knows needs saying here.
         setLocale(code).catch((error: unknown) => {

@@ -4,7 +4,7 @@
  * nothing around them clips them, take the menu keys (arrows, typeahead,
  * Escape back to the button), mark the current choice in the accent look, open a
  * submenu beside its row, and say why a row can't run. The bars over selected
- * text and a selected annotation sit above it, below it without room, and
+ * text and a selected annotation sit below it, above it without room, and
  * open their menus away from it.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -546,6 +546,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
       ['Download', null],
       ['Share', 'menu'],
       ['Print', null],
+      ['Take a Snapshot', null],
       ['Full Screen', null],
     ]);
     expect(await focused(tab)).toBe('Open');
@@ -613,23 +614,23 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await tab.close();
   });
 
-  it('sits above selected text, and opens its menus above it, away from the selection', async () => {
+  it('sits below selected text, and opens its menus below it, away from the selection', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
-    // The "Start here" line, low on the first page: room above it.
-    await selectText(tab, 554, 125, 360);
+    // The document's title, just under the main bar: room below it.
+    await selectText(tab, 196, 310, 600);
     const text = await highlightOf(tab);
     const bar = await selectionBarOf(tab);
     expect(text, 'the selected text').not.toBeNull();
-    expect(bar?.placement).toBe('top');
-    expect(bar!.bottom).toBeLessThanOrEqual(text!.top);
+    expect(bar?.placement).toBe('bottom');
+    expect(bar!.top).toBeGreaterThanOrEqual(text!.bottom);
     const share = await buttonOf(tab, 'Share');
     expect(share, 'the Share button in the selection bar').not.toBeNull();
     await click(tab, 'Share');
     const [menu] = await menusOf(tab);
     expect(menu).toBeDefined();
     expect(menu!.rows.map((row) => row.label)).toEqual(['Copy link']);
-    expect(menu!.box.bottom).toBeLessThanOrEqual(share!.top);
+    expect(menu!.box.top).toBeGreaterThanOrEqual(share!.bottom);
     await tab.close();
   });
 
@@ -637,48 +638,54 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const gapOver = async (touch: boolean) => {
       const tab = await open('/selection.html', 1280, touch);
       await tab.waitForTimeout(1500);
-      await selectText(tab, 554, 125, 360);
+      await selectText(tab, 196, 310, 600);
       const text = await highlightOf(tab);
       const bar = await selectionBarOf(tab);
       await tab.close();
-      return text!.top - bar!.bottom;
+      return bar!.top - text!.bottom;
     };
     // Each handle's 12 px head and the 14 px a finger grabs around it, beyond the usual 12 px.
     expect(Math.round(await gapOver(false))).toBe(12);
     expect(Math.round(await gapOver(true))).toBe(12 + 12 + 14);
   });
 
-  it('sits below selected text without room above it, and opens its menus below it', async () => {
+  it('sits above selected text without room below it, and opens its menus above it', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
-    // The document's title, just under the main bar: no room above it for the bar.
-    await selectText(tab, 196, 310, 600);
+    // "Are you a nonprofit…", at the bottom of the view: no room below it for the bar.
+    await selectText(tab, 654, 505, 690);
     const text = await highlightOf(tab);
     const bar = await selectionBarOf(tab);
-    expect(bar?.placement).toBe('bottom');
-    expect(bar!.top).toBeGreaterThanOrEqual(text!.bottom);
+    expect(bar?.placement).toBe('top');
+    expect(bar!.bottom).toBeLessThanOrEqual(text!.top);
     const share = await buttonOf(tab, 'Share');
     await click(tab, 'Share');
     const [menu] = await menusOf(tab);
-    expect(menu!.box.top).toBeGreaterThanOrEqual(share!.bottom);
+    expect(menu!.box.bottom).toBeLessThanOrEqual(share!.top);
     await tab.close();
   });
 
-  it('sits above a selected annotation, and below one at the top of the view', async () => {
+  it('sits below a selected annotation, and above one at the bottom of the view', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
     // Mid-page, with room above and below it.
     const middle = await selectSquareAt(tab, 150);
+    const below = await selectionBarOf(tab);
+    expect(below?.placement).toBe('bottom');
+    expect(Math.round(below!.top - middle.bottom)).toBe(15);
+    await press(tab, 'Escape');
+
+    // Its bottom edge 20 px above the view's: no room below it for the bar.
+    const low = await tab.evaluate(() => {
+      const stage = (window as unknown as { element: { viewer: any } }).element.viewer.get('stage');
+      const { height } = stage.getViewportSize();
+      return stage.viewportToPage(0, { x: 10, y: height - 20 }).y - 100;
+    });
+    const bottom = await selectSquareAt(tab, low);
     const above = await selectionBarOf(tab);
     expect(above?.placement).toBe('top');
     // Clear of the annotation, and of the handle that turns it, which sits above it.
-    expect(above!.bottom).toBeLessThan(middle.top - 15);
-    await press(tab, 'Escape');
-
-    const top = await selectSquareAt(tab, 4);
-    const below = await selectionBarOf(tab);
-    expect(below?.placement).toBe('bottom');
-    expect(below!.top).toBeGreaterThanOrEqual(top.bottom);
+    expect(above!.bottom).toBeLessThan(bottom.top - 15);
     await tab.close();
   });
 
@@ -688,10 +695,12 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const [menu] = await menusOf(tab);
     const download = menu!.rows.find((row) => row.label === 'Download')!;
     const print = menu!.rows.find((row) => row.label === 'Print')!;
-    for (const row of [download, print]) {
+    // Without doc.content.copy there are no snapshots either.
+    const snapshot = menu!.rows.find((row) => row.label === 'Take a Snapshot')!;
+    for (const row of [download, print, snapshot]) {
       expect(row.disabled).toBe(true);
-      expect(row.title).toBeTruthy();
-      expect(row.title).not.toBe(row.label);
+      // Why, in the viewer's own tooltip beside the row (buttons.test.ts), not the browser's.
+      expect(row.title).toBeNull();
     }
     // Opening another file needs nothing of this document's scope.
     expect(await focused(tab)).toBe('Open');

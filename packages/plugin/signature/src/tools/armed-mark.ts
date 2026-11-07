@@ -29,13 +29,13 @@ export function createArmedMarkHandler(
     id: 'signature:armed-mark-on-field',
     priority: ANNOTATION_EDIT_PRIORITY + 1,
     enabledFor: (tool) => tool.id === ARMED_STAMP_TOOL_ID,
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page) return false;
       const armed = stamp.getArmedAsset(documentId);
       if (!armed || stamp.getLibrary(armed.libraryId)?.kind !== SIGNATURES_LIBRARY_KIND)
         return false;
       const hit = form.getWidgetAt(sample.page.ref, sample.page.point);
-      if (!hit || hit.field.family !== 'signature') return false;
+      if (!hit || hit.field.kind !== 'signature') return false;
       // A signed field is final: consume the click (no stamp lands on it) and do nothing.
       if (signature.getSignature(hit.field.ref)?.signed || hit.field.valueEntry.kind !== 'none') {
         return true;

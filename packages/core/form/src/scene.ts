@@ -2,25 +2,27 @@
  * A widget's drawing on the page: the generator's operations, from the
  * widget's upright frame (PDF points, y up) to page space (y down), turned
  * by the widget's quarter turn about the middle of its box, as core-annotation
- * scene nodes. Paths become SVG path data; each text run becomes a `glyphs`
- * node, every character at the place the engine puts it, in the standard
- * face's CSS (its program first, which the node carries for mounting).
+ * scene nodes. Paths become SVG path data; each text run becomes a `textRun`
+ * node at the place the engine puts it, in its font's CSS (its program first,
+ * which the node carries for mounting).
  */
 import type { Paint, SceneNode } from '@embedpdf/core-annotation';
-import { standardFontCss, standardFontProgram } from '@embedpdf/core-fonts';
+import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { DrawOp, PathSegment, Rgb, WidgetDrawing } from './drawing/types';
-import type { PdfRect } from './layout/variable-text';
 
 /** Where a widget is: its box in page space, before the turn, and the turn. */
-export interface WidgetPlacement {
+export interface WidgetScenePlacement {
   readonly box: {
     readonly x: number;
     readonly y: number;
     readonly width: number;
     readonly height: number;
   };
-  /** Degrees clockwise, a quarter turn, about the middle of `box`. */
+  /**
+   * Degrees clockwise, a quarter turn, about the middle of `box`. Upright when
+   * left out or `null`, as a widget without one reads.
+   */
   readonly rotation?: number | null;
 }
 
@@ -35,7 +37,7 @@ const hexOf = (color: Rgb): string =>
 
 const round = (value: number) => Number(value.toFixed(3));
 
-export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement): SceneNode[] {
+export function widgetScene(drawing: WidgetDrawing, placement: WidgetScenePlacement): SceneNode[] {
   const { box } = placement;
   const turn = ((((placement.rotation ?? 0) % 360) + 360) % 360) as 0 | 90 | 180 | 270;
   const centerX = box.x + box.width / 2;
@@ -115,26 +117,22 @@ export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement):
           walk(op.ops, clipOf(op.rect));
           break;
         case 'text': {
-          const css = standardFontCss(op.font);
           for (const run of op.runs) {
-            const offsets: number[] = [];
-            let along = 0;
-            for (const advance of run.advances) {
-              offsets.push(round(along));
-              along += advance;
-            }
             const at = toPage(run.x, run.y);
             nodes.push({
-              kind: 'glyphs',
+              kind: 'textRun',
               at: { x: round(at.x), y: round(at.y) },
               text: run.text,
-              offsets,
+              rtl: run.rtl,
+              plain: run.plain,
+              ...(run.joinsPrevious ? { joinsPrevious: true } : {}),
+              ...(run.joinsNext ? { joinsNext: true } : {}),
               fontSize: op.size,
-              fontFamily: css.fontFamily,
-              fontWeight: css.fontWeight,
-              fontStyle: css.fontStyle,
+              fontFamily: run.font.fontFamily,
+              fontWeight: run.font.fontWeight,
+              fontStyle: run.font.fontStyle,
               ...(turn ? { rotation: turn } : {}),
-              program: standardFontProgram(op.font),
+              program: run.font.program,
               paint: { fill: hexOf(op.color) },
               ...clipped,
             });

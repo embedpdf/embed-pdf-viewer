@@ -59,11 +59,11 @@ A file that isn't a PDF, or is too damaged to read, fails with `DocOpenFailed`.
 The document is already on your server, so you open it by reference. There are three ways,
 depending on where the credential comes from:
 
-| Input                           | When to use it                                                   |
-| :------------------------------ | :--------------------------------------------------------------- |
-| `{ kind: 'token', token }`      | Your backend created a token for this user and this document.    |
-| `{ kind: 'id', id }`            | Your app has a token for your whole account (admin tools, jobs). |
-| `{ kind: 'share', shareToken }` | A public share link from the CloudPDF dashboard.                 |
+| Input                      | When to use it                                                   |
+| :------------------------- | :--------------------------------------------------------------- |
+| `{ kind: 'token', token }` | Your backend created a token for this user and this document.    |
+| `{ kind: 'id', id }`       | Your app has a token for your whole account (admin tools, jobs). |
+| `{ kind: 'grant', grant }` | A grant from the CloudPDF dashboard: public access, no backend.  |
 
 [Authentication](/docs/engine/authentication) shows how to create tokens and when to use each.
 

@@ -1,7 +1,7 @@
 /**
  * The commands binding: `[epdfCommand]` runs a command on click and keeps the button's
- * `disabled`, `aria-pressed`, `title` and `hidden` in step, with the rest as signals on its
- * template reference; `commandOf()` changes only when what the command shows does; the keys,
+ * `disabled`, `aria-pressed` or `aria-expanded`, `title` and `hidden` in step, with the rest as
+ * signals on its template reference; `commandOf()` changes only when what the command shows does; the keys,
  * app-wide (`withCommandShortcuts()`) or inside one element (`epdfCommandShortcuts`); and the
  * events as streams.
  */
@@ -16,7 +16,7 @@ import {
   withCommands,
   withCommandShortcuts,
 } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import { EpdfDocumentScope } from '@embedpdf/angular/runtime';
 import { bytesInput, kernelOf, mount, viewerHost } from './fixtures';
 
@@ -28,7 +28,7 @@ const press = (key: string, target: EventTarget = window, init: KeyboardEventIni
 /** A command that can be switched on and off, and pressed, from the test. */
 function toggleable(run = vi.fn()) {
   const state = { enabled: true, active: false };
-  const command: CommandDef = {
+  const command: CommandDefinition = {
     id: 'review:approve',
     label: 'Approve',
     icon: 'check',
@@ -49,7 +49,7 @@ describe('[epdfCommand]', () => {
         features: [withCommands({ commands: [command] })],
         template: `
           <button [epdfCommand]="'review:approve'" #approve="epdfCommand">
-            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcut() }}
+            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcutLabel() }}
           </button>
         `,
       }),
@@ -62,7 +62,8 @@ describe('[epdfCommand]', () => {
     expect(button.title).toBe('Approve');
     expect(button.disabled).toBe(false);
     expect(button.hidden).toBe(false);
-    expect(button.getAttribute('aria-pressed')).toBeNull();
+    // A toggle says it isn't pressed.
+    expect(button.getAttribute('aria-pressed')).toBe('false');
 
     button.click();
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ documentId: 'a' }));
@@ -97,6 +98,31 @@ describe('[epdfCommand]', () => {
     await fixture.whenStable();
     expect(known.disabled).toBe(true);
     expect(known.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it("says aria-pressed only on a toggle, and aria-expanded on a menu's button", async () => {
+    const commands: CommandDefinition[] = [
+      { id: 'review:share', label: 'Share', run: vi.fn() },
+      { id: 'review:more', label: 'More', menu: 'review-menu' },
+    ];
+    const fixture = await mount(
+      viewerHost({
+        imports: [EpdfCommand],
+        features: [withCommands({ commands })],
+        template: `
+          <button id="share" [epdfCommand]="'review:share'"></button>
+          <button id="more" [epdfCommand]="'review:more'"></button>
+        `,
+      }),
+    );
+    await kernelOf(fixture).documents.open(bytesInput('a'));
+    await fixture.whenStable();
+    const share = fixture.nativeElement.querySelector('#share') as HTMLButtonElement;
+    const more = fixture.nativeElement.querySelector('#more') as HTMLButtonElement;
+    expect(share.getAttribute('aria-pressed')).toBeNull();
+    expect(share.getAttribute('aria-expanded')).toBeNull();
+    expect(more.getAttribute('aria-pressed')).toBeNull();
+    expect(more.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('acts on the document [epdfDocumentScope] names', async () => {

@@ -17,6 +17,7 @@ export type {
   BarSchema,
   BarSections,
   CustomItem,
+  Emphasis,
   Importance,
   NormalizedBar,
   NormalizedGroup,
@@ -29,9 +30,11 @@ export {
   EXPANDED_MIN_WIDTH_PX,
   MEDIUM_MIN_WIDTH_PX,
   createLayout,
+  hostOf,
   isLayout,
   itemCommandOf,
   itemIdOf,
+  panelOf,
   panelPresentationsOf,
   panelWidthFieldsOf,
   resolveLayout,
@@ -42,6 +45,7 @@ export type {
   AddItemOptions,
   BarEdge,
   BarPlace,
+  FloatPlace,
   FloatPosition,
   Layout,
   LayoutBar,
@@ -75,6 +79,7 @@ export {
   barsAt,
   barsFloating,
   barsInMode,
+  barsInPanel,
   barsOnEdge,
   barsWith,
   compileBar,
@@ -82,7 +87,7 @@ export {
   edgeStackOf,
   floatOf,
   floatStackOf,
-  hostOf,
+  hideWhenIdleOf,
   menuOf,
   modeCommandOf,
   modesOf,
@@ -105,10 +110,11 @@ export type { OverflowRow, OverflowSection, ResolveMenuTarget, StripGroup } from
 export { groupMenuView, layoutToolbar, sameStripGroups, stripGroupsOf } from './toolbar-layout';
 export type {
   CollapsedGroupView,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView,
   LiveGroup,
   LiveSection,
+  SectionSpacing,
   OverflowMenuView,
   StripView,
   StripViewGroup,
@@ -121,3 +127,6 @@ export type {
 
 export { formatShortcut, matchShortcut, parseShortcut, sameShortcut } from './shortcuts';
 export type { KeyStroke, ParsedShortcut } from './shortcuts';
+
+export { treeKeyAction } from './tree-keys';
+export type { TreeKeyAction, TreeKeyOptions, TreeKeyRow } from './tree-keys';

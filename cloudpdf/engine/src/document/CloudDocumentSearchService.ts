@@ -3,7 +3,6 @@ import {
   EngineError,
   EngineErrorCode,
   canonicalSearchQuery,
-  searchContentEpoch,
   type DocumentSearchService,
   type SearchQuery,
   type SearchRequest,
@@ -15,7 +14,9 @@ import {
   encodeSearchToken,
   wirePaths,
   type SearchToken,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
+import type { CloudManifest } from './CloudDocumentHandle';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { HttpClient } from '../transport/HttpClient';
@@ -24,7 +25,7 @@ import type { HttpClient } from '../transport/HttpClient';
  * Cloud search transport: versioned GETs, one per budgeted slice.
  *
  * Every slice URL is a canonical cache key — the search token pins the
- * layer's content epoch (computed from the cached manifest), the
+ * manifest's `contentsVersion` and `layoutVersion` (copied, never computed), the
  * canonical query (default-fold literals collapse case/diacritic
  * variants into one entry), and the resume position. Identical searches
  * from any reader of the document hit the same CDN entry; matches are
@@ -99,9 +100,11 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         }
       }
 
-      const mint = (epoch: string) =>
+      const mint = (current: CloudManifest) =>
         encodeSearchToken({
-          epoch,
+          pin: tokenPinOf('search', current.engine),
+          contentsVersion: current.contentsVersion,
+          layoutVersion: current.layoutVersion,
           query,
           ...(from !== undefined ? { from } : {}),
           skip: 0,
@@ -109,13 +112,13 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         });
       try {
         const manifest = await this.manifest.get(signal);
-        return await get(mint(searchContentEpoch(manifest)));
+        return await get(mint(manifest));
       } catch (err) {
         if (!EngineError.is(err, EngineErrorCode.NotFound)) throw err;
         // Our cached manifest is behind the layer — the standard
         // versioned-read retry: refresh once, re-mint, re-issue.
         const fresh = await this.manifest.refresh(signal);
-        return await get(mint(searchContentEpoch(fresh)));
+        return await get(mint(fresh));
       }
     });
   }

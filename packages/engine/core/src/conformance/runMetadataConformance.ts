@@ -62,15 +62,15 @@ export interface ConformanceOptions {
  */
 export function runMetadataConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`metadata conformance: ${opts.label}`, () => {
+  describe(`metadata conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -78,10 +78,10 @@ export function runMetadataConformance(
     });
 
     test('reads metadata from sample fixture', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const meta = await doc.metadata.get();
-        expect(meta).toMatchObject(opts.fixture.expected);
+        expect(meta).toMatchObject(options.fixture.expected);
         expect(meta.trapped).toMatch(/^(true|false|unknown)$/);
       } finally {
         await doc.close();
@@ -89,7 +89,7 @@ export function runMetadataConformance(
     });
 
     test('abort() before completion rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const p = doc.metadata.get();
         p.abort('test');
@@ -100,20 +100,20 @@ export function runMetadataConformance(
     });
 
     test('aborting one read does not affect a concurrent one', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const a = doc.metadata.get();
         const b = doc.metadata.get();
         a.abort('test');
         await expect(a).rejects.toBeInstanceOf(AbortError);
-        await expect(b).resolves.toMatchObject(opts.fixture.expected);
+        await expect(b).resolves.toMatchObject(options.fixture.expected);
       } finally {
         await doc.close();
       }
     });
 
     test('metadata after close throws DocNotOpen', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       await doc.close();
       let caught: unknown;
       try {
@@ -126,7 +126,7 @@ export function runMetadataConformance(
     });
 
     test('update() sets standard fields, custom.update() sets custom keys, each read sees its own', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const result = await doc.metadata.update({
           title: 'Conformance Title',
@@ -156,7 +156,7 @@ export function runMetadataConformance(
     });
 
     test('custom.update(): a key left out stays, null removes, standard fields are untouched', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await doc.metadata.update({ title: 'Kept Title' });
         await doc.metadata.custom.update({ KeepMe: 'a', DropMe: 'b' });
@@ -172,7 +172,7 @@ export function runMetadataConformance(
     });
 
     test("'' is a value, and custom.update() refuses a key it can't write", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await doc.metadata.update({ title: '' });
         await doc.metadata.custom.update({ EmptyKey: '' });
@@ -197,7 +197,7 @@ export function runMetadataConformance(
     });
 
     test('update() clears a field with null', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await doc.metadata.update({ title: 'To Be Cleared' });
         const set = await doc.metadata.get();
@@ -212,7 +212,7 @@ export function runMetadataConformance(
     });
 
     test('update() after close throws DocNotOpen', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       await doc.close();
       let caught: unknown;
       try {
@@ -225,7 +225,7 @@ export function runMetadataConformance(
     });
 
     test('custom reads and writes after close throw DocNotOpen', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       await doc.close();
       for (const call of [() => doc.metadata.custom.get(), () => doc.metadata.custom.update({})]) {
         let caught: unknown;

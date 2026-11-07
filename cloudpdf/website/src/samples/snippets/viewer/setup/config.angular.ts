@@ -6,7 +6,7 @@ import { EpdfPdfViewer, type Viewer } from '@cloudpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: `
     <epdf-pdf-viewer
-      [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }"
+      [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
       theme="system"
       [disable]="['forms']"
       style="height: 100vh"

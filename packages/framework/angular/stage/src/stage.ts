@@ -38,11 +38,11 @@ import {
 import { shallowEqual } from '@embedpdf/core';
 import type { OpenSource } from '@embedpdf/core';
 import type { PageFrame } from '@embedpdf/core-geometry';
-import { createScrollHandler, StageToken } from '@embedpdf/plugin-stage';
+import { createScrollHandler, createZoomDragHandler, StageToken } from '@embedpdf/plugin-stage';
 import type { VisiblePage } from '@embedpdf/plugin-stage';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-import { createStageSurface, stageViewProjector } from '@embedpdf/web';
+import { createStageSurface, stageViewProjector, ZOOM_BOX_DASH, zoomBoxPaint } from '@embedpdf/web';
 import {
   CapabilityBinding,
   EPDF_DOCUMENT_SCOPE,
@@ -56,6 +56,7 @@ import { EpdfPageChrome, EpdfPageTemplate, type EpdfPageTemplateContext } from '
 
 const NO_PAGES: readonly VisiblePage[] = Object.freeze([]);
 const NO_FRAME: PageFrame = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
+const FOLLOW_ACCENT = Object.freeze({ fill: null, stroke: null });
 const frameEqual = (left: PageFrame, right: PageFrame) =>
   left.top === right.top &&
   left.right === right.right &&
@@ -106,6 +107,25 @@ class StageDocument implements EpdfDocumentScopeRef {
           [chromeTemplate]="chromeTemplate()"
         />
       }
+    }
+    @if (zoomBox(); as box) {
+      <svg
+        aria-hidden="true"
+        style="position: absolute; overflow: visible; pointer-events: none;"
+        [style.left.px]="box.x"
+        [style.top.px]="box.y"
+        [attr.width]="box.width"
+        [attr.height]="box.height"
+      >
+        <rect
+          stroke-width="1"
+          [attr.width]="box.width"
+          [attr.height]="box.height"
+          [attr.stroke-dasharray]="zoomBoxDash"
+          [style.fill]="zoomBoxStyle().fill"
+          [style.stroke]="zoomBoxStyle().stroke"
+        />
+      </svg>
     }
     <!-- What you put inside <epdf-stage> sits over the pages, in the Stage's own box. -->
     <ng-content />
@@ -160,6 +180,18 @@ export class EpdfStage extends EpdfStageRef {
   protected readonly look = computed(() => this.host.viewerSettings().page, {
     equal: shallowEqual,
   });
+  /** The box the zoom tool drags, in viewport px, while its drag is a box. */
+  protected readonly zoomBox = this.binding.select((stage) => stage.getZoomBox(), null, Object.is);
+  private readonly zoomBoxColors = this.binding.select(
+    (stage) => stage.getSettings().zoomBox,
+    FOLLOW_ACCENT,
+    Object.is,
+  );
+  /** The box's fill and stroke: the `zoomBox` setting, following the viewer's accent. */
+  protected readonly zoomBoxStyle = computed(() =>
+    zoomBoxPaint(this.zoomBoxColors(), this.host.viewerSettings().accent),
+  );
+  protected readonly zoomBoxDash = ZOOM_BOX_DASH;
   private readonly pageTemplateDirective = contentChild(EpdfPageTemplate);
   private readonly chromeTemplateDirective = contentChild(EpdfPageChrome);
   // Typed, so the built declarations name `EpdfPageTemplateContext` from this file instead of
@@ -324,15 +356,20 @@ export class EpdfStage extends EpdfStageRef {
         source: stage.getLensId(),
         zoomGestures,
       });
-      // The pointer and this view's drag-to-scroll go to the hub together, for this view only,
-      // so two Stages on one document never scroll each other.
+      // The pointer, this view's drag-to-scroll and its zoom box go to the hub together, for
+      // this view only, so two Stages on one document never scroll or zoom each other.
       const offScroll =
         usesHub && hub
           ? hub.registerHandler(createScrollHandler(stage, hub, { panFallback }), {
               source: stage.getLensId(),
             })
           : null;
+      const offZoomDrag =
+        usesHub && hub
+          ? hub.registerHandler(createZoomDragHandler(stage, hub), { source: stage.getLensId() })
+          : null;
       onCleanup(() => {
+        offZoomDrag?.();
         offScroll?.();
         detachSurface();
       });

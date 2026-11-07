@@ -23,6 +23,7 @@ import type {
   FormFieldRef,
   FormSubmissionEntry,
   FormSubmissionReceipt,
+  OutlineItemRef,
   PageRef,
   PdfActionNode,
   PdfActionTargetRef,
@@ -50,6 +51,8 @@ export type ActionOrigin = 'user' | 'hover' | 'lifecycle';
 export type ActionSource =
   | { kind: 'widget'; field: FormFieldRef; annotation: AnnotationRef; page: PageRef }
   | { kind: 'link'; annotation?: AnnotationRef; page?: PageRef }
+  /** An outline item the user followed: its /A, run as a link's is. */
+  | { kind: 'outline'; item: OutlineItemRef }
   /** A non-widget annotation's own /AA event (E/X on squares, stamps, …). */
   | { kind: 'annotation'; annotation: AnnotationRef; page: PageRef }
   /** A page /AA tree (O/C) inside a page-trigger fan-out. */
@@ -74,10 +77,10 @@ export type DocumentTriggerEvent =
  *  executor-visible "which event fired" (cursorEnter and cursorExit are both
  *  `origin: 'hover'`; this carries the difference). */
 export type ActionTriggerEvent =
-  | { scope: 'activate' }
-  | { scope: 'annotation'; name: PdfAnnotationEventKind }
-  | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
-  | { scope: 'document'; name: DocumentTriggerEvent };
+  | { type: 'activate' }
+  | { type: 'annotation'; event: PdfAnnotationEventKind }
+  | { type: 'page'; event: 'open' | 'close' | 'visible' | 'invisible' }
+  | { type: 'document'; event: DocumentTriggerEvent };
 
 /** The four field-level /AA scripts (ISO Table 198: K F V C). */
 export type PdfFieldEventKind = 'keystroke' | 'format' | 'validate' | 'calculate';
@@ -93,7 +96,7 @@ export type PdfNamedAction =
   | (string & {});
 
 /**
- * Where an action tree lives, for {@link ActionsCapability.getActionTree}.
+ * Where an action tree lives, for {@link ActionsCapability.readActionTree}.
  * Each arm names its own event vocabulary; the annotation arm defaults to
  * the /A click tree, the page and document arms to their open trees.
  */
@@ -106,7 +109,9 @@ export type ActionTreeSource =
     }
   | { kind: 'field'; field: FormFieldRef; event: PdfFieldEventKind }
   | { kind: 'page'; page: PageRef; event?: 'open' | 'close' }
-  | { kind: 'document'; event?: DocumentTriggerEvent };
+  | { kind: 'document'; event?: DocumentTriggerEvent }
+  /** An outline item's /A. */
+  | { kind: 'outline'; item: OutlineItemRef };
 
 /** The document-open sequence has run (once per document). */
 export interface OpenSequenceCompletedEvent {
@@ -114,9 +119,9 @@ export interface OpenSequenceCompletedEvent {
 }
 
 export interface ActionContext {
-  origin: ActionOrigin;
-  source: ActionSource;
-  event: ActionTriggerEvent;
+  readonly origin: ActionOrigin;
+  readonly source: ActionSource;
+  readonly event: ActionTriggerEvent;
 }
 
 /** The six annotation /AA pointer and focus events (ISO 32000-2 Table 197:
@@ -138,35 +143,35 @@ export type PdfAnnotationEventKind =
  * anchor `event.target`); policy never reads it and it cannot change origin.
  */
 export type ActionTrigger =
-  | { scope: 'activate'; ref: AnnotationRef; page: PageRef; source?: ActionSource }
+  | { type: 'activate'; annotation: AnnotationRef; page: PageRef; source?: ActionSource }
   | {
-      scope: 'annotation';
+      type: 'annotation';
       event: PdfAnnotationEventKind;
-      ref: AnnotationRef;
+      annotation: AnnotationRef;
       page: PageRef;
       source?: ActionSource;
     }
-  | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
-  | { scope: 'document'; event: DocumentTriggerEvent };
+  | { type: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
+  | { type: 'document'; event: DocumentTriggerEvent };
 
 /** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
 export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
-  switch (trigger.scope) {
+  switch (trigger.type) {
     case 'activate':
-      return { scope: 'activate' };
+      return { type: 'activate' };
     case 'annotation':
-      return { scope: 'annotation', name: trigger.event };
+      return { type: 'annotation', event: trigger.event };
     case 'page':
-      return { scope: 'page', name: trigger.event };
+      return { type: 'page', event: trigger.event };
     case 'document':
-      return { scope: 'document', name: trigger.event };
+      return { type: 'document', event: trigger.event };
   }
 };
 
 /** The one origin mapping, derived by the dispatcher and never claimed by a
  *  caller: a feed cannot launder a hover into a user gesture. */
 export const triggerOriginOf = (trigger: ActionTrigger): ActionOrigin => {
-  switch (trigger.scope) {
+  switch (trigger.type) {
     case 'activate':
       return 'user';
     case 'annotation':
@@ -189,14 +194,14 @@ export type ActionNodeStatus =
 
 export interface ActionNodeResult {
   /** Node address as child indexes from the root ([] = root, [0] = root.next[0]…). */
-  path: number[];
-  type: PdfActionType;
-  status: ActionNodeStatus;
-  detail?: string;
+  readonly path: number[];
+  readonly type: PdfActionType;
+  readonly status: ActionNodeStatus;
+  readonly detail?: string;
 }
 
 export interface ActionDiagnostic {
-  code:
+  readonly code:
     | 'incomplete-tree'
     | 'blocked'
     | 'no-executor'
@@ -216,7 +221,7 @@ export interface ActionDiagnostic {
     | 'submit-payload-unavailable' // older-runtime extraction: node stays inert
     | 'submit-entry-unsupported' // an explicitly included entry has no representable value
     | 'reentrant-print'; // a print request during a document print event — suppressed
-  message: string;
+  readonly message: string;
 }
 
 /**
@@ -228,9 +233,9 @@ export interface ActionDiagnostic {
  * fired.
  */
 export interface ActionDispatchResult {
-  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
-  nodes: ActionNodeResult[];
-  diagnostics: ActionDiagnostic[];
+  readonly status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
+  readonly nodes: ActionNodeResult[];
+  readonly diagnostics: ActionDiagnostic[];
 }
 
 /**
@@ -240,9 +245,9 @@ export interface ActionDispatchResult {
  * built from this source, so fan-out never merges trees in the event.
  */
 export interface ActionStepResult {
-  source: ActionSource;
-  tree: PdfActionTree;
-  result: ActionDispatchResult;
+  readonly source: ActionSource;
+  readonly tree: PdfActionTree;
+  readonly result: ActionDispatchResult;
 }
 
 /**
@@ -253,11 +258,11 @@ export interface ActionStepResult {
  */
 export interface ActionTriggerResult {
   /** `'cancelled'`: the caller's signal fired before or while the trigger ran. */
-  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
-  steps: ActionStepResult[];
+  readonly status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
+  readonly steps: ActionStepResult[];
   /** Trigger-level diagnostics (disabled family, resolution failure);
    *  per-node diagnostics live inside each step's `result`. */
-  diagnostics: ActionDiagnostic[];
+  readonly diagnostics: ActionDiagnostic[];
 }
 
 // ── events ─────────────────────────────────────────────────────────────────
@@ -433,9 +438,9 @@ export type ActionExecutor = (
  *  default adapter's visibility matrix keys on it; embedder adapters receive
  *  everything and decide for themselves. */
 export interface ActionUiContext {
-  origin: ActionOrigin;
+  readonly origin: ActionOrigin;
   /** Script-model axis: `'boot'` = name-tree/document-open boot scripts. */
-  phase: 'boot' | 'user';
+  readonly phase: 'boot' | 'user';
 }
 
 export interface ActionUiAdapter {
@@ -446,8 +451,8 @@ export interface ActionUiAdapter {
   print(uiContext?: ActionUiContext): void;
   /** Script `app.alert`: the one alert port for every script origin. */
   alert?(message: string, options: ActionUiContext & { icon: number; title?: string }): void;
-  /** Script `this.pageNum = n` navigation requests. */
-  gotoPage?(page: number, uiContext: ActionUiContext): void;
+  /** Script `this.pageNum = n` navigation requests: `n` is the zero-based page index. */
+  goToPage?(pageIndex: number, uiContext: ActionUiContext): void;
 }
 
 // ── the submit pipeline: one intent, one resolver, one sink chain ──
@@ -460,17 +465,15 @@ export interface ActionUiAdapter {
  * resolver.
  */
 export interface SubmitIntent {
-  url: string | null;
+  readonly url: string | null;
   /** ISO 32000-2 Table 239 targets (names and object numbers mixed); `null`
    *  is the whole eligible form. */
-  fields: PdfActionTargetRef[] | null;
-  exclude: boolean;
-  includeNoValueFields: boolean;
-  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
-  method: 'post' | 'get';
-  /** Raw ISO Table 240 word (0 for scripted submits without one). */
-  flagsRaw: number;
-  charSet?: string;
+  readonly fields: PdfActionTargetRef[] | null;
+  readonly exclude: boolean;
+  readonly includeNoValueFields: boolean;
+  readonly format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  readonly method: 'post' | 'get';
+  readonly charSet?: string;
 }
 
 /**
@@ -485,7 +488,6 @@ export interface ActionSubmitRequest {
   url: string | null;
   method: 'post' | 'get';
   format: 'fdf' | 'html' | 'xfdf' | 'pdf';
-  flagsRaw: number;
   charSet?: string;
   entries: FormSubmissionEntry[];
   origin: ActionOrigin;
@@ -553,7 +555,7 @@ export interface ActionsCapability extends SettingsApi<ActionsSettings> {
    * ISO 32000-2 Table 197's "/A shadows /AA U" are not applied here. Rejects
    * `operation-cancelled` when `options.signal` fires.
    */
-  getActionTree(
+  readActionTree(
     source: ActionTreeSource,
     options?: OperationOptions,
   ): Promise<PdfActionTree | null>;

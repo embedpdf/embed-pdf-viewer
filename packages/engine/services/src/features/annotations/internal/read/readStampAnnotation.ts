@@ -1,29 +1,14 @@
 import type {
   AnnotationBase,
   StampAnnotation,
-  StampFit,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readAppearanceFit } from '../appearanceFit';
+import { readCommentRichText } from '../richTextWire';
 import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
 import { readAnnotationBox } from './readAnnotationTurn';
-import { readEmbedMetadataString } from './readEmbedMetadata';
-
-/** `/EMBD_Metadata/AppearanceFit`: how a stamp's drawing fills its box. */
-export const KEY_APPEARANCE_FIT = 'AppearanceFit';
-
-const STAMP_FITS: readonly string[] = ['contain', 'cover', 'fill'];
-
-/** The fit a stamp records, or `null` when it records none (or one we don't know). */
-export function readStampFit(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-): StampFit | null {
-  const value = readEmbedMetadataString(fn, mem, annotPtr, KEY_APPEARANCE_FIT);
-  return value !== undefined && STAMP_FITS.includes(value) ? (value as StampFit) : null;
-}
 
 /**
  * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) +
@@ -39,9 +24,10 @@ export function readStamp(
 ): StampAnnotation<PdfCoordinates> {
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
-    fit: readStampFit(fn, mem, annotPtr),
+    fit: readAppearanceFit(fn, mem, annotPtr),
     opacity: readAnnotOpacity(fn, mem, annotPtr) ?? 1,
     ...readAnnotationBox(fn, mem, annotPtr),
   };

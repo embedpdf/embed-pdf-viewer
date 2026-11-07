@@ -14,10 +14,10 @@
     class="button"
     title={cmd.label}
     disabled={!cmd.enabled}
-    aria-pressed={cmd.active}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
     onclick={cmd.run}
   >
     {cmd.label}
-    {#if cmd.shortcut}<kbd class="shortcut">{cmd.shortcut}</kbd>{/if}
+    {#if cmd.shortcutLabel}<kbd class="shortcut">{cmd.shortcutLabel}</kbd>{/if}
   </button>
 {/if}

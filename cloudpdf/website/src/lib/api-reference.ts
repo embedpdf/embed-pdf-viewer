@@ -272,7 +272,7 @@ export function getGrantIndex(kind: 'x-required-capability' | 'x-required-scope'
 
 /**
  * A `$ref` target. Reused sub-schemas are emitted as pointers into the
- * component that first declared them (`.../DocAnnotationsList200Response/
+ * component that first declared them (`.../DocAnnotationsListResponse/
  * properties/annotations/items/anyOf/0/properties/color`), so resolving only
  * `#/components/schemas/{name}` left several hundred refs unresolved — they
  * rendered as their last path segment with no fields beneath it.

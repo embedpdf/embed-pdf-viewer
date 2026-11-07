@@ -13,16 +13,17 @@ choose one yourself, set `locale`:
 ```
 
 `locale` follows its prop, so a language switch in your app switches the viewer too. Without it,
-or with `'auto'`, the viewer follows the browser.
+or with `'auto'`, the viewer follows the browser, and shows the
+[fallback language](#fall-back-to-another-language) when the browser asks for none of its languages.
 
 ## The languages it speaks
 
-English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Japanese, Chinese
-(Simplified), Korean, Arabic and Hebrew. Each one loads only when it's needed. For Arabic and
-Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
+English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Swedish, Japanese, Chinese
+(Simplified and Traditional), Korean, Arabic and Hebrew. Each one loads only when it's needed. For
+Arabic and Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
 
-A language matches in its own script: readers of Traditional Chinese (`zh-TW`, `zh-HK`) see English,
-not Simplified Chinese, until there are strings for `zh-TW`.
+A language matches in its own script: readers in Taiwan and Hong Kong (`zh-TW`, `zh-HK`) see
+Traditional Chinese, and readers in China and Singapore (`zh-CN`, `zh-SG`) Simplified.
 
 ## Change a word
 
@@ -37,13 +38,27 @@ A built-in button's label has the command's id as its key. Give a new one, per l
 }
 ```
 
+A panel's button and the title in its header are one word, under the button's command id:
+`'panel:comments'` renames both. See [Panels](panels#a-panels-title).
+
+A mode tab is a button too, with the command `mode:annotate` for **Annotate**. Here a picker in your
+app sets `locale`, and `strings` gives two labels your own words in each language it offers:
+
+<Example name="viewer/customize/translations/languages" />
+
+> **Try it:** the second tab reads **Review** instead of Annotate, and the menu at the top left has
+> **Save a copy**. Pick Deutsch above the viewer: every word changes, yours too. Pick العربية and
+> the bars mirror.
+
 ## Translate your own buttons
 
-Give a command a `labelKey` instead of a `label`, and its words per language:
+Give a command a `labelKey`, and its words per language:
 
 ```js
 {
-  commands: [{ id: 'acme:send', labelKey: 'acme.send', icon: 'signature', run: send }],
+  commands: [
+    { id: 'acme:send', labelKey: 'acme.send', label: 'Send for signature', icon: 'signature', run: send },
+  ],
   strings: {
     en: { 'acme.send': 'Send for signature' },
     nl: { 'acme.send': 'Verstuur ter ondertekening' },
@@ -51,31 +66,108 @@ Give a command a `labelKey` instead of a `label`, and its words per language:
 }
 ```
 
-Panels and mode bars take a `titleKey` the same way, for their title.
+The `label` shows when no language has the word, so give it too. Panels and mode bars take a
+`titleKey` the same way, for their title. A panel's title is its
+button's label too.
 
 The style panel's words have keys too: each property and option by what it says
-(`annotation.style.stroke`, `annotation.flags.noView`, `annotation.lineEndings.openArrow`), and a
+(`annotation.style.stroke`, `annotation.style.opacity`, `annotation.lineEndings.openArrow`), and a
 form field's settings by theirs (`form.settings.tooltip`). Change one like any other word:
 
 ```js
 { strings: { en: { 'annotation.style.stroke': 'Line' } } }
 ```
 
+So do the page number's words, under `pageNumber.`, and the comments panel's, under `comments.`.
+The ones you're most likely to change:
+
+| Key | What it says |
+| :-- | :-- |
+| `pageNumber.page` | `{current} / {total}` |
+| `pageNumber.pages` | `{first}–{last} / {total}`, while a spread fits across the view (`spread`) |
+| `pageNumber.goToPage` | The tooltip of the page number, and the label of the field it turns into |
+| `comments.empty`, `comments.emptyReadOnly` | What the panel says while the document has no comments, when the user can add some and when not |
+| `comments.addPlaceholder`, `comments.replyPlaceholder`, `comments.reply` | The field for a new comment, and for a reply |
+| `comments.statusAccepted`, `comments.statusRejected`, `comments.statusCancelled`, `comments.statusCompleted`, `comments.statusNone` | A thread's status |
+
+A word in braces is filled in as the viewer writes it: keep it in your words. The number that turns
+into a field to type a page is `{current}`, or `{first}`:
+
+```js
+{ strings: { en: { 'pageNumber.page': 'Page {current} of {total}', 'comments.empty': 'No notes yet.' } } }
+```
+
 ## A language of your own
 
 Give `strings` for a language the viewer doesn't have, and it becomes one of its languages. Anything
-you don't translate shows in English, or in the plugins' own words where they have that language
-(in Swedish, the zoom, page and copy buttons):
+you don't translate shows in the [fallback language](#fall-back-to-another-language), English unless
+you set another:
 
 ```js
 {
-  locale: 'sv',
-  strings: { sv: { 'document:download': 'Ladda ner', 'zoom:in': 'Zooma in' } },
+  locale: 'da',
+  strings: { da: { 'document:download': 'Hent', 'zoom:in': 'Zoom ind' } },
 }
 ```
 
 It reads right to left when its code says so: a right-to-left language such as `fa` or `ur`, or a
 right-to-left script such as `ku-Arab`.
+
+## Load words when they're needed
+
+Give a language's words as a function, and they load the first time the viewer shows that language,
+so a page in Swedish never downloads your Danish:
+
+```js
+{
+  strings: {
+    sv: () => import('./strings/sv.json'),
+    da: () => import('./strings/da.json'),
+  },
+}
+```
+
+The viewer shows the language once its words are in, and English until then. The function returns
+the words, or a module whose `default` export is the words, which is what `import()` of a JSON file
+gives you. Without a bundler, fetch the file instead:
+`sv: () => fetch('/strings/sv.json').then((response) => response.json())`.
+
+## Fall back to another language
+
+The fallback language is the one the viewer shows when the browser asks for none of its languages,
+and the one a word comes from when the current language doesn't have it. It's English unless you
+set another:
+
+```js
+{
+  strings: {
+    sv: { 'acme.send': 'Skicka för signering', 'acme.archive': 'Arkivera' },
+    da: { 'acme.send': 'Send til underskrift' },
+  },
+  plugins: { i18n: { fallbackLocale: 'sv' } },
+}
+```
+
+A reader in Denmark sees your Danish, and Swedish for everything you didn't translate into Danish:
+**Arkivera**, and every word of the viewer's own. A reader in Finland, which the viewer has no
+language for, sees Swedish. The fallback language can be one of the viewer's languages or one of
+yours, and it loads at the start, so no word waits for it.
+
+## Translate the whole viewer
+
+Every word the viewer shows is in English in `@embedpdf/viewer/strings/en.json`, in the shape
+`strings` takes. Copy it, translate it, and give it as a language of your own:
+
+```js
+{
+  locale: 'da',
+  strings: { da: () => import('./strings/da.json') },
+}
+```
+
+Download it from
+[jsDelivr](https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/strings/en.json), or import it from
+the package. Any word you leave out shows in the fallback language.
 
 ## Good to know
 

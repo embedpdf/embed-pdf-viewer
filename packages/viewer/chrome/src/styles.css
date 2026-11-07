@@ -32,6 +32,10 @@
   --embedpdf-host-border: var(--epdf-border);
   --embedpdf-host-hover: var(--epdf-hover);
   --embedpdf-host-canvas: var(--epdf-canvas);
+  --embedpdf-host-page-background: var(--epdf-page-background);
+  --embedpdf-host-page-shadow: var(--epdf-page-shadow);
+  --embedpdf-host-tooltip: var(--epdf-tooltip);
+  --embedpdf-host-tooltip-text: var(--epdf-tooltip-text);
   --embedpdf-host-radius: var(--epdf-radius);
   --embedpdf-host-font: var(--epdf-font);
   --embedpdf-host-scrollbar-thumb: var(--epdf-scrollbar-thumb);
@@ -56,6 +60,13 @@
   --epdf-border: var(--embedpdf-host-border, #d1d5db);
   --epdf-hover: var(--embedpdf-host-hover, #f3f4f6);
   --epdf-canvas: var(--embedpdf-host-canvas, #f3f4f6);
+  /* A page before its picture arrives, and the shadow under it, the same in both modes: the
+     pages are paper. The Stage and a page view read them over their `page` settings. */
+  --epdf-page-background: var(--embedpdf-host-page-background, #ffffff);
+  --epdf-page-shadow: var(--embedpdf-host-page-shadow, 0 6px 18px rgb(0 0 0 / 0.18));
+  /* A tooltip in the other mode's colors, so it stands off what it's over, in either mode. */
+  --epdf-tooltip: var(--embedpdf-host-tooltip, var(--epdf-text));
+  --epdf-tooltip-text: var(--embedpdf-host-tooltip-text, var(--epdf-surface));
   --epdf-radius: var(--embedpdf-host-radius, 6px);
   --epdf-font: var(
     --embedpdf-host-font,
@@ -96,6 +107,8 @@
   --epdf-border: var(--embedpdf-host-border, #4b5563);
   --epdf-hover: var(--embedpdf-host-hover, #374151);
   --epdf-canvas: var(--embedpdf-host-canvas, #0d1117);
+  --epdf-tooltip: var(--embedpdf-host-tooltip, var(--epdf-text));
+  --epdf-tooltip-text: var(--embedpdf-host-tooltip-text, var(--epdf-surface));
   --epdf-scrollbar-thumb: var(
     --embedpdf-host-scrollbar-thumb,
     color-mix(in srgb, var(--epdf-text) 28%, transparent)
@@ -127,6 +140,8 @@
   --color-active: color-mix(in srgb, var(--epdf-hover) 90%, var(--epdf-text));
   --color-selected: var(--embedpdf-accent-tint);
   --color-canvas: var(--epdf-canvas);
+  --color-tooltip: var(--epdf-tooltip);
+  --color-tooltip-fg: var(--epdf-tooltip-text);
 
   --radius: calc(var(--epdf-radius) * 2 / 3);
   --radius-xs: calc(var(--epdf-radius) / 2);
@@ -168,6 +183,21 @@ body {
   background: var(--epdf-text-muted);
 }
 
+/* Full Screen where the browser has no full screen for the viewer (ui/fullscreen.ts): its box
+   over the whole window, from the top layer, so the page around it can't hold it in. Two parts,
+   so it wins over the element's own sizing of its root. */
+[data-epdf-fills-window]:popover-open {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
 /* With a finger as the main way of pointing (`data-touch` on the viewer's root, from its env),
    every button in a bar, document tab, panel header button and menu row, in a sheet or not, is
    at least 44 px tall: the size a fingertip hits. It follows the viewer's env, not a media
@@ -193,12 +223,22 @@ body {
   font-size: 16px;
 }
 
-/* On a phone, the floating bar with the page number gets out of the way while the pages scroll
-   (places.tsx): it fades out, then takes no presses or focus until it fades back in. */
-[data-scroll-hidden] {
+/* A floating bar that rests out of sight while nothing moves (places.tsx, its place's
+   `hideWhenIdle`): it fades out slowly and comes back quickly. Out of sight it takes no presses,
+   so a press there reaches the page and wakes it, but it keeps its place in the keyboard's order:
+   focus coming into it brings it back. */
+[data-float] [data-bar] {
+  transition: opacity 150ms;
+}
+[data-float] [data-idle-hidden] {
   opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 200ms,
-    visibility 0s 200ms;
+  transition: opacity 500ms;
+}
+[data-idle-hidden] * {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-float] [data-bar] {
+    transition: none;
+  }
 }

@@ -21,7 +21,7 @@ const field = (
 ): ScriptFieldInput => ({
   ref: ref(name),
   name,
-  family: 'text',
+  kind: 'text',
   value,
   defaultValue: value,
   display: 'visible',
@@ -108,8 +108,24 @@ describe('AcroJS prelude', () => {
     expect(out.event.rc).toBe(false);
     expect(out.formEffects).toEqual([]);
     expect(out.uiEffects).toEqual([
-      { kind: 'alert', message: 'Please enter a valid email.', icon: 1 },
+      { type: 'alert', message: 'Please enter a valid email.', icon: 1 },
     ]);
+  });
+
+  it("asks for the cursor in a field with setFocus(), by the field's full name", () => {
+    const vm = createVm();
+    const out = plain(
+      vm.__acrojsRun(
+        `if (event.value === '') this.getField('email').setFocus();`,
+        input([field('email', ''), field('name', '')], {
+          kind: 'field-validate',
+          target: ref('name'),
+          value: '',
+        }),
+      ),
+    );
+    expect(out.uiEffects).toEqual([{ type: 'focusField', field: 'email' }]);
+    expect(out.diagnostics).toEqual([]);
   });
 
   it('uses only the injected identity, clock and timezone for dynamic text', () => {
@@ -281,7 +297,7 @@ describe('AcroJS prelude', () => {
     expect(out.diagnostics).toEqual([]);
     expect(out.uiEffects).toEqual([
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/collect',
         fieldNames: ['a', 'b'],
         includeEmpty: true,
@@ -290,14 +306,14 @@ describe('AcroJS prelude', () => {
       },
       // Positional default: FDF via POST, whole eligible form.
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/plain',
         fieldNames: null,
         includeEmpty: false,
       },
       // bFDF === false is Acrobat's HTML-format switch.
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/html',
         fieldNames: ['c'],
         includeEmpty: false,
@@ -349,7 +365,6 @@ describe('AcroJS prelude', () => {
           ],
         },
         incomplete: false,
-        warningFlags: 0,
         warnings: [],
       }),
     ).toBe('root();\n;\nnext();');
@@ -358,7 +373,6 @@ describe('AcroJS prelude', () => {
       javaScriptProgramFromActionTree({
         root: null,
         incomplete: true,
-        warningFlags: 4,
         warnings: ['incomplete'],
       }),
     ).toThrow(/incomplete/);

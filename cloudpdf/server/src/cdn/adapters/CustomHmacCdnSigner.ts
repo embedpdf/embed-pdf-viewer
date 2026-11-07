@@ -49,6 +49,7 @@ import type { CdnSigner, PurgeInput, PurgeReceipt, SignInput } from '../CdnSigne
 import { base64url } from '../util/base64url';
 import { buildBaseUrlOverrides } from '../util/baseUrlOverrides';
 import { hmacSha256 } from '../util/hmac';
+import { isoTimeOfSeconds } from '../../time';
 
 export interface CustomHmacCdnSignerOptions {
   cdnOrigin: string;
@@ -80,7 +81,7 @@ export class CustomHmacCdnSigner implements CdnSigner {
       const { sig, nonce, expires } = signCustomHmacToken(this.secret, docPrefix, input.expiresAt);
       return {
         adapter: 'custom-hmac',
-        expiresAt: input.expiresAt,
+        expiresAt: isoTimeOfSeconds(input.expiresAt),
         cache: { scope: 'edge-shared', immutableVersionedReads: true },
         baseUrlOverrides,
         authHeader: {
@@ -113,7 +114,7 @@ export class CustomHmacCdnSigner implements CdnSigner {
     });
     return {
       adapter: 'custom-hmac',
-      expiresAt: input.expiresAt,
+      expiresAt: isoTimeOfSeconds(input.expiresAt),
       cache: { scope: 'edge-shared', immutableVersionedReads: true },
       baseUrlOverrides,
       authHeader: null,

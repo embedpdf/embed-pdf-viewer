@@ -1,35 +1,48 @@
 /**
- * Direct manipulation: set, pan, scroll and pinch-zoom the camera, and the
- * gesture bracket. The camera moves freely and the cursor is derived from it
- * (the manipulation direction of cursor reconciliation).
+ * Direct manipulation: set, pan, scroll and pinch-zoom the camera, the
+ * gesture bracket and the release fling. The camera moves freely and the
+ * cursor is derived from it (the manipulation direction of cursor
+ * reconciliation). In paged flow the same input turns pages
+ * (`navigation/turn.ts`).
  */
+import type { PluginContext } from '@embedpdf/core';
+import type { Point } from '@embedpdf/core-geometry';
 import {
   anchorAtPoint,
   cameraForAnchorAtScreen,
   cameraFromScroll,
   clampCamera,
+  clampZoom,
   panByScreen,
   toWorld,
   zoomAround,
+  type Camera,
 } from '@embedpdf/core-stage';
-import type { PluginContext } from '@embedpdf/core';
 
 import type { StageScrollToOptions } from '../contract';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, type StageState } from '../model';
+import { patchSettings, type StageModel } from '../model';
+import type { StageTurns } from '../navigation/turn';
 import type { StagePageReads } from '../read/pages';
 import type { StageServices } from '../services';
 import type { StageAnimation } from './animation';
 import type { StageCameraWrite } from './write';
 
+/** The part of a pan the clamp refused, in screen px, signed like the pan. */
+const refusedBy = (wanted: Camera, allowed: Camera): Point => ({
+  x: (allowed.x - wanted.x) * wanted.zoom,
+  y: (allowed.y - wanted.y) * wanted.zoom,
+});
+
 export function createGestures(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
   write: StageCameraWrite,
   { cancelAnimation, animateTo, startCameraPhysics }: StageAnimation,
   { scrollMetricsNow }: Pick<StagePageReads, 'scrollMetricsNow'>,
+  turns: StageTurns,
 ) {
-  const { camera, viewport, padding, buildScene, stayBounds, constraint } = scene;
+  const { camera, viewport, padding, zoomLimits, buildScene, stayBounds, constraint } = scene;
   const {
     gesture,
     armRest,
@@ -59,10 +72,11 @@ export function createGestures(
       setCamera: (next) => {
         markCause('user');
         cancelAnimation();
-        writeCamera(next);
+        writeCamera({ ...next, zoom: clampZoom(next.zoom, zoomLimits()) });
         syncCursorFromCamera();
       },
       panBy: (dx, dy) => {
+        if (turns.beforePan()) return; // this stream already turned the page
         markCause('user');
         cancelAnimation();
         if (gesture.depth > 0 && gesture.elastic) {
@@ -73,7 +87,9 @@ export function createGestures(
           gesture.raw = panByScreen(gesture.raw ?? unrubberize(camera()), dx, dy);
           writeCameraUnclamped(rubberize(gesture.raw));
         } else {
-          writeCamera(panByScreen(camera(), dx, dy));
+          const wanted = panByScreen(camera(), dx, dy);
+          writeCamera(wanted);
+          turns.refused(refusedBy(wanted, camera()));
         }
         syncCursorFromCamera();
       },
@@ -92,7 +108,7 @@ export function createGestures(
         // The page-relative focal point: the durable identity of "what is
         // under the pointer".
         const focal = before.itemCount ? anchorAtPoint(before, toWorld(camera(), point)) : null;
-        writeCamera(zoomAround(camera(), point, factor));
+        writeCamera(zoomAround(camera(), point, factor, zoomLimits()));
         // Record the resulting level as the zoom intent (focal, so no
         // re-anchor). Inside a gesture bracket it is deferred to endGesture:
         // one patch per pinch instead of one per event.
@@ -121,12 +137,18 @@ export function createGestures(
           gesture.zoomed = false;
           gesture.elastic = options?.elastic === true;
           gesture.raw = null;
+          turns.dragBegan();
         }
       },
       endGesture: () => {
         if (gesture.depth === 0) return;
         gesture.depth--;
         if (gesture.depth > 0) return;
+        // How far the finger pulled past the edge, read before the bracket forgets it.
+        const overshoot = gesture.raw
+          ? refusedBy(gesture.raw, clampCamera(gesture.raw, stayBounds(), viewport(), constraint()))
+          : { x: 0, y: 0 };
+        const zoomed = gesture.zoomed;
         gesture.raw = null;
         const wasElastic = gesture.elastic;
         gesture.elastic = false;
@@ -139,6 +161,8 @@ export function createGestures(
           armRest(); // the gesture is over: the rest countdown runs now
         }
         syncCursorFromCamera();
+        // A pull past a paged view's edge turns the page instead of springing home.
+        if (turns.dragEnded(overshoot, zoomed)) return;
         if (wasElastic) {
           // Released while stretched: spring home. A fling() right after
           // re-enters the same physics with the release velocity.
@@ -146,6 +170,11 @@ export function createGestures(
           const clamped = clampCamera(current, stayBounds(), viewport(), constraint());
           if (clamped.x !== current.x || clamped.y !== current.y) startCameraPhysics(0, 0);
         }
+      },
+      fling: (velocityX, velocityY) => {
+        // A flick past a paged view's edge turns the page instead of gliding.
+        if (turns.flung({ x: velocityX, y: velocityY })) return;
+        startCameraPhysics(velocityX, velocityY);
       },
     } satisfies Partial<StageHostCapability>,
   };

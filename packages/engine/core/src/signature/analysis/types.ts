@@ -1,11 +1,11 @@
-import type { FormFieldFamily } from '../../forms/field';
+import type { FormFieldKind } from '../../forms/field';
 import type {
   BaseVersionInfo,
   DocMdpPermission,
   DocumentFieldLock,
   FieldLockSpec,
   ModificationLevel,
-  SignatureDTO,
+  Signature,
 } from '../types';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 
@@ -33,11 +33,17 @@ export type PdfValue =
  * lists the objects it was resolved through, from the anchor's side down
  * to the object. A widget's appearance stream reached through an unchanged
  * indirect `/AP` dictionary is therefore
- * `{ parent: widget, label: 'AP/N', via: [apDict] }`.
+ * `{ parent: widget, label: 'AP/N', via: [apDict] }`. A route inside a loop
+ * of unchanged objects is written `…`, and `via` names the member the edge
+ * enters the loop at and the one it leaves from: a page under a structure
+ * tree is `{ parent: catalog, label: 'StructTreeRoot/…/Pg', via: [structTreeRoot, element] }`.
  */
 export interface ObjectReferrer {
   parent: number;
-  /** Escaped dictionary keys and `[n]` indexes joined by `/`, e.g. `AcroForm/Fields/[0]`, `AP/N`. */
+  /**
+   * Escaped dictionary keys and `[n]` indexes joined by `/`, e.g.
+   * `AcroForm/Fields/[0]`, `AP/N`; `…` for a route inside a loop.
+   */
   label: string;
   via?: number[];
 }
@@ -116,7 +122,7 @@ export interface RevisionField {
   objectNumber: number;
   /** Fully qualified name. */
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   /** Widget annotation object numbers (a merged field-widget lists its own number). */
   widgets: number[];
   /**
@@ -140,7 +146,7 @@ export interface RevisionStructure {
   pages: number[];
   fields: RevisionField[];
   /** In the file's coordinates: a past revision's pages may not be the document's now. */
-  signatures: SignatureDTO[];
+  signatures: Signature[];
 }
 
 export interface ChangeFinding {

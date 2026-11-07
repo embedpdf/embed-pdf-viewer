@@ -7,10 +7,16 @@
  */
 import { defineState } from '@embedpdf/core';
 
-import { StampToken } from './contract';
+import { StampToken, type StampAsset } from './contract';
+
+/** The armed stamp. */
+export interface StampState {
+  /** The stamp the next click on the document places, or `null`. */
+  readonly armedAsset: StampAsset | null;
+}
 
 export const stampState = defineState(StampToken, {
-  read: (stamp) => ({
+  read: (stamp): StampState => ({
     armedAsset: stamp.getArmedAsset(),
   }),
   empty: {

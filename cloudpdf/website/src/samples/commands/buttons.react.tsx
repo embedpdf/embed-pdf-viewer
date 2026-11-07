@@ -10,7 +10,7 @@ import './buttons.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), commandsPlugin({ commands: standardCommands })];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // One button, drawn from its command: the label, the shortcut, and whether it can run now.
 function CommandButton({ id }: { id: string }) {
@@ -23,18 +23,18 @@ function CommandButton({ id }: { id: string }) {
       className="button"
       title={command.label}
       disabled={!command.enabled}
-      aria-pressed={command.active}
+      aria-pressed={command.pressable ? command.active : undefined}
       onClick={command.run}
     >
       {command.label}
-      {command.shortcut && <kbd className="shortcut">{command.shortcut}</kbd>}
+      {command.shortcutLabel && <kbd className="shortcut">{command.shortcutLabel}</kbd>}
     </button>
   );
 }
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="toolbar">
           <CommandButton id="page:previous" />

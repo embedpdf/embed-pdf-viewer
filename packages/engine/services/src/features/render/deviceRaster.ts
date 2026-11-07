@@ -89,11 +89,11 @@ export interface RasterizeAsyncOptions extends Omit<RasterizeOptions, 'draw'> {
  * into a `PageRaster`, and free everything. Returns null on a degenerate rect or
  * a failed allocation/draw.
  */
-export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): PageRaster | null {
-  const target = allocateRaster(runtime, opts);
+export function rasterize(runtime: PdfRuntimeModule, options: RasterizeOptions): PageRaster | null {
+  const target = allocateRaster(runtime, options);
   if (!target) return null;
   try {
-    return opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr) ? target.read() : null;
+    return options.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr) ? target.read() : null;
   } finally {
     target.free();
   }
@@ -102,12 +102,12 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
 /** {@link rasterize} with a `draw` that may await; everything stays allocated until it settles. */
 export async function rasterizeAsync(
   runtime: PdfRuntimeModule,
-  opts: RasterizeAsyncOptions,
+  options: RasterizeAsyncOptions,
 ): Promise<PageRaster | null> {
-  const target = allocateRaster(runtime, opts);
+  const target = allocateRaster(runtime, options);
   if (!target) return null;
   try {
-    return (await opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr))
+    return (await options.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr))
       ? target.read()
       : null;
   } finally {

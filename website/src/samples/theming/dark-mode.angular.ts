@@ -16,14 +16,14 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { localEngine } from '@embedpdf/engine';
 
-const TITLE = { start: 10, count: 52 };
+const FIRST_WORD = { start: 28, count: 9 };
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
+// On load: the first word is selected and "PDF" is found, so every color below has something to paint.
 @Component({
   selector: 'demo-show-colors',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,7 +36,7 @@ export class ShowColors {
     void inject(EpdfSearch).search({ text: 'PDF' });
     effect(() => {
       const cover = document.pages()[0]?.ref;
-      if (cover) untracked(() => selection.select({ page: cover, ...TITLE }));
+      if (cover) untracked(() => selection.select({ page: cover, ...FIRST_WORD }));
     });
   }
 }
@@ -54,7 +54,7 @@ export class ShowColors {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

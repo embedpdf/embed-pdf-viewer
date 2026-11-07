@@ -1,14 +1,7 @@
-import type { ReopenableUploadSource, UploadSource } from "./types.js";
+import { hex, isBlobSource, prepareBlobSource } from "./blob-source.js";
+import type { PreparedUploadSource, ReopenableUploadSource, UploadSource } from "./types.js";
 
-export interface PreparedUploadSource {
-    size: number;
-    sha256: string;
-    filename: string;
-    contentType: string;
-    open(): Promise<BodyInit>;
-    openProxyBlob(): Promise<Blob>;
-}
-
+/** Every source `uploads.create` takes, on a server: bytes, Blobs, files on disk and reopenable streams. */
 export async function prepareUploadSource(source: UploadSource): Promise<PreparedUploadSource> {
     if (isReopenable(source)) {
         return {
@@ -30,15 +23,8 @@ export async function prepareUploadSource(source: UploadSource): Promise<Prepare
 
     if (isPathSource(source)) return preparePath(source.path);
 
-    const blob = toBlob(source);
-    return {
-        size: blob.size,
-        sha256: await sha256Bytes(new Uint8Array(await blob.arrayBuffer())),
-        filename: "document.pdf",
-        contentType: blob.type || "application/pdf",
-        open: async (): Promise<BodyInit> => blob,
-        openProxyBlob: async (): Promise<Blob> => blob,
-    };
+    if (isBlobSource(source)) return prepareBlobSource(source, sha256Bytes);
+    throw new Error("upload source must be bytes, a Blob, { path } or a reopenable source");
 }
 
 async function preparePath(path: string): Promise<PreparedUploadSource> {
@@ -66,6 +52,7 @@ async function preparePath(path: string): Promise<PreparedUploadSource> {
     };
 }
 
+/** Web Crypto where there is one; Node 18 has no global `crypto`, so `node:crypto` there. */
 async function sha256Bytes(bytes: Uint8Array): Promise<string> {
     if (globalThis.crypto?.subtle) {
         const digest = await globalThis.crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
@@ -73,12 +60,6 @@ async function sha256Bytes(bytes: Uint8Array): Promise<string> {
     }
     const { createHash } = await import("node:crypto");
     return createHash("sha256").update(bytes).digest("hex");
-}
-
-function toBlob(source: Uint8Array | ArrayBuffer | Blob): Blob {
-    if (source instanceof Blob) return source;
-    const bytes = source instanceof Uint8Array ? new Uint8Array(source) : new Uint8Array(source.slice(0));
-    return new Blob([bytes], { type: "application/pdf" });
 }
 
 function isPathSource(source: UploadSource): source is { path: string } {
@@ -95,8 +76,4 @@ function normalizeSha(value: string): string {
         throw new Error("reopenable upload source sha256 must be 64 lowercase or uppercase hex characters");
     }
     return normalized;
-}
-
-function hex(bytes: Uint8Array): string {
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

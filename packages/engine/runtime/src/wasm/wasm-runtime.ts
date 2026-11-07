@@ -254,7 +254,10 @@ function expandI64Args(signature: PdfFunctionSignature, args: unknown[]): unknow
 
 function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
   const out: Record<string, (...args: unknown[]) => unknown> = {};
-  for (const [name, signature] of Object.entries(pdfFunctionSignatures)) {
+  // Read through the general signature type: the table's literal types,
+  // united across every function, are more than the compiler can represent.
+  const signatures: Readonly<Record<string, PdfFunctionSignature>> = pdfFunctionSignatures;
+  for (const [name, signature] of Object.entries(signatures)) {
     const hasI64Params = signature.params.some((p) => p.wasm.kind === 'i64');
     const bridge =
       (call: (...args: unknown[]) => unknown) =>

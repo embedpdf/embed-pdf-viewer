@@ -41,7 +41,8 @@ export type StampLibraryKind = string;
 
 /**
  * How a mark is authored: drawn strokes (kept as a vector path), typed text
- * in a registered font (embedded by the flatten), a raster image, or a page
+ * in a standard font or one of the `fonts` setting's (embedded by the
+ * flatten), a raster image, or a page
  * of a PDF. Ink strokes are in points, from the top-left and y down like
  * every page position, any origin — the asset page is the mark's bounds.
  */
@@ -64,26 +65,26 @@ export type MarkSource =
  */
 export interface StampAsset {
   /** Derived and stable: `${libraryId}:${name}` (never allocated). */
-  id: string;
-  libraryId: string;
-  kind: StampAssetKind;
+  readonly id: string;
+  readonly libraryId: string;
+  readonly kind: StampAssetKind;
   /**
    * The stamp's identifier: the text before the first `=` in its library
    * key, and the placed annotation's `/Name`: a standard name (`Approved`)
    * or a custom one (`#LBGiYhk8V_oAfmqAPENiwD`). Not display text.
    */
-  name: string;
+  readonly name: string;
   /** What the picker shows and the placed annotation's default `/Subj`:
    *  the text after `=` in the library key (`Goedgekeurd`). */
-  label: string;
+  readonly label: string;
   /** Intrinsic size in PDF points (the source page's crop box / image pixels 1:1). */
-  size: { width: number; height: number };
+  readonly size: { width: number; height: number };
   /** The library page that is this asset. Every asset is a page: a raster
    *  added to a library becomes a page carrying the image. */
-  page: PageRef;
+  readonly page: PageRef;
   /** An explicit `/Subj` override (PieceInfo); placements use `label` otherwise. */
-  subject?: string;
-  categories?: string[];
+  readonly subject?: string;
+  readonly categories?: string[];
 }
 
 /**
@@ -93,15 +94,15 @@ export interface StampAsset {
  */
 export interface StampLibrary {
   /** PieceInfo `Id`: stable while the title is editable. */
-  id: string;
-  name: string;
+  readonly id: string;
+  readonly name: string;
   /** PieceInfo `Kind`: `'stamps'`, `'signatures'`, or an embedder's own. */
-  kind: StampLibraryKind;
+  readonly kind: StampLibraryKind;
   /** PieceInfo `Locale`: the language of the labels, when the library says. */
-  locale?: string;
-  categories?: string[];
+  readonly locale?: string;
+  readonly categories?: string[];
   /** Asset ids in display order. */
-  assetIds: string[];
+  readonly assetIds: string[];
 }
 
 // ── settings ──────────────────────────────────────────────────────────────
@@ -112,6 +113,18 @@ export interface StampLibrary {
  * destroyed with the plugin.
  */
 export type StampAssetEngine = LocalEngine | (() => LocalEngine | Promise<LocalEngine>);
+
+/**
+ * A font typed marks can be written in (`mark: { kind: 'text', fontFamily: key }`), beyond the
+ * standard 14 and the asset engine's own: registered on the asset engine the first time a mark
+ * names it.
+ */
+export interface StampFont {
+  /** What a typed mark's `fontFamily` names it by. */
+  readonly key: string;
+  /** Its TrueType or OpenType file, read the first time a mark names it. */
+  readonly load: () => Promise<Uint8Array>;
+}
 
 /**
  * The stamp plugin's settings. `stampPlugin(config)` registers them over
@@ -131,6 +144,12 @@ export interface StampSettings {
    * ```
    */
   readonly assetEngine: StampAssetEngine | null;
+  /**
+   * The fonts typed marks can be written in, each registered on the asset engine the first time
+   * a mark names it: a mark is written on the asset engine, so the font goes there, whichever
+   * engine the viewer draws with.
+   */
+  readonly fonts: readonly StampFont[];
   /** The width of a stamp's thumbnail, in device pixels. */
   readonly previewWidth: number;
   /**
@@ -146,6 +165,7 @@ export interface StampSettings {
 /** What the stamp settings are when the app registers none. */
 export const STAMP_DEFAULTS: StampSettings = {
   assetEngine: null,
+  fonts: [],
   previewWidth: 256,
   dynamic: true,
 };
@@ -193,7 +213,7 @@ export interface ImportLibraryOptions extends OperationOptions {
   /** Library categories written to catalog `/PieceInfo`. */
   categories?: string[];
   /** Kind stamped onto every imported asset. Default `'stamp'`. */
-  kind?: StampAssetKind;
+  assetKind?: StampAssetKind;
   /** What the file is for; overrides what the file says (an Acrobat-authored set imported for a toolbar). */
   libraryKind?: StampLibraryKind;
   /**
@@ -204,7 +224,7 @@ export interface ImportLibraryOptions extends OperationOptions {
   assetName?: (pageIndex: number) => string;
 }
 
-export interface AddAssetInput {
+export interface CreateAssetInput {
   /** Target library; omitted, a new single-asset library named after the asset. */
   libraryId?: string;
   /** The identifier (placed `/Name`). Omit to mint an Acrobat-style `#…` one. */
@@ -230,7 +250,7 @@ export interface AddAssetInput {
 }
 
 /** What `createAssetFromAnnotations()` takes besides the annotations: where the stamp goes and its name. */
-export type AssetFromAnnotationsInput = Omit<AddAssetInput, 'source' | 'mark' | 'size'>;
+export type AssetFromAnnotationsInput = Omit<CreateAssetInput, 'source' | 'mark' | 'size'>;
 
 export interface StampAssetPatch {
   readonly label?: string;
@@ -241,8 +261,8 @@ export interface StampAssetPatch {
 
 /** A cached, browser-paintable render of an asset (PNG from import; raster assets as-is). */
 export interface StampAssetPreview {
-  bytes: Uint8Array;
-  mimeType: string;
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
 }
 
 export interface StampLibraryFilter {
@@ -259,14 +279,14 @@ export interface StampAssetFilter {
 /** A library's bytes changed, and why: the one to save it on. */
 export interface StampLibraryChangedEvent {
   readonly libraryId: string;
-  readonly reason:
+  readonly type:
     | 'created'
     | 'imported'
     | 'updated'
-    | 'asset-added'
+    | 'asset-created'
     | 'asset-updated'
-    | 'asset-removed'
-    | 'removed';
+    | 'asset-deleted'
+    | 'deleted';
 }
 export interface StampLibraryCreatedEvent {
   readonly libraryId: string;
@@ -326,7 +346,7 @@ export interface StampCapability extends SettingsApi<StampSettings> {
     options: { width: number } & OperationOptions,
   ): Promise<StampAssetPreview | null>;
   /** A copy of the asset's placement bytes (a one-page PDF), or null. */
-  readAssetBytes(assetId: string): Uint8Array | null;
+  getAssetBytes(assetId: string): Uint8Array | null;
 
   // ── libraries ──
   /** Create an empty library. Fires `onLibraryCreated` and `onLibraryChanged`. */
@@ -357,7 +377,7 @@ export interface StampCapability extends SettingsApi<StampSettings> {
    * library, `invalid-input` for bytes that aren't a picture or a taken
    * identifier. Fires `onAssetCreated`.
    */
-  createAsset(input: AddAssetInput, options?: OperationOptions): Promise<{ asset: StampAsset }>;
+  createAsset(input: CreateAssetInput, options?: OperationOptions): Promise<{ asset: StampAsset }>;
   /**
    * Annotations on a page of a document become one stamp, exactly as they
    * look. All or nothing: a hidden annotation, one without an appearance, or

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine-services",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "Engine v3 service implementations: synchronous, runtime-agnostic logic that runs identically inside the local WASM worker and the @cloudpdf/server worker_thread.",
   "type": "module",
@@ -44,6 +44,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-runtime": "workspace:*"
   },

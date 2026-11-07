@@ -62,13 +62,32 @@ export interface DocumentManifest {
    */
   formsVersion: number;
   /**
+   * Doc-level pin for the immutable outline (`/outline@{outlineVersion,
+   * layoutVersion}`). Bumps only on outline writes. The outline is read in
+   * page space, so its URL also carries `layoutVersion`: a page delete or a
+   * box change moves what it reads without an outline write.
+   */
+  outlineVersion: number;
+  /**
+   * Doc-level pin for the fonts that can be named in the document
+   * (`/fonts@{fontsVersion}`). Bumps on a write that changes the fonts the
+   * list shows: one that embeds a font, or removes the last use of one.
+   */
+  fontsVersion: number;
+  /**
+   * Doc-level pin for a read across every page's content (search). Moves with
+   * any write that moves a page's `contentVersion`, inserts a page or deletes
+   * one, and never on an annotation or form write.
+   */
+  contentsVersion: number;
+  /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
    * from `auditHead` can never miss a mutation between manifest fetch and
    * stream open (the gapless-subscribe cursor).
    */
   auditHead: number;
-  baseSha: string;
+  baseSha256: string;
   /**
    * The layer's write serial (`layers.current_version`; 0 for the base view
    * and for a never-written layer) — the `editsVersion` half of the
@@ -81,8 +100,8 @@ export interface DocumentManifest {
    * while `layerVersion` keeps counting, so this is the only honest signal.
    */
   working: boolean;
-  /** Byte length of `baseSha`'s file — with the sha, the `BaseVersionInfo` a client signs. */
-  baseByteLength: number;
+  /** Size of `baseSha256`'s file — with the sha, the `BaseVersionInfo` a client signs. */
+  baseSizeBytes: number;
   /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge

@@ -14,9 +14,9 @@ import '../reveal.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const active = ref(0);
@@ -30,7 +30,7 @@ function boxOn(page: PageContextValue, rect: (typeof SPOTS)[number]['rect']) {
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <SpotPicker v-model:active="active" v-model:zoom="zoom" />

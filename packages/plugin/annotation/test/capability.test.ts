@@ -61,21 +61,21 @@ const keys = (annotations: readonly { ref: AnnotationRef }[]) =>
 describe('settings', () => {
   it('reads what the app registered over the defaults, and the session snaps as they say', async () => {
     const harness = annotationHarness({
-      config: { chrome: { accent: '#e91e63' }, snap: { alignmentThreshold: 10 } },
+      config: { chrome: { accent: '#e91e63' }, snap: { alignmentThresholdPx: 10 } },
     });
     await harness.load([]);
     const settings = harness.capability.getSettings();
     expect(settings.chrome.accent).toBe('#e91e63');
     expect(settings.chrome.handles.shape).toBe('square'); // a default the app left alone
     expect(settings.afterCreate).toEqual({ select: true, tool: 'stay', editText: true });
-    expect(harness.model().snap.alignmentThreshold).toBe(10);
+    expect(harness.model().snap.alignmentThresholdPx).toBe(10);
   });
 
   it('updateSettings changes snapping at once, says what changed, and resetSettings goes back', async () => {
     const harness = annotationHarness();
     await harness.load([]);
     const changes: string[][] = [];
-    harness.capability.onSettingsChanged(({ changed }) => changes.push([...changed]));
+    harness.capability.onSettingsChanged(({ changedKeys }) => changes.push([...changedKeys]));
     harness.capability.updateSettings({ snap: { alignment: false } });
     expect(harness.model().snap.alignment).toBe(false);
     harness.capability.updateSettings({ chrome: { rotationHandle: { enabled: false } } });
@@ -90,7 +90,7 @@ describe('settings', () => {
       config: { chrome: { rotationHandle: { enabled: false } } },
     });
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const kinds = harness.capability.listChromeNodes(PAGE).map((node) => node.kind);
     expect(kinds).toContain('handle');
     expect(kinds).not.toContain('rotate-knob');
@@ -135,7 +135,7 @@ describe('reads', () => {
   it('the declared state has the status, the selection and what is typed in', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const state = annotationState.read(harness.capability);
     expect(state.status).toBe('ready');
     expect(keys(state.selected)).toEqual([annotationKey(ref(20))]);
@@ -154,21 +154,21 @@ describe('the selection', () => {
     const harness = annotationHarness();
     await harness.load([square(20), square(21)]);
     const { selection } = harness.capability;
-    selection.set([ref(20)]);
+    selection.select([ref(20)]);
     selection.add([ref(21)]);
-    expect(keys(selection.list())).toEqual([annotationKey(ref(20)), annotationKey(ref(21))]);
+    expect(keys(selection.getSelected())).toEqual([annotationKey(ref(20)), annotationKey(ref(21))]);
     selection.clear();
-    expect(selection.list()).toEqual([]);
+    expect(selection.getSelected()).toEqual([]);
     selection.selectAll(0);
-    expect(selection.list()).toHaveLength(2);
+    expect(selection.getSelected()).toHaveLength(2);
     selection.selectAll(7); // no such page: nothing to select
-    expect(selection.list()).toEqual([]);
-    selection.set([ref(20)]);
-    selection.set([]); // selects nothing
-    expect(selection.list()).toEqual([]);
-    selection.set([ref(21)]);
+    expect(selection.getSelected()).toEqual([]);
+    selection.select([ref(20)]);
+    selection.select([]); // selects nothing
+    expect(selection.getSelected()).toEqual([]);
+    selection.select([ref(21)]);
     selection.add([]); // adds nothing
-    expect(keys(selection.list())).toEqual([annotationKey(ref(21))]);
+    expect(keys(selection.getSelected())).toEqual([annotationKey(ref(21))]);
   });
 
   it('selectInRect refuses a page that isn’t in the document', async () => {
@@ -187,7 +187,7 @@ describe('the selection', () => {
   it('flags are properties: a selection reports them, and update writes them', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const { properties, values } = harness.capability.selection.getProperties();
     expect(properties.find((property) => property.key === 'color')?.control).toBe('color');
     expect(properties.find((property) => property.key === 'locked')?.control).toBe('flag');
@@ -195,6 +195,27 @@ describe('the selection', () => {
     harness.update.mockResolvedValueOnce({ annotation: square(20, { locked: true }) });
     await harness.capability.selection.update({ locked: true });
     expect(harness.update).toHaveBeenCalledWith(ref(20), expect.objectContaining({ locked: true }));
+  });
+
+  it('the kind is a property too: update turns a square into a circle in place', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.capability.selection.select([ref(20)]);
+    const { properties, values } = harness.capability.selection.getProperties();
+    const [kind] = properties;
+    expect(kind?.key).toBe('subtype');
+    expect(kind?.control === 'choice' && kind.options.map((option) => option.value)).toEqual([
+      'square',
+      'circle',
+    ]);
+    expect(values.subtype).toBe('square');
+    harness.update.mockResolvedValueOnce({ annotation: { ...square(20), subtype: 'circle' } });
+    await harness.capability.selection.update({ subtype: 'circle' });
+    expect(harness.update).toHaveBeenCalledWith(
+      ref(20),
+      expect.objectContaining({ subtype: 'circle' }),
+    );
+    expect(harness.capability.get(ref(20))?.subtype).toBe('circle');
   });
 });
 

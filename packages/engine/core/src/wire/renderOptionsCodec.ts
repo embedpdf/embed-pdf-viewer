@@ -11,12 +11,17 @@ import {
   type AnnotationAppearanceRenderOptions,
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
+import type { TokenPin } from './cachedReads';
 
-/** A picture's pins: `contentVersion`, and the pins of what its family draws. */
+/**
+ * A picture's pins: `contentVersion`, the pins of what its family draws, and
+ * the render engine value and shape every cached read carries.
+ */
 export interface RenderVersions {
   contentVersion: number;
   annotationVersion?: number;
   widgetVersion?: number;
+  pin: TokenPin;
 }
 
 /**
@@ -27,8 +32,10 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * What the picture draws is never in the token: the caller picks the
- * family's path (`PAGE_RENDER_FAMILIES`) and passes that family's pins.
+ * What the picture draws, whether it's a thumbnail, and whether and at which
+ * DPI it prints, is never in the token: the caller picks the picture's path
+ * (`PAGE_RENDER_FAMILIES`, `PAGE_THUMBNAIL_FAMILIES`, `PAGE_PRINT_FAMILIES`)
+ * and passes that family's pins.
  * Each family's query schema checks its own pins when the URL is decoded
  * server-side. Round-tripping (flatten → encode → decode → unflatten →
  * schema parse) recovers the original SDK options.
@@ -40,9 +47,18 @@ export function renderImageOptionsToWire(
   const {
     includeAnnotations: _inThePath,
     includeFormFields: _alsoInThePath,
+    usage,
+    viewport,
     ...wireOptions
   } = options;
-  return flatten({ ...wireOptions, ...versions });
+  // A print picture's size is its tier, and a thumbnail's is a thumbnail's:
+  // both are their path too.
+  const sized =
+    usage === 'print' || viewport === undefined || viewport.kind === 'thumbnail'
+      ? {}
+      : { viewport };
+  const { pin, ...pins } = versions;
+  return flatten({ ...wireOptions, ...sized, ...pins, engine: pin.engine, shape: pin.shape });
 }
 
 /**
@@ -58,8 +74,9 @@ export function renderImageOptionsToToken(
 
 /**
  * The worker-side `PageRenderOptions` of a parsed picture request: the
- * render options, and what its family draws (stamped by the family's query
- * schema). Pure shape transform; image encoding stays out.
+ * render options, and what its family draws and whether it prints (stamped
+ * by the picture's query schema). Pure shape transform; image encoding stays
+ * out.
  */
 export function pageRenderOptionsFromImageOptions(options: PageImageOptions): PageRenderOptions {
   return {
@@ -69,6 +86,7 @@ export function pageRenderOptionsFromImageOptions(options: PageImageOptions): Pa
     ...(options.background !== undefined ? { background: options.background } : {}),
     includeAnnotations: options.includeAnnotations ?? false,
     includeFormFields: options.includeFormFields ?? false,
+    ...(options.usage !== undefined ? { usage: options.usage } : {}),
   };
 }
 
@@ -79,6 +97,7 @@ export function pageRenderOptionsFromImageOptions(options: PageImageOptions): Pa
  */
 export interface AnnotationRenderVersion {
   annotationVersion: number;
+  pin: TokenPin;
 }
 
 /**
@@ -90,7 +109,11 @@ export function annotationAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: AnnotationRenderVersion,
 ): WireFlat {
-  return appearancesToWire(options, { annotationVersion: versions.annotationVersion });
+  return appearancesToWire(options, {
+    annotationVersion: versions.annotationVersion,
+    engine: versions.pin.engine,
+    shape: versions.pin.shape,
+  });
 }
 
 /** Convenience: build the full encoded appearance render token in one call. */
@@ -109,6 +132,7 @@ export function annotationAppearancesImageOptionsToToken(
  */
 export interface WidgetRenderVersion {
   widgetVersion: number;
+  pin: TokenPin;
 }
 
 /** The widget twin of {@link annotationAppearancesImageOptionsToWire}. */
@@ -116,7 +140,11 @@ export function widgetAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: WidgetRenderVersion,
 ): WireFlat {
-  return appearancesToWire(options, { widgetVersion: versions.widgetVersion });
+  return appearancesToWire(options, {
+    widgetVersion: versions.widgetVersion,
+    engine: versions.pin.engine,
+    shape: versions.pin.shape,
+  });
 }
 
 /** The widget twin of {@link annotationAppearancesImageOptionsToToken}. */
@@ -133,7 +161,7 @@ export function widgetAppearancesImageOptionsToToken(
  */
 function appearancesToWire(
   options: AnnotationAppearanceImageOptions,
-  pin: Record<string, number>,
+  pin: Record<string, number | string>,
 ): WireFlat {
   const { modes, ...rest } = options;
   const asked = appearanceModesOf(modes);

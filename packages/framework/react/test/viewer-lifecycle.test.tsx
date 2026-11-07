@@ -56,8 +56,8 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
 function makeHandle(id: string) {
   const handle = {
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page(1, 0)] }) },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
+    pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page(1, 0)] }) },
     close: vi.fn(() => Promise.resolve()),
   };
   return { handle: handle as unknown as DocumentHandle, close: handle.close };
@@ -146,7 +146,7 @@ describe('<Viewer> lifecycle', () => {
 
     function BootScreen() {
       const kernel = useKernel(); // usable before boot completes
-      statuses.push(kernel.status());
+      statuses.push(kernel.getStatus());
       return <div data-testid="boot">booting</div>;
     }
 

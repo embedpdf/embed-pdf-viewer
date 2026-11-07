@@ -18,9 +18,9 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -50,7 +50,7 @@ type Role = keyof typeof roles;
         engine: () => localEngine(),
         identity: dana,
         scope: roles.reader,
-        initialDocuments: [{ source: ebook, name: 'ebook.pdf' }],
+        initialDocuments: [{ source: welcome, name: 'welcome.pdf' }],
       },
       withStage(),
       withRender(),
@@ -111,7 +111,7 @@ export class App {
   protected async openAgain() {
     const role = this.role();
     await this.documents.close(this.document.id());
-    await this.documents.open(ebook, { name: 'ebook.pdf' });
+    await this.documents.open(welcome, { name: 'welcome.pdf' });
     this.openedAs.set(role);
   }
 }

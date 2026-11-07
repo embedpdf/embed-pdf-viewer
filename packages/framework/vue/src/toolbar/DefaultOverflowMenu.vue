@@ -58,7 +58,7 @@ const sections = computed(() =>
 
 function choose(row: OverflowRow) {
   props.view.execute(row.command);
-  if (row.type !== 'submenu') props.view.close();
+  if (row.kind !== 'submenu') props.view.close();
 }
 </script>
 
@@ -107,7 +107,7 @@ function choose(row: OverflowRow) {
         @click="choose(row)"
       >
         <span>{{ command.active && section.radio ? '• ' : '' }}{{ command.label }}</span>
-        <span v-if="row.type === 'submenu'">▸</span>
+        <span v-if="row.kind === 'submenu'">▸</span>
       </button>
     </template>
   </div>

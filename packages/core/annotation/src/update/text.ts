@@ -2,7 +2,7 @@
  * Free-text typing: the editor's plain or rich result becomes the record's
  * text at once, and a `text` effect asks for the (debounced) engine write.
  */
-import type { RichTextDocumentInput } from '@embedpdf/engine-core/runtime';
+import { DEFAULT_RICH_TEXT_BODY, type RichTextDocumentInput } from '@embedpdf/engine-core/runtime';
 
 import { normalizeRuns, paragraphsFromPlainText, plainTextOf } from '../richtext';
 import type { Effect, Id, Model } from '../types';
@@ -31,14 +31,17 @@ export function setText(model: Model, id: Id, text: string): [Model, Effect[]] {
   ];
 }
 
-/** Apply the editor's rich document, like `setText`. The annotation's body is
- *  kept (a partial input body layers on it); `contents` is the projection. */
+/** Apply the editor's rich document, like `setText`, as the engine does: a
+ *  body it gives is replaced whole over the defaults, and without one the
+ *  annotation's body is kept; `contents` is the projection. */
 export function setRichText(model: Model, id: Id, doc: RichTextDocumentInput): [Model, Effect[]] {
   const record = model.byId[id];
   if (!record || record.annotation.subtype !== 'free-text') return [model, []];
   const normalized = normalizeRuns(doc);
   const richText = {
-    body: { ...record.annotation.richText.body, ...(normalized.body ?? {}) },
+    body: normalized.body
+      ? { ...DEFAULT_RICH_TEXT_BODY, ...normalized.body }
+      : record.annotation.richText.body,
     paragraphs: normalized.paragraphs,
   };
   const next = {

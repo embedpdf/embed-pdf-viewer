@@ -41,7 +41,7 @@ const samePlain = (left: FormPlainValue, right: FormPlainValue): boolean =>
     : left === right;
 
 /**
- * The form: `fields()`, `status()`, `formKind()` and `selectedField()` as signals; reading,
+ * The form: `fields()`, `status()`, `formKind()`, `selectedField()` and `focusedField()` as signals; reading,
  * filling, form data and building as methods (`setValue()`, `importValues()`, `export()`,
  * `create()`, `update()`, …, the Methods tables of the Filling forms and Building forms pages);
  * the events as streams (`valueChanged$`, `validationRejected$`, `fieldCreated$`, …); and the
@@ -65,6 +65,7 @@ export class EpdfForm extends pluginService({
     'listWidgets',
     'getWidgetAt',
     'getSelectedField',
+    'getFocusedField',
     'validate',
     'exportValues',
     'setValue',
@@ -72,6 +73,8 @@ export class EpdfForm extends pluginService({
     'importValues',
     'reset',
     'activateWidget',
+    'focus',
+    'focusNext',
     'export',
     'import',
     'refresh',
@@ -95,6 +98,7 @@ export class EpdfForm extends pluginService({
     'onFieldDeleted',
     'onValidationRejected',
     'onResynced',
+    'onFocusChanged',
   ],
 }) {
   /**
@@ -140,13 +144,10 @@ export class EpdfForm extends pluginService({
       null,
       samePlain,
     );
-    const fillable = this.binding.select(
-      (form) => {
-        const current = form.get(refOf());
-        return current !== null && !current.readOnly && form.canFill(current.ref);
-      },
-      false,
-    );
+    const fillable = this.binding.select((form) => {
+      const current = form.get(refOf());
+      return current !== null && !current.readOnly && form.canFill(current.ref);
+    }, false);
 
     const control = new FormControl<FormPlainValue>(untracked(value));
     const show = (plain: FormPlainValue) => {

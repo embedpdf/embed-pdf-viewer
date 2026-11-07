@@ -3,167 +3,25 @@
  *
  * `@google-cloud/storage` has no first-party mock library (unlike S3's
  * aws-sdk-client-mock), so we `vi.mock` the module with a faithful
- * in-memory fake bucket. The fake stores bytes + custom metadata, so
- * the adapter's real logic (sha-in-metadata, content-length guard,
- * ranged materialize, prefix delete) is exercised end-to-end.
+ * in-memory fake bucket, `__mocks__/@google-cloud/storage.ts`. The fake
+ * stores bytes + custom metadata, so the adapter's real logic
+ * (sha-in-metadata, content-length guard, ranged materialize, prefix
+ * delete) is exercised end-to-end. It's a `__mocks__` file and not a
+ * `vi.mock` factory: see "Faking an SDK in tests" in
+ * `docs/conventions/server-adapters.md`.
  *
  * Live GCS acceptance runs out-of-band against a real bucket / the
  * fake-gcs-server emulator (STORAGE_LIVE=1), not in CI.
  */
 import { createHash } from 'node:crypto';
-import { Readable, Writable } from 'node:stream';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { FakeBucket, gcs } from '../__mocks__/@google-cloud/storage';
 
-// In-memory store shared between the mock and the assertions.
-const gcs = vi.hoisted(() => {
-  interface Obj {
-    bytes: Buffer;
-    contentType: string;
-    metadata: Record<string, string>;
-  }
-  const objects = new Map<string, Obj>();
-  return { objects, signedUrlCalls: [] as unknown[] };
-});
-
-vi.mock('@google-cloud/storage', () => {
-  class FakeFile {
-    constructor(
-      readonly bucketName: string,
-      readonly key: string,
-    ) {}
-    async exists(): Promise<[boolean]> {
-      return [gcs.objects.has(this.key)];
-    }
-    async getMetadata(): Promise<[Record<string, unknown>]> {
-      const o = gcs.objects.get(this.key);
-      if (!o) {
-        const err = new Error('Not Found') as Error & { code: number };
-        err.code = 404;
-        throw err;
-      }
-      return [
-        {
-          size: String(o.bytes.byteLength),
-          etag: `etag-${o.bytes.byteLength}`,
-          contentType: o.contentType,
-          metadata: o.metadata,
-        },
-      ];
-    }
-    async save(
-      buf: Buffer,
-      opts: { contentType?: string; metadata?: { metadata?: Record<string, string> } },
-    ): Promise<void> {
-      gcs.objects.set(this.key, {
-        bytes: Buffer.from(buf),
-        contentType: opts.contentType ?? 'application/octet-stream',
-        metadata: opts.metadata?.metadata ?? {},
-      });
-    }
-    async download(): Promise<[Buffer]> {
-      const o = gcs.objects.get(this.key);
-      if (!o) {
-        const err = new Error('Not Found') as Error & { code: number };
-        err.code = 404;
-        throw err;
-      }
-      return [o.bytes];
-    }
-    createReadStream(opts?: { start?: number; end?: number }): Readable {
-      const o = gcs.objects.get(this.key);
-      if (!o) {
-        const r = new Readable({ read() {} });
-        process.nextTick(() => r.destroy(Object.assign(new Error('Not Found'), { code: 404 })));
-        return r;
-      }
-      const start = opts?.start ?? 0;
-      // GCS createReadStream end is inclusive.
-      const end = opts?.end === undefined ? o.bytes.byteLength - 1 : opts.end;
-      return Readable.from([o.bytes.subarray(start, end + 1)]);
-    }
-    createWriteStream(opts?: {
-      resumable?: boolean;
-      contentType?: string;
-      metadata?: { metadata?: Record<string, string> };
-    }): Writable {
-      // Commit-on-finish mirrors real GCS: a destroyed stream (source
-      // error, length violation) must leave no visible object.
-      const chunks: Buffer[] = [];
-      const key = this.key;
-      return new Writable({
-        write(chunk, _enc, cb) {
-          chunks.push(Buffer.from(chunk as Uint8Array));
-          cb();
-        },
-        final(cb) {
-          gcs.objects.set(key, {
-            bytes: Buffer.concat(chunks),
-            contentType: opts?.contentType ?? 'application/octet-stream',
-            metadata: opts?.metadata?.metadata ?? {},
-          });
-          cb();
-        },
-      });
-    }
-    async setMetadata(meta: { metadata?: Record<string, string> }): Promise<void> {
-      const o = gcs.objects.get(this.key);
-      if (!o) {
-        const err = new Error('Not Found') as Error & { code: number };
-        err.code = 404;
-        throw err;
-      }
-      o.metadata = { ...o.metadata, ...(meta.metadata ?? {}) };
-    }
-    async getSignedUrl(opts: {
-      version: string;
-      action: string;
-      expires: number;
-      contentType?: string;
-    }): Promise<[string]> {
-      gcs.signedUrlCalls.push({ key: this.key, ...opts });
-      const q = `?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Expires=${opts.expires}&action=${opts.action}`;
-      return [`https://storage.googleapis.com/${this.bucketName}/${this.key}${q}`];
-    }
-    async delete(opts?: { ignoreNotFound?: boolean }): Promise<void> {
-      if (!gcs.objects.has(this.key)) {
-        if (opts?.ignoreNotFound) return;
-        const err = new Error('Not Found') as Error & { code: number };
-        err.code = 404;
-        throw err;
-      }
-      gcs.objects.delete(this.key);
-    }
-  }
-
-  class FakeBucket {
-    constructor(readonly name: string) {}
-    file(key: string): FakeFile {
-      return new FakeFile(this.name, key);
-    }
-    async getFiles({ prefix }: { prefix: string }): Promise<[FakeFile[]]> {
-      const matching = [...gcs.objects.keys()]
-        .filter((k) => k.startsWith(prefix))
-        .map((k) => new FakeFile(this.name, k));
-      return [matching];
-    }
-    async deleteFiles({ prefix }: { prefix: string; force?: boolean }): Promise<void> {
-      for (const k of [...gcs.objects.keys()]) {
-        if (k.startsWith(prefix)) gcs.objects.delete(k);
-      }
-    }
-  }
-
-  return {
-    Storage: class {
-      bucket(name: string): FakeBucket {
-        return new FakeBucket(name);
-      }
-    },
-  };
-});
+// No factory: vitest serves __mocks__/@google-cloud/storage.ts.
+vi.mock('@google-cloud/storage');
 
 // Import after the mock is registered.
 const { GcsObjectStore } = await import('../src/storage/adapters/GcsObjectStore');
@@ -184,6 +42,10 @@ function randomBytes(n: number): Uint8Array {
   const a = new Uint8Array(n);
   for (let i = 0; i < n; i++) a[i] = i % 256;
   return a;
+}
+/** The store's SDK bucket, read without calling it: a real one would call Google. */
+function bucketOf(store: InstanceType<typeof GcsObjectStore>): Promise<unknown> {
+  return (store as unknown as { bucketPromise: Promise<unknown> }).bucketPromise;
 }
 
 let tmp: string;
@@ -206,6 +68,15 @@ describe('GcsObjectStore', () => {
       bucket: 'b',
       projectId: 'p',
     });
+  });
+
+  test('stores built back to back all get the fake SDK', async () => {
+    // Each constructor starts its own import of the SDK, so these
+    // imports overlap. A vi.mock factory hands about half of them the
+    // real client.
+    const stores = Array.from({ length: 8 }, newStore);
+    const buckets = await Promise.all(stores.map(bucketOf));
+    expect(buckets.every((b) => b instanceof FakeBucket)).toBe(true);
   });
 
   test('put records SHA-256 in custom metadata and returns it', async () => {

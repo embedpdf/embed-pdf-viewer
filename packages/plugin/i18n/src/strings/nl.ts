@@ -14,9 +14,12 @@ export const nl: EmbedpdfStrings = {
     selection: { copy: 'Kopiëren' },
     annotation: { delete: 'Verwijderen' },
     document: { download: 'Downloaden', print: 'Afdrukken' },
+    snapshot: { copy: 'Kopiëren', save: 'Afbeelding opslaan', clear: 'Momentopname wissen' },
     tool: {
       pointer: 'Selecteren',
       pan: 'Verschuiven',
+      zoom: 'Inzoomen op gebied',
+      snapshot: 'Momentopname',
       highlight: 'Markeren',
       underline: 'Onderstrepen',
       strikeout: 'Doorhalen',
@@ -51,4 +54,5 @@ export const nl: EmbedpdfStrings = {
       'form-signature': 'Handtekeningveld',
     },
   },
+  outline: { untitled: 'Naamloos' },
 };

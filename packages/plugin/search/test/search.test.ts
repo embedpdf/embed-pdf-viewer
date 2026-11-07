@@ -98,9 +98,11 @@ function fakeDocument(
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: 2, pages: [page(5, 0), page(7, 1)] }) },
+    pages: {
+      list: () => Promise.resolve({ pageCount: 2, labels: [], pages: [page(5, 0), page(7, 1)] }),
+    },
     security: { allows },
     search: {
       query: (request: SearchRequest) => {
@@ -278,7 +280,7 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
-  it('drops snippets when they are denied, unless snippets are pinned', async () => {
+  it('drops snippets when the engine denies them although the session looked allowed to copy', async () => {
     const { kernel, api, requests } = await boot([
       new PermissionDenied('doc.text.copy'),
       slice([], null, 2),
@@ -288,6 +290,28 @@ describe('search session', () => {
     expect(requests.map((request) => request.snippets)).toEqual([true, false]);
     await api.findAll({ text: 'x' }, { snippets: false });
     expect(requests[2].snippets).toBe(false);
+    await kernel.destroy();
+  });
+
+  it('asks without snippets from the start when the session may not copy text', async () => {
+    const { kernel, api, requests } = await boot([slice([], null, 2), slice([], null, 2)], {
+      allows: (permission) => permission === 'doc.text.search',
+    });
+    await api.search({ text: 'x' });
+    await api.findAll({ text: 'x' });
+    // One request each: no refused snippet request first.
+    expect(requests.map((request) => request.snippets)).toEqual([false, false]);
+    await kernel.destroy();
+  });
+
+  it('refuses findAll with snippets pinned on without doc.text.copy, before the engine is asked', async () => {
+    const { kernel, api, requests } = await boot([], {
+      allows: (permission) => permission === 'doc.text.search',
+    });
+    await expect(api.findAll({ text: 'x' }, { snippets: true })).rejects.toSatisfy(
+      (error) => isPluginError(error, 'permission-denied') && error.permission === 'doc.text.copy',
+    );
+    expect(requests).toEqual([]);
     await kernel.destroy();
   });
 
@@ -489,7 +513,8 @@ describe('cancelling', () => {
     const refreshing = api.refresh({ signal: controller.signal });
     await tick();
     controller.abort();
-    await expect(refreshing).resolves.toMatchObject({ status: 'cancelled' });
+    await expect(refreshing).resolves.toBeUndefined();
+    expect(api.getStatus()).toBe('cancelled');
     expect(held[0].aborted).toBe(true);
     await kernel.destroy();
   });
@@ -526,21 +551,21 @@ describe('settings', () => {
     await api.search({ text: 'x' });
 
     api.nextHit();
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 0.35 }, behavior: 'smooth' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 0.35 }, behavior: 'smooth' });
 
-    api.updateSettings({ reveal: { anchor: { y: 'center' }, behavior: 'instant' } });
+    api.updateSettings({ reveal: { align: { y: 'center' }, behavior: 'instant' } });
     api.nextHit();
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'instant' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 'center' }, behavior: 'instant' });
 
     api.revealActiveHit({ behavior: 'smooth' });
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'smooth' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 'center' }, behavior: 'smooth' });
     await kernel.destroy();
   });
 
   it('a highlight change keeps the colors it leaves out, fires once, and reset goes back to what was registered', async () => {
     const { kernel, api } = await boot([], { config: { highlight: { activeColor: '#ff0000' } } });
     const changes: unknown[] = [];
-    api.onSettingsChanged((event) => changes.push(event.changed));
+    api.onSettingsChanged((event) => changes.push(event.changedKeys));
 
     api.updateSettings({ highlight: { color: 'rgb(253 224 71 / 0.4)', blendMode: 'normal' } });
     expect(api.getSettings().highlight).toEqual({

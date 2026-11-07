@@ -12,7 +12,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { createDestination } from '../../../destinations/createDestination';
+import { createLinkTargetAction } from '../../../destinations/linkTarget';
 
 /**
  * Link writer: rect + the `/A` action. `goto`, `uri` and the standard
@@ -102,15 +102,7 @@ function applyLinkTarget(
     );
   }
 
-  const actionPtr =
-    target.kind === 'uri'
-      ? fn.EPDFAction_CreateURI(docPtr, target.uri)
-      : target.kind === 'named'
-        ? fn.EPDFAction_CreateNamed(docPtr, target.name)
-        : fn.EPDFAction_CreateGoTo(docPtr, createDestination(fn, mem, docPtr, target.destination));
-  if (!actionPtr) {
-    throw new EngineError(EngineErrorCode.Unknown, `failed to create '${target.kind}' action`);
-  }
+  const actionPtr = createLinkTargetAction(fn, mem, docPtr, target);
   if (!fn.EPDFAnnot_SetAction(annotPtr, actionPtr)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetAction failed for link');
   }

@@ -20,11 +20,20 @@ export {
 export type { FilePickerPort, PickFileOptions } from './file-picker';
 export { browserClock } from './clock';
 export type { WebClock } from './clock';
+export { browserPrinter } from './printer';
+export type { WebPrinter, WebPrintSheet, WebStagedPrint } from './printer';
+export { browserTextMeasurer } from './text-measurer';
+export type { WebTextMeasurer } from './text-measurer';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
-export { copySelection, wireSelectionClipboard } from './clipboard';
-export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
+export { copyImage, copySelection, wireSelectionClipboard } from './clipboard';
+export type {
+  ClipboardImageSource,
+  ClipboardSelectionSource,
+  SelectionClipboardOptions,
+} from './clipboard';
 export { bindCommandShortcuts, isMacPlatform } from './command-shortcuts';
+export { isFromTextField } from './text-field-event';
 export type {
   CommandShortcutOptions,
   ShortcutCommands,
@@ -73,7 +82,7 @@ export type {
   ActionsUiOrigin,
   DefaultActionsUiAdapterOptions,
 } from './actions-ui';
-export { bindPaintedImage } from './painted-image';
+export { afterPresented, bindPaintedImage, whenPresented } from './painted-image';
 export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';
 export { vibrationFeedback, wkFeedback } from './feedback';
 export type { WebPlatformFeedback } from './feedback';
@@ -104,6 +113,7 @@ export {
   offsetOfPosition,
   positionOfOffset,
   renderRichText,
+  restyleFaces,
   serializeRichText,
   styleDeltaOf,
 } from './rich-text-editor';
@@ -119,6 +129,7 @@ export type {
   RichTextEditorCommand,
   RichTextEditorDecoration,
   RichTextEditorDocument,
+  RichTextEditorFace,
   RichTextEditorHost,
   RichTextEditorParagraph,
   RichTextEditorProps,
@@ -127,15 +138,10 @@ export type {
   RichTextEditorScript,
   RichTextEditorStyle,
 } from './rich-text-editor';
-export {
-  createFontMounts,
-  mountFontProgram,
-  mountWebFont,
-  type MountableFontProgram,
-} from './web-font';
+export { createFontMounts, mountFontProgram, type MountableFontProgram } from './web-font';
 export { pictureOrPainting, type LookState, type PictureOrPainting } from './picture-or-painting';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
-export type { LineModel, WebFontMetrics } from './web-font-metrics';
+export type { FamilyOfCss, LineModel, WebFontMetrics } from './web-font-metrics';
 export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
 export type {
   EpdfCssOnlyVariable,
@@ -147,6 +153,10 @@ export type {
   EpdfVariable,
   EpdfVariableDefinition,
 } from './theme';
+export { ZOOM_BOX_DASH, zoomBoxPaint } from './zoom-box';
+export type { ZoomBoxColors } from './zoom-box';
+export { SNAPSHOT_BOX_DASH, snapshotBoxPaint } from './snapshot-box';
+export type { SnapshotBoxColors } from './snapshot-box';
 export { isUprightQuad, quadInPixels, rectInPixels, svgPoints } from './page-pixels';
 export type { PagePoint, PageQuad, PageToPixels, PixelRect } from './page-pixels';
 export { isolatePointerDown, isolateWheel } from './event-isolation';
@@ -168,7 +178,13 @@ export type {
   SelectionEndpointShape,
   SelectionEndpointsShape,
 } from './anchor-equality';
-export { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
+export {
+  fontProgramsOf,
+  ghostOpacity,
+  sceneViewBox,
+  styleText,
+  svgShapesOf,
+} from './annotation-scene';
 export type {
   ScenePaint,
   SceneShapeNode,
@@ -243,7 +259,6 @@ export {
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
-  cssFontOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,
@@ -347,7 +362,9 @@ export {
   observeContentWidth,
   observeHeight,
   observeLength,
+  observeOwnLength,
   observeWidth,
+  ownLengthOf,
   toolbarMeasureKey,
 } from './toolbar-measure';
 export type { ToolbarFitMetrics, ToolbarLengths } from './toolbar-measure';
@@ -370,6 +387,8 @@ export { attachMenuKeys, menuItemLabelOf, typeaheadMatchOf } from './menu-keys';
 export type { MenuKeysOptions } from './menu-keys';
 export { attachFocusTrap, moveFocusInto } from './focus-trap';
 export type { FocusTrapOptions } from './focus-trap';
+export { bindFieldFocus } from './field-focus';
+export type { FieldFocusForm, FieldFocusOptions } from './field-focus';
 export { createSurfaceFocusFollower } from './surface-focus';
 export type { SurfaceFocusFollower, SurfaceFocusOptions } from './surface-focus';
 export { standardCommandsBrowser } from './standard-commands-platform';

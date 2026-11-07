@@ -13,14 +13,14 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfSearchLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withSearch(),
@@ -39,7 +39,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
               <button
                 type="button"
                 class="hit"
-                (click)="stage.reveal(hit.page, { rect: bounds, anchor: { y: 0.35 } })"
+                (click)="stage.reveal(hit.page, { rect: bounds, align: { y: 0.35 } })"
               >
                 <span class="where">page {{ hit.pageIndex + 1 }}</span>
                 <code class="rect">x {{ round(bounds.x) }}, y {{ round(bounds.y) }}</code>

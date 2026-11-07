@@ -47,7 +47,7 @@ import {
 import type {
   BarSchema,
   CollapsedGroupView as CollapsedGroupViewOf,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView as GroupDisclosureViewOf,
   LiveSection,
   OverflowMenuView as OverflowMenuViewOf,
@@ -68,6 +68,7 @@ import {
   observeContentLength,
   observeLength,
   observeOutsidePress,
+  observeOwnLength,
   paintDefault,
   toolbarMeasureKey,
 } from '@embedpdf/web';
@@ -93,7 +94,7 @@ export type OverflowMenuView = OverflowMenuViewOf<ResolvedCommand>;
 export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;
 
 /** Passed to custom-slot renderers alongside the variant. */
-export type { CustomSlotCtx };
+export type { CustomSlotContext };
 
 // ── the strip view — a bar projected through the registry, live ──────────────
 
@@ -182,7 +183,7 @@ export interface ToolbarProps {
    * element of an item that takes focus is the item's stop in the toolbar's
    * arrow-key order.
    */
-  renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
+  renderCustom?: Record<string, (variant: string, ctx: CustomSlotContext) => React.ReactNode>;
   /**
    * A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'; a
    * renderer that returns `undefined` leaves the group to the default.
@@ -234,36 +235,45 @@ function Measured({
  * the <embedpdf-viewer> shadow root the browser projects same-named light-DOM
  * children into it; anywhere else it just displays its fallback (the terminal
  * command). Measured live — the projected content lives in the host's world,
- * so its length can only be observed where it actually renders.
+ * so its length can only be observed where it actually renders. One that
+ * grows fills its item's box, and reports its own length without the growth.
  */
 function NativeSlotSocket({
   name,
   k,
   orientation,
+  grow,
   onLength,
   children,
 }: {
   name: string;
   k: string;
   orientation: Orientation;
+  grow: boolean;
   onLength: (key: string, length: number) => void;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLSlotElement>(null);
   // Projection changes (a child slotted in/out) resize the socket's
   // inline-flex box, so one observer covers both content and assignment.
-  useLayoutEffect(
-    () =>
-      ref.current
-        ? observeLength(ref.current, orientation, (length) => onLength(k, length))
-        : undefined,
-    [k, orientation, onLength],
-  );
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+    const report = (length: number) => onLength(k, length);
+    return grow
+      ? observeOwnLength(element, orientation, report)
+      : observeLength(element, orientation, report);
+  }, [k, orientation, grow, onLength]);
   return (
     <slot
       ref={ref}
       name={name}
-      style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexShrink: 0,
+        flexGrow: grow ? 1 : 0,
+      }}
     >
       {children}
     </slot>
@@ -295,6 +305,14 @@ const TOOLBAR_ITEM = { [TOOLBAR_ITEM_ATTRIBUTE]: '' } as Record<string, string>;
 /** The element around an item adds no box, so the item lays out as the section's own child. */
 const ITEM_STYLE: React.CSSProperties = { display: 'contents' };
 
+/** Around an item that grows, a box that grows into the room the toolbar has left. */
+const growingItemStyle = (orientation: Orientation): React.CSSProperties => ({
+  display: 'flex',
+  flexDirection: orientation === 'vertical' ? 'column' : 'row',
+  alignItems: 'center',
+  flex: '1 0 auto',
+});
+
 // ── defaults: plain, and meant to be replaced ────────────────────────────────
 
 const SURFACE = paintDefault('toolbar-surface');
@@ -310,8 +328,9 @@ const defaultRenderCommand = (
     type="button"
     onClick={run}
     disabled={!cmd.enabled}
-    aria-pressed={cmd.active || undefined}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
     aria-haspopup={cmd.menu ? 'menu' : undefined}
+    aria-expanded={cmd.menu ? cmd.active : undefined}
     title={cmd.label}
     style={{
       display: 'inline-flex',
@@ -423,7 +442,7 @@ function DefaultOverflowMenu({
           {section.rows.map((row) => {
             const cmd = view.resolve(row.command);
             if (!cmd) return null;
-            const isSubmenu = row.type === 'submenu';
+            const isSubmenu = row.kind === 'submenu';
             return (
               <button
                 key={row.command}
@@ -683,6 +702,7 @@ export function Toolbar({
             name={part.name}
             k={part.measureKey}
             orientation={orientation}
+            grow={part.grow}
             onLength={onLength}
           >
             {terminal()}
@@ -714,7 +734,11 @@ export function Toolbar({
         {i > 0 &&
           (renderSeparator ? renderSeparator() : <DefaultSeparator orientation={orientation} />)}
         {group.parts.map((part) => (
-          <span key={part.key} {...TOOLBAR_ITEM} style={ITEM_STYLE}>
+          <span
+            key={part.key}
+            {...TOOLBAR_ITEM}
+            style={part.kind === 'custom' && part.grow ? growingItemStyle(orientation) : ITEM_STYLE}
+          >
             {renderPart(part, 'live')}
           </span>
         ))}
@@ -730,19 +754,25 @@ export function Toolbar({
    * per-unit gaps) is exactly the layout's minimum length: what the solver
    * says fits, fits. Its cross-segment gap allowance (≤ 2×gap) becomes slack
    * the auto margins absorb, keeping ≥ gap between segments at the floor.
-   * Segments never grow or shrink: fit is the solver's job, not flexbox's.
+   * Segments never shrink, and grow only to hold an item that grows (a custom
+   * item with `grow`): that segment takes the leftover, and each drawn segment
+   * after another keeps the gap the solver counted instead (`section.spacing`).
    */
-  const sectionStyle = (position: 'start' | 'center' | 'end'): React.CSSProperties => ({
+  const sectionStyle = (section: LiveSection<ResolvedCommand>): React.CSSProperties => ({
     display: 'flex',
     flexDirection: vertical ? 'column' : 'row',
     alignItems: 'center',
     gap,
-    flex: '0 0 auto',
-    ...(position !== 'center'
-      ? null
-      : vertical
+    flex: section.grows ? '1 0 auto' : '0 0 auto',
+    ...(section.spacing === 'balance'
+      ? vertical
         ? { marginTop: 'auto', marginBottom: 'auto' }
-        : { marginLeft: 'auto', marginRight: 'auto' }),
+        : { marginLeft: 'auto', marginRight: 'auto' }
+      : section.spacing === 'gap'
+        ? vertical
+          ? { marginTop: gap }
+          : { marginInlineStart: gap }
+        : null),
   });
 
   const overflowView: OverflowMenuView = {
@@ -769,7 +799,7 @@ export function Toolbar({
       }}
     >
       {layout.sections.map((section) => (
-        <div key={section.name} style={sectionStyle(section.name)}>
+        <div key={section.name} style={sectionStyle(section)}>
           {renderLiveSection(section)}
           {section.name === 'end' && layout.hasOverflow && (
             <span {...TOOLBAR_ITEM} style={{ position: 'relative', display: 'inline-flex' }}>

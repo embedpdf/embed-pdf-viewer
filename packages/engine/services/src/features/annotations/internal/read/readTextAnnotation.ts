@@ -9,6 +9,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { NOTE_NAME_TO_ICON } from '../annotationIcon';
 import { stateFromPdf, stateModelFromPdf } from '../annotationState';
+import { readCommentRichText } from '../richTextWire';
 import {
   readAnnotBoolean,
   readAnnotColor,
@@ -42,6 +43,7 @@ export function readText(
 
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'text',
     icon,
     open: readAnnotBoolean(fn, mem, annotPtr, 'Open') ?? readPopupOpen(fn, mem, annotPtr) ?? false,

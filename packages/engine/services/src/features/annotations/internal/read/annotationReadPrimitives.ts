@@ -479,6 +479,24 @@ export function readAppearanceState(
 }
 
 /**
+ * Where the annotation sits in the document's structure tree
+ * (`EPDFAnnot_GetStructurePosition`): the index of each step from the root
+ * down, or `null` for an annotation that isn't tagged.
+ */
+export function readStructurePosition(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): number[] | null {
+  const count = fn.EPDFAnnot_GetStructurePosition(annotPtr, NULL_PTR, 0);
+  if (count <= 0) return null;
+  return withScratch(mem, 4 * count, (buffer) => {
+    fn.EPDFAnnot_GetStructurePosition(annotPtr, buffer, count);
+    return Array.from({ length: count }, (_, i) => Number(mem.peek(buffer, 'i32', 4 * i)) >>> 0);
+  });
+}
+
+/**
  * The states appearance mode `modeInt` stores, in the file's key order
  * (`EPDFAnnot_GetAppearanceStateName`): none when the mode is a single
  * appearance or missing.

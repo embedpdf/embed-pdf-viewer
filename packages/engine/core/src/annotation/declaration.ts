@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { closed } from '../wire/reading';
 import { PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './kinds/link/values';
 import type { AnnotationResourceRole } from './resources';
 import type { PdfAnnotationActions, WidgetActionsPatch } from '../dto/PdfAction';
@@ -437,7 +438,7 @@ function shapesOf(
   fields: KindFields,
   schemasOf: (spec: AnyField) => { read: z.ZodTypeAny; write: z.ZodTypeAny },
 ): ZodShapes {
-  const read: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
+  const read: Record<string, z.ZodTypeAny> = { subtype: closed(z.literal(subtype)) };
   const create: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const update: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype).optional() };
   const readBackWrites: Record<string, z.ZodTypeAny | null> = {};

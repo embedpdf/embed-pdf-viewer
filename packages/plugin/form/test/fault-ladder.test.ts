@@ -15,7 +15,7 @@ import {
   toPageRef,
   type DocumentHandle,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type PageLayout,
   type PdfActionTree,
@@ -32,7 +32,6 @@ const ref = (fieldObjectNumber: number) => ({
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 
@@ -40,11 +39,11 @@ const text = (
   fieldObjectNumber: number,
   name: string,
   value: string,
-  actions?: FormFieldDTO['actions'],
-): FormFieldDTO => ({
+  actions?: FormField['actions'],
+): FormField => ({
   ref: ref(fieldObjectNumber),
   name,
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -72,7 +71,7 @@ const text = (
 
 class NodeSandbox implements ScriptSandbox {
   private readonly vm: AcroJsVmGlobal;
-  disposed = false;
+  destroyed = false;
 
   constructor() {
     const context = createContext({});
@@ -88,8 +87,8 @@ class NodeSandbox implements ScriptSandbox {
     return this.plain(this.vm.__acrojsRun(source, input, budget));
   }
 
-  dispose(): void {
-    this.disposed = true;
+  destroy(): void {
+    this.destroyed = true;
   }
 
   protected plain(output: ScriptOutput): ScriptOutput {
@@ -124,9 +123,11 @@ const documentMeta = (): DocumentMeta => ({
   pageCount: 1,
   // Only the page's identity matters to the scripting controller.
   pages: [{ ref: toPageRef(10) } as PageLayout],
-  revision: 0,
+  pagesSequence: 0,
   hasUnsavedChanges: false,
   renderPolicy: { kind: 'continuous' },
+  pageLabels: [],
+  pendingPages: new Map(),
 });
 
 function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbox()) {
@@ -199,7 +200,7 @@ describe('script fault ladder', () => {
     expect(rejected.status).toBe('rejected');
     expect(rejected.uiEffects).toContainEqual(
       expect.objectContaining({
-        kind: 'alert',
+        type: 'alert',
         message: 'The value entered does not match the format of the field [ price ]',
         phase: 'user',
       }),

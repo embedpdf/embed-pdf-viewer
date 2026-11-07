@@ -9,12 +9,18 @@
  * underline/strikeout/squiggly stroke, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
-import { cssFontFamilyForFont } from './font-css';
 import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
-import { HELVETICA_ASCENT, HELVETICA_LINE_HEIGHT, helveticaAdvance } from './helvetica';
+import {
+  defaultPaintFonts,
+  layoutField,
+  type FieldText,
+  type FieldTextOptions,
+  type TextFont,
+  type TextFonts,
+} from '@embedpdf/core-text';
 import { drawsLive } from './appearance';
 import { fileAttachmentIconScene, noteIconScene } from './icons';
 import { blendFor, dashOf } from './kinds/styles';
@@ -34,13 +40,16 @@ import type {
 
 const num = (value: number): number => Number(value.toFixed(3));
 
+/** The kinds a width of 0 draws as a hairline. */
+const HAIRLINE_KINDS: ReadonlySet<KindName> = new Set(['line', 'polyline', 'ink']);
+
 /** Uniform paint for a shape/line/poly node. Fill only lands on closed nodes; the
  *  dash comes solely from the border style — so a live draft (ghost) previews
  *  exactly how the committed annotation will look, not as a dashed hint. */
 function shapePaint(style: Style, closed: boolean): Paint {
   return {
     fill: closed ? (style.interiorColor ?? undefined) : undefined,
-    stroke: style.color,
+    stroke: style.color ?? undefined,
     width: style.strokeWidth,
     opacity: style.opacity,
     dash: dashOf(style),
@@ -84,7 +93,7 @@ function squigglePath(
  *  sheared cells draw along their true baselines; upright output is identical
  *  to the old axis-aligned math. */
 function markupScene(subtype: KindName, quads: Quad[], style: Style): SceneNode[] {
-  const color = style.color;
+  const color = style.color ?? undefined;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
   for (const quad of quads) {
@@ -177,89 +186,95 @@ function redactRegions(geometry: Shape): RedactRegion[] {
 }
 
 /**
- * The size a label draws at when its `fontSize` is 0 (fit) and `/Repeat` is
- * on: fitting would only shrink the label as it repeats, so the engine tiles
- * at this size instead.
+ * The size a repeated label draws at when its `fontSize` is 0 (fit): fitting
+ * would only shrink the label as it repeats, so the engine sets this one.
  */
 const REPEAT_FIT_FONT_SIZE = 12;
 
-/** The sizes the engine tries when it fits a label to its region, smallest first. */
-const FIT_FONT_SIZES = [
-  4, 6, 8, 9, 10, 12, 14, 18, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120, 130,
-  144,
-];
+/** How many times a repeated label's text doubles at most, as in the engine: 1,024 labels. */
+const MAX_REPEAT_DOUBLINGS = 10;
 
-/** The largest size at which one line of text `advance` em wide fits the region. */
-function fitFontSize(region: Rect, advance: number): number {
-  let fitted = FIT_FONT_SIZES[0]!;
-  for (const size of FIT_FONT_SIZES) {
-    if (size * HELVETICA_LINE_HEIGHT > region.height || size * advance > region.width) break;
-    fitted = size;
+/** `/Q` by the label's alignment. */
+const QUADDING = { left: 0, center: 1, right: 2 } as const;
+
+/**
+ * A redaction label laid out in a region `width` × `height`, as the engine
+ * lays it out when it writes the mark's overlay: a form field's text in the
+ * region (PDF points, y up from its bottom), top-aligned, placed across by
+ * `/Q`. A label shown once at size 0 fits the region on one line; one at a
+ * set size, or a repeated one, wraps to it. A repeated label's text is the
+ * label space-joined to itself, doubled until its lines reach the region's
+ * bottom; what runs past the region is clipped. `null` for no text.
+ */
+export function redactLabelText<F extends TextFont>(
+  size: { readonly width: number; readonly height: number },
+  label: { readonly text: string; readonly repeat: boolean },
+  text: TextStyle | undefined,
+  fonts: TextFonts<F>,
+): FieldText<F> | null {
+  if (!label.text) return null;
+  const setSize = text?.fontSize ?? 0;
+  const fitted = Math.abs(setSize) < 0.0001;
+  const options: FieldTextOptions = {
+    plate: { left: 0, bottom: 0, right: size.width, top: size.height },
+    fontSize: label.repeat && fitted ? REPEAT_FIT_FONT_SIZE : setSize,
+    alignment: QUADDING[text?.textAlign ?? 'left'],
+    multiline: label.repeat || !fitted,
+    password: false,
+    limit: 0,
+    cells: 0,
+    centered: false,
+  };
+  let shown = label.text;
+  let laid = layoutField(shown, fonts, options);
+  for (
+    let doubling = 0;
+    label.repeat && doubling < MAX_REPEAT_DOUBLINGS && laid.contentHeight < size.height;
+    doubling++
+  ) {
+    shown = `${shown} ${shown}`;
+    laid = layoutField(shown, fonts, options);
   }
-  return fitted;
+  return laid;
 }
 
 /**
- * Redaction label layout — the same reading of ISO 32000-2 the engine's
- * apply-time painter uses, as pure math: top-aligned, `/Q` horizontal
- * alignment, `/Repeat` tiling a full grid that fits the region (no partial
- * glyph bleed — the scene has no clipping). A `fontSize` of 0 fits one label
- * to the region on one line, and tiles a repeated one at 12pt, like the
- * engine. Text is measured in Helvetica, the engine's default label font, so
- * a label in another font is estimated; this is a live preview, the engine
- * bakes the truth.
+ * A redaction label's preview in `region` (page space): the runs
+ * {@link redactLabelText} lays out, in the fonts the label carries (its
+ * standard font, or Helvetica, without them), clipped to the region. What
+ * the engine writes on apply, before it has.
  */
 export function layoutRedactLabel(
   region: Rect,
-  label: { text: string; repeat: boolean },
+  label: NonNullable<RenderItem['label']>,
   text: TextStyle | undefined,
 ): SceneNode[] {
-  if (!label.text) return [];
-  const advance = helveticaAdvance(label.text);
-  const fit = label.repeat ? REPEAT_FIT_FONT_SIZE : fitFontSize(region, advance);
-  const fontSize = Math.max(4, text && text.fontSize > 0 ? text.fontSize : fit);
-  const textW = advance * fontSize;
-  // Repeated labels are joined with a space.
-  const gap = helveticaAdvance(' ') * fontSize;
-  const lineH = fontSize * HELVETICA_LINE_HEIGHT;
+  const laid = redactLabelText(
+    region,
+    label,
+    text,
+    label.fonts ?? defaultPaintFonts(text?.fontFamily ?? null),
+  );
+  if (!laid) return [];
   const paint: Paint = { fill: text?.fontColor ?? '#ffffff', opacity: 1 };
-  const base = {
-    fontSize,
-    ...(text?.fontFamily ? { fontFamily: cssFontFamilyForFont(text.fontFamily) } : {}),
-    paint,
-  };
-  const baseline = (rowTop: number) => rowTop + fontSize * HELVETICA_ASCENT;
-  /** Where a line `width` wide starts, by the label's alignment. */
-  const lineStart = (width: number) =>
-    text?.textAlign === 'center'
-      ? region.x + Math.max(0, (region.width - width) / 2)
-      : text?.textAlign === 'right'
-        ? region.x + Math.max(0, region.width - width)
-        : region.x;
-
-  if (!label.repeat) {
-    if (fontSize > region.height) return [];
-    return [
-      {
-        kind: 'text',
-        at: { x: lineStart(textW), y: baseline(region.y) },
-        text: label.text,
-        ...base,
-      },
-    ];
-  }
-
-  const cols = Math.max(1, Math.floor((region.width + gap) / (textW + gap)));
-  const rows = Math.max(1, Math.floor(region.height / lineH));
-  const left = lineStart(cols * textW + (cols - 1) * gap);
   const nodes: SceneNode[] = [];
-  for (let row = 0; row < rows && nodes.length < 400; row++) {
-    for (let column = 0; column < cols && nodes.length < 400; column++) {
+  for (const line of laid.lines) {
+    for (const run of line.runs) {
       nodes.push({
-        kind: 'text',
-        at: { x: left + column * (textW + gap), y: baseline(region.y + row * lineH) },
-        text: label.text,
-        ...base,
+        kind: 'textRun',
+        at: { x: num(region.x + run.x), y: num(region.y + region.height - line.baseline) },
+        text: run.text,
+        rtl: run.rtl,
+        plain: run.plain,
+        ...(run.joinsPrevious ? { joinsPrevious: true } : {}),
+        ...(run.joinsNext ? { joinsNext: true } : {}),
+        fontSize: laid.fontSize,
+        fontFamily: run.font.fontFamily,
+        fontWeight: run.font.fontWeight,
+        fontStyle: run.font.fontStyle,
+        program: run.font.program,
+        paint,
+        clip: region,
       });
     }
   }
@@ -276,7 +291,7 @@ function redactScene(item: RenderItem): SceneNode[] {
   const regions = redactRegions(item.geometry);
   if (!item.hovered) {
     const paint = {
-      stroke: item.style.color,
+      stroke: item.style.color ?? undefined,
       width: item.style.strokeWidth || 1.5,
       opacity: item.style.opacity,
     };
@@ -292,8 +307,7 @@ function redactScene(item: RenderItem): SceneNode[] {
     }
   }
   if (item.label) {
-    // Label tiling stays axis-aligned inside the region's bounds — the live
-    // preview approximates; the engine's apply-time painter bakes the truth.
+    // The engine writes a label in each region's upright bounds.
     for (const region of regions) {
       nodes.push(...layoutRedactLabel(region.bounds, item.label, item.text));
     }
@@ -335,27 +349,37 @@ export function scene(item: RenderItem): SceneNode[] {
     return geomScene(item.geometry, item.style).map((node) => ({
       ...node,
       paint: {
-        fill: item.style.color,
-        stroke: item.style.color,
+        fill: item.style.color ?? undefined,
+        stroke: item.style.color ?? undefined,
         width: CARET_STROKE_WIDTH,
         opacity: item.style.opacity,
       },
     })) as SceneNode[];
   }
-  const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
+  const ink = item.geometry.kind === 'ink';
+  // A line, polyline or ink at width 0 is a hairline, as the engine and Acrobat
+  // draw it; a square, circle or polygon at width 0 has no outline.
+  const hairline = item.style.strokeWidth === 0 && HAIRLINE_KINDS.has(item.subtype);
   const nodes = geomScene(item.geometry, item.style).map((node) => {
     const closed =
       node.kind === 'rect' ||
       node.kind === 'ellipse' ||
-      node.kind === 'path' ||
+      (node.kind === 'path' && !ink) ||
       (node.kind === 'poly' && node.closed);
-    const paint = { ...shapePaint(item.style, closed), blend: blendFor(item.style) };
-    // Ink is freehand: round the pen-stroke ends and joins. Every other kind keeps
-    // the default butt caps + sharp (miter) joins — square corners and poly knees
-    // stay crisp.
+    const paint = {
+      ...shapePaint(item.style, closed),
+      blend: blendFor(item.style),
+      ...(hairline ? { hairline: true as const } : {}),
+    };
+    // Ink is drawn as Acrobat draws it: round caps and no join (its curves
+    // meet smoothly), and a stroke of one point is a dot filled in the
+    // stroke's colour. Every other kind keeps the default butt caps and
+    // miter joins: square corners and poly knees stay crisp.
     return {
       ...node,
-      paint: ink ? { ...paint, lineCap: 'round', join: 'round' } : paint,
+      paint: ink
+        ? { ...paint, fill: closed ? (item.style.color ?? undefined) : undefined, lineCap: 'round' }
+        : paint,
     } as SceneNode;
   });
   if (item.measure) {

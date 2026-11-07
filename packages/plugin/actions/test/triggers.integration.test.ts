@@ -52,9 +52,9 @@ async function boot(file: string, options?: { config?: ActionsConfig }) {
   const firstPage = 3; // both fixtures: the first page is object 3
   const drain = () =>
     actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(firstPage), objectNumber: 999 },
+      annotation: { kind: 'objectNumber', page: toPageRef(firstPage), objectNumber: 999 },
       page: toPageRef(firstPage),
     });
   const ref = (annotObjectNumber: number): AnnotationRef => ({
@@ -84,7 +84,7 @@ describe('trigger integration (real engine)', () => {
       config: { openSequence: 'off' },
     });
     await booted.actions.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'open',
       page: toPageRef(booted.firstPage),
     });
@@ -92,7 +92,7 @@ describe('trigger integration (real engine)', () => {
     expect(booted.seam).toEqual(['show:7', 'show:9']);
     booted.seam.length = 0;
     await booted.actions.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'close',
       page: toPageRef(booted.firstPage),
     });
@@ -105,12 +105,12 @@ describe('trigger integration (real engine)', () => {
       config: { openSequence: 'off' },
     });
     await booted.actions.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'visible',
       page: toPageRef(booted.firstPage),
     });
     await booted.actions.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'invisible',
       page: toPageRef(booted.firstPage),
     });
@@ -122,16 +122,16 @@ describe('trigger integration (real engine)', () => {
       config: { openSequence: 'off' },
     });
     await booted.actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: booted.ref(5),
+      annotation: booted.ref(5),
       page: toPageRef(booted.firstPage),
     });
     expect(booted.seam).toEqual(['show:6']);
     await booted.actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorExit',
-      ref: booted.ref(5),
+      annotation: booted.ref(5),
       page: toPageRef(booted.firstPage),
     });
     expect(booted.seam).toEqual(['show:6', 'hide:6']);
@@ -142,9 +142,9 @@ describe('trigger integration (real engine)', () => {
       config: { openSequence: 'off' },
     });
     const result = await booted.actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: booted.ref(10),
+      annotation: booted.ref(10),
       page: toPageRef(booted.firstPage),
       source: { kind: 'link', annotation: booted.ref(10), page: toPageRef(booted.firstPage) },
     });
@@ -163,7 +163,7 @@ describe('trigger integration (real engine)', () => {
     // fires after — the view never moves before the session effect lands.
     // (No fallback page-open in auto.)
     expect(booted.seam).toEqual(['show:4', 'named:NextPage']);
-    const replay = await booted.actions.dispatch({ scope: 'document', event: 'open' });
+    const replay = await booted.actions.dispatch({ type: 'document', event: 'open' });
     expect(replay.diagnostics[0]).toMatchObject({ code: 'open-sequence-replayed' });
   });
 

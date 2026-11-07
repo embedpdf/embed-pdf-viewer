@@ -42,6 +42,7 @@ import {
   type WriteStamp,
 } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import { fontWriteContext } from '../fonts/DocumentFontReader';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 
 /**
@@ -148,13 +149,14 @@ export class AnnotationBatchApplier {
         prepareCreate(create.draft, create.resources, ctx),
       );
       labelled(create.label, () => this.claimName(given.nm, record, claimed));
-      // A fresh name is never taken: no claim needed.
+      // A create of your own left without a name gets a fresh one, never
+      // taken: no claim needed. `nm: null` asks for none.
       const draft =
-        given.nm || create.attribution.kind !== 'stamp'
+        given.nm !== undefined || create.attribution.kind !== 'stamp'
           ? given
           : { ...given, nm: generateUuidV7() };
       if (create.objectNumber !== undefined) {
-        labelled(create.label, () => this.session.useObjectNumber(create.objectNumber!));
+        labelled(create.label, () => this.session.claimObjectNumber(create.objectNumber!));
       }
       const replyTo = create.replyTo && {
         type: create.replyTo.type,
@@ -177,7 +179,8 @@ export class AnnotationBatchApplier {
       return { create, record, ctx, draft, replyTo, parent };
     });
     throwIfAborted(signal);
-    if (prepared.length === 0) return { created: [], meta: metaOf(this.session.writeStamp(), [], []) };
+    if (prepared.length === 0)
+      return { created: [], meta: metaOf(this.session.writeStamp(), [], []) };
 
     const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
       throwIfAborted(signal);
@@ -260,10 +263,10 @@ export class AnnotationBatchApplier {
       );
     });
 
-    const readCtx = readContextFor(this.session, this.fonts);
+    const readContext = readContextFor(this.session, this.fonts);
     const created = placed.map((at) =>
       this.withOpen(at, (annotPtr) =>
-        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readCtx),
+        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readContext),
       ),
     );
     joinWidgetFieldNumbers(this.runtime, this.session, created);
@@ -325,14 +328,8 @@ export class AnnotationBatchApplier {
   }
 
   private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
-    const fonts = this.fonts;
     return {
-      ...(fonts
-        ? {
-            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
-            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
-          }
-        : {}),
+      ...fontWriteContext(this.runtime, this.session, this.fonts),
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),
       pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),
@@ -391,7 +388,7 @@ function metaOf(
     affectedPages: pages.map((page) => toPageRef(page)),
     cacheDelta: null,
     ...stamp,
-    changed: [
+    changedRefs: [
       ...placed.map(
         (at): AnnotationRef => ({
           kind: 'objectNumber',

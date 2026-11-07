@@ -21,4 +21,33 @@ describe("DeploymentClient", () => {
         const response = await client.deployment.licenseStatus();
         expect(response).toEqual(rawResponseBody);
     });
+
+    test("modules", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = {
+            modules: [
+                {
+                    id: "id",
+                    name: "name",
+                    description: "description",
+                    permissions: [{ name: "name", level: "document", label: "label" }],
+                    meters: [{ name: "name", label: "label", unit: "unit" }],
+                    requires: { document: ["document"] },
+                },
+            ],
+        };
+
+        server
+            .mockEndpoint()
+            .get("/v1/deployment/modules")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.deployment.modules();
+        expect(response).toEqual(rawResponseBody);
+    });
 });

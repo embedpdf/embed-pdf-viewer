@@ -8,22 +8,26 @@ import {
   type PageImageResult,
   type PageLayerRights,
   type PageLayout,
+  type PagePictureRights,
   type PageNetworkRenderFormat,
   type PageRef,
   type PageRenderImage,
+  type PageRenderOptions,
+  type PageRenderRaster,
   type PageRenderService,
   type PageRenderTransform,
   renderAreaTransform,
   renderTargetArea,
   checkImageQuality,
+  checkRenderUsage,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import {
-  PAGE_RENDER_FAMILIES,
-  pageRenderFamilyOf,
+  pagePictureOf,
   renderImageOptionsToWire,
   wirePaths,
   type RenderVersions,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -41,7 +45,33 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
     /** What the caller may read, when the client can know it; null leaves it to the server. */
     private readonly layerRights: () => PageLayerRights | null,
+    /** Which pictures the caller may make, when the client can know it; null leaves it to the server. */
+    private readonly pictureRights: () => PagePictureRights | null,
   ) {}
+
+  /**
+   * The page's pixels, not encoded as an image, with the transform they were
+   * made with: only where this engine runs inside the server and was given a
+   * source (`renderRaw`, a server module's own document). Over the network
+   * the cloud API serves images: `image()`.
+   */
+  raw(options: PageRenderOptions = {}): AbortablePromise<PageRenderRaster> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    const source = this.http.renderRaw;
+    if (source === undefined) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.NotImplemented,
+          'raw pixels are drawn only inside the server; use image()',
+        ),
+      );
+    }
+    return AbortablePromise.run((signal) => source(this.pageRef, options, signal));
+  }
 
   image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
     if (this.isClosed()) {
@@ -52,14 +82,18 @@ export class CloudPageRenderService implements PageRenderService {
     return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
-      // A picture draws what the caller may read, and the family it draws is
-      // its path. Without the caller's rights (a tenant or API token), it asks
-      // for everything and the server decides.
+      // A picture draws what the caller may read, and needs its own right: a
+      // screen picture `doc.render`, a thumbnail `doc.render.thumbnail`, a
+      // print picture the print right of its DPI. What it draws, and whether
+      // it's a thumbnail or prints at which DPI, is its path. Without the
+      // caller's rights (a tenant or API token), it asks for everything and
+      // the server decides.
+      checkRenderUsage(options, this.pictureRights());
       const layers = resolvePageLayers(
         options,
         this.layerRights() ?? { annotations: true, formFields: true },
       );
-      const family = PAGE_RENDER_FAMILIES[pageRenderFamilyOf(layers)];
+      const picture = pagePictureOf(layers, options);
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;
@@ -75,23 +109,45 @@ export class CloudPageRenderService implements PageRenderService {
         // Normalized above so the URL always carries an explicit,
         // network-supported format (PNG or WebP; default WebP). What the
         // picture draws is its family's path; the token carries the family's
-        // pins.
-        const pins: RenderVersions = { contentVersion: page.cache.contentVersion };
-        for (const pin of family.pins) pins[pin] = page.cache[pin];
+        // pins, and the render engine value and shape.
+        const pins: RenderVersions = {
+          contentVersion: page.cache.contentVersion,
+          pin: tokenPinOf('render', manifest.engine),
+        };
+        for (const pin of picture.pins) pins[pin] = page.cache[pin];
         const wireToken = renderImageOptionsToWire({ ...options, format }, pins);
         // Plane-scope rule: a picture resolves at the doc-level (shared base)
         // path iff every plane its family depends on is inherited, so 1,000
         // inheriting visitors share one URL set, one origin render, and no
         // layer session.
-        return planesInherited(manifest, family.planes)
-          ? wirePaths.docPageRender(this.docId, family.family, this.pageRef, wireToken)
-          : wirePaths.layerPageRender(
+        const { print, family } = picture;
+        if (planesInherited(manifest, picture.planes)) {
+          if (print) {
+            return wirePaths.docPagePrint(this.docId, print.tier, family, this.pageRef, wireToken);
+          }
+          return picture.thumbnail
+            ? wirePaths.docPageThumbnail(this.docId, family, this.pageRef, wireToken)
+            : wirePaths.docPageRender(this.docId, family, this.pageRef, wireToken);
+        }
+        if (print) {
+          return wirePaths.layerPagePrint(
+            this.docId,
+            this.layerName,
+            print.tier,
+            family,
+            this.pageRef,
+            wireToken,
+          );
+        }
+        return picture.thumbnail
+          ? wirePaths.layerPageThumbnail(
               this.docId,
               this.layerName,
-              family.family,
+              family,
               this.pageRef,
               wireToken,
-            );
+            )
+          : wirePaths.layerPageRender(this.docId, this.layerName, family, this.pageRef, wireToken);
       };
       // The advertised URL reflects the current manifest; the blob loader
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a
@@ -106,7 +162,7 @@ export class CloudPageRenderService implements PageRenderService {
           width: transform.width,
           height: transform.height,
           format,
-          contentType: `image/${format}`,
+          mimeType: `image/${format}`,
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
         },
         this.http,

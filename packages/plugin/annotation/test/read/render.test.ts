@@ -337,7 +337,7 @@ describe('an annotation an undo brings back', () => {
     const deleting = harness.capability.delete(ref);
     harness.renderAppearances.mockResolvedValueOnce({ appearances: [] });
     expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([]);
-    const deleted = harness.ctx.changes.pending().at(-1)!;
+    const deleted = harness.ctx.changes.listPending().at(-1)!;
     harness.ctx.changes.stage({
       label: { key: 'history.undo' },
       undoOf: deleted.opId,
@@ -352,5 +352,163 @@ describe('an annotation an undo brings back', () => {
     expect(harness.renderAppearances.mock.calls.length).toBe(asked);
     answer();
     await deleting;
+  });
+});
+
+describe('a hovered redaction’s label', () => {
+  const mark = {
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 30 },
+    page: PAGE,
+    hasAppearance: true,
+    appearanceState: null,
+    nm: null,
+    invisible: false,
+    hidden: false,
+    print: true,
+    noZoom: false,
+    noRotate: false,
+    noView: false,
+    readOnly: false,
+    locked: false,
+    toggleNoView: false,
+    lockedContents: false,
+    contents: null,
+    subject: null,
+    author: null,
+    createdAt: null,
+    modifiedAt: null,
+    blendMode: 'normal',
+    subtype: 'redact',
+    rect: { left: 40, bottom: 270, right: 160, top: 300 },
+    quadPoints: [],
+    color: '#ff0000',
+    strokeWidth: 1,
+    opacity: 1,
+    interiorColor: '#000000',
+    overlayText: 'SECRET',
+    repeat: false,
+    fontFamily: 'Roboto',
+    fontSize: 12,
+    fontColor: '#ffffff',
+    textAlign: 'left',
+  } as unknown as FileAnnotation;
+
+  it('draws in the fonts plugin’s fonts for its font, once they are found', async () => {
+    const found = { face: {}, fallbacks: [], lastResort: {} };
+    let answer: typeof found | null = null;
+    let epoch = 0;
+    const asked: [string, string][] = [];
+    const harness = annotationHarness({
+      fonts: {
+        getPaintFonts: (font: string, text: string) => {
+          asked.push([font, text]);
+          return answer;
+        },
+        getPaintFontsEpoch: () => epoch,
+      },
+    });
+    await harness.load([mark]);
+    const labelOf = () =>
+      harness.capability.listPageItems(PAGE).find((item) => item.subtype === 'redact')?.label;
+
+    // At rest the mark draws no label: nothing asks for its fonts.
+    expect(labelOf()).toEqual({ text: 'SECRET', repeat: false });
+    expect(asked).toEqual([]);
+
+    // Hovered while the plugin finds them: the label's standard font draws it.
+    harness.capability.hoverAt({ page: PAGE, point: { x: 100, y: 515 } });
+    expect(labelOf()?.fonts).toBeUndefined();
+    expect(asked).toEqual([['Roboto', 'SECRET']]);
+
+    answer = found;
+    epoch++;
+    expect(labelOf()?.fonts).toBe(found);
+  });
+});
+
+describe('a text box saved in the file', () => {
+  const ref = { kind: 'objectNumber', page: PAGE, objectNumber: 80 } as const;
+  const body = {
+    family: 'Helvetica',
+    weight: 400,
+    italic: false,
+    size: 14,
+    color: '#1a2748',
+    decoration: [],
+    script: 'normal',
+    letterSpacing: 0,
+    horizontalScale: 1,
+    align: 'left',
+    dir: 'ltr',
+  };
+  const saved = {
+    ref,
+    page: PAGE,
+    hasAppearance: true,
+    appearanceState: null,
+    nm: 'text-box',
+    invisible: false,
+    hidden: false,
+    print: true,
+    noZoom: false,
+    noRotate: false,
+    noView: false,
+    readOnly: false,
+    locked: false,
+    toggleNoView: false,
+    lockedContents: false,
+    contents: 'Saved with the file',
+    subject: null,
+    author: null,
+    createdAt: null,
+    modifiedAt: null,
+    blendMode: 'normal',
+    subtype: 'free-text',
+    intent: 'free-text',
+    fontFamily: 'helvetica',
+    fontSize: 14,
+    fontColor: '#1a2748',
+    textAlign: 'left',
+    richText: { body, paragraphs: [{ runs: [{ text: 'Saved with the file' }] }] },
+    color: '#000000',
+    interiorColor: null,
+    opacity: 1,
+    strokeWidth: 1,
+    borderStyle: 'solid',
+    rect: { left: 100, bottom: 700, right: 300, top: 740 },
+    box: { left: 100, bottom: 700, right: 300, top: 740 },
+  } as unknown as FileAnnotation;
+
+  it('the layer shows its picture, while a renderer that draws it gets its text and style', async () => {
+    const harness = annotationHarness();
+    await harness.load([saved]);
+    // Idle and saved: no element of the layer's, the engine's picture shows.
+    expect(harness.capability.listTextItems(PAGE)).toEqual([]);
+    // A renderer draws over no picture, so its editor reads the text all the same.
+    const item = harness.capability.getTextItem(ref);
+    expect(item).toMatchObject({
+      ref,
+      box: { x: 100, y: 60, width: 200, height: 40 },
+      richText: { paragraphs: [{ runs: [{ text: 'Saved with the file' }] }] },
+      editing: false,
+      css: { fontSize: 14, color: '#1a2748', fontWeight: 400, padding: 2 },
+    });
+    // Asked again with nothing changed: the same item, for selectors.
+    expect(harness.capability.getTextItem(ref)).toBe(item);
+  });
+
+  it('typed in, it is the item the layer lists, editing', async () => {
+    const harness = annotationHarness();
+    await harness.load([saved]);
+    harness.capability.text.begin(ref);
+    const [listed] = harness.capability.listTextItems(PAGE);
+    expect(listed?.editing).toBe(true);
+    expect(harness.capability.getTextItem(ref)).toEqual(listed);
+  });
+
+  it('a ref that names no free text here has no text box', async () => {
+    const harness = annotationHarness();
+    await harness.load([saved]);
+    expect(harness.capability.getTextItem({ ...ref, objectNumber: 81 })).toBeNull();
   });
 });

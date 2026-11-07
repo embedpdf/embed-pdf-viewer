@@ -6,7 +6,7 @@
  *   - whether the route is origin-only or versioned-read
  *
  * Consumed by:
- *   - server route guards via `requireResource(req, docId, id, pdfBits)`
+ *   - server route guards via `requireResource(req, docId, id, permissionFlags)`
  *   - the CDN signer to determine which path prefixes to cover for a token
  *   - documentation generators
  *
@@ -17,9 +17,15 @@
  * doc-access check without requiring any capability.
  */
 
-import type { DocCapability, PdfBits } from '../auth/scope';
+import type { DocCapability, PdfPermissionFlags } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
-import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
+import { TEXT_WRITING_CAPABILITIES } from '../fonts/fontList';
+import {
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
+  type PageRenderFamilySpec,
+} from './renderFamilies';
 
 /**
  * Canonical id for every read resource the server exposes.
@@ -27,7 +33,7 @@ import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
  * Adding a new resource:
  *   1. Add the id to this union
  *   2. Add a `DOC_RESOURCES` entry
- *   3. Update the route handler to call `requireResource(req, docId, '<id>', pdfBits)`
+ *   3. Update the route handler to call `requireResource(req, docId, '<id>', permissionFlags)`
  *   4. CDN signer automatically considers it
  */
 export type DocResourceId =
@@ -40,6 +46,24 @@ export type DocResourceId =
   | 'page-render-annotations'
   | 'page-render-fields'
   | 'page-render-all'
+  // The thumbnails (`PAGE_THUMBNAIL_FAMILIES`): each family as a small
+  // picture of the whole page. A thumbnail is a right of its own
+  // (`doc.render.thumbnail`), so it is a path of its own too.
+  | 'page-thumbnail'
+  | 'page-thumbnail-annotations'
+  | 'page-thumbnail-fields'
+  | 'page-thumbnail-all'
+  // The print pictures (`PAGE_PRINT_FAMILIES`): each family at each print
+  // tier. The tier is a right (`doc.print`, `doc.print.high`), so it is a
+  // path of its own too.
+  | 'page-print'
+  | 'page-print-annotations'
+  | 'page-print-fields'
+  | 'page-print-all'
+  | 'page-print-high'
+  | 'page-print-high-annotations'
+  | 'page-print-high-fields'
+  | 'page-print-high-all'
   | 'page-text'
   | 'page-geometry'
   // Plane-scope model: doc-level shared variants, one per plane-dependent
@@ -68,6 +92,9 @@ export type DocResourceId =
   | 'metadata-custom'
   | 'actions'
   | 'attachments'
+  // The outline: pinned by its own version and the layout's (it is read in
+  // page space), so its own family and prefix.
+  | 'outline'
   | 'attachment-files'
   // Layer-scoped variants of the page resources. Same capability
   // gates as their doc-level cousins (the layer just provides a
@@ -79,22 +106,35 @@ export type DocResourceId =
   | 'layer-metadata'
   | 'layer-metadata-custom'
   // Digital signatures: the layer's snapshot and analysis (pinned by
-  // docVersion, like the manifest), and the version-scoped families —
+  // docVersion, like the manifest), and the layer's version families,
   // content-addressed by base sha, each under its own prefix (the CDN
   // signs literal prefixes, so a grant for signature reads must never
-  // also cover version downloads). The versions list is origin-only.
+  // also cover version downloads, and a layer's grant never another
+  // layer's versions). The versions list is origin-only.
   | 'layer-signatures'
   | 'layer-signatures-analysis'
-  | 'versions'
-  | 'version-signatures'
-  | 'version-analysis'
-  | 'version-download'
-  | 'version-revisions'
+  | 'layer-versions'
+  | 'layer-version-signatures'
+  | 'layer-version-analysis'
+  | 'layer-version-download'
+  | 'layer-version-revisions'
   | 'layer-actions'
   | 'layer-page-render'
   | 'layer-page-render-annotations'
   | 'layer-page-render-fields'
   | 'layer-page-render-all'
+  | 'layer-page-thumbnail'
+  | 'layer-page-thumbnail-annotations'
+  | 'layer-page-thumbnail-fields'
+  | 'layer-page-thumbnail-all'
+  | 'layer-page-print'
+  | 'layer-page-print-annotations'
+  | 'layer-page-print-fields'
+  | 'layer-page-print-all'
+  | 'layer-page-print-high'
+  | 'layer-page-print-high-annotations'
+  | 'layer-page-print-high-fields'
+  | 'layer-page-print-high-all'
   | 'layer-page-text'
   | 'layer-page-geometry'
   // Search slices, one resource per permission tier: rects-only results
@@ -115,6 +155,15 @@ export type DocResourceId =
   // must never authorize the byte prefix.
   | 'layer-attachments'
   | 'layer-attachment-files'
+  | 'layer-outline'
+  // The fonts: the list (pinned by `fontsVersion` and the server's fonts),
+  // a program's facts (content-addressed by its hash) and its bytes, each
+  // under its own prefix: the bytes go only to a token that may write text,
+  // and never through a shared CDN.
+  | 'fonts'
+  | 'layer-fonts'
+  | 'layer-font-programs'
+  | 'layer-font-program-files'
   | 'download-current'
   | 'download-versioned';
 
@@ -192,8 +241,8 @@ export interface DocResourceDescriptor {
 }
 
 /** A page picture of one family, at the document's shared path. */
-function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
-  const { resource, path, needs } = PAGE_RENDER_FAMILIES[family];
+function pageRenderResource(picture: PageRenderFamilySpec): DocResourceDescriptor {
+  const { resource, path, needs } = picture;
   return {
     id: resource,
     pathPattern: `/v1/docs/{docId}/${path}/*/data@*`,
@@ -207,8 +256,8 @@ function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
 }
 
 /** A page picture of one family, at a layer's path. */
-function layerPageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
-  const { layerResource, path, needs } = PAGE_RENDER_FAMILIES[family];
+function layerPageRenderResource(picture: PageRenderFamilySpec): DocResourceDescriptor {
+  const { layerResource, path, needs } = picture;
   return {
     id: layerResource,
     pathPattern: `/v1/docs/{docId}/layers/{layerName}/${path}/*/data@*`,
@@ -268,10 +317,22 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'page-render': pageRenderResource('pages'),
-  'page-render-annotations': pageRenderResource('annotations'),
-  'page-render-fields': pageRenderResource('fields'),
-  'page-render-all': pageRenderResource('all'),
+  'page-render': pageRenderResource(PAGE_RENDER_FAMILIES.pages),
+  'page-render-annotations': pageRenderResource(PAGE_RENDER_FAMILIES.annotations),
+  'page-render-fields': pageRenderResource(PAGE_RENDER_FAMILIES.fields),
+  'page-render-all': pageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'page-thumbnail': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.pages),
+  'page-thumbnail-annotations': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.annotations),
+  'page-thumbnail-fields': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.fields),
+  'page-thumbnail-all': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.all),
+  'page-print': pageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
+  'page-print-annotations': pageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
+  'page-print-fields': pageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
+  'page-print-all': pageRenderResource(PAGE_PRINT_FAMILIES.print.all),
+  'page-print-high': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].pages),
+  'page-print-high-annotations': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].annotations),
+  'page-print-high-fields': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].fields),
+  'page-print-high-all': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].all),
   'page-annotations': {
     id: 'page-annotations',
     pathPattern: '/v1/docs/{docId}/annotations/pages/*/items@*',
@@ -437,6 +498,17 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  outline: {
+    id: 'outline',
+    pathPattern: '/v1/docs/{docId}/outline@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/outline@*`,
+    pathPrefix: '/v1/docs/{docId}/outline@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/outline@`,
+    // Part of opening the document, like the metadata.
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   'attachment-files': {
     id: 'attachment-files',
     pathPattern: '/v1/docs/{docId}/attachment-files/*',
@@ -461,6 +533,66 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  'layer-outline': {
+    id: 'layer-outline',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/outline@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/outline@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/outline@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/outline@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  fonts: {
+    id: 'fonts',
+    pathPattern: '/v1/docs/{docId}/fonts@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/fonts@*`,
+    pathPrefix: '/v1/docs/{docId}/fonts@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/fonts@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-fonts': {
+    id: 'layer-fonts',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/fonts@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/fonts@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/fonts@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/fonts@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-font-programs': {
+    id: 'layer-font-programs',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/font-programs/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-programs/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/font-programs/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-programs/`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-font-program-files': {
+    id: 'layer-font-program-files',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/font-program-files/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-program-files/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/font-program-files/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-program-files/`,
+    requirement: { kind: 'any', capabilities: TEXT_WRITING_CAPABILITIES },
+    // A font's licence may allow sending it to the document's users, not
+    // hosting it on the web: browsers keep it privately.
+    routeKind: 'origin',
+    cdnCacheable: false,
+  },
   'layer-attachment-files': {
     id: 'layer-attachment-files',
     pathPattern: '/v1/docs/{docId}/layers/{layerName}/attachment-files/*',
@@ -473,10 +605,24 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'layer-page-render': layerPageRenderResource('pages'),
-  'layer-page-render-annotations': layerPageRenderResource('annotations'),
-  'layer-page-render-fields': layerPageRenderResource('fields'),
-  'layer-page-render-all': layerPageRenderResource('all'),
+  'layer-page-render': layerPageRenderResource(PAGE_RENDER_FAMILIES.pages),
+  'layer-page-render-annotations': layerPageRenderResource(PAGE_RENDER_FAMILIES.annotations),
+  'layer-page-render-fields': layerPageRenderResource(PAGE_RENDER_FAMILIES.fields),
+  'layer-page-render-all': layerPageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'layer-page-thumbnail': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.pages),
+  'layer-page-thumbnail-annotations': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.annotations),
+  'layer-page-thumbnail-fields': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.fields),
+  'layer-page-thumbnail-all': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.all),
+  'layer-page-print': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
+  'layer-page-print-annotations': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
+  'layer-page-print-fields': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
+  'layer-page-print-all': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.all),
+  'layer-page-print-high': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].pages),
+  'layer-page-print-high-annotations': layerPageRenderResource(
+    PAGE_PRINT_FAMILIES['print-high'].annotations,
+  ),
+  'layer-page-print-high-fields': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].fields),
+  'layer-page-print-high-all': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].all),
   'page-text': {
     id: 'page-text',
     pathPattern: '/v1/docs/{docId}/text/pages/*/data@*',
@@ -674,54 +820,64 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  versions: {
-    id: 'versions',
-    pathPattern: '/v1/docs/{docId}/versions',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions`,
-    pathPrefix: '/v1/docs/{docId}/versions',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions`,
+  'layer-versions': {
+    id: 'layer-versions',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'origin',
     // The list grows with every signature and its prefix covers every
     // version family below: never signed at the edge.
     cdnCacheable: false,
   },
-  'version-signatures': {
-    id: 'version-signatures',
-    pathPattern: '/v1/docs/{docId}/versions/signatures/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/signatures/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/signatures/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/signatures/`,
+  'layer-version-signatures': {
+    id: 'layer-version-signatures',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/signatures/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/signatures/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/signatures/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/signatures/`,
     requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-analysis': {
-    id: 'version-analysis',
-    pathPattern: '/v1/docs/{docId}/versions/analysis/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/analysis/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/analysis/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/analysis/`,
+  'layer-version-analysis': {
+    id: 'layer-version-analysis',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/analysis/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/analysis/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/analysis/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/analysis/`,
     requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-download': {
-    id: 'version-download',
-    pathPattern: '/v1/docs/{docId}/versions/download/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/download/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/download/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/download/`,
+  'layer-version-download': {
+    id: 'layer-version-download',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/download/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/download/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/download/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/download/`,
     requirement: { kind: 'single', capability: 'doc.download' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-revisions': {
-    id: 'version-revisions',
-    pathPattern: '/v1/docs/{docId}/versions/revisions/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/revisions/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/revisions/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/revisions/`,
+  'layer-version-revisions': {
+    id: 'layer-version-revisions',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/revisions/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/revisions/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/revisions/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/revisions/`,
     requirement: { kind: 'single', capability: 'doc.download' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
@@ -738,16 +894,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
 export function checkResourceAccess(
   resourceId: DocResourceId,
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): boolean {
   const r = DOC_RESOURCES[resourceId];
   switch (r.requirement.kind) {
     case 'single':
-      return checkCapability(r.requirement.capability, rawScope, pdfBits);
+      return checkCapability(r.requirement.capability, rawScope, permissionFlags);
     case 'any':
-      return checkAnyCapability(r.requirement.capabilities, rawScope, pdfBits);
+      return checkAnyCapability(r.requirement.capabilities, rawScope, permissionFlags);
     case 'all':
-      return r.requirement.capabilities.every((cap) => checkCapability(cap, rawScope, pdfBits));
+      return r.requirement.capabilities.every((cap) =>
+        checkCapability(cap, rawScope, permissionFlags),
+      );
   }
 }
 

@@ -10,7 +10,7 @@ import {
   useCommands,
   useCommandsSettings,
 } from '@embedpdf/react/commands';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { localEngine } from '@embedpdf/engine';
 
 import './custom.css';
@@ -18,7 +18,7 @@ import './custom.css';
 const engine = localEngine();
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],
@@ -35,9 +35,9 @@ const plugins = [
   commandsPlugin({ commands: [...standardCommands, twoPages] }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 function CommandButton({ id }: { id: string }) {
@@ -49,7 +49,7 @@ function CommandButton({ id }: { id: string }) {
       type="button"
       className="button"
       disabled={!command.enabled}
-      aria-pressed={command.active}
+      aria-pressed={command.pressable ? command.active : undefined}
       onClick={command.run}
     >
       {command.label}
@@ -104,7 +104,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

@@ -25,9 +25,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const root = path.resolve(new URL('../../..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('../../..', import.meta.url));
+/** `file` relative to the repo root with `/` separators, so a snapshot reads the same on every platform. */
+const rel = (file) => path.relative(root, file).split(path.sep).join('/');
 const check = process.argv.includes('--check');
 const outRoot = path.join(root, 'api');
 
@@ -175,13 +178,13 @@ function normalize(text) {
 function describe(symbol, checker, source) {
   const component = componentOf(symbol, checker);
   if (component) {
-    return `${symbol.name} [${component.kind}] (from ${path.relative(root, component.file)}): ${component.surface}`;
+    return `${symbol.name} [${component.kind}] (from ${rel(component.file)}): ${component.surface}`;
   }
   const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
   const decl = target.declarations?.[0];
   if (!decl) return `${symbol.name}: <unresolved>`;
   const kind = ts.SyntaxKind[decl.kind];
-  const from = decl.getSourceFile() === source ? '' : ` (from ${path.relative(root, decl.getSourceFile().fileName)})`;
+  const from = decl.getSourceFile() === source ? '' : ` (from ${rel(decl.getSourceFile().fileName)})`;
   return `${symbol.name} [${kind}]${from}: ${signatureText(decl)}`;
 }
 
@@ -393,10 +396,11 @@ for (const pkg of packages) {
     const next = `# ${pkg.name} — ${entry.subpath === 'index' ? '.' : './' + entry.subpath.replace(/__/g, '/')}\n\n${lines.join('\n')}\n`;
     const outFile = path.join(outRoot, pkg.name.replace('@', '').replace('/', '__'), `${entry.subpath}.api.txt`);
     if (check) {
-      const prev = fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8') : null;
+      // A checkout with CRLF line endings (Git's autocrlf on Windows) holds the same snapshot.
+      const prev = fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8').replace(/\r\n/g, '\n') : null;
       if (prev !== next) {
         drift++;
-        console.error(`API changed: ${path.relative(root, outFile)} (run: pnpm api:snapshot)`);
+        console.error(`API changed: ${rel(outFile)} (run: pnpm api:snapshot)`);
       }
     } else {
       fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -408,4 +412,4 @@ if (check && drift > 0) {
   console.error(`\n${drift} public entry point(s) changed without an updated snapshot.`);
   process.exit(1);
 }
-if (!check) console.log(`API snapshots written to ${path.relative(root, outRoot)}/`);
+if (!check) console.log(`API snapshots written to ${rel(outRoot)}/`);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   caps,
   collab,
-  decodePdfBits,
+  permissionFlagsOf,
   materializePdfPermissions,
   parseScope,
   pdfPermissions,
@@ -14,6 +14,7 @@ describe('caps — capability builders return the expected literal strings', () 
   it('session capabilities', () => {
     expect(caps.doc.open()).toBe('doc.open');
     expect(caps.doc.render()).toBe('doc.render');
+    expect(caps.doc.render.thumbnail()).toBe('doc.render.thumbnail');
   });
 
   it('text + content capabilities', () => {
@@ -55,6 +56,7 @@ describe('caps — capability builders return the expected literal strings', () 
     const all = [
       caps.doc.open(),
       caps.doc.render(),
+      caps.doc.render.thumbnail(),
       caps.doc.text.select(),
       caps.doc.text.copy(),
       caps.doc.text.search(),
@@ -153,7 +155,7 @@ describe('pdfPermissions virtual builder', () => {
 
 describe('materializePdfPermissions', () => {
   it('always includes doc.open, doc.render, and the unconditional reads', () => {
-    const set = new Set(materializePdfPermissions(decodePdfBits(null)));
+    const set = new Set(materializePdfPermissions(permissionFlagsOf(null)));
     expect(set.has('doc.open')).toBe(true);
     expect(set.has('doc.render')).toBe(true);
     expect(set.has('doc.annotate.read')).toBe(true);
@@ -161,7 +163,7 @@ describe('materializePdfPermissions', () => {
   });
 
   it('null bits yields ONLY the always-on capabilities', () => {
-    const list = materializePdfPermissions(decodePdfBits(null));
+    const list = materializePdfPermissions(permissionFlagsOf(null));
     expect(list).toEqual(
       expect.arrayContaining([
         'doc.open',
@@ -176,19 +178,19 @@ describe('materializePdfPermissions', () => {
   });
 
   it('bit 5 adds text.copy + content.copy: taking the text out, as Acrobat reads it', () => {
-    const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.COPY)));
+    const set = new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.COPY)));
     expect(set.has('doc.text.copy')).toBe(true);
     expect(set.has('doc.content.copy')).toBe(true);
   });
 
   it('bit 6 adds doc.annotate.modify (reads are unconditional, not bit-gated)', () => {
-    const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.ANNOTATE_FILL)));
+    const set = new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.ANNOTATE_FILL)));
     expect(set.has('doc.annotate.modify')).toBe(true);
     expect(set.has('doc.annotate.read')).toBe(true); // unconditional, already in set
   });
 
   it('bit 9 adds doc.forms.fill and doc.sign; doc.forms.read is unconditional', () => {
-    const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.FILL_FORMS)));
+    const set = new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.FILL_FORMS)));
     expect(set.has('doc.forms.fill')).toBe(true);
     expect(set.has('doc.sign')).toBe(true);
     expect(set.has('doc.forms.read')).toBe(true); // unconditional
@@ -196,28 +198,32 @@ describe('materializePdfPermissions', () => {
 
   it('bit 6 AND bit 4 required for doc.forms.modify', () => {
     expect(
-      new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.ANNOTATE_FILL))).has(
+      new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.ANNOTATE_FILL))).has(
         'doc.forms.modify',
       ),
     ).toBe(false);
     expect(
-      new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.MODIFY))).has('doc.forms.modify'),
+      new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.MODIFY))).has(
+        'doc.forms.modify',
+      ),
     ).toBe(false);
     expect(
       new Set(
-        materializePdfPermissions(decodePdfBits(PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY)),
+        materializePdfPermissions(permissionFlagsOf(PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY)),
       ).has('doc.forms.modify'),
     ).toBe(true);
   });
 
   it('bit 12 requires bit 3 for doc.print.high', () => {
     expect(
-      new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.PRINT_HIGH))).has('doc.print.high'),
-    ).toBe(false);
-    expect(
-      new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH))).has(
+      new Set(materializePdfPermissions(permissionFlagsOf(PDF_BITS.PRINT_HIGH))).has(
         'doc.print.high',
       ),
+    ).toBe(false);
+    expect(
+      new Set(
+        materializePdfPermissions(permissionFlagsOf(PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH)),
+      ).has('doc.print.high'),
     ).toBe(true);
   });
 });
@@ -229,6 +235,7 @@ describe('caps — covers every capability', () => {
     const every: Record<DocCapability, true> = {
       'doc.open': true,
       'doc.render': true,
+      'doc.render.thumbnail': true,
       'doc.text.select': true,
       'doc.text.copy': true,
       'doc.text.search': true,
@@ -250,6 +257,7 @@ describe('caps — covers every capability', () => {
       'doc.annotate.import': true,
       'doc.metadata.modify': true,
       'doc.attachments.modify': true,
+      'doc.outline.modify': true,
       'doc.redact': true,
       'doc.sign': true,
       'doc.sign.certify': true,

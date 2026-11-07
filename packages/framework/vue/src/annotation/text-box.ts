@@ -8,13 +8,19 @@
  * renderer that draws its text box itself.
  */
 import { computed, inject, onScopeDispose, provide, shallowRef, toValue, watch } from 'vue';
-import type { ComponentPublicInstance, CSSProperties, InjectionKey, MaybeRefOrGetter, Ref } from 'vue';
-import { annotationKey } from '@embedpdf/core';
+import type {
+  ComponentPublicInstance,
+  CSSProperties,
+  InjectionKey,
+  MaybeRefOrGetter,
+  Ref,
+} from 'vue';
 import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annotation';
 // Typing reaches the plugin through its host lens (drafts, the text selection).
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { createTextBoxEditorFollower, ownTextBoxOf, textBoxEditorScaleOf } from '@embedpdf/web';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
+import { useFontMounts } from '../runtime/font-mounts';
 import { usePage } from '../runtime/page';
 import type { RichTextEditor } from './types';
 
@@ -72,16 +78,15 @@ const NO_STYLE: CSSProperties = Object.freeze({});
  */
 export function useRichTextEditor(annotation: MaybeRefOrGetter<Annotation>): RichTextEditor {
   const page = usePage();
+  // Saved and idle too: your element draws its text, no engine picture does.
   const item = useOptionalSelector(
     AnnotationHostToken,
     (host) => {
-      const key = annotationKey(toValue(annotation).ref);
       const { transform } = page.value;
-      return (
-        host
-          .listTextItems(page.value.ref, { zoom: transform.zoom, rotation: transform.rotation })
-          .find((text) => text.ref !== null && annotationKey(text.ref) === key) ?? null
-      );
+      return host.getTextItem(toValue(annotation).ref, {
+        zoom: transform.zoom,
+        rotation: transform.rotation,
+      });
     },
     null,
   );
@@ -93,6 +98,7 @@ export function useRichTextEditor(annotation: MaybeRefOrGetter<Annotation>): Ric
   );
   const own = computed(() => (item.value ? ownTextBoxOf(item.value, scale.value) : null));
   const element = useTextBoxEditor(item, () => own.value?.scale ?? scale.value);
+  useFontMounts(() => item.value?.programs ?? []);
   const style = computed((): CSSProperties => own.value?.style ?? NO_STYLE);
   return {
     ref: (target: Element | ComponentPublicInstance | null) => {

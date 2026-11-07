@@ -92,6 +92,23 @@ describe('addBar and removeBar', () => {
       'removeBar: no bar "anotate" (did you mean "annotate"?)',
     ]);
   });
+
+  it('removes the bars that ride along a removed bar, and theirs, without a warning', () => {
+    const layout = createLayout(base)
+      .addBar('notes', { place: { with: 'annotate' }, center: [['acme:note']] })
+      .addBar('pager', { place: { float: 'bottom' }, center: [['page:next']] })
+      .removeBar('main');
+    expect(Object.keys(layout.toJSON().bars!)).toEqual(['selection', 'pager']);
+    expect(layoutWarningsOf(layout)).toEqual([]);
+  });
+
+  it('takes a list of bars, and warns about each one it does not have', () => {
+    const layout = createLayout(base)
+      .addBar('pager', { place: { float: 'bottom' }, center: [['page:next']] })
+      .removeBar(['pagre', 'annotate', 'pager']);
+    expect(Object.keys(layout.toJSON().bars!)).toEqual(['main', 'selection']);
+    expect(layoutWarningsOf(layout)).toEqual(['removeBar: no bar "pagre" (did you mean "pager"?)']);
+  });
 });
 
 describe('add', () => {
@@ -320,6 +337,18 @@ describe('replace', () => {
     expect(next.menus!.document[1]).toEqual(['acme:full']);
   });
 
+  it('names a component by its id, in its place and next to it', () => {
+    const next = createLayout(base)
+      .replace('zoom', { custom: 'zoom-pill' })
+      .add('acme:share', { to: 'main', after: 'zoom-pill' })
+      .add('acme:help', { to: 'main', before: 'zoom-pill' })
+      .toJSON();
+    expect(next.bars!.main!.start![1]).toEqual({
+      id: 'zoom',
+      items: ['acme:help', { custom: 'zoom-pill' }, 'acme:share'],
+    });
+  });
+
   it('leaves menus alone when the replacement is your own component', () => {
     const next = createLayout(base)
       .addBar('rail', { place: 'start', start: [['document:print']] })
@@ -392,6 +421,31 @@ describe('menus, panels and tabs', () => {
     });
   });
 
+  it('gives a panel one title: a title replaces its titleKey, and a titleKey its title', () => {
+    const layout = createLayout(base)
+      .addPanel('notes', { side: 'end', titleKey: 'acme.notes' })
+      .panel('notes', { title: 'Notes' })
+      .panel('comments', { title: 'Review notes' })
+      .panel('comments', { titleKey: 'acme.review' })
+      .panel('thumbnails', { title: 'Pages', titleKey: 'acme.pages' });
+    expect(layout.toJSON().panels).toEqual({
+      comments: { side: 'end', titleKey: 'acme.review' },
+      thumbnails: { side: 'start', title: 'Pages', titleKey: 'acme.pages' },
+      notes: { side: 'end', title: 'Notes' },
+    });
+  });
+
+  it('opens a panel from the start, or keeps it from closing, as fields like the others', () => {
+    const layout = createLayout(base)
+      .panel('comments', { open: true, closable: false })
+      .panel('comments', { side: 'start' });
+    expect(layout.toJSON().panels!.comments).toEqual({
+      side: 'start',
+      open: true,
+      closable: false,
+    });
+  });
+
   it('keeps the width limits when only where it starts changes', () => {
     const layout = createLayout(base)
       .panel('comments', { width: { initial: 360, min: 280, max: 520 } })
@@ -418,6 +472,16 @@ describe('menus, panels and tabs', () => {
     expect(next.panels).toEqual({ thumbnails: { side: 'start' } });
     expect(next.bars!.main!.end).toEqual([{ id: 'panels', items: ['panel:search'] }]);
     expect(next.menus!.extra).toEqual([['acme:x']]);
+  });
+
+  it('takes a removed panel’s bars with it, and the bars that ride along them', () => {
+    const layout = createLayout(base)
+      .addBar('pages', { place: { panel: 'thumbnails' }, center: [['page:rotate']] })
+      .addBar('more', { place: { with: 'pages' }, center: [['page:delete']] })
+      .addBar('notes', { place: { panel: 'comments' }, center: [['acme:note']] })
+      .removePanel('thumbnails');
+    expect(Object.keys(layout.toJSON().bars!)).toEqual(['main', 'annotate', 'selection', 'notes']);
+    expect(layoutWarningsOf(layout)).toEqual([]);
   });
 
   it('sets when the document tabs show', () => {

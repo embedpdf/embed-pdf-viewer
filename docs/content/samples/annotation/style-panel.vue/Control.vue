@@ -39,7 +39,7 @@ function setBorder(event: Event) {
 
 function setLink(event: Event) {
   void annotation.selection.updateLink(
-    valueOf(event) === 'website' ? { kind: 'uri', uri: 'https://www.embedpdf.com' } : null,
+    valueOf(event) === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
   );
 }
 </script>
@@ -53,12 +53,7 @@ function setLink(event: Event) {
       :value="typeof value === 'string' ? value : '#ffffff'"
       @input="update(valueOf($event))"
     />
-    <button
-      v-if="property.key === 'interiorColor'"
-      type="button"
-      class="link"
-      @click="update(null)"
-    >
+    <button v-if="property.allowsNone" type="button" class="link" @click="update(null)">
       {{ value === null ? 'none' : 'remove' }}
     </button>
   </span>
@@ -140,6 +135,6 @@ function setLink(event: Event) {
     @change="setLink"
   >
     <option value="none">No link</option>
-    <option value="website">embedpdf.com</option>
+    <option value="website">example.com</option>
   </select>
 </template>

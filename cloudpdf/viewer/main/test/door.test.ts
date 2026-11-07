@@ -41,8 +41,8 @@ async function firstRequestFor(src: object, settings: object): Promise<string | 
 }
 
 describe('the cloud door', () => {
-  it('opens a share link through the cloud engine, at CloudPDF SaaS by default', async () => {
-    expect(await firstRequestFor({ shareToken: 'shr_1' }, {})).toMatch(
+  it('opens a grant through the cloud engine, at CloudPDF SaaS by default', async () => {
+    expect(await firstRequestFor({ grant: 'grt_1' }, {})).toMatch(
       /^https:\/\/engine\.cloudpdf\.com\/v1\//,
     );
   });
@@ -56,10 +56,10 @@ describe('the cloud door', () => {
   it('names the cloud documents as the engine opens them, and leaves the rest as they are', () => {
     expect(openInputOf({ token: 't' })).toEqual({ kind: 'token', token: 't' });
     expect(openInputOf({ id: 'doc', token: 't' })).toEqual({ kind: 'id', id: 'doc', token: 't' });
-    expect(openInputOf({ shareToken: 'shr', sharePassword: 'pw' })).toEqual({
-      kind: 'share',
-      shareToken: 'shr',
-      sharePassword: 'pw',
+    expect(openInputOf({ grant: 'shr', passphrase: 'pw' })).toEqual({
+      kind: 'grant',
+      grant: 'shr',
+      passphrase: 'pw',
     });
     const input = { kind: 'token', token: 't' } as const;
     expect(openInputOf(input)).toBe(input);

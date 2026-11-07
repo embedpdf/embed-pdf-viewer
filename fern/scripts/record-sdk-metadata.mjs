@@ -122,6 +122,22 @@ if (language === 'typescript') {
   manifest.scripts.test = 'vitest run';
   manifest.scripts['test:unit'] = 'vitest run --project unit';
   manifest.scripts['test:wire'] = 'vitest run --project wire';
+  // The browser upload entry (`src/upload.ts`, handwritten, in .fernignore)
+  // is an entry Fern doesn't know of. Pages import only it, so it gets its
+  // own export, in Fern's shape, before `./package.json`.
+  if (!manifest.exports?.['./package.json']) {
+    throw new Error('TypeScript package exports changed shape; revisit the ./upload export');
+  }
+  const { './package.json': packageJsonExport, ...entries } = manifest.exports;
+  manifest.exports = {
+    ...entries,
+    './upload': {
+      import: { types: './dist/esm/upload.d.mts', default: './dist/esm/upload.mjs' },
+      require: { types: './dist/cjs/upload.d.ts', default: './dist/cjs/upload.js' },
+      default: './dist/cjs/upload.js',
+    },
+    './package.json': packageJsonExport,
+  };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
 }
 
@@ -151,6 +167,37 @@ if (language === 'python') {
     .replace('description = ""', 'description = "The official Python SDK for the CloudPDF API."')
     .replace('authors = []', 'authors = ["CloudPDF <hello@cloudpdf.com>"]');
   writeFileSync(projectPath, project);
+
+  // fern-python-sdk 5.26.0 names the environment class from
+  // `environment_class_name` (CloudPDFEnvironment) in the code, but its
+  // README and reference examples import a `CloudPDFClientEnvironment` that
+  // doesn't exist. Use the real name, and fail if the code ever disagrees.
+  const environmentSource = readFileSync(`${outputDirectory}/src/cloudpdf/environment.py`, 'utf8');
+  if (!environmentSource.includes('class CloudPDFEnvironment(enum.Enum):')) {
+    throw new Error('Python environment class changed; revisit the README environment patch');
+  }
+  for (const document of ['README.md', 'reference.md']) {
+    const documentPath = `${outputDirectory}/${document}`;
+    writeFileSync(
+      documentPath,
+      readFileSync(documentPath, 'utf8').replaceAll(
+        'CloudPDFClientEnvironment',
+        'CloudPDFEnvironment',
+      ),
+    );
+  }
+
+  // Clients read an object of a kind they don't know, one a newer server
+  // sends, as its union's catch-all (docs/conventions/api-evolution.md,
+  // "Reading tolerantly"). fern-python-sdk 5.26.0 has no setting for it: each
+  // union dispatches with pydantic's `discriminator`, which refuses an unknown
+  // tag and with it the whole response. Put a validator in front of each open
+  // union's dispatch that turns an unknown kind into the catch-all; a known
+  // one goes on to its model as before. Fail if Fern changes a union's shape.
+  const openUnions = JSON.parse(
+    readFileSync(`${repositoryDirectory}fern/tolerant-reading/open-unions.json`, 'utf8'),
+  );
+  for (const union of openUnions) readUnknownKindAsCatchAll(union);
 }
 
 // The Ruby generator intentionally leaves registry metadata in its generated
@@ -181,13 +228,14 @@ if (language === 'ruby') {
   }
   uploadClient = uploadClient.replace(generatedMultipartBlock, patchedMultipartBlock);
   uploadClient = uploadClient.replace(
-    '# @option params [String] :id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id"\n      #   )',
-    '# @option params [String] :id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id",\n      #     file: File.open("document.pdf", "rb")\n      #   )',
+    '# @option params [String] :doc_id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     doc_id: "docId"\n      #   )',
+    '# @option params [String] :doc_id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     doc_id: "docId",\n      #     file: File.open("document.pdf", "rb")\n      #   )',
   );
   writeFileSync(uploadClientPath, uploadClient);
 
   const uploadTypePath = `${outputDirectory}/lib/CloudPDF/documents/types/upload_proxy_documents_request.rb`;
-  const generatedIdField = '        field :id, -> { String }, optional: false, nullable: false\n';
+  const generatedIdField =
+    '        field :doc_id, -> { String }, optional: false, nullable: false, api_name: "docId"\n';
   const patchedFileField = '        field :file, -> { Object }, optional: false, nullable: false\n';
   const uploadTypeSource = readFileSync(uploadTypePath, 'utf8');
   if (
@@ -204,7 +252,7 @@ if (language === 'ruby') {
   const referencePath = `${outputDirectory}/reference.md`;
   const generatedReferenceExample = `client.documents.upload_proxy(
   tenant_id: "tenantId",
-  id: "id"
+  doc_id: "docId"
 )`;
   const patchedReferenceExample = 'File.open("document.pdf", "rb") do |file|';
   const referenceSource = readFileSync(referencePath, 'utf8');
@@ -222,7 +270,7 @@ if (language === 'ruby') {
         `File.open("document.pdf", "rb") do |file|
   client.documents.upload_proxy(
     tenant_id: "tenantId",
-    id: "id",
+    doc_id: "docId",
     file: file
   )
 end`,
@@ -374,4 +422,85 @@ signing {
 }
 `);
   writeFileSync(projectPath, project);
+}
+
+/**
+ * Appends to a Python open union's module a validator that reads a kind the
+ * SDK doesn't know as the union's catch-all (one row of
+ * fern/tolerant-reading/open-unions.json): the body's fields, with each
+ * `fill` field kept when the body carries it as its type and `otherwise`
+ * when it doesn't. Running it again leaves the module as it is.
+ */
+function readUnknownKindAsCatchAll({ name, tag, catchAll, fill }) {
+  const snake = (text) => text.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  const pythonValue = (value) => (value === null ? 'None' : JSON.stringify(value));
+  const isType = {
+    integer: (variable) => `isinstance(${variable}, int) and not isinstance(${variable}, bool)`,
+    string: (variable) => `isinstance(${variable}, str)`,
+  };
+  const modulePath = `${outputDirectory}/src/cloudpdf/types/${snake(name)}.py`;
+  const source = readFileSync(modulePath, 'utf8');
+  // Each union is its own module, so its names can't meet another union's.
+  const known = '_KNOWN_KINDS';
+  const reader = `_read_unknown_${tag}_as_${snake(catchAll)}`;
+  const comment = (text) =>
+    text
+      .split(' ')
+      .reduce(
+        (lines, word) => {
+          const last = lines[lines.length - 1];
+          if (`${last} ${word}`.length > 79) lines.push(`# ${word}`);
+          else lines[lines.length - 1] = `${last} ${word}`;
+          return lines;
+        },
+        ['#'],
+      )
+      .join('\n');
+  const reads = fill.map(({ field }) => `        ${snake(field)} = value.get("${field}")\n`);
+  const fills = fill.map(
+    ({ field, is, otherwise }) =>
+      `            "${field}": ${snake(field)} if ${isType[is](snake(field))} else ${pythonValue(otherwise)},\n`,
+  );
+  const kept =
+    fill.length === 0
+      ? ''
+      : `, keeping ${fill.map(({ field }) => `\`${field}\``).join(' and ')} when the body carries ${fill.length === 1 ? 'it' : 'them'}`;
+  const patch = `
+
+${comment(
+  `A ${name} of a ${tag} this SDK doesn't know, one a newer server sends, reads as ` +
+    `\`${catchAll}\`${kept}. A ${tag} it knows is read as that ${tag}. Added after ` +
+    'generation by fern/scripts/record-sdk-metadata.mjs from ' +
+    'fern/tolerant-reading/open-unions.json.',
+)}
+if IS_PYDANTIC_V2:
+    ${known} = frozenset(
+        member.model_fields["${tag}"].default
+        for member in typing.get_args(typing.get_args(${name})[0])
+    )
+
+    def ${reader}(value: typing.Any) -> typing.Any:
+        if not isinstance(value, dict):
+            return value
+        ${tag}_ = value.get("${tag}")
+        if not isinstance(${tag}_, str) or ${tag}_ in ${known}:
+            return value
+${reads.join('')}        return {
+            **value,
+            "${tag}": "${catchAll}",
+${fills.join('')}        }
+
+    ${name} = typing_extensions.Annotated[  # type: ignore[misc]
+        ${name}, pydantic.BeforeValidator(${reader})
+    ]
+`;
+  if (source.endsWith(patch)) return;
+  const pascal = catchAll.replace(/(^|-)([a-z])/g, (_, __, letter) => letter.toUpperCase());
+  const dispatch = new RegExp(
+    `\\n${name} = typing_extensions\\.Annotated\\[\\n    typing\\.Union\\[[^\\]]*\\b${name}_${pascal}\\b[^\\]]*\\],\\n    pydantic\\.Field\\(discriminator="${tag}"\\),\\n\\]\\n$`,
+  );
+  if (!dispatch.test(source) || !source.includes('IS_PYDANTIC_V2')) {
+    throw new Error(`Python ${name} union changed; revisit its unknown-${tag} patch`);
+  }
+  writeFileSync(modulePath, source + patch);
 }

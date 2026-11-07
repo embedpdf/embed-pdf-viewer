@@ -270,12 +270,12 @@ describe('planAnnotationImport', () => {
     const field = annotation(first, 10, {
       subtype: 'widget',
       field: { kind: 'objectNumber', objectNumber: 44 },
-      fieldFamily: 'text',
+      fieldKind: 'text',
     });
     const inert = annotation(first, 11, {
       subtype: 'widget',
       field: null,
-      fieldFamily: 'unknown',
+      fieldKind: 'unknown',
     });
     const square = annotation(first, 12);
     const { creates, dropped } = plan(bundleOf(field, inert, square));
@@ -289,7 +289,6 @@ describe('planAnnotationImport', () => {
   test('reports the actions a copy leaves out, and not the one a link target carries', () => {
     const goto = {
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
       root: { type: 'goto', subtype: 'GoTo', next: [], destination: { kind: 'fit', page: first } },
     };

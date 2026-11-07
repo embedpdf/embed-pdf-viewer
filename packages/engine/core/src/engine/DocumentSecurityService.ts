@@ -1,5 +1,11 @@
+import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { Identity } from '../auth/scope/types';
-import type { DocCapability, FieldRights, PdfBits } from '../auth/scope';
+import type {
+  DocCapability,
+  FieldRights,
+  PdfPermissionFlags,
+  PluginPermission,
+} from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { DocumentProtection } from '../signature/types';
 import type { EditSessionAccess } from '../identity/ObjectNumbers';
@@ -9,46 +15,13 @@ export type DocumentOpenMode = 'none' | 'user' | 'owner';
 export type DocumentEncryptionState = 'unknown' | 'none' | 'encrypted' | 'unsupported';
 export type DocumentAccessReason = 'password' | 'cdn' | 'permissions-unknown';
 
-/**
- * Boolean view of "what the PDF's permission bits allow," surfaced for
- * client UI badges ("this PDF disallows printing", "copy is blocked",
- * etc.). Names mirror the user-facing capability they correspond to,
- * not the raw bit names — so docs can render "Print: disabled" without
- * the reader needing to know PDF bit positions.
- *
- * Computed from {@link PdfBits} as `pdf.permissions` reads them, which
- * is what Acrobat allows on the file: for example, form fill comes with
- * bit 4, 6 or 9, and form modification needs both bit 4 and bit 6.
- */
-export interface PdfPermissionAdvisory {
-  readonly canPrint: boolean;
-  readonly canPrintHigh: boolean;
-  readonly canCopy: boolean;
-  readonly canAnnotate: boolean;
-  readonly canFillForms: boolean;
-  readonly canModifyForms: boolean;
-  readonly canModifyPages: boolean;
-  readonly canAssemble: boolean;
-}
-
 export interface PdfPermissionInfo {
   readonly known: boolean;
   readonly allAllowed: boolean | null;
-  readonly bits: number | null;
+  /** What the file's permissions allow, one flag per bit. */
+  readonly flags: PdfPermissionFlags;
   readonly openedAs: DocumentOpenMode | null;
   readonly securityHandlerRevision: number | null;
-  /**
-   * Typed boolean view of `bits`. Present whenever the caller had
-   * access to the document's PDF bits at construction time (always
-   * true in the /access response; not always populated by the cheaper
-   * /head shape).
-   */
-  readonly flags?: PdfBits;
-  /**
-   * Capability-shaped "what does this PDF natively allow" view for UI
-   * badges. Same population rule as `flags`.
-   */
-  readonly advisory?: PdfPermissionAdvisory;
 }
 
 export interface DocumentSecurityState {
@@ -58,7 +31,8 @@ export interface DocumentSecurityState {
   };
   readonly permissions: {
     readonly known: boolean;
-    readonly bits: number | null;
+    /** What the file's permissions allow; `null` until it was read. */
+    readonly flags: PdfPermissionFlags | null;
     readonly allAllowed: boolean | null;
     readonly openedAs: DocumentOpenMode | null;
     readonly securityHandlerRevision: number | null;
@@ -94,7 +68,8 @@ export type CdnAdapter = 'none' | 'cloudfront' | 'cloud-cdn' | 'bunny' | 'azure-
  */
 export interface CdnAccessInfo {
   readonly adapter: CdnAdapter;
-  readonly expiresAt: number;
+  /** When the CDN's signing expires: ISO 8601, UTC. */
+  readonly expiresAt: IsoDateTime;
   readonly cache: {
     readonly scope: 'browser-private' | 'edge-shared';
     readonly immutableVersionedReads: boolean;
@@ -144,7 +119,8 @@ export interface DocumentAccessInfo {
   readonly originPasswordPolicy: {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';
   };
-  readonly expiresAt: number;
+  /** When the token this access was given for expires: ISO 8601, UTC. */
+  readonly expiresAt: IsoDateTime;
   /**
    * The deployment's render lattice: canonical full-page
    * `viewport.width` points whose renders are durable, CDN-shared
@@ -230,7 +206,7 @@ export interface DocumentSecurityService {
    * gating (e.g. `allows('doc.pages.assemble')`); use `scope` only to
    * *display* the concrete grants.
    */
-  allows(capability: DocCapability): boolean;
+  allows(capability: DocCapability | PluginPermission): boolean;
 
   /**
    * Per-record annotation authorization mirrors — the same resolver the

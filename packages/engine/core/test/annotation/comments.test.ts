@@ -293,7 +293,7 @@ describe('buildCommentThreads — review status', () => {
         at: '2026-08-28T10:00:00Z',
       }),
     ];
-    expect(buildCommentThreads(input)[0]!.review.mine).toBeUndefined();
+    expect(buildCommentThreads(input)[0]!.review.mine).toBe(null);
     expect(buildCommentThreads(input, { currentUserId: 'alice' })[0]!.review.mine?.state).toBe(
       'accepted',
     );

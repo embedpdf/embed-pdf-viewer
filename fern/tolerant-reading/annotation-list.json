@@ -1,0 +1,373 @@
+{
+  "annotations": [
+    {
+      "subtype": "square",
+      "ref": {
+        "kind": "objectNumber",
+        "page": {
+          "kind": "objectNumber",
+          "objectNumber": 3
+        },
+        "objectNumber": 9
+      },
+      "page": {
+        "kind": "objectNumber",
+        "objectNumber": 3
+      },
+      "hasAppearance": true,
+      "appearanceState": null,
+      "structurePosition": null,
+      "nm": null,
+      "contents": null,
+      "subject": null,
+      "blendMode": "normal",
+      "invisible": false,
+      "hidden": false,
+      "print": true,
+      "noZoom": false,
+      "noRotate": false,
+      "noView": false,
+      "readOnly": false,
+      "locked": false,
+      "toggleNoView": false,
+      "lockedContents": false,
+      "reply": null,
+      "popup": null,
+      "groupId": null,
+      "author": "Ada",
+      "createdAt": "2026-11-04T10:00:00Z",
+      "modifiedAt": "2026-11-04T10:30:00Z",
+      "userId": null,
+      "createdBy": null,
+      "modifiedBy": null,
+      "importedBy": null,
+      "actions": null,
+      "rect": {
+        "x": 10,
+        "y": 20,
+        "width": 30,
+        "height": 40,
+        "fieldFromANewerServer": true
+      },
+      "box": {
+        "x": 10,
+        "y": 20,
+        "width": 30,
+        "height": 40
+      },
+      "rotation": null,
+      "richText": null,
+      "color": "#ff0000",
+      "opacity": 1,
+      "strokeWidth": 1,
+      "borderStyle": "solid",
+      "dashArray": null,
+      "interiorColor": null,
+      "cloudyIntensity": null,
+      "fieldFromANewerServer": {
+        "addedIn": "3.1",
+        "nested": {
+          "values": [1, "two", null]
+        }
+      }
+    },
+    {
+      "subtype": "sound",
+      "ref": {
+        "kind": "objectNumber",
+        "page": {
+          "kind": "objectNumber",
+          "objectNumber": 3
+        },
+        "objectNumber": 10
+      },
+      "page": {
+        "kind": "objectNumber",
+        "objectNumber": 3
+      },
+      "hasAppearance": true,
+      "appearanceState": null,
+      "structurePosition": null,
+      "nm": null,
+      "contents": null,
+      "subject": null,
+      "blendMode": "normal",
+      "invisible": false,
+      "hidden": false,
+      "print": true,
+      "noZoom": false,
+      "noRotate": false,
+      "noView": false,
+      "readOnly": false,
+      "locked": false,
+      "toggleNoView": false,
+      "lockedContents": false,
+      "reply": null,
+      "popup": null,
+      "groupId": null,
+      "author": "Ada",
+      "createdAt": "2026-11-04T10:00:00Z",
+      "modifiedAt": "2026-11-04T10:30:00Z",
+      "userId": null,
+      "createdBy": null,
+      "modifiedBy": null,
+      "importedBy": null,
+      "actions": null,
+      "rect": {
+        "x": 100,
+        "y": 20,
+        "width": 24,
+        "height": 24
+      },
+      "sound": {
+        "format": "wav",
+        "seconds": 3
+      }
+    },
+    {
+      "subtype": "widget",
+      "ref": {
+        "kind": "objectNumber",
+        "page": {
+          "kind": "objectNumber",
+          "objectNumber": 3
+        },
+        "objectNumber": 11
+      },
+      "page": {
+        "kind": "objectNumber",
+        "objectNumber": 3
+      },
+      "hasAppearance": true,
+      "appearanceState": null,
+      "structurePosition": null,
+      "nm": null,
+      "contents": null,
+      "subject": null,
+      "blendMode": "normal",
+      "invisible": false,
+      "hidden": false,
+      "print": true,
+      "noZoom": false,
+      "noRotate": false,
+      "noView": false,
+      "readOnly": false,
+      "locked": false,
+      "toggleNoView": false,
+      "lockedContents": false,
+      "reply": null,
+      "popup": null,
+      "groupId": null,
+      "author": "Ada",
+      "createdAt": "2026-11-04T10:00:00Z",
+      "modifiedAt": "2026-11-04T10:30:00Z",
+      "userId": null,
+      "createdBy": null,
+      "modifiedBy": null,
+      "importedBy": null,
+      "actions": null,
+      "rect": {
+        "x": 10,
+        "y": 100,
+        "width": 120,
+        "height": 24
+      },
+      "box": {
+        "x": 10,
+        "y": 100,
+        "width": 120,
+        "height": 24
+      },
+      "rotation": null,
+      "color": null,
+      "interiorColor": null,
+      "strokeWidth": 1,
+      "borderStyle": "solid",
+      "dashArray": null,
+      "fontFamily": "Helvetica",
+      "fontSize": 12,
+      "fontColor": "#000000",
+      "textAlign": "left",
+      "caption": null,
+      "checkStyle": null,
+      "hasMark": false,
+      "field": {
+        "kind": "objectNumber",
+        "objectNumber": 12
+      },
+      "fieldKind": "barcode"
+    },
+    {
+      "subtype": "line",
+      "ref": {
+        "kind": "objectNumber",
+        "page": {
+          "kind": "objectNumber",
+          "objectNumber": 3
+        },
+        "objectNumber": 12
+      },
+      "page": {
+        "kind": "objectNumber",
+        "objectNumber": 3
+      },
+      "hasAppearance": true,
+      "appearanceState": null,
+      "structurePosition": null,
+      "nm": null,
+      "contents": null,
+      "subject": null,
+      "blendMode": "normal",
+      "invisible": false,
+      "hidden": false,
+      "print": true,
+      "noZoom": false,
+      "noRotate": false,
+      "noView": false,
+      "readOnly": false,
+      "locked": false,
+      "toggleNoView": false,
+      "lockedContents": false,
+      "reply": null,
+      "popup": null,
+      "groupId": null,
+      "author": "Ada",
+      "createdAt": null,
+      "modifiedAt": null,
+      "userId": null,
+      "createdBy": null,
+      "modifiedBy": null,
+      "importedBy": null,
+      "actions": null,
+      "rect": {
+        "x": 100,
+        "y": 100,
+        "width": 200,
+        "height": 10
+      },
+      "rotation": null,
+      "richText": null,
+      "color": "#0000ff",
+      "opacity": 1,
+      "strokeWidth": 1,
+      "borderStyle": "solid",
+      "dashArray": null,
+      "fieldFromANewerServer": {
+        "addedIn": "3.1",
+        "nested": {
+          "values": [1, "two", null]
+        }
+      },
+      "interiorColor": null,
+      "linePoints": {
+        "start": {
+          "x": 100,
+          "y": 105
+        },
+        "end": {
+          "x": 300,
+          "y": 105
+        }
+      },
+      "lineEndings": {
+        "start": "none",
+        "end": "none"
+      },
+      "intent": "line-dimension",
+      "measure": {
+        "subtype": "volumetric",
+        "unitsFromANewerServer": "m3"
+      },
+      "captionEnabled": false,
+      "captionPosition": "inline",
+      "captionOffset": {
+        "along": 0,
+        "perpendicular": 0
+      },
+      "leader": null
+    },
+    {
+      "subtype": "link",
+      "ref": {
+        "kind": "objectNumber",
+        "page": {
+          "kind": "objectNumber",
+          "objectNumber": 3
+        },
+        "objectNumber": 13
+      },
+      "page": {
+        "kind": "objectNumber",
+        "objectNumber": 3
+      },
+      "hasAppearance": true,
+      "appearanceState": null,
+      "structurePosition": null,
+      "nm": null,
+      "contents": null,
+      "subject": null,
+      "blendMode": "normal",
+      "invisible": false,
+      "hidden": false,
+      "print": true,
+      "noZoom": false,
+      "noRotate": false,
+      "noView": false,
+      "readOnly": false,
+      "locked": false,
+      "toggleNoView": false,
+      "lockedContents": false,
+      "reply": null,
+      "popup": null,
+      "groupId": null,
+      "author": "Ada",
+      "createdAt": "2026-11-04T10:00:00Z",
+      "modifiedAt": "2026-11-04T10:30:00Z",
+      "userId": null,
+      "createdBy": null,
+      "modifiedBy": null,
+      "importedBy": null,
+      "actions": {
+        "activate": {
+          "root": {
+            "type": "set-presentation",
+            "subtype": "SetPresentation",
+            "next": [],
+            "step": 2
+          },
+          "incomplete": false,
+          "warnings": []
+        }
+      },
+      "rect": {
+        "x": 10,
+        "y": 300,
+        "width": 80,
+        "height": 12
+      },
+      "rotation": null,
+      "fieldFromANewerServer": {
+        "addedIn": "3.1",
+        "nested": {
+          "values": [1, "two", null]
+        }
+      },
+      "target": {
+        "kind": "goto-3d",
+        "view": "front"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "kind": "objectNumber",
+      "objectNumber": 3
+    }
+  ],
+  "fieldFromANewerServer": {
+    "addedIn": "3.1",
+    "nested": {
+      "values": [1, "two", null]
+    }
+  }
+}

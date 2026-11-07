@@ -67,9 +67,6 @@ describe('textFieldEditorStyleOf', () => {
       outline: '2px solid F',
       outlineOffset: '-2px',
       padding: '0 2px',
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontWeight: 400,
-      fontStyle: 'normal',
       fontSize: '20px',
       textAlign: 'left',
       color: 'T',
@@ -90,6 +87,7 @@ describe('textFieldEditorStyleOf', () => {
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
       letterSpacing: 0,
       comb: false,
+      rtl: false,
     };
     expect(textFieldEditorStyleOf(field, frame, colors, true, layout)).toMatchObject({
       fontFamily: layout.fontFamily,
@@ -97,7 +95,12 @@ describe('textFieldEditorStyleOf', () => {
       lineHeight: '22.2px',
       padding: '2px 4px 2px 4px',
       textAlign: 'left',
+      direction: 'ltr',
     });
+    // A line that reads right to left in the engine reads so in the editor too, aligned as the field is.
+    expect(
+      textFieldEditorStyleOf(field, frame, colors, true, { ...layout, rtl: true }),
+    ).toMatchObject({ direction: 'rtl', textAlign: 'left' });
     // A comb starts at its first cell and spaces its characters by the cells.
     const comb = {
       ...field,
@@ -137,6 +140,7 @@ describe('textFieldEditorStyleOf', () => {
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
       letterSpacing: 0,
       comb: false,
+      rtl: false,
     };
     expect(textFieldEditorStyleOf(small, frame, colors, true, layout)).toMatchObject({
       width: '200%',
@@ -162,15 +166,14 @@ describe('textFieldEditorStyleOf', () => {
 });
 
 describe('listBoxControlStyleOf', () => {
-  it('fills the box in the field’s look, with its own border', () => {
-    expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors)).toEqual({
+  it('fills the box in the field’s look and the font the form plugin gives, with its own border', () => {
+    const font = { fontFamily: '"epdf-helvetica"', fontWeight: 400, fontStyle: 'normal' as const };
+    expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors, font)).toEqual({
       ...FORM_CONTROL_FILL,
       padding: '0',
       borderRadius: '0',
       outline: 'none',
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontWeight: 400,
-      fontStyle: 'normal',
+      ...font,
       fontSize: '20px',
       textAlign: 'left',
       color: 'T',

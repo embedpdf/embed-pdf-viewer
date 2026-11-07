@@ -2,29 +2,37 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddTextBox from './AddTextBox.svelte';
+  import SelectRichText from './SelectRichText.svelte';
   import RichTextToolbar from './RichTextToolbar.svelte';
 
   import '../rich-text.css';
 
   const engine = cloudEngine();
-  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+  const plugins = [
+    stagePlugin(),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    annotationPlugin(),
+  ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: notice }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddTextBox />
+    <SelectRichText />
     <RichTextToolbar />
     <Stage class="stage">
       <RenderLayer />
+      <SelectionLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

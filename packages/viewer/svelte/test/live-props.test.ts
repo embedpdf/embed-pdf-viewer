@@ -1,7 +1,7 @@
 /**
  * `<PDFViewer>`'s live props (`pages/live-props.ts`): the element has its config before its
  * viewer mounts, and `theme`, `locale`, `disable`,
- * `readOnly` and `src` change the running viewer in place, the same viewer and kernel
+ * `readOnly`, `appState` and `src` change the running viewer in place, the same viewer and kernel
  * throughout; `onpanelresize` calls the latest function given; and a changed read-once prop is
  * ignored with one warning naming it.
  */
@@ -80,9 +80,10 @@ describe('<PDFViewer> live props', () => {
     const spanish = await until(
       page,
       () =>
-        /Página 1 de \d+/.test(
-          document.querySelector('embedpdf-viewer')!.shadowRoot!.textContent ?? '',
-        ),
+        // The pager's next page button, in Spanish.
+        document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
       { timeout: 15_000 },
     );
     expect(spanish).toBe(true);
@@ -115,6 +116,29 @@ describe('<PDFViewer> live props', () => {
           .disabledCategories,
     );
     expect(readOnly).toEqual(expect.arrayContaining(['annotations', 'forms']));
+    expect(await sameViewer()).toBe(true);
+  });
+
+  it("follows appState: the commands read the app's new state", async () => {
+    const approved = () =>
+      page.evaluate(
+        () =>
+          (window.__viewerCheck as LivePropsRecord).viewers[0]!.commands.resolveCommand(
+            'acme:approve',
+          )?.active,
+      );
+    expect(await approved()).toBe(false);
+    await page.evaluate(() =>
+      (window.__viewerCheck as LivePropsRecord).set({ appState: { approved: true } }),
+    );
+    await page.waitForTimeout(100);
+    expect(await approved()).toBe(true);
+    // A property, not an attribute the spread wrote in lower case.
+    expect(
+      await page.evaluate(() =>
+        document.querySelector('embedpdf-viewer')!.hasAttribute('appstate'),
+      ),
+    ).toBe(false);
     expect(await sameViewer()).toBe(true);
   });
 

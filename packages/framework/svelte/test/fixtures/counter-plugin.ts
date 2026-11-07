@@ -78,11 +78,12 @@ export const testPage: PageLayout = pageAt(0);
 const handleFor = (id: string, pageCount = 1) =>
   ({
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
       list: () =>
         Promise.resolve({
           pageCount,
+          labels: [],
           pages: Array.from({ length: pageCount }, (_, index) => pageAt(index)),
         }),
     },

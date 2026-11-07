@@ -13,7 +13,7 @@ export type CompiledExampleProps = CodePanelProps & {
   kind?: 'example' | 'snippet';
   /** The sample's name, as written in the page (the key already carries it). */
   name?: string;
-  /** A bigger preview than the example's own: `tall`, or `wide` (see `Example`). */
+  /** A bigger preview than the example's own: `tall`, or `page` (see `Example`). */
   size?: ExampleSize;
 };
 

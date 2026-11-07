@@ -1,4 +1,5 @@
-import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
+import type { Rotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
+import type { PaintFonts } from '@embedpdf/core-text';
 import type {
   AnnotationBorderStyle,
   AnnotationDraft,
@@ -63,7 +64,7 @@ export type PolySubtype = 'polygon' | 'polyline';
  */
 export interface ViewEnv {
   zoom: number;
-  rotation: PageRotation;
+  rotation: Rotation;
 }
 
 /**
@@ -116,8 +117,11 @@ export type Shape =
  * hit-testing: nothing is written back through it.
  */
 export interface Style {
-  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
-  color: Color;
+  /**
+   * The stroke for a drawn kind, a markup's colour, a free text's border.
+   * `null` strokes nothing: a shape with no stroke keeps its fill and its width.
+   */
+  color: Color | null;
   /** The fill; `null` when the annotation has none. */
   interiorColor: Color | null;
   strokeWidth: number;
@@ -282,13 +286,13 @@ export interface SnapSettings {
    * How close a move comes before it snaps, in screen pixels: each pointer
    * sample converts it by its `scale`. Without one it is in page units.
    */
-  readonly alignmentThreshold: number;
+  readonly alignmentThresholdPx: number;
   /** Snap a turn onto `rotationAngles`. */
   readonly rotation: boolean;
   /** The angles a turn snaps to, in degrees clockwise. */
   readonly rotationAngles: readonly number[];
   /** How close a turn comes before it snaps, in degrees. */
-  readonly rotationThreshold: number;
+  readonly rotationThresholdDeg: number;
 }
 
 /**
@@ -310,7 +314,7 @@ export type Draft =
       /** Display rotation + upright policy captured at down (the gesture's home
        *  page), so the commit counter-rotates against what the author saw even
        *  if the up sample resolves elsewhere. See {@link PointerInput}. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -340,7 +344,7 @@ export type Draft =
       to: Point;
       /** Display rotation + upright policy captured at down (see the rect
        *  draft): an upright tool's click lays its line as the author saw the page. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -391,7 +395,7 @@ export type Draft =
        *  gesture's home page) — the text box commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.
        *  Same capture rule as the rect draft. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
@@ -402,7 +406,7 @@ export type Draft =
   // Single-shape resize / vertex drag. For a screen-anchored (`noZoom`/
   // `noRotate`) target, `base`/`cur` live in view space — the projected
   // geometry the user actually grabbed — and the commit maps `cur` back to
-  // stored space through `unanchoredGeom` with the captured `view`. For every
+  // stored space through `unanchoredGeometry` with the captured `view`. For every
   // other target the projection is the identity and `base` Is the stored geom.
   | {
       kind: 'handle';
@@ -417,7 +421,7 @@ export type Draft =
   // centre for a group); `ids` are the members being turned; `start`/`cur` are
   // the pointer at grab and now, so the live angle is
   // `angle(cur - pivot) - angle(start - pivot)`. The base geometry stays in
-  // `m.byId` until commit, so `effGeom` rotates from there. `free` (shift
+  // `m.byId` until commit, so `effectiveGeometry` rotates from there. `free` (shift
   // held) bypasses rotation snapping for this sample. `view` (captured at
   // Down) projects screen-anchored members for preview + commit.
   | {
@@ -607,10 +611,10 @@ export interface PointerInput {
    * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
    * clamp at their effective geometry. Page space itself never rotates.
    */
-  displayRotation?: PageRotation;
+  displayRotation?: Rotation;
   /**
    * Screen pixels per page unit at the event: the page's view scale. A
-   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * setting in screen pixels (`snap.alignmentThresholdPx`) is converted by it,
    * so snapping feels the same at every zoom. Absent → 1.
    */
   scale?: number;
@@ -757,6 +761,8 @@ export type Message =
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
   // Merge fields into a tool's defaults (keyed by its preset).
   | { type: 'setDefaults'; preset: string; patch: FieldValues }
+  // Set a tool's defaults to exactly these, dropping any field they leave out.
+  | { type: 'replaceDefaults'; preset: string; defaults: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
   // Turn the selection a quarter turn, clockwise (90) or back (-90): the
@@ -866,8 +872,12 @@ export interface RenderItem {
   /** The pointer is over this annotation — scene-level hover affordances
    *  (e.g. a redaction mark previews its applied look). */
   hovered?: boolean;
-  /** Redaction label projection (redact kind only) — see {@link ModelAnnotation.label}. */
-  label?: { text: string; repeat: boolean };
+  /**
+   * A redaction's overlay text (redact kind only), and the fonts its hover
+   * preview draws it in: the fonts plugin's, as the engine picks them for
+   * the label's font; without them, its standard font or Helvetica.
+   */
+  label?: { text: string; repeat: boolean; fonts?: PaintFonts };
   /**
    * The box a painter draws into: `box` before its turn, and that turn,
    * degrees clockwise about the box's middle. Everything the item draws sits
@@ -927,9 +937,11 @@ export interface Paint {
   opacity?: number;
   dash?: number[]; // stroke dash (content units)
   blend?: Exclude<BlendMode, 'normal'>;
-  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
-  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for freehand ink.
+  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for ink and icons.
+  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for clouds and icons.
   fillRule?: 'evenodd'; // fill-rule; omitted = the default nonzero. Even-odd punches icon holes.
+  /** The thinnest line the screen draws, one pixel at any zoom: a stroke of width 0 (ISO 32000-2 §8.4.3.2). */
+  hairline?: true;
 }
 
 /**
@@ -946,7 +958,7 @@ export type SceneNode = (
   | { kind: 'path'; d: string; paint: Paint }
   /** Painted (non-interactive) text — `at` is the baseline start point in
    *  content units. Editable text (free text) stays a framework element;
-   *  this is for pure pixels, e.g. a redaction label preview. */
+   *  this is for pure pixels, e.g. a measurement's caption. */
   | {
       kind: 'text';
       at: Point;
@@ -954,18 +966,29 @@ export type SceneNode = (
       fontSize: number;
       fontFamily?: string;
       rotation?: number;
+      /** The face it draws in, for whatever draws it to mount (`fontFamily` names it first). */
+      program?: SceneFontProgram;
       paint: Paint;
     }
-  /** Painted text placed character by character: `offsets[i]` is how far
-   *  along the baseline from `at` character `i` starts, so each glyph lands
-   *  where the PDF puts it (a form widget's painted text). `rotation` turns
-   *  the run about `at`, degrees clockwise. `program` is the face it draws
-   *  in, for whatever draws it to mount (`fontFamily` names it first). */
+  /** A run of painted text in one font and one direction, as a layout
+   *  placed it (a form widget's text): `at` is where its left edge meets the
+   *  baseline, `text` its characters in typing order. A right-to-left run is
+   *  drawn right to left from its right end, so it ends at `at`; the browser
+   *  shapes the run and orders nothing. `plain` turns kerning and ligatures
+   *  off, as the engine draws simple scripts. `joinsPrevious` and `joinsNext`
+   *  say a letter drawn alone (a comb's cell) is joined to the letter before
+   *  or after it in the text: it takes that joined form, drawn with a joiner
+   *  (U+200D) on that side. `rotation` turns the run about `at`, degrees
+   *  clockwise. `program` is the face it draws in, for whatever draws it to
+   *  mount (`fontFamily` names it first). */
   | {
-      kind: 'glyphs';
+      kind: 'textRun';
       at: Point;
       text: string;
-      offsets: number[];
+      rtl: boolean;
+      plain: boolean;
+      joinsPrevious?: boolean;
+      joinsNext?: boolean;
       fontSize: number;
       fontFamily: string;
       fontWeight?: number;

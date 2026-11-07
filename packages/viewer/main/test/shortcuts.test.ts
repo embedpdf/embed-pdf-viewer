@@ -129,7 +129,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('keyboard shortcuts', ()
     await tab.waitForFunction(
       () =>
         Object.values((window as unknown as PageRecord).viewers).every((element) =>
-          /Page 1 of \d+/.test(element.shadowRoot?.textContent ?? ''),
+          /1 \/ \d+/.test(element.shadowRoot?.textContent ?? ''),
         ),
       null,
       { timeout: 60_000 },
@@ -231,7 +231,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('keyboard shortcuts', ()
         subtype: 'square',
         box: { x: 120, y: 160, width: 160, height: 100 },
       });
-      annotation.selection.set([made.ref]);
+      annotation.selection.select([made.ref]);
       return made.ref;
     });
     await frames(tab);

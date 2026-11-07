@@ -5,7 +5,7 @@ import type {
   PdfDestination,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { toLineBreaks, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -13,6 +13,7 @@ import {
   readAnnotRect,
   readAnnotString,
   readAppearanceState,
+  readStructurePosition,
 } from './annotationReadPrimitives';
 import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
@@ -43,7 +44,8 @@ export function readAnnotationBase(
   const page = toPageRef(pageObjectNumber);
   const rect = readAnnotRect(fn, mem, annotPtr);
   const flags = readAnnotFlags(fn, annotPtr);
-  const contents = readAnnotString(fn, mem, annotPtr, 'Contents');
+  const pdfContents = readAnnotString(fn, mem, annotPtr, 'Contents');
+  const contents = pdfContents === null ? null : toLineBreaks(pdfContents, '\n');
   const subject = readAnnotString(fn, mem, annotPtr, 'Subj');
   const author = readAnnotString(fn, mem, annotPtr, 'T');
   const createdRaw = readAnnotString(fn, mem, annotPtr, 'CreationDate');
@@ -60,6 +62,7 @@ export function readAnnotationBase(
     page,
     hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
     appearanceState: readAppearanceState(fn, mem, annotPtr),
+    structurePosition: readStructurePosition(fn, mem, annotPtr),
     nm: readAnnotString(fn, mem, annotPtr, 'NM'),
     ...flags,
     rect,

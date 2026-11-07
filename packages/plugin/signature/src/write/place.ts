@@ -16,14 +16,14 @@ import { verb } from '../services/errors';
 export function createTarget(
   ctx: SignatureContext,
   { events }: Pick<SignatureServices, 'events'>,
-  { getSignature }: Pick<SignatureReads, 'getSignature'>,
+  { findSignature }: Pick<SignatureReads, 'findSignature'>,
 ) {
   const { inspectionRequested } = events;
   /** One field, whether a ref names it by object number or by name. */
   const sameField = (left: FormFieldRef, right: FormFieldRef): boolean => {
     if (sameFieldRef(left, right)) return true;
-    const signature = getSignature(left);
-    return signature !== null && signature.index === getSignature(right)?.index;
+    const signature = findSignature(left);
+    return signature !== null && signature.index === findSignature(right)?.index;
   };
   /** A field that was just signed or filled is no longer the target. */
   const clearIfTarget = (field: FormFieldRef): void => {
@@ -78,14 +78,14 @@ export function createPlacement(
           documentId: documentId(),
           signal: options?.signal,
         });
-        return { kind: 'placed', annotation: placed.annotation.ref };
+        return { status: 'placed', annotation: placed.annotation.ref };
       }
       const annotations = annotation();
       if (!annotations) {
         throw new PluginError('unsupported', 'signature', 'no annotation plugin to place a mark');
       }
       const placed = await annotations.stamps.place({ source: mark.source }, target, options);
-      return { kind: 'placed', annotation: placed.annotation.ref };
+      return { status: 'placed', annotation: placed.annotation.ref };
     }
     switch (mode()) {
       case 'sign':
@@ -94,19 +94,19 @@ export function createPlacement(
         // dialog) instead of sealing a plain approval on the spot.
         if (settings.get().allowCertify && !hasSignedField(snapshot())) {
           signRequested.emit({ field: target.field, mark });
-          return { kind: 'requested', field: target.field };
+          return { status: 'requested', field: target.field };
         }
         return {
-          kind: 'signed',
+          status: 'signed',
           field: target.field,
           result: await sign({ field: target.field, mark }, options),
         };
       case 'visual':
         await fillField(target.field, mark, options);
-        return { kind: 'filled', field: target.field };
+        return { status: 'filled', field: target.field };
       case 'ask':
         signRequested.emit({ field: target.field, mark });
-        return { kind: 'requested', field: target.field };
+        return { status: 'requested', field: target.field };
     }
   };
 

@@ -25,7 +25,18 @@ export const metadata: Metadata = {
   title: 'EmbedPDF — Open Source PDF Solutions',
   description:
     'The ultimate Open Source PDF viewer for JavaScript. Choose our drop-in component for instant results, or use our headless library to build a completely custom UI. Apache-2.0 licensed.',
-  icons: { icon: '/embedpdf-icon.svg' },
+  // The favicon set in public/ (RealFaviconGenerator): the SVG switches to its dark variant on
+  // its own, the PNG and ICO cover browsers without SVG favicons.
+  icons: {
+    icon: [
+      { url: '/favicon-96x96.png', type: 'image/png', sizes: '96x96' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180' },
+  },
+  manifest: '/site.webmanifest',
+  appleWebApp: { title: 'EmbedPDF' },
 };
 
 /**

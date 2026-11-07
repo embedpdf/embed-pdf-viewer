@@ -87,6 +87,7 @@ describe('createPlacedComponents', () => {
     command,
     icon: null,
     label: null,
+    active: false,
   });
 
   it('keeps one entry per element, replaced in place, and says when it changes', () => {

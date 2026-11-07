@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useEffect } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -8,12 +8,7 @@ import {
   useInteraction,
   useInteractionState,
 } from '@embedpdf/react/interaction';
-import {
-  AnnotationLayer,
-  annotationPlugin,
-  useAnnotation,
-  useAnnotationState,
-} from '@embedpdf/react/annotation';
+import { AnnotationLayer, annotationPlugin, useAnnotation } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
 import './custom-tools.css';
@@ -55,9 +50,9 @@ const plugins = [
   }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
@@ -65,23 +60,12 @@ function Toolbar() {
   const annotation = useAnnotation();
   const interaction = useInteraction();
   const { activeToolId } = useInteractionState();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
   const labelled = annotation.tools.list().filter((tool) => typeof tool.meta?.label === 'string');
 
-  // On load: an arrow drawn with the arrow tool's defaults, and the arrow tool active.
+  // On load: the arrow tool is active.
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(
-      cover,
-      { subtype: 'line', linePoints: { start: { x: 520, y: 120 }, end: { x: 470, y: 230 } } },
-      undefined,
-      { tool: 'arrow' },
-    );
     interaction.activateTool('arrow');
-  }, [annotation, interaction, ready, cover]);
+  }, [interaction]);
 
   return (
     <div className="toolbar">
@@ -110,7 +94,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">

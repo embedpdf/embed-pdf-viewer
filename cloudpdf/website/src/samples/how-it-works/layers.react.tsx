@@ -24,9 +24,9 @@ const plugins = [
   searchPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
-// Something on every layer on load: the matches of a search, and the title selected.
+// Something on every layer on load: the matches of a search, and the first word selected.
 function OnLoad() {
   const search = useSearch();
   const selection = useSelection();
@@ -36,7 +36,7 @@ function OnLoad() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   return null;
@@ -58,7 +58,7 @@ export default function App() {
   const [showSelection, setShowSelection] = useState(true);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <OnLoad />
         <div className="toolbar">

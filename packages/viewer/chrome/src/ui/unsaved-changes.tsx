@@ -1,31 +1,37 @@
 /**
  * Changes that would be lost. A document has unsaved changes once it changed since it opened or
  * since its last download (`hasUnsavedChanges`, always false on an engine that stores every
- * change as it's made). While one has, leaving the page asks first ({@link LeaveWarning}), and
- * closing its tab asks first ({@link CloseUnsavedDialog}). What the app's code closes, or a new
- * `src` replaces, is the app's call and closes without asking.
+ * change as it's made). While one has, leaving the page asks first ({@link LeaveWarning}) unless
+ * the app said not to (`warnBeforeLeaving: false`), and closing its tab asks first
+ * ({@link CloseUnsavedDialog}). What the app's code closes, or a new `src` replaces, is the app's
+ * call and closes without asking.
  */
 import { useT } from '@embedpdf/react/i18n';
 import { useDocumentsState } from '@embedpdf/react/runtime';
 import { useEffect, useId } from 'react';
 
+import { useWarnBeforeLeaving } from '../config-context';
 import { Dialog } from './dialog';
 
-/** While any document has unsaved changes, the browser asks before the page is left. */
+/**
+ * While any document has unsaved changes, the browser asks before the page is left, unless the
+ * app's `warnBeforeLeaving` is `false`.
+ */
 export function LeaveWarning() {
+  const warn = useWarnBeforeLeaving();
   const unsaved = useDocumentsState((state) =>
     state.documents.some((document) => document.hasUnsavedChanges),
   );
   useEffect(() => {
-    if (!unsaved) return;
-    const warn = (event: BeforeUnloadEvent) => {
+    if (!warn || !unsaved) return;
+    const ask = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       // What browsers before Chrome 119 ask for; the text itself is the browser's own.
       event.returnValue = '';
     };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [unsaved]);
+    window.addEventListener('beforeunload', ask);
+    return () => window.removeEventListener('beforeunload', ask);
+  }, [warn, unsaved]);
   return null;
 }
 

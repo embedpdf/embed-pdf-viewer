@@ -78,7 +78,7 @@ export const EMPTY_TILE_PLAN: TilePaintPlan = {
  * The base-plane strategy: the pixel budget and the render points below it.
  * Device px throughout (CSS px × devicePixelRatio).
  */
-export interface FullPageOptions {
+export interface FullPageSettings {
   /**
    * The budget: no full-page raster ever renders wider. Small by design —
    * the base is the instant backdrop; sharpness past it is the tile plane's
@@ -96,7 +96,7 @@ export interface FullPageOptions {
 }
 
 /** The tile-plane strategy. Pass `tiles: false` to disable the plane. */
-export interface TilesOptions {
+export interface TilesSettings {
   /** Tile edge in device px. Default 512 (policy `tileSizes` win when advertised). */
   size?: number;
   /**
@@ -122,13 +122,13 @@ export interface TilesOptions {
    * making every edge land over the neighbor's identical content instead of
    * the backdrop. Default 1; 0 disables.
    */
-  bleed?: number;
+  bleedPx?: number;
   /**
    * Sharpness deficit (desired ÷ supplied-by-base) above which tiles engage.
    * Resolved default: 1.0 when the base is exact (nothing may rest
    * stretched), 1.25 under a lattice.
    */
-  engageAt?: number;
+  engageRatio?: number;
   /** Prefetch ring around the visible rect. */
   prefetch?: {
     /** Extra coverage per side, in fractions of the visible rect. Default 0.5. */
@@ -165,7 +165,7 @@ export interface ResolvedRenderOptions {
     quantize: 'exact' | readonly number[];
     maxScale: number;
     bleedPx: number;
-    engageAt: number | undefined;
+    engageRatio: number | undefined;
     prefetchMargin: number;
     velocityBias: boolean;
     settleMs: number;
@@ -184,10 +184,10 @@ export interface ResolvedRenderOptions {
  * width other than the default 640.
  */
 export function resolveRenderOptions(options: {
-  fullPage?: FullPageOptions;
-  tiles?: TilesOptions | false;
-  format?: 'png' | 'webp' | 'bmp';
-  quality?: number;
+  fullPage?: FullPageSettings;
+  tiles?: TilesSettings | false;
+  format?: 'png' | 'webp' | 'bmp' | null;
+  quality?: number | null;
   debug?: boolean;
 }): ResolvedRenderOptions {
   const tiles = options.tiles === false ? undefined : options.tiles;
@@ -203,15 +203,15 @@ export function resolveRenderOptions(options: {
       size: tiles?.size ?? 512,
       quantize: tiles?.quantize ?? 'exact',
       maxScale: tiles?.maxScale ?? 128,
-      bleedPx: tiles?.bleed ?? 1,
-      engageAt: tiles?.engageAt,
+      bleedPx: tiles?.bleedPx ?? 1,
+      engageRatio: tiles?.engageRatio,
       prefetchMargin: tiles?.prefetch?.margin ?? 0.5,
       velocityBias: tiles?.prefetch?.velocityBias ?? true,
       settleMs: tiles?.settleMs ?? 150,
       fallbackPyramid: DEFAULT_TILE_PYRAMID,
     },
-    format: options.format,
-    quality: options.quality,
+    format: options.format ?? undefined,
+    quality: options.quality ?? undefined,
     debug: options.debug ?? false,
   };
 }

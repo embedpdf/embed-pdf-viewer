@@ -125,6 +125,23 @@ export function createStageSurface(
   reportDpr();
   cleanups.push(() => mq?.removeEventListener('change', reportDpr));
 
+  // The camera is the only scroll. The viewport clips (`overflow: hidden`), yet the browser
+  // still scrolls it to show something inside: a field reached with Tab, an element code calls
+  // `focus()` or `scrollIntoView()` on, the caret at a text box's edge. The camera never hears of
+  // that offset, so the pages would stay shifted under it, out of reach of every scroll after.
+  // Take what the browser scrolled, put the viewport back and pan the camera as far: the scroll
+  // event comes before the frame is painted, so the target shows where the browser meant it to.
+  const takeNativeScroll = () => {
+    const dx = element.scrollLeft;
+    const dy = element.scrollTop;
+    if (dx === 0 && dy === 0) return;
+    element.scrollLeft = 0;
+    element.scrollTop = 0;
+    stage.panBy(-dx, -dy);
+  };
+  element.addEventListener('scroll', takeNativeScroll);
+  cleanups.push(() => element.removeEventListener('scroll', takeNativeScroll));
+
   // The sink is the hub bridge: it converts events to page-resolved samples
   // (`pageAt` per event, so a drag can cross pages) and stamps the lens source.
   const sampleOf = (

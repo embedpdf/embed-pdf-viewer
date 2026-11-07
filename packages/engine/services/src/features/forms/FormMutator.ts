@@ -3,8 +3,8 @@ import type {
   FieldScriptWrite,
   FormFieldDisplay,
   FormFieldDraft,
-  FormFieldDTO,
-  FormFieldFamily,
+  FormField,
+  FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -40,6 +40,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { withI32Array, withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
+import { fontWriteContext, type FontRegistrar } from '../fonts';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
@@ -64,7 +65,7 @@ import {
 } from './internal/fieldAttribution';
 import { writeFieldScripts } from './internal/fieldScripts';
 import { writeFieldEntry, writeSelectedIndices } from './internal/fieldValues';
-import { withWideStringArray } from './internal/wideStringArray';
+import { withWideStringArray } from '../../runtime/memory/wideStringArray';
 import { readFieldAt } from './internal/readFormSnapshot';
 import {
   fieldObjectNumberOf,
@@ -94,8 +95,8 @@ const CHANGED_WIDGETS_CAPACITY = 256;
 // Mirrors EPDF_FORM_REPAIR_* in public/epdf_form.h.
 const REPAIR_BAKE_APPEARANCES = 0x1;
 
-/** The families that hold a value: the ones `reset` puts back. */
-const VALUE_FAMILIES: ReadonlySet<FormFieldFamily> = new Set([
+/** The kinds that hold a value: the ones `reset` puts back. */
+const VALUE_FAMILIES: ReadonlySet<FormFieldKind> = new Set([
   'text',
   'checkbox',
   'radio',
@@ -119,6 +120,8 @@ export class FormMutator {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    /** The thread's registered fonts: what a widget's `fontFamily` may name, besides the standard and document fonts. */
+    private readonly fonts?: FontRegistrar,
   ) {}
 
   /**
@@ -195,10 +198,10 @@ export class FormMutator {
     this.assertWritable(resolved);
     const docPtr = this.session.requireDocPtr();
     const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    if (field.family !== 'text' && field.family !== 'combobox') {
+    if (field.kind !== 'text' && field.kind !== 'combobox') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `appearance text does not apply to a ${field.family} field`,
+        `appearance text does not apply to a ${field.kind} field`,
       );
     }
     const changed = withUtf16String(this.runtime.mem, text, (textPtr) =>
@@ -259,7 +262,7 @@ export class FormMutator {
       });
     if (written.length > 0) this.session.invalidateDerived();
 
-    const fields: FormFieldDTO<PdfCoordinates>[] = [];
+    const fields: FormField<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
     const redrawnWidgets: FormWidget[] = [];
     for (const { before, changed } of written) {
@@ -271,7 +274,7 @@ export class FormMutator {
         .filter((widget) => changedSet.has(widget.objectNumber))
         .map((widget) => formWidget(widget.objectNumber, widget.page));
       changedWidgets.push(...fieldWidgets);
-      redrawnWidgets.push(...redrawnByValue(after.family, fieldWidgets));
+      redrawnWidgets.push(...redrawnByValue(after.kind, fieldWidgets));
     }
     return {
       fields,
@@ -285,14 +288,14 @@ export class FormMutator {
   }
 
   /** Every field a whole-form reset puts back: those with a value, written directly, unlocked. */
-  private wholeFormTargets(model: Ptr): FormFieldDTO<PdfCoordinates>[] {
+  private wholeFormTargets(model: Ptr): FormField<PdfCoordinates>[] {
     const docPtr = this.session.requireDocPtr();
     const locks = readFieldLocks(this.runtime, this.session);
-    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    const targets: FormField<PdfCoordinates>[] = [];
     const count = this.runtime.fn.EPDFForm_CountFields(model);
     for (let index = 0; index < count; index++) {
       const field = readFieldAt(this.runtime, model, index, docPtr);
-      if (!VALUE_FAMILIES.has(field.family) || field.ref.kind !== 'objectNumber') continue;
+      if (!VALUE_FAMILIES.has(field.kind) || field.ref.kind !== 'objectNumber') continue;
       if (locks?.(field.name)) continue;
       targets.push(field);
     }
@@ -300,14 +303,14 @@ export class FormMutator {
   }
 
   /** The named fields with a value, each once; one that can't be written is refused. */
-  private namedTargets(model: Ptr, refs: FormFieldRef[]): FormFieldDTO<PdfCoordinates>[] {
+  private namedTargets(model: Ptr, refs: FormFieldRef[]): FormField<PdfCoordinates>[] {
     const docPtr = this.session.requireDocPtr();
     const seen = new Set<number>();
-    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    const targets: FormField<PdfCoordinates>[] = [];
     for (const ref of refs) {
       const resolved = resolveFieldRef(this.runtime, model, ref);
       const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-      if (!VALUE_FAMILIES.has(field.family) || seen.has(resolved.fieldObjectNumber)) continue;
+      if (!VALUE_FAMILIES.has(field.kind) || seen.has(resolved.fieldObjectNumber)) continue;
       this.assertWritable(resolved);
       seen.add(resolved.fieldObjectNumber);
       targets.push(field);
@@ -357,16 +360,16 @@ export class FormMutator {
       /** Its widgets', in `draft.widgets` order; the next free ones when absent. */
       readonly widgetObjectNumbers?: readonly number[];
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
+  ): { field: FormField<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
     const placements = (draft.widgets ?? []).map((placement) =>
-      placedWidgetOf(fitWidgetToFamily(draft.family, placement)),
+      placedWidgetOf(fitWidgetToFamily(draft.kind, placement)),
     );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
-    const onStates = placements.map((placement) => onStateOf(draft.family, placement));
+    const onStates = placements.map((placement) => onStateOf(draft.kind, placement));
     // The default is checked against the draft before anything is written.
     defaultEntryOfDraft(draft);
     if ('maxLength' in draft && draft.maxLength !== undefined) {
@@ -386,8 +389,8 @@ export class FormMutator {
         { details: { field: 'widgetObjectNumbers' } },
       );
     }
-    if (objectNumber !== undefined) this.session.useObjectNumber(objectNumber);
-    for (const number of widgetObjectNumbers ?? []) this.session.useObjectNumber(number);
+    if (objectNumber !== undefined) this.session.claimObjectNumber(objectNumber);
+    for (const number of widgetObjectNumbers ?? []) this.session.claimObjectNumber(number);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction, which takes
@@ -405,6 +408,7 @@ export class FormMutator {
         pageIndexes[at]!,
         placement,
         widgetObjectNumbers?.[at],
+        fontWriteContext(this.runtime, this.session, this.fonts),
       );
       // A new field is never merged, so no split number is needed.
       if (
@@ -460,7 +464,7 @@ export class FormMutator {
     try {
       fieldObjectNumber = fn.EPDFForm_CreateField(
         this.session.requireDocPtr(),
-        FAMILY_CODE[draft.family],
+        FAMILY_CODE[draft.kind],
         namePtr,
         objectNumber ?? 0, // 0: the next free one
       );
@@ -530,17 +534,17 @@ export class FormMutator {
     ref: FormFieldRef,
     pdf: Uint8Array,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormField<PdfCoordinates> } {
     throwIfAborted(signal);
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    if (before.family !== 'signature') {
+    if (before.kind !== 'signature') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `'${before.name}' is a ${before.family} field, not a signature field`,
+        `'${before.name}' is a ${before.kind} field, not a signature field`,
       );
     }
     const signed = withSignatureModel(this.runtime, docPtr, (signatures) =>
@@ -564,7 +568,7 @@ export class FormMutator {
       );
     }
     for (const widget of before.widgets) {
-      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf);
+      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, { recordFit: true });
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };
@@ -574,7 +578,7 @@ export class FormMutator {
     ref: FormFieldRef,
     patch: FormFieldPatch,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
+  ): { field: FormField<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -587,7 +591,7 @@ export class FormMutator {
       resolved.fieldIndex,
       this.session.requireDocPtr(),
     );
-    assertPatchFitsFamily(patch, before.family);
+    assertPatchFitsFamily(patch, before.kind);
     // Checked against the field as the patch leaves it, before anything is written.
     if ('defaultValue' in patch && patch.defaultValue !== undefined) {
       formFieldAfter({ field: before, widgets: [] }, patch);
@@ -780,7 +784,7 @@ export class FormMutator {
       /** Where a merged field's widget moves; the next free one when absent. */
       readonly splitObjectNumber?: number;
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
+  ): { field: FormField<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -788,17 +792,17 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const fitted = placedWidgetOf(fitWidgetToFamily(before.family, placement));
+    const fitted = placedWidgetOf(fitWidgetToFamily(before.kind, placement));
     const pageIndex = this.preflightPlacement(fitted);
-    const onState = onStateOf(before.family, fitted);
+    const onState = onStateOf(before.kind, fitted);
     // A merged field/widget splits: its widget half becomes a new widget, at
     // a new number in the same place in that page's /Annots.
     const mergedPage =
       before.widgets.find((w) => w.objectNumber === resolved.fieldObjectNumber)?.page ?? null;
-    if (numbers.objectNumber !== undefined) this.session.useObjectNumber(numbers.objectNumber);
+    if (numbers.objectNumber !== undefined) this.session.claimObjectNumber(numbers.objectNumber);
     // The split number is used only when the field is merged.
     const splitObjectNumber = mergedPage ? numbers.splitObjectNumber : undefined;
-    if (splitObjectNumber !== undefined) this.session.useObjectNumber(splitObjectNumber);
+    if (splitObjectNumber !== undefined) this.session.claimObjectNumber(splitObjectNumber);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction.
@@ -809,6 +813,7 @@ export class FormMutator {
       pageIndex,
       fitted,
       numbers.objectNumber,
+      fontWriteContext(this.runtime, this.session, this.fonts),
     );
     if (
       !fn.EPDFForm_AttachWidget(
@@ -832,7 +837,7 @@ export class FormMutator {
     ref: FormFieldRef,
     widget: AnnotationRef,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
+  ): { field: FormField<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -917,7 +922,7 @@ export class FormMutator {
     }
   }
 
-  private readBackField(fieldObjectNumber: number): FormFieldDTO<PdfCoordinates> {
+  private readBackField(fieldObjectNumber: number): FormField<PdfCoordinates> {
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
     if (fieldIndex < 0) {
@@ -959,13 +964,13 @@ export class FormMutator {
    */
   private writeFieldAfter(
     fieldObjectNumber: number,
-    before: FormFieldDTO<PdfCoordinates>,
-    after: FormFieldDTO<PdfCoordinates>,
+    before: FormField<PdfCoordinates>,
+    after: FormField<PdfCoordinates>,
     redraw = false,
   ): number[] | null {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const toggles = after.family === 'checkbox' || after.family === 'radio' ? after.widgets : null;
+    const toggles = after.kind === 'checkbox' || after.kind === 'radio' ? after.widgets : null;
     const valueChanges = !valueEntriesEqual(before.valueEntry, after.valueEntry);
     const statesChange =
       toggles?.some(
@@ -981,7 +986,7 @@ export class FormMutator {
     ) {
       throw refused();
     }
-    if (after.family === 'combobox' || after.family === 'listbox') {
+    if (after.kind === 'combobox' || after.kind === 'listbox') {
       const selected = after.options.flatMap((option, at) => (option.selected ? [at] : []));
       if (!writeSelectedIndices(this.runtime, docPtr, fieldObjectNumber, selected)) {
         throw refused();
@@ -1035,7 +1040,7 @@ export class FormMutator {
   private readBack(
     fieldObjectNumber: number,
     changedObjNums: number[],
-    /** Whether the write drew the widgets again; a value write: by the field's family. */
+    /** Whether the write drew the widgets again; a value write: by the field's kind. */
     redraws?: boolean,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     this.session.invalidateDerived();
@@ -1044,7 +1049,7 @@ export class FormMutator {
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    const field: FormFieldDTO<PdfCoordinates> = readFieldAt(
+    const field: FormField<PdfCoordinates> = readFieldAt(
       this.runtime,
       fresh,
       fieldIndex,
@@ -1061,7 +1066,7 @@ export class FormMutator {
         [field.ref],
         changedWidgets,
         redraws === undefined
-          ? redrawnByValue(field.family, changedWidgets)
+          ? redrawnByValue(field.kind, changedWidgets)
           : redraws
             ? changedWidgets
             : [],
@@ -1070,9 +1075,9 @@ export class FormMutator {
   }
 }
 
-/** The patch members every family has. */
+/** The patch members every kind has. */
 const PATCH_BASE_MEMBERS = [
-  'family',
+  'kind',
   'name',
   'readOnly',
   'required',
@@ -1083,8 +1088,8 @@ const PATCH_BASE_MEMBERS = [
   'actions',
 ];
 
-/** The members each family's patch adds; a family not listed takes the base only. */
-const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldFamily, readonly string[]>> = {
+/** The members each kind's patch adds; a kind not listed takes the base only. */
+const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldKind, readonly string[]>> = {
   text: ['defaultValue', 'maxLength', 'multiline', 'password', 'comb'],
   radio: ['radiosInUnison', 'noToggleToOff'],
   combobox: ['edit', 'defaultValue', 'options'],
@@ -1092,15 +1097,15 @@ const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldFamily, readonly string[]>> 
 };
 
 /**
- * A patch names no family (the ref says it) or the field's own, and sets
- * only members that family has.
+ * A patch names no kind (the ref says it) or the field's own, and sets
+ * only members that kind has.
  */
-function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): void {
-  if (patch.family !== undefined && patch.family !== family) {
+function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldKind): void {
+  if (patch.kind !== undefined && patch.kind !== family) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `patch family '${patch.family}' does not match field family '${family}'`,
-      { details: { field: 'family' } },
+      `patch family '${patch.kind}' does not match field family '${family}'`,
+      { details: { field: 'kind' } },
     );
   }
   const allowed = new Set([...PATCH_BASE_MEMBERS, ...(PATCH_FAMILY_MEMBERS[family] ?? [])]);
@@ -1129,11 +1134,11 @@ function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): 
 }
 
 /**
- * The on-state a new widget of a `family` field gets: its export value. A
+ * The on-state a new widget of a `kind` field gets: its export value. A
  * radio button needs one other than `'Off'`; a checkbox's is `'Yes'` when
- * left out; other families take none.
+ * left out; other kinds take none.
  */
-function onStateOf(family: FormFieldFamily, placement: PlacedWidget): string {
+function onStateOf(family: FormFieldKind, placement: PlacedWidget): string {
   const { exportValue } = placement;
   if (family !== 'checkbox' && family !== 'radio') {
     if (exportValue !== undefined) {

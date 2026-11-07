@@ -39,15 +39,15 @@ type FreeText = Extract<Annotation, { subtype: 'free-text' }>;
  */
 export function runAnnotationRotationConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationRotationConformanceOptions,
+  options: AnnotationRotationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation rotation conformance: ${opts.label}`, () => {
+  describe(`annotation rotation conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -58,7 +58,7 @@ export function runAnnotationRotationConformance(
       fixture: AnnotationRotationFixture,
       run: (page: PageHandle, layout: PageLayout) => Promise<void>,
     ): Promise<void> => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       try {
         const { pages } = await doc.pages.list();
         await run(doc.page(pages[0]!.ref), pages[0]!);
@@ -142,7 +142,7 @@ export function runAnnotationRotationConformance(
           ),
           0.01,
         );
-        const upright = await textBoxOf(page, 'test\rtest 123');
+        const upright = await textBoxOf(page, 'test\ntest 123');
         expect(upright.rotation).toBeNull();
         expectRect(upright.box, upright.rect, 0);
       });

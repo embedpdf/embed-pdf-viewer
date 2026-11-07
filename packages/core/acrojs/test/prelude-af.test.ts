@@ -18,7 +18,7 @@ const field = (
 ): ScriptFieldInput => ({
   ref: ref(name),
   name,
-  family: 'text',
+  kind: 'text',
   value,
   defaultValue: value,
   display: 'visible',
@@ -110,7 +110,7 @@ describe('AF number helpers', () => {
     expect(output.event.rc).toBe(false);
     expect(output.uiEffects).toEqual([
       {
-        kind: 'alert',
+        type: 'alert',
         message: 'The value entered does not match the format of the field [ price ]',
         icon: 0,
       },
@@ -200,14 +200,14 @@ describe('AF special and range helpers', () => {
     const bad = validateEvent(`AFRange_Validate(true, 0, true, 100);`, '150');
     expect(bad.event.rc).toBe(false);
     expect(bad.uiEffects[0]).toMatchObject({
-      kind: 'alert',
+      type: 'alert',
       message: 'Invalid value: must be greater than or equal to 0 and less than or equal to 100.',
     });
     expect(validateEvent(`AFRange_Validate(true, 0, true, 100);`, '50').event.rc).toBe(true);
     expect(validateEvent(`AFRange_Validate(true, 10, false, 0);`, '50').event.rc).toBe(true);
-    expect(
-      validateEvent(`AFRange_Validate(true, 10, false, 0);`, '5').uiEffects[0],
-    ).toMatchObject({ message: 'Invalid value: must be greater than or equal to 10.' });
+    expect(validateEvent(`AFRange_Validate(true, 10, false, 0);`, '5').uiEffects[0]).toMatchObject({
+      message: 'Invalid value: must be greater than or equal to 10.',
+    });
   });
 });
 
@@ -218,16 +218,28 @@ describe('AF date and time helpers', () => {
     const bad = commitKeystroke(`AFDate_KeystrokeEx('mm/dd/yy');`, '13/45/26');
     expect(bad.event.rc).toBe(false);
     expect(bad.uiEffects[0]).toMatchObject({
-      kind: 'alert',
+      type: 'alert',
       message:
         'Invalid date/time: please ensure that the date/time exists. Field [ price ] should match format mm/dd/yy',
     });
     expect(commitKeystroke(`AFDate_Keystroke(2);`, '02/30/26').event.rc).toBe(false);
   });
 
-  it('AFDate_FormatEx formats via the lenient parser when native parsing fails', () => {
+  it('AFDate_FormatEx reads the value in the field format before a JavaScript date', () => {
     expect(formatEvent(`AFDate_FormatEx('dd-mm-yyyy');`, '31-12-2026').event.value).toBe(
       '31-12-2026',
+    );
+    // Day first, as the format says: JavaScript's own parse would read 2 December.
+    expect(formatEvent(`AFDate_FormatEx('dd/mm/yyyy');`, '12/02/2027').event.value).toBe(
+      '12/02/2027',
+    );
+    expect(formatEvent(`AFDate_FormatEx('dd/mm/yyyy');`, '12/1/2027').event.value).toBe(
+      '12/01/2027',
+    );
+    expect(formatEvent(`AFDate_FormatEx('mm/dd/yy');`, '07/15/26').event.value).toBe('07/15/26');
+    // A value the format can't read, such as an ISO date, is read as a JavaScript date.
+    expect(formatEvent(`AFDate_FormatEx('dd/mm/yyyy');`, '2027-12-02').event.value).toBe(
+      '02/12/2027',
     );
     // Unparsable input leaves the value untouched instead of emitting NaN text.
     expect(formatEvent(`AFDate_FormatEx('mm/dd/yy');`, 'not a date').event.value).toBe(

@@ -28,9 +28,9 @@ const plugins = [
   renderPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 function Toolbar({ narrow, onNarrow }: { narrow: boolean; onNarrow: (narrow: boolean) => void }) {
@@ -53,7 +53,8 @@ function Toolbar({ narrow, onNarrow }: { narrow: boolean; onNarrow: (narrow: boo
         compact <strong>{compact ? 'on' : 'off'}</strong>
       </output>
       <output className="badge">
-        padding <strong>{padding}</strong> · spread <strong>{spread}</strong>
+        padding <strong>{typeof padding === 'number' ? padding : 'by side'}</strong> · spread{' '}
+        <strong>{spread}</strong>
       </output>
       <div className="pager">
         <button type="button" className="button" onClick={() => stage.previousPage()}>
@@ -71,7 +72,7 @@ export default function App() {
   const [narrow, setNarrow] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar narrow={narrow} onNarrow={setNarrow} />
         <div className="frame" data-width={narrow ? 'narrow' : 'full'}>

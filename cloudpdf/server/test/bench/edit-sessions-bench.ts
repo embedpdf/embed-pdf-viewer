@@ -123,6 +123,7 @@ async function main(): Promise<void> {
     const documents = new DocumentsRepo(db);
     await documents.createPending({
       id: DOC,
+      name: DOC,
       tenantId: TENANT,
       metadata: null,
       idempotencyKey: null,

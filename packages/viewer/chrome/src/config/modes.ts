@@ -6,7 +6,7 @@
  */
 import type { LayoutData } from '@embedpdf/core-ui';
 import { barsInMode, modeCommandOf, modesOf } from '@embedpdf/core-ui';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken, type ShellCapability } from '@embedpdf/react/shell';
 
@@ -53,7 +53,7 @@ export const sameModeSpecs = (left: readonly ModeSpec[], right: readonly ModeSpe
 export function modeCommandsFor(
   specs: readonly ModeSpec[],
   isTaken: (id: string) => boolean,
-): CommandDef[] {
+): CommandDefinition[] {
   return specs
     .filter((spec) => !isTaken(modeCommandOf(spec.mode)))
     .map((spec) => {

@@ -25,17 +25,17 @@ const plugins = [
   formPlugin(),
   stampPlugin({ assetEngine }),
   signaturePlugin({
-    key: () => signer,
+    signingKey: () => signer,
     // Trust the demo key itself, so its signatures check out as 'valid'.
     trust: { anchors: async () => [(await signer).certificate] },
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: agreement }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <SignBar />

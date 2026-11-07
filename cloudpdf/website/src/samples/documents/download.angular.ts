@@ -17,7 +17,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const megabytes = (bytes: Uint8Array) => `${(bytes.byteLength / 1_000_000).toFixed(2)} MB`;
 
@@ -81,7 +81,7 @@ export class DownloadBar {
   }
 
   protected async download() {
-    saveFile(await this.documents.download(undefined, { mode: this.mode() }), 'ebook.pdf');
+    saveFile(await this.documents.download(undefined, { mode: this.mode() }), 'welcome.pdf');
   }
 }
 
@@ -90,7 +90,7 @@ export class DownloadBar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, DownloadBar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
     ),

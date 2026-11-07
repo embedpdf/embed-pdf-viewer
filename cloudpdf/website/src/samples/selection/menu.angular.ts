@@ -24,7 +24,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 const PLACEMENTS = ['top', 'bottom', 'left', 'right'] as const;
 type Placement = (typeof PLACEMENTS)[number];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // What's in the menu is yours: here, copy and clear.
 @Component({
@@ -63,7 +63,7 @@ export class SelectionActions {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -109,10 +109,10 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something selected on load, so the menu shows: the title on the cover.
+    // Something selected on load, so the menu shows: "Documents", the first word on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 10, count: 52 });
+      if (cover) this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 }

@@ -17,10 +17,10 @@ import type { Fills } from './fill';
 
 export function createActivation(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'siblings' | 'scripting'>,
+  services: Pick<FormServices, 'fields' | 'siblings' | 'scripting' | 'cursor'>,
   { fill }: Fills,
 ) {
-  const { fields, scripting } = services;
+  const { fields, scripting, cursor } = services;
 
   /** The widget's activation action, from its row in the form. */
   const annotationActivation = async (ref: AnnotationRef) => {
@@ -104,8 +104,8 @@ export function createActivation(
           const result = await ctx.cancellable(
             options?.signal,
             actions.dispatch({
-              scope: 'activate',
-              ref: annotationRef,
+              type: 'activate',
+              annotation: annotationRef,
               page: annotationRef.page,
               source: widgetSource(field.ref, annotationRef),
             }),
@@ -114,14 +114,15 @@ export function createActivation(
             result.status === 'inert' &&
             result.steps.length === 0 &&
             result.diagnostics.length === 0;
-          if (!noTree) return { kind: 'dispatched', result };
+          if (!noTree) return { status: 'dispatched', result };
         }
         return {
-          kind: 'form',
+          status: 'form',
           result: await activateThroughScripts(field.ref, annotationRef, options),
         };
       },
       notifyWidgetEvent: (fieldRef, annotationRef, event) => {
+        if (event === 'focus' || event === 'blur') cursor.note(event, fieldRef, annotationRef);
         const actions = ctx.tryGet(ActionsToken);
         if (!actions) return;
         const source = widgetSource(fieldRef, annotationRef);
@@ -151,9 +152,9 @@ export function createActivation(
         // through the actions events. The dispatcher also applies the rule
         // that /A shadows the up event (ISO 32000-2 Table 197).
         void actions.dispatch({
-          scope: 'annotation',
+          type: 'annotation',
           event,
-          ref: annotationRef,
+          annotation: annotationRef,
           page: annotationRef.page,
           source,
         });

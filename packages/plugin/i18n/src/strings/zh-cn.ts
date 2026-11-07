@@ -9,9 +9,12 @@ export const zhCN: EmbedpdfStrings = {
     selection: { copy: '复制' },
     annotation: { delete: '删除' },
     document: { download: '下载', print: '打印' },
+    snapshot: { copy: '复制', save: '保存图像', clear: '清除快照' },
     tool: {
       pointer: '选择',
       pan: '平移',
+      zoom: '框选放大',
+      snapshot: '快照',
       highlight: '高亮',
       underline: '下划线',
       strikeout: '删除线',
@@ -46,4 +49,5 @@ export const zhCN: EmbedpdfStrings = {
       'form-signature': '签名字段',
     },
   },
+  outline: { untitled: '无标题' },
 };

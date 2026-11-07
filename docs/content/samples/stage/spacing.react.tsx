@@ -16,10 +16,10 @@ const engine = localEngine();
 // No responsive rules, so the padding you set applies at every width.
 const plugins = [stagePlugin({ padding: 32, gap: { px: 12 }, responsive: [] }), renderPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -27,6 +27,8 @@ function SpacingControls() {
   const stage = useStage();
   const { padding, gap } = useStageSettings();
   const zoomLevel = useStageState((state) => state.zoomLevel);
+  // A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+  const paddingSize = typeof padding === 'number' ? padding : padding.top;
   // A number grows with the zoom; { px } stays the same on screen.
   const onScreen = typeof gap !== 'number';
   const gapSize = typeof gap === 'number' ? gap : gap.px;
@@ -40,10 +42,10 @@ function SpacingControls() {
           type="range"
           min={0}
           max={64}
-          value={padding}
+          value={paddingSize}
           onChange={(event) => stage.updateSettings({ padding: Number(event.target.value) })}
         />
-        <output className="value">{padding}</output>
+        <output className="value">{paddingSize}</output>
       </label>
       <label className="label">
         Gap
@@ -101,7 +103,7 @@ function SpacingControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SpacingControls />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

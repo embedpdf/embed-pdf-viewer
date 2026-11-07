@@ -1,10 +1,12 @@
 # @embedpdf/viewer-svelte — ./component
 
 Button [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/Button.svelte): props ButtonProps
-ButtonProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface ButtonProps{ command?: string; icon?: string; label?: string; onclick?: (event: MouseEvent) => void; class?: string; style?: string; }
+ButtonProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface ButtonProps{ command?: string; icon?: string; label?: string; active?: boolean; onclick?: (event: MouseEvent) => void; class?: string; style?: string; }
+Icon [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/Icon.svelte): props IconProps
+IconProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface IconProps{ name: string; size?: number; label?: string; class?: string; style?: string; }
 Menu [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/Menu.svelte): props MenuProps
 MenuItem [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/MenuItem.svelte): props MenuItemProps
-MenuItemProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface MenuItemProps{ command?: string; icon?: string; onselect?: () => void; children?: Snippet; }
+MenuItemProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface MenuItemProps{ command?: string; icon?: string; active?: boolean; onselect?: () => void; children?: Snippet; }
 MenuProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface MenuProps{ icon?: string; label: string; children?: Snippet; }
 PDFViewer [SvelteComponent] (from packages/viewer/svelte/src/component.svelte): props PDFViewerImplProps; defaults { element: null}; bindable element
 PDFViewerExtras [InterfaceDeclaration] (from packages/viewer/svelte/src/props.ts): export interface PDFViewerExtras{ class?: string; style?: string; children?: Snippet; element?: EmbedPdfViewerElement | null; onready?: (viewer: Viewer) => void; ondocumentchange?: (documentId: string | null) => void; onpanelresize?: (event: PanelResizeEvent) => void; }

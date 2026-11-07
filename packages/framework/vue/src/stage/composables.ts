@@ -8,7 +8,7 @@
 import { shallowEqual } from '@embedpdf/core';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import { DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
-import type { StageCapability, StageSettings } from '@embedpdf/plugin-stage';
+import type { StageCapability, StageSettings, StageState } from '@embedpdf/plugin-stage';
 import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import type { MaybeRefOrGetter, Ref } from 'vue';
 import { useCapability, useCapabilityEvent } from '../runtime/capabilities';
@@ -20,9 +20,6 @@ import type { StageTokenProp } from './scope';
 
 /** A stage token, or a ref or getter of one: for a view chosen by a prop. */
 export type StageTokenSource = MaybeRefOrGetter<StageTokenProp | undefined>;
-
-/** What `useStageState()` reads: the Stage page's State table. */
-export type StageStateValue = (typeof stageState)['empty'];
 
 /** The Stage's API (zoom, navigation, reveal, settings), for app chrome. The object never changes. */
 export function useStage(token?: StageTokenSource): StageCapability {
@@ -45,16 +42,13 @@ export function useStageEvent<Event>(
  * picks, which updates only when that value changes. Without a document it
  * reads `stageState.empty`.
  */
-export function useStageState(
-  select?: undefined,
-  token?: StageTokenSource,
-): FieldRefs<StageStateValue>;
+export function useStageState(select?: undefined, token?: StageTokenSource): FieldRefs<StageState>;
 export function useStageState<Selected>(
-  select: (state: StageStateValue) => Selected,
+  select: (state: StageState) => Selected,
   token?: StageTokenSource,
 ): Readonly<Ref<Selected>>;
 export function useStageState<Selected>(
-  select?: (state: StageStateValue) => Selected,
+  select?: (state: StageState) => Selected,
   token?: StageTokenSource,
 ) {
   const lens = useStageToken(token);
@@ -68,7 +62,7 @@ export function useStageState<Selected>(
   }, shallowEqual);
   return select
     ? value
-    : fieldRefs(value as Readonly<Ref<StageStateValue>>, Object.keys(stageState.empty));
+    : fieldRefs(value as Readonly<Ref<StageState>>, Object.keys(stageState.empty));
 }
 
 /**

@@ -8,6 +8,7 @@ export interface WidgetPatch {
     page?: unknown | undefined;
     hasAppearance?: unknown | undefined;
     appearanceState?: unknown | undefined;
+    structurePosition?: unknown | undefined;
     nm?: (string | null) | undefined;
     rect?: WidgetPatch.Rect | undefined;
     contents?: (string | null) | undefined;
@@ -48,7 +49,8 @@ export interface WidgetPatch {
     caption?: (string | null) | undefined;
     checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
     field?: unknown | undefined;
-    fieldFamily?: unknown | undefined;
+    fieldKind?: unknown | undefined;
+    hasMark?: unknown | undefined;
 }
 
 export namespace WidgetPatch {

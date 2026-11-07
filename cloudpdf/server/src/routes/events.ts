@@ -82,16 +82,20 @@ export async function registerEventsRoutes(
   app.get('/v1/docs/:docId/layers/:layerName/events', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await opts.documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await opts.documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     // Events are a read of the document's mutation history — same gate as
     // opening the document at all.
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', pdfBits);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', permissionFlags);
     const protection = await opts.documentService.getProtection(accessCtx, docId, layerName);
-    const mayCreate = mayCreateObjects(ctx, pdfBits, protection);
+    const mayCreate = mayCreateObjects(ctx, permissionFlags, protection);
     // Each row is filtered to what this connection may read, as the reads
     // are: annotations and the form each take their own read capability.
     const may = (capability: DocCapability) =>
-      ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits, protection);
+      checkCapability(capability, ctx.jwt.scope, permissionFlags, protection);
     const rights = { annotations: may('doc.annotate.read'), forms: may('doc.forms.read') };
 
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);
@@ -182,8 +186,8 @@ export async function registerEventsRoutes(
         });
         if (!status || closed) return;
         const held = JSON.stringify(status.held);
-        const expiresAt = Date.now() + status.expiresIn * 1000;
-        // `expiresIn` is in whole seconds: a second's drift is no move.
+        const expiresAt = Date.now() + status.expiresInSeconds * 1000;
+        // `expiresInSeconds` is whole: a second's drift is no move.
         if (lastSession?.held === held && expiresAt <= lastSession.expiresAt + 1000) return;
         lastSession = { held, expiresAt };
         raw.write(`event: session\ndata: ${JSON.stringify(status)}\n\n`);

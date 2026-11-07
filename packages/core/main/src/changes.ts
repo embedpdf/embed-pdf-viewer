@@ -26,11 +26,15 @@ import {
   objectNumbersNamedBy,
   objectNumbersReferencedBy,
   type Annotation,
+  type Attachment,
   type Change,
   type ChangeOp,
   type ChangeResult,
   type DocumentHandle,
-  type FormFieldDTO,
+  type FormField,
+  type OutlineItem,
+  type PageLabelSection,
+  type RestoredPage,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -54,7 +58,7 @@ export type PredictedOp =
     }
   | {
       readonly type: 'forms.restore';
-      readonly field: FormFieldDTO;
+      readonly field: FormField;
       /** The rows of its widgets, as they were. */
       readonly widgets: readonly WidgetAnnotation[];
     }
@@ -63,7 +67,32 @@ export type PredictedOp =
       /** The widget's row, as it was. */
       readonly widget: WidgetAnnotation;
       /** Its field as the restore leaves it, with the widget back; `null` when it had none. */
-      readonly field: FormFieldDTO | null;
+      readonly field: FormField | null;
+    }
+  | {
+      readonly type: 'outline.restore';
+      /** The items as they were: the item first, then the items under it, depth first. */
+      readonly items: readonly OutlineItem[];
+      /** The item's place among its parent's children. */
+      readonly index: number;
+    }
+  | {
+      readonly type: 'attachments.restore';
+      /** The embedded file as it was, under the key it had. */
+      readonly attachment: Attachment;
+    }
+  | {
+      readonly type: 'pages.restore';
+      /** The pages a delete took, in display order, each with the page it followed (`restoredPagesOf`). */
+      readonly pages: readonly RestoredPage[];
+    }
+  | {
+      /**
+       * The page label sections an undo of a page edit puts back: those the
+       * edit found, after the ops that put the pages back.
+       */
+      readonly type: 'pages.relabel';
+      readonly labels: readonly PageLabelSection[];
     };
 
 /** One user action, as a plugin stages it. */
@@ -166,7 +195,7 @@ export interface ChangeQueue {
   /** Resolves once at least `count` names are held. */
   reserveObjectNumbers(count: number): Promise<void>;
   /** This session's changes the engine hasn't answered, open holds included, in staging order. */
-  pending(): readonly PendingChange[];
+  listPending(): readonly PendingChange[];
   hasPending(): boolean;
   /** Resolves once every change sent so far is answered; open holds aren't waited for. Never rejects. */
   whenSettled(): Promise<void>;
@@ -524,7 +553,7 @@ export function createDocumentChanges(options: {
         throw toPluginError(capability, error);
       }
     },
-    pending: () => entries,
+    listPending: () => entries,
     hasPending: () => entries.length > 0,
     whenSettled: () => whenSettled(),
     onStaged: staged.on,
@@ -554,8 +583,8 @@ export function createDocumentChanges(options: {
         entry.answered = true;
         entry.reject(new PluginError('instance-closed', entry.capability, 'the document closed'));
       }
-      staged.dispose();
-      settled.dispose();
+      staged.destroy();
+      settled.destroy();
     },
   };
 }

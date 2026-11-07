@@ -17,6 +17,7 @@ import {
   type WorkerImageEncoder,
 } from '@embedpdf/engine-services';
 
+import { defaultFallbackFontSpecs } from './defaultFallbackFonts';
 import { signingCandidatePathFactory } from './signing-paths';
 import type { WorkerBootstrapData } from './WorkerThreadPool';
 
@@ -40,14 +41,17 @@ function bootstrap(): WorkerBootstrapData | undefined {
 
 function bootstrapFontSpecs(): StartupFontSpec[] {
   const descriptors = bootstrap()?.fonts ?? [];
-  return descriptors.map((d) => ({
+  const own = descriptors.map((d) => ({
     key: d.key,
     path: d.path,
     familyName: d.familyName,
     weight: d.weight,
     italic: d.italic,
     fallback: d.fallback ?? true,
+    serve: d.serve ?? false,
   }));
+  // Then the fonts the engine comes with, tried after the deployment's own.
+  return [...own, ...defaultFallbackFontSpecs(new Set(own.map((spec) => spec.key)))];
 }
 
 (async () => {
@@ -92,6 +96,9 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     },
     {
       imageEncoder,
+      // Every write says whether it changed the document's fonts: the font
+      // list's URL is versioned by each change.
+      reportEveryFontChange: true,
       // File-backed sessions sign through a candidate file under the
       // signing root the API process shares, keyed by signing id, so the
       // tail can be streamed to object storage right after prepare without

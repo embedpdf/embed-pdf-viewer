@@ -1,4 +1,4 @@
-<!-- Pick a page, then move it. Each button uses another placement. -->
+<!-- Pick a page, then move it. Each button uses another position. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { usePageEdit } from '@embedpdf/svelte/page-edit';

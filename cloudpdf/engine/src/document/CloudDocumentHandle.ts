@@ -6,6 +6,10 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  attachmentVerbs,
+  isPluginId,
+  outlineVerbs,
+  pageVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -13,8 +17,12 @@ import {
   type DocumentSignaturesService,
   type DocumentEvent,
   type DocumentEventStream,
+  type DocumentFontsService,
   type DocumentFormsService,
+  type DocumentPagesService,
   type DocumentHandle,
+  type DocumentGrant,
+  type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
   type DocumentRenderService,
@@ -37,15 +45,20 @@ import {
   ObjectNumberReservationResponseSchema,
   wirePaths,
   type DocumentHead,
+  tokenPinOf,
   type DocumentManifest,
+  type EngineValues,
   type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
 
+import { CLOUD_DOCUMENT, type CloudDocument } from './cloudDocument';
 import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
 import { changeSender, CloudDocumentChanges } from './CloudDocumentChanges';
+import { CloudDocumentFontsService } from './CloudDocumentFontsService';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
+import { readCloudOutline } from './CloudDocumentOutlineService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentRedactionService } from './CloudDocumentRedactionService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
@@ -55,6 +68,7 @@ import { CloudMetadataService } from './CloudMetadataService';
 import { CloudObjectNumberPool } from './CloudObjectNumberPool';
 import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
+import type { GrantSessionSource } from '../grant';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
 import { awaitSignal } from '../shared/awaitSignal';
@@ -66,11 +80,17 @@ import type { HttpClient } from '../transport/HttpClient';
  * back to the document handle (smaller circular-ref surface, easier
  * to mock in unit tests).
  */
+/**
+ * The manifest as this client holds it: the server's manifest, and the engine
+ * values of the `/head` it was read after, which every cached URL copies.
+ */
+export type CloudManifest = DocumentManifest & { readonly engine: EngineValues };
+
 export interface ManifestAccessor {
   /** Cached manifest (cold-fetched once, kept across requests). */
-  get(signal: AbortSignal): Promise<DocumentManifest>;
+  get(signal: AbortSignal): Promise<CloudManifest>;
   /** Force re-fetch of `/head` + `/manifest@docVersion=N`; replaces the cache. */
-  refresh(signal: AbortSignal): Promise<DocumentManifest>;
+  refresh(signal: AbortSignal): Promise<CloudManifest>;
   /**
    * Absorb mutation-returned state/cache deltas when safe. `owns` names the
    * planes this mutation kind takes ownership of (the monotone-flip
@@ -91,14 +111,33 @@ export interface ManifestAccessor {
 
 export class CloudDocumentHandle implements DocumentHandle {
   readonly id: string;
+  /** The cloud side, read with `cloudDocument()`: the server modules' routes on this layer. */
+  readonly [CLOUD_DOCUMENT]: CloudDocument = {
+    module: (id) => {
+      if (!isPluginId(id)) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `"${id}" can't be a module's id: lowercase words joined by '-', not a core name`,
+        );
+      }
+      const base = `/v1/docs/${encodeURIComponent(this.id)}/layers/${encodeURIComponent(this.layerName)}/${id}/`;
+      return {
+        fetch: (path, init) => this.http.fetchRoute(`${base}${path.replace(/^\/+/, '')}`, init),
+      };
+    },
+  };
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;
+  readonly outline: DocumentOutlineService;
   readonly attachments: DocumentAttachmentsService;
   readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
+  readonly fonts: DocumentFontsService;
   readonly search: CloudDocumentSearchService;
-  readonly pages: CloudDocumentPagesService;
+  readonly pages: DocumentPagesService;
+  /** The page reads behind `pages`, the layout per page among them. */
+  private readonly pageReads: CloudDocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
@@ -125,10 +164,11 @@ export class CloudDocumentHandle implements DocumentHandle {
    * `pageObjectNumber`. Today's documents are page-sparse so the
    * scan is cheaper than the hash overhead.
    */
-  private manifestCache: DocumentManifest | null = null;
-  private inflightManifest: Promise<DocumentManifest> | null = null;
+  private manifestCache: CloudManifest | null = null;
+  private inflightManifest: Promise<CloudManifest> | null = null;
   private manifestFloorVersion = 0;
   private pendingInitialHead: DocumentHead | null;
+  private readonly stopEngineWatch: () => void;
 
   private readonly manifestAccessor: ManifestAccessor;
   private readonly cloudSecurity: CloudDocumentSecurityService;
@@ -148,9 +188,12 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
+    /** A grant session's: the document's `grant`, and the gate its writes pass. */
+    private readonly grantSession: Pick<GrantSessionSource, 'grant' | 'writeGate'> | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
+    this.stopEngineWatch = http.onEngineChanged(() => this.forgetEngineValues());
     // The editing session's object numbers: from `/access`, write
     // responses, the stream's `session` events and the bulk reservation.
     const pool = new CloudObjectNumberPool({
@@ -165,7 +208,11 @@ export class CloudDocumentHandle implements DocumentHandle {
     });
     this.pool = pool;
     this.objectNumbers = pool;
-    this.writes = new CloudWrites(pool, changeSender(http, id, layerName));
+    this.writes = new CloudWrites(
+      pool,
+      changeSender(http, id, layerName),
+      grantSession?.writeGate ?? null,
+    );
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -231,19 +278,33 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.events = {
       subscribe,
       on: (type, listener) => subscribeToType(subscribe, type, listener),
-      lastServerId: () => hub.lastServerId(),
+      lastServerSequence: () => hub.lastServerSequence(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
     // A version this handle published itself numbers objects anew too.
     hub.subscribe((event) => {
       if (event.type === 'document.versioned') pool.versioned(event.version.sha256);
     });
+    // An own write whose delta moved the font list's pin changed the fonts
+    // the list shows: its events end with `fonts.changed`, as locally.
+    const noticeFonts = (meta: MutationMeta) => {
+      if (meta.cacheDelta?.fontsVersion !== undefined) this.publisher.noteFontsChanged(meta.opId);
+    };
     this.manifestAccessor = {
       get: (signal) => this.getManifest(signal),
       refresh: (signal) => this.refreshManifest(signal),
-      apply: (meta, owns) => this.absorbMutation(meta, owns),
-      applyPageDelete: (meta, deletedPages) => this.absorbPageDelete(meta, deletedPages),
-      applyPageInsert: (meta) => this.absorbPageInsert(meta),
+      apply: (meta, owns) => {
+        noticeFonts(meta);
+        this.absorbMutation(meta, owns);
+      },
+      applyPageDelete: (meta, deletedPages) => {
+        noticeFonts(meta);
+        this.absorbPageDelete(meta, deletedPages);
+      },
+      applyPageInsert: (meta) => {
+        noticeFonts(meta);
+        this.absorbPageInsert(meta);
+      },
     };
     this.changes = new CloudDocumentChanges(
       () => this.closed,
@@ -281,14 +342,26 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
     );
-    this.attachments = new CloudDocumentAttachmentsService(
+    this.outline = outlineVerbs(
+      () => readCloudOutline(http, id, layerName, () => this.closed, this.manifestAccessor),
+      (change, options) => this.apply(change, options),
+    );
+    this.fonts = new CloudDocumentFontsService(
       http,
       id,
       layerName,
       () => this.closed,
       this.manifestAccessor,
-      this.publisher,
-      this.writes,
+    );
+    this.attachments = attachmentVerbs(
+      new CloudDocumentAttachmentsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.signatures = new CloudDocumentSignaturesService(
       http,
@@ -316,7 +389,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
     );
-    this.pages = new CloudDocumentPagesService(
+    this.pageReads = new CloudDocumentPagesService(
       http,
       id,
       layerName,
@@ -325,6 +398,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
+    this.pages = pageVerbs(this.pageReads, (change, options) => this.apply(change, options));
     this.redaction = new CloudDocumentRedactionService(
       http,
       id,
@@ -346,8 +420,9 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
-      (signal) => this.pages.pageLayout(ref, signal),
+      (signal) => this.pageReads.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
+      () => this.cloudSecurity.pagePictureRights(),
     );
   }
 
@@ -363,6 +438,10 @@ export class CloudDocumentHandle implements DocumentHandle {
   /** One change as one transaction, or the undo of one (see `DocumentHandle.apply`). */
   apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
     return this.changes.apply(change, options);
+  }
+
+  get grant(): DocumentGrant | undefined {
+    return this.grantSession?.grant;
   }
 
   /** Ignored: the server learns what's needed from what is asked of it. */
@@ -381,6 +460,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         return wirePaths.layerDownloadVersioned(this.id, this.layerName, {
           docVersion: manifest.docVersion,
           mode,
+          pin: tokenPinOf('download', manifest.engine),
         });
       };
       try {
@@ -414,7 +494,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * so an N-page handle that opens N services in parallel still
    * triggers exactly one `/head` + `/manifest@docVersion=N` round-trip.
    */
-  async getManifest(signal: AbortSignal): Promise<DocumentManifest> {
+  async getManifest(signal: AbortSignal): Promise<CloudManifest> {
     if (this.manifestCache) return this.manifestCache;
     if (!this.inflightManifest) {
       this.startManifestFetch({ allowInitialHead: true });
@@ -434,7 +514,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * URL returns 404 (stale version). Replaces `manifestCache`
    * wholesale so the next `getManifest()` is a Map lookup.
    */
-  async refreshManifest(signal: AbortSignal): Promise<DocumentManifest> {
+  async refreshManifest(signal: AbortSignal): Promise<CloudManifest> {
     const promise = this.startManifestFetch({ allowInitialHead: false });
     return awaitSignal(promise, signal);
   }
@@ -500,13 +580,16 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
       ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
-      // The plane pins a page-structure, metadata or attachment write bumps:
+      // The plane pins a page-structure, metadata, attachment, outline, font or content write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
       ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
       ...(delta?.attachmentsVersion !== undefined
         ? { attachmentsVersion: delta.attachmentsVersion }
         : {}),
+      ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
+      ...(delta?.fontsVersion !== undefined ? { fontsVersion: delta.fontsVersion } : {}),
+      ...(delta?.contentsVersion !== undefined ? { contentsVersion: delta.contentsVersion } : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),
@@ -559,7 +642,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.manifestCache = null;
   }
 
-  private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<DocumentManifest> {
+  private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<CloudManifest> {
     const ctrl = new AbortController();
     const promise = this.fetchManifest(ctrl.signal, opts);
     this.inflightManifest = promise;
@@ -585,7 +668,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   private async fetchManifest(
     signal: AbortSignal,
     opts: { allowInitialHead: boolean },
-  ): Promise<DocumentManifest> {
+  ): Promise<CloudManifest> {
     if (this.closed) {
       throw new EngineError(EngineErrorCode.DocNotOpen, `document ${this.id} is closed`);
     }
@@ -618,12 +701,31 @@ export class CloudDocumentHandle implements DocumentHandle {
     return head;
   }
 
-  private fetchManifestForHead(head: DocumentHead, signal: AbortSignal): Promise<DocumentManifest> {
-    return this.http.getJson(
-      wirePaths.layerManifest(this.id, this.layerName, head.docVersion),
+  private async fetchManifestForHead(
+    head: DocumentHead,
+    signal: AbortSignal,
+  ): Promise<CloudManifest> {
+    const manifest = await this.http.getJson(
+      wirePaths.layerManifest(
+        this.id,
+        this.layerName,
+        head.docVersion,
+        tokenPinOf('manifest', head.engine),
+      ),
       (raw) => DocumentManifestSchema.parse(raw),
       signal,
     );
+    return { ...manifest, engine: head.engine };
+  }
+
+  /**
+   * The server answered a cached read with another engine value than its
+   * URL named: its values moved (its fonts, a rule, another replica during a
+   * deploy). Read `/head` again before the next cached read.
+   */
+  private forgetEngineValues(): void {
+    this.inflightManifest = null;
+    this.manifestCache = null;
   }
 
   close(): AbortablePromise<void> {
@@ -631,6 +733,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       return AbortablePromise.resolveValue<void>(undefined);
     }
     this.closed = true;
+    this.stopEngineWatch();
     this.sseClient?.close();
     this.sseClient = null;
     this.manifestCache = null;
@@ -649,7 +752,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // already seen, else the cached manifest's transactional auditHead.
       // Null (cold start, no manifest yet) subscribes "from now", which is
       // exact too: the first manifest fetched afterwards is newer anyway.
-      initialCursor: this.hub.lastServerId() ?? this.manifestCache?.auditHead ?? null,
+      initialCursor: this.hub.lastServerSequence() ?? this.manifestCache?.auditHead ?? null,
       onRow: (row) => {
         // Advance the cached manifest's audit cursor — own echoes and
         // unknown kinds included — so a later `annotations.list()` never stamps a
@@ -660,13 +763,13 @@ export class CloudDocumentHandle implements DocumentHandle {
         // A change this connection may not read: the server sent only its
         // pins, absorbed so reads stay warm. Which family it changed is part
         // of what was withheld, so both planes flip: never wrong, only
-        // unshared until the next manifest.
+        // unshared until the next manifest. Its one event, when its pins
+        // moved the font list's, is `fonts.changed`, published below.
         if (row.withheld) {
           const meta = (row.payload as { meta?: MutationMeta } | null)?.meta;
           if (meta && row.originSessionId !== this.sessionId) {
             this.absorbMutation(meta, ['annotations', 'forms']);
           }
-          return;
         }
         // A new version, this handle's own included: in stream order, before
         // the `session` event that hands out its fresh numbers.
@@ -688,7 +791,11 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.inflightManifest = null;
         // Tell subscribers their event-derived state may be stale — the
         // gap's mutations will never arrive as events.
-        this.hub.publish({ type: 'stream.desynced', reason: 'backlog-overflow', ts: Date.now() });
+        this.hub.publish({
+          type: 'stream.desynced',
+          reason: 'backlog-overflow',
+          at: new Date().toISOString(),
+        });
       },
       onAuthLost: () => {
         // The stream is gone for good under this credential. Local events
@@ -712,7 +819,9 @@ export class CloudDocumentHandle implements DocumentHandle {
 
   /** Patch the cached manifest from a remote event's coherence pins — the
    *  same absorb rails local mutations use, so reads stay warm no matter
-   *  whose hand caused the change. */
+   *  whose hand caused the change. Every event kind is named below, so a new
+   *  one can't be forgotten: a missed one leaves this client reading the
+   *  old version from an immutable, cached URL. */
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
       case 'pages.scaleSet':
@@ -721,8 +830,16 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotations.created':
       case 'annotations.updated':
       case 'annotations.deleted':
+      case 'annotations.restored':
       case 'annotations.reordered':
         this.absorbMutation(event.meta, ['annotations']);
+        return;
+      case 'outline.created':
+      case 'outline.updated':
+      case 'outline.moved':
+      case 'outline.deleted':
+      case 'outline.restored':
+        this.absorbMutation(event.meta, ['outline']);
         return;
       case 'pages.reordered':
       case 'pages.rotated':
@@ -733,6 +850,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbPageDelete(event.meta, event.pages);
         return;
       case 'pages.inserted':
+      case 'pages.restored':
         this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':
@@ -741,6 +859,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'attachments.created':
       case 'attachments.deleted':
+      case 'attachments.restored':
         this.absorbMutation(event.meta, ['attachments']);
         return;
       case 'forms.valueSet':
@@ -778,6 +897,21 @@ export class CloudDocumentHandle implements DocumentHandle {
         // so a remote apply must stop this client's base reads immediately.
         this.absorbMutation(event.meta, ['content', 'annotations', 'forms']);
         return;
+      case 'signatures.completed':
+        // Arrives with `document.versioned`, which drops the manifest.
+        return;
+      case 'signatures.cancelled':
+        // Moves no pin a read uses, as an own cancel absorbs nothing.
+        return;
+      case 'fonts.changed':
+        // Ends a row whose own events, or its withheld pins, absorbed the
+        // font list's pin already.
+        return;
+      case 'stream.desynced':
+        // The stream's own handler dropped the manifest already.
+        return;
+      default:
+        event satisfies never;
     }
   }
 }
@@ -785,14 +919,14 @@ export class CloudDocumentHandle implements DocumentHandle {
 function fallbackUnknownHead(id: string): DocumentHead {
   return {
     id,
-    baseSha: '',
-    storageSizeBytes: 0,
+    baseSha256: '',
+    sizeBytes: 0,
     docVersion: 1,
     state: 'ready',
     encryption: { state: 'unknown', requiresPassword: null },
     permissions: {
       known: false,
-      bits: null,
+      flags: null,
       allAllowed: null,
       openedAs: null,
       securityHandlerRevision: null,
@@ -803,5 +937,6 @@ function fallbackUnknownHead(id: string): DocumentHead {
       reasons: ['permissions-unknown'],
       endpoint: wirePaths.access(id, DEFAULT_LAYER_NAME),
     },
+    engine: {},
   };
 }

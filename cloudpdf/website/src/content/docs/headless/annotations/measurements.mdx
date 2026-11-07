@@ -22,7 +22,7 @@ centimeters on the page reads as 3 meters in the room. Register `measurementPlug
 
 Each measurement is an annotation with its value as a label, so it shows the same in Acrobat and other
 PDF apps, and you can select, move and restyle it like any annotation. The example measures the
-cover's width at 1:100; pick a tool and measure something else:
+width of a building on a floor plan drawn at 1:100; pick a tool and measure a room:
 
 <Example name="measurement/basic" mode="open" />
 
@@ -171,7 +171,7 @@ A measurement's look, such as its line, arrows and label position, is its tool's
 | `onCalibrationRequested` | The user drew a known length, and your UI should ask for it | `request` |
 | `onCalibrationCompleted` | A page was calibrated                              | `page`            |
 | `onCalibrationDismissed` | Calibrating was cancelled                          | —                 |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 `report` lists the measurements recalculated for the new scale, and any that couldn't be.
 

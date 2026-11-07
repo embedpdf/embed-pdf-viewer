@@ -131,6 +131,39 @@ and `/CreationDate`). Your own keys live in the same dictionary under their own 
 `reviewedBy` is `/reviewedBy`. `trapped` is `'unknown'` both when the file says so and when it
 doesn't say.
 
+### The XMP copy
+
+Many PDFs carry their metadata a second time, as XML in an XMP packet, and some PDF apps read that
+copy first. `update()` keeps it in step: a field you set is written there too, and a field you set
+to `null` is removed from it. A removed author or app name is gone from both places.
+
+| Field        | XMP property                                                    |
+| :----------- | :-------------------------------------------------------------- |
+| `title`      | `dc:title`                                                      |
+| `author`     | `dc:creator`                                                    |
+| `subject`    | `dc:description`                                                |
+| `keywords`   | `pdf:Keywords`, and the `dc:subject` list when the file has one |
+| `creator`    | `xmp:CreatorTool`                                               |
+| `producer`   | `pdf:Producer`                                                  |
+| `createdAt`  | `xmp:CreateDate`                                                |
+| `modifiedAt` | `xmp:ModifyDate`                                                |
+| `trapped`    | `pdf:Trapped`                                                   |
+
+- A field you set is added to the XMP when it isn't there yet. PDF/A asks the two copies to match.
+- Your own keys follow the `pdfx:` properties Adobe apps copy them to: `null` removes one, and a
+  value changes one that's there. None is added, because PDF/A files would then need a schema
+  for it.
+- Everything else in the XMP stays exactly as it was: a PDF/A identification, other apps'
+  properties, an editing history. That history can name the apps that edited the file.
+- A file without XMP gets none, and XMP that isn't valid XML is left as it is.
+
+`get()` reads `/Info` only. A field that's only in the XMP still reads `null`, and
+`update({ author: null })` removes it from the XMP all the same.
+
+An incremental save appends your changes, so the file still holds the earlier values. To share a
+file without them, save it with `download({ mode: 'rewrite' })`. See
+[Saving](/docs/engine/documents/saving#incremental-or-rewrite).
+
 ### Why your own keys are separate
 
 `update()` keeps what you leave out one level deep: each field you pass replaces that field.

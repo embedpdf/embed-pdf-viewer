@@ -6,7 +6,7 @@ import type {
   RevisionField,
   RevisionStructure,
   SignatureCoverage,
-  SignatureDTO,
+  Signature,
   SignatureSeedValue,
 } from '@embedpdf/engine-core/runtime';
 import { formWidget } from '@embedpdf/engine-core/runtime';
@@ -41,9 +41,14 @@ const FIELD_ACTION_BY_CODE: Record<number, FieldLockSpec['action']> = {
 };
 const FIELDS_FIELDMDP = 0;
 const FIELDS_LOCK = 1;
+// `/SV /Ff` (ISO 32000-2 Table 260), named in the read.
+const SV_FILTER = 1 << 0;
+const SV_SUBFILTER = 1 << 1;
 const SV_V = 1 << 2;
+const SV_REASONS = 1 << 3;
 const SV_LEGAL_ATTESTATION = 1 << 4;
 const SV_ADD_REV_INFO = 1 << 5;
+const SV_DIGEST_METHOD = 1 << 6;
 const SV_LOCK_DOCUMENT = 1 << 7;
 const SV_APPEARANCE_FILTER = 1 << 8;
 const SV_MDP = 1 << 17;
@@ -137,15 +142,19 @@ function readSeedValue(
     }
     return items;
   };
+  const required = (bit: number) => (requiredFlags & bit) !== 0;
   return {
-    requiredFlags,
-    presentFlags,
-    version: version > 0 ? version : null,
+    parserVersion: version > 0 ? version : null,
+    parserVersionRequired: required(SV_V),
     mdp: (presentFlags & SV_MDP) !== 0 && mdp >= 0 && mdp <= 3 ? (mdp as 0 | 1 | 2 | 3) : null,
     filter: readWide(runtime, (buf, cap) => fn.EPDFSig_GetSeedValueFilter(model, index, buf, cap)),
+    filterRequired: required(SV_FILTER),
     subFilters: list(SV_LIST_SUBFILTER),
+    subFiltersRequired: required(SV_SUBFILTER),
     digestMethods: list(SV_LIST_DIGEST_METHOD),
+    digestMethodsRequired: required(SV_DIGEST_METHOD),
     reasons: list(SV_LIST_REASONS),
+    reasonsRequired: required(SV_REASONS),
     unsupportedRequired:
       (requiredFlags & SV_UNSUPPORTED_REQUIRED) !== 0 ||
       ((requiredFlags & SV_V) !== 0 && version > SUPPORTED_SEED_VALUE_VERSION),
@@ -153,10 +162,10 @@ function readSeedValue(
 }
 
 /** Every signature field of a native signature model, in model order. */
-export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): SignatureDTO[] {
+export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): Signature[] {
   const { fn } = runtime;
   const count = fn.EPDFSig_Count(model);
-  const out: SignatureDTO[] = [];
+  const out: Signature[] = [];
   const str = (i: number, key: number) =>
     readWide(runtime, (buf, cap) => fn.EPDFSig_GetString(model, i, key, buf, cap));
   for (let i = 0; i < count; i++) {
@@ -177,7 +186,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
       filter: str(i, STRING_FILTER),
       subFilter: str(i, STRING_SUBFILTER),
       byteRange: signed ? readByteRange(runtime, model, i) : null,
-      contentsSize: signed ? Math.max(0, fn.EPDFSig_GetContents(model, i, NULL_PTR, 0)) : 0,
+      contentsSizeBytes: signed ? Math.max(0, fn.EPDFSig_GetContents(model, i, NULL_PTR, 0)) : 0,
       coverage: signed ? (COVERAGE_BY_CODE[fn.EPDFSig_GetCoverage(model, i)] ?? 'malformed') : null,
       revisionIndex: signed && revisionIndex >= 0 ? revisionIndex : null,
       signer: {
@@ -222,7 +231,7 @@ export function readContentsAt(runtime: PdfRuntimeModule, model: Ptr, index: num
 export function readRevisions(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  signatures: ReadonlyArray<SignatureDTO>,
+  signatures: ReadonlyArray<Signature>,
 ): PdfRevision[] {
   const { fn, mem } = runtime;
   const count = fn.EPDFDoc_GetRevisionCount(docPtr);
@@ -307,7 +316,7 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
         fields.push({
           objectNumber: fieldObjectNumberOf(f),
           name: f.name,
-          family: f.family,
+          kind: f.kind,
           widgets: f.widgets.map((w) => w.objectNumber),
           flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });

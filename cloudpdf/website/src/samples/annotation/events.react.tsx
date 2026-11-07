@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useRef, useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import {
   interactionPlugin,
   useInteraction,
@@ -20,9 +21,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './events.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 interface Entry {
   id: number;
@@ -110,43 +117,22 @@ function Toolbar() {
   );
 }
 
-// On load: a rectangle on the cover, so the log starts with its event.
-function AddRectangle() {
-  const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'square',
-      box: { x: 96, y: 506, width: 178, height: 54 },
-      color: '#e5484d',
-      strokeWidth: 3,
-    });
-  }, [annotation, ready, cover]);
-
-  return null;
-}
-
 export default function App() {
   return (
     <Viewer
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: ebook }]}
+      initialDocuments={[{ source: report }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddRectangle />
         <Toolbar />
         <div className="viewer">
           <Stage className="stage">
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

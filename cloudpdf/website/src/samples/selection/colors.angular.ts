@@ -27,7 +27,7 @@ const COLORS = [
   { name: 'Pink', color: 'rgb(236 72 153 / 0.3)', handles: '#db2777', swatch: '#ec4899' },
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
@@ -41,7 +41,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -96,10 +96,10 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something selected on load: the title on the cover.
+    // Something selected on load: "Documents", the first word on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 10, count: 52 });
+      if (cover) this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 }

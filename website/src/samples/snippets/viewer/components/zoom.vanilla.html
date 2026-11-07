@@ -10,11 +10,24 @@
   import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
 
   const element = document.getElementById('viewer');
+  element.config = {
+    layout: (layout) => layout.add({ custom: 'zoom-pill' }, { to: 'main', section: 'end' }),
+  };
   element.addEventListener('epdf:ready', () => {
     const { viewer } = element;
     viewer.watch(
       () => viewer.get('stage').getZoomLevel(),
-      (level) => (document.getElementById('zoom-level').textContent = `${Math.round(level * 100)}%`),
+      (level) =>
+        (document.getElementById('zoom-level').textContent = `${Math.round(level * 100)}%`),
+      { immediate: true },
     );
   });
 </script>
+
+<style>
+  .zoom-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+</style>

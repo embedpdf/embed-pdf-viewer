@@ -66,9 +66,10 @@ const textLayout = {
 function selectionEngine(): Engine {
   const handle = {
     id: 'doc',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
-      list: () => Promise.resolve({ pageCount: 2, pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
+      list: () =>
+        Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
     },
     security: { allows: () => true },
     page: () => ({
@@ -162,8 +163,8 @@ describe('useSelectionSettings', () => {
       handles: { ...SELECTION_DEFAULTS.handles, color: '#e91e63' },
     });
 
-    act(() => kernel.settingsOf(SelectionToken).updateSettings({ dragThreshold: 8 }));
-    expect(latest(renders)).toMatchObject({ dragThreshold: 8 });
+    act(() => kernel.settingsOf(SelectionToken).updateSettings({ dragThresholdPx: 8 }));
+    expect(latest(renders)).toMatchObject({ dragThresholdPx: 8 });
 
     const selection = await open(kernel);
     expect(selection.getSettings()).toBe(latest(renders));

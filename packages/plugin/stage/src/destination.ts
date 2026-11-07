@@ -25,7 +25,7 @@ export function revealOfDestination(destination: PageDestination, size: PdfSize)
         // A null axis keeps the current camera value; the number fed in for
         // it is never read (the 'keep' anchor).
         rect: { x: x ?? 0, y: y ?? 0, width: 0, height: 0 },
-        anchor: { x: x != null ? 'start' : 'keep', y: y != null ? 'start' : 'keep' },
+        align: { x: x != null ? 'start' : 'keep', y: y != null ? 'start' : 'keep' },
         // A zoom of 0 means the same as null: keep the current zoom.
         zoom: zoom != null && zoom !== 0 ? { level: zoom } : 'keep',
       };
@@ -40,7 +40,7 @@ export function revealOfDestination(destination: PageDestination, size: PdfSize)
       return {
         rect: { x: 0, y: y ?? 0, width, height: 0 },
         zoom: 'fit-width',
-        anchor: { y: y != null ? 'start' : 'keep' },
+        align: { y: y != null ? 'start' : 'keep' },
       };
     }
     case 'fitV':
@@ -49,7 +49,7 @@ export function revealOfDestination(destination: PageDestination, size: PdfSize)
       return {
         rect: { x: x ?? 0, y: 0, width: 0, height },
         zoom: 'fit-height',
-        anchor: { x: x != null ? 'start' : 'keep' },
+        align: { x: x != null ? 'start' : 'keep' },
       };
     }
     case 'fitR': {

@@ -55,12 +55,12 @@ interface WorkerSlot {
 }
 
 /**
- * A deployment fallback font, registered on every worker thread at startup.
- * The pool passes these to each worker via `workerData`; the worker reads the
- * file and registers it through `WorkerHost.registerStartupFonts`. This is the
+ * A deployment font, registered on every worker thread at startup. The pool
+ * passes these to each worker via `workerData`; the worker reads the file and
+ * registers it through `WorkerHost.registerStartupFonts`. This is the
  * server-owned font policy — cloud clients cannot configure fonts.
  */
-export interface FallbackFontDescriptor {
+export interface ServerFontDescriptor {
   /** Stable key. Also usable as a FreeText `fontFamily` if you expose it. */
   key: string;
   /** Absolute path to a TTF/OTF file, read by each worker at startup. */
@@ -73,11 +73,16 @@ export interface FallbackFontDescriptor {
   italic?: boolean;
   /** Add to the glyph-fallback chain. Defaults to `true` (the server use case). */
   fallback?: boolean;
+  /**
+   * Send the font's file to clients that may write text, so text being typed
+   * shows in it. Defaults to `false`: check the font's licence allows it.
+   */
+  serve?: boolean;
 }
 
 /** Shape passed to each worker via `workerData`. */
 export interface WorkerBootstrapData {
-  fonts: ReadonlyArray<FallbackFontDescriptor>;
+  fonts: ReadonlyArray<ServerFontDescriptor>;
   /** Where file-backed signing candidates are written (see `signing-paths.ts`). */
   signingRoot: string;
 }
@@ -125,7 +130,7 @@ export interface WorkerThreadPoolOptions {
    * a misconfigured font set is a boot error, not a silent degrade. Server-
    * owned: clients never configure fonts on the cloud engine.
    */
-  fonts?: ReadonlyArray<FallbackFontDescriptor>;
+  fonts?: ReadonlyArray<ServerFontDescriptor>;
   /** Signing candidate root; defaults to `defaultSigningRoot()`. */
   signingRoot?: string;
   /**

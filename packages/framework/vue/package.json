@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/vue",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "Vue adapter for EmbedPDF v3: composables, components with v-model and scoped slots, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
@@ -22,13 +22,16 @@
     "./actions": "./src/actions.ts",
     "./anchored": "./src/anchored.ts",
     "./annotation": "./src/annotation.ts",
+    "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.ts",
+    "./fonts": "./src/fonts.ts",
     "./i18n": "./src/i18n.ts",
     "./interaction": "./src/interaction.ts",
     "./link": "./src/link.ts",
     "./measurement": "./src/measurement.ts",
     "./metadata": "./src/metadata.ts",
+    "./outline": "./src/outline.ts",
     "./history": "./src/history.ts",
     "./page-edit": "./src/page-edit.ts",
     "./page-view": "./src/page-view.ts",
@@ -66,6 +69,10 @@
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
       },
+      "./attachment": {
+        "import": "./dist/attachment.js",
+        "require": "./dist/attachment.cjs"
+      },
       "./commands": {
         "import": "./dist/commands.js",
         "require": "./dist/commands.cjs"
@@ -73,6 +80,10 @@
       "./form": {
         "import": "./dist/form.js",
         "require": "./dist/form.cjs"
+      },
+      "./fonts": {
+        "import": "./dist/fonts.js",
+        "require": "./dist/fonts.cjs"
       },
       "./i18n": {
         "import": "./dist/i18n.js",
@@ -93,6 +104,10 @@
       "./metadata": {
         "import": "./dist/metadata.js",
         "require": "./dist/metadata.cjs"
+      },
+      "./outline": {
+        "import": "./dist/outline.js",
+        "require": "./dist/outline.cjs"
       },
       "./history": {
         "import": "./dist/history.js",
@@ -163,12 +178,15 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",

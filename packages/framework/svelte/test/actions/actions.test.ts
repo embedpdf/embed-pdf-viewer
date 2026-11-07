@@ -81,13 +81,12 @@ describe('useActionsUiAdapter', () => {
   const websiteLink: PdfActionTree = {
     root: { type: 'uri', subtype: 'URI', uri: 'https://example.com', isMap: false, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   it('installs the adapter for the document, reads the handlers late, and removes it with the component', async () => {

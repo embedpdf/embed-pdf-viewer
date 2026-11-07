@@ -36,7 +36,8 @@ remembered for every example in the reference.
 
     Your API key from the [dashboard](https://app.cloudpdf.com) is a **tenant token**: it can manage
     documents and mint document tokens under your account, and nothing else.
-    Use it as the `token` in every example in this reference.
+    Use it as the `token` in every example in this reference. The SDKs reach CloudPDF on their own,
+    so the token is all a client needs.
   </DeploymentTab>
   <DeploymentTab mode="self-hosted">
     On a self-hosted deployment **you are the operator**. Configure the root
@@ -51,6 +52,15 @@ remembered for every example in the reference.
     customers' documents. Use it as the `token` in every example, or mint
     scoped [tenant tokens](/docs/api-reference/authentication#tenant-tokens)
     for your services.
+
+    The examples reach CloudPDF SaaS. Give the client your server's address as well:
+
+    ```ts
+    const client = new CloudPDFClient({ baseUrl: 'https://pdf.example.com', token });
+    ```
+
+    Every SDK has the same option: `baseUrl` in PHP, `base_url` in Python and Ruby, `BaseUrl` in
+    C#'s `ClientOptions`, `option.WithBaseURL` in Go, and `.url()` in Java.
   </DeploymentTab>
 </DeploymentTabs>
 
@@ -77,6 +87,17 @@ than the one above it, and only the last one ever reaches a browser.
 
 [How authentication works →](/docs/api-reference/authentication) — minting,
 signing modes, revocation, and the full capability tables.
+
+## Versions
+
+Every SDK sends `EmbedPDF-Version` with each request: the API version it was
+generated from, such as `3.0`. Every response carries `EmbedPDF-Server-Version`,
+the version of the server that answered.
+
+Within a major version the API only grows, so an SDK keeps working as the server
+updates. A request without the header, such as a plain `curl`, is answered as the
+server's own version. A request from another major version gets a `400` that
+names both versions.
 
 ## Resources
 

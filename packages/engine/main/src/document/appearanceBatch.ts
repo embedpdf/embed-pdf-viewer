@@ -117,7 +117,7 @@ export function renderAppearanceImages(
       const bytes = encoded.source.bytes;
       const image = createPageImageHandle(encoded, {
         async blob() {
-          return new Blob([copyToExactArrayBuffer(bytes)], { type: encoded.contentType });
+          return new Blob([copyToExactArrayBuffer(bytes)], { type: encoded.mimeType });
         },
       });
       appearances.push({

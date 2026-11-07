@@ -15,9 +15,12 @@ export const en = {
     selection: { copy: 'Copy' },
     annotation: { delete: 'Delete' },
     document: { download: 'Download', print: 'Print' },
+    snapshot: { copy: 'Copy', save: 'Save image', clear: 'Clear snapshot' },
     tool: {
       pointer: 'Select',
       pan: 'Pan',
+      zoom: 'Marquee zoom',
+      snapshot: 'Snapshot',
       highlight: 'Highlight',
       underline: 'Underline',
       strikeout: 'Strikethrough',
@@ -52,6 +55,7 @@ export const en = {
       'form-signature': 'Signature field',
     },
   },
+  outline: { untitled: 'Untitled' },
 } as const;
 
 /** The strings every language has, with their text left open. */

@@ -9,8 +9,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
@@ -22,9 +22,9 @@ import { localEngine } from '@embedpdf/engine';
 const engine = localEngine();
 const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const APPROVAL = toFieldRef('approval');
@@ -34,7 +34,7 @@ const APPROVAL = toFieldRef('approval');
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -74,7 +74,6 @@ export class App {
   private readonly form = inject(EpdfForm);
   private readonly stamp = inject(EpdfStamp);
   private readonly signature = inject(EpdfSignature);
-  private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
   private done = false;
   protected readonly assetId = signal<string | null>(null);
@@ -84,13 +83,12 @@ export class App {
     this.signature.filled$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(true));
     this.signature.cleared$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(false));
 
-    // On load: a signature field on the last page, a typed signature, drawn into the field.
+    // On load: Ada's typed signature, ready to draw in, and the signature field in view.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
       const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.done) return;
+      if (this.form.status() !== 'ready' || !stage || this.done) return;
       this.done = true;
-      untracked(() => void this.setUp(page, stage));
+      untracked(() => void this.setUp(stage));
     });
   }
 
@@ -103,13 +101,11 @@ export class App {
     void this.signature.clearField(APPROVAL);
   }
 
-  private async setUp(page: PageRef, stage: EpdfStage) {
-    await this.form.create({
-      family: 'signature',
-      name: 'approval',
-      widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-    });
-    stage.goToPage(page);
+  private async setUp(stage: EpdfStage) {
+    // Bring the agreement's signature field into view.
+    const first = this.form.get(APPROVAL)?.widgets[0];
+    const widget = first ? this.form.getWidget(first) : null;
+    if (widget) stage.reveal(widget.page, { rect: widget.rect });
     const { library } = await this.stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
     const { asset } = await this.stamp.createAsset({
       libraryId: library.id,
@@ -118,6 +114,5 @@ export class App {
       mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
     });
     this.assetId.set(asset.id);
-    await this.signature.fillField(APPROVAL, { assetId: asset.id });
   }
 }

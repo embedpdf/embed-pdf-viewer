@@ -13,13 +13,14 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { connectLink } from './connect';
-import type {
-  Link,
-  LinkActivateContext,
-  LinkActivatedEvent,
-  LinkActivation,
-  LinkLoadedEvent,
-  LinkResolution,
+import {
+  resolveLinkTarget,
+  type Link,
+  type LinkActivateContext,
+  type LinkActivatedEvent,
+  type LinkActivation,
+  type LinkLoadedEvent,
+  type LinkResolution,
 } from './contract';
 import type { LinkHostCapability, UriOpener } from './host-contract';
 import { linksOf } from './source';
@@ -87,7 +88,7 @@ export function createLinkController(ctx: PluginContext<void>) {
       return linksOf(snapshot.annotations);
     },
     affected: pagesChangedBy,
-    changed: ({ page, cause }) => {
+    onChanged: ({ page, cause }) => {
       if (cause === 'load') loaded.emit({ page });
     },
   });
@@ -114,21 +115,9 @@ export function createLinkController(ctx: PluginContext<void>) {
   // The framework's website openers, the latest first: the plugin never opens one itself.
   const uriOpeners: UriOpener[] = [];
 
-  const resolve = (target: PdfLinkTarget): LinkResolution => {
-    switch (target.kind) {
-      case 'goto':
-        // A page the document doesn't have can't be shown.
-        return ctx.getPage(target.destination.page)
-          ? { kind: 'destination', destination: target.destination }
-          : { kind: 'reported', target };
-      case 'uri':
-        return { kind: 'uri', uri: target.uri };
-      case 'named':
-        return { kind: 'named', name: target.name };
-      default:
-        return { kind: 'reported', target };
-    }
-  };
+  // A page the document doesn't have can't be shown.
+  const resolve = (target: PdfLinkTarget): LinkResolution =>
+    resolveLinkTarget(target, (page) => ctx.getPage(page) !== null);
 
   const perform = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
     const actions = ctx.tryGet(ActionsToken);
@@ -136,28 +125,28 @@ export function createLinkController(ctx: PluginContext<void>) {
       const dispatch = actions.execute(context.activate, {
         origin: 'user',
         source: { kind: 'link', annotation: context.ref, page: context.page },
-        event: { scope: 'activate' },
+        event: { type: 'activate' },
       });
-      return { outcome: 'dispatched', dispatch };
+      return { status: 'dispatched', dispatch };
     }
     const resolution = resolve(target);
     switch (resolution.kind) {
       case 'destination': {
         // The view the link was followed in, by its own scroll behavior.
         const stage = context?.stage ?? ctx.tryGet(StageToken);
-        if (!stage) return { outcome: 'destination', destination: resolution.destination };
+        if (!stage) return { status: 'destination', destination: resolution.destination };
         stage.goToDestination(resolution.destination);
-        return { outcome: 'revealed' };
+        return { status: 'revealed' };
       }
       case 'uri': {
         const open = uriOpeners[0];
-        if (!open || open(resolution.uri)) return { outcome: 'uri', uri: resolution.uri };
-        return { outcome: 'reported', target };
+        if (!open || open(resolution.uri)) return { status: 'uri', uri: resolution.uri };
+        return { status: 'reported', target };
       }
       case 'named':
-        return { outcome: 'named', name: resolution.name };
+        return { status: 'named', name: resolution.name };
       default:
-        return { outcome: 'reported', target };
+        return { status: 'reported', target };
     }
   };
 
@@ -203,7 +192,7 @@ export function createLinkController(ctx: PluginContext<void>) {
     listLinks,
     getLink: (page, linkId) => listLinks(page).find((link) => link.id === linkId) ?? null,
     getLinkAt,
-    listAllLinks: async (options) => {
+    readAllLinks: async (options) => {
       const layouts = ctx.document()?.pages ?? [];
       await ctx.cancellable(
         options?.signal,

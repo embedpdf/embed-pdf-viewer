@@ -4,23 +4,29 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddNotes from './AddNotes.vue';
 import CommentBubble from './CommentBubble.vue';
 import TurnButton from './TurnButton.vue';
 
 import '../renderers.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source proposal]
+const proposal = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/proposal.pdf');
+  return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -38,11 +44,10 @@ const mine = ref(true);
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: ebook }]"
+    :initial-documents="[{ source: proposal }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddNotes />
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Look">
           <button type="button" :aria-pressed="mine" @click="mine = true">Your look</button>
@@ -53,6 +58,7 @@ const mine = ref(true);
       <Stage class="stage">
         <template #page>
           <RenderLayer />
+          <SelectionLayer />
           <AnnotationLayer :renderers="mine ? RENDERERS : NONE" />
         </template>
       </Stage>

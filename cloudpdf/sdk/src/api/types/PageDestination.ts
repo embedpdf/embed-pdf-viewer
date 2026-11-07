@@ -16,9 +16,9 @@ export namespace PageDestination {
     export interface Xyz {
         kind: "xyz";
         page: CloudPDF.PageRef;
-        x?: (number | null) | undefined;
-        y?: (number | null) | undefined;
-        zoom?: (number | null) | undefined;
+        x: number | null;
+        y: number | null;
+        zoom: number | null;
     }
 
     export interface Fit {
@@ -29,13 +29,13 @@ export namespace PageDestination {
     export interface FitH {
         kind: "fitH";
         page: CloudPDF.PageRef;
-        y?: (number | null) | undefined;
+        y: number | null;
     }
 
     export interface FitV {
         kind: "fitV";
         page: CloudPDF.PageRef;
-        x?: (number | null) | undefined;
+        x: number | null;
     }
 
     export interface FitR {
@@ -55,12 +55,12 @@ export namespace PageDestination {
     export interface FitBh {
         kind: "fitBH";
         page: CloudPDF.PageRef;
-        y?: (number | null) | undefined;
+        y: number | null;
     }
 
     export interface FitBv {
         kind: "fitBV";
         page: CloudPDF.PageRef;
-        x?: (number | null) | undefined;
+        x: number | null;
     }
 }

@@ -10,8 +10,11 @@ export interface PageRenderService {
   image(options?: PageImageOptions): AbortablePromise<PageRenderImage>;
 }
 
-/** A local engine page's rendering: an image, or the pixels themselves. */
-export interface LocalPageRenderService extends PageRenderService {
+/**
+ * A page's rendering where the pixels themselves are at hand: an image, or
+ * the raw pixels. The local engine's pages, and a server module's own.
+ */
+export interface RawPageRenderService extends PageRenderService {
   /** The page's pixels, with the transform they were made with, not encoded as an image. */
   raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster>;
 }

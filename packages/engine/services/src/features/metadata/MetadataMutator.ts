@@ -8,6 +8,8 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { applyCustomMetadataPatch } from './internal/write/applyCustomMetadataPatch';
 import { applyMetadataPatch } from './internal/write/applyMetadataPatch';
+import { syncXmp } from './internal/xmp/syncXmp';
+import { xmpEditsForCustomMetadata, xmpEditsForMetadata } from './internal/xmp/xmpFields';
 import { MetadataReader } from './MetadataReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
@@ -17,7 +19,8 @@ import { throwIfAborted } from '../../shared/abort';
  * `MetadataReader` (one orchestrator per feature) so both worker hosts
  * (browser Web Worker and Node `worker_thread`) share the same code path.
  *
- * A metadata write rewrites the document Info dictionary in place. Like
+ * A metadata write rewrites the document Info dictionary in place, and the
+ * same fields in the XMP packet when the document has one. Like
  * `PagesMutator.move`, it is a structural layer edit: it returns the
  * re-read metadata and a `null` cache (the worker never fills cloud
  * coherence pins — the server does, after persisting the artifact and
@@ -35,6 +38,7 @@ export class MetadataMutator {
     const docPtr = this.session.requireDocPtr();
 
     applyMetadataPatch(fn, mem, docPtr, patch);
+    syncXmp(fn, mem, docPtr, xmpEditsForMetadata(patch));
     throwIfAborted(signal);
 
     // Re-read the canonical metadata off the mutated session via the
@@ -48,7 +52,9 @@ export class MetadataMutator {
   updateCustom(patch: CustomMetadataPatch, signal: AbortSignal): CustomMetadataUpdateResult {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
-    applyCustomMetadataPatch(fn, mem, this.session.requireDocPtr(), patch);
+    const docPtr = this.session.requireDocPtr();
+    applyCustomMetadataPatch(fn, mem, docPtr, patch);
+    syncXmp(fn, mem, docPtr, xmpEditsForCustomMetadata(patch));
     throwIfAborted(signal);
     const custom = new MetadataReader(this.runtime, this.session).readCustom(signal);
     return { custom, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };

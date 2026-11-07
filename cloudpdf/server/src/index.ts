@@ -5,7 +5,13 @@
  * at bin/cloudpdf-server.ts.
  */
 export { buildApp } from './app/buildApp';
-export type { BuildAppOptions, AppBundle } from './app/buildApp';
+export type { BuildAppOptions, AppBundle, MountedRoute } from './app/buildApp';
+export type { PermissionRegistry } from './auth/permission-registry';
+export type {
+  PermissionDeclaration,
+  PermissionLevel,
+  RegisteredPermission,
+} from './auth/permission-registry';
 
 /**
  * @license FCL-1.0-ALv2
@@ -51,10 +57,10 @@ export { DbJwksCacheStore } from './auth/JwksCacheStore';
 export { WorkerThreadPool } from './runtime/WorkerThreadPool';
 export type {
   WorkerThreadPoolOptions,
-  FallbackFontDescriptor,
+  ServerFontDescriptor,
   WorkerBootstrapData,
 } from './runtime/WorkerThreadPool';
-export { loadFallbackFontsFromEnv } from './runtime/loadFallbackFontsFromEnv';
+export { loadServerFontsFromEnv } from './runtime/loadServerFontsFromEnv';
 export * from './security/index';
 
 // Database drivers, migrations, repositories and object storage.
@@ -85,6 +91,7 @@ export type {
   AuditLogTable,
 } from './db/schema';
 export { DocumentsRepo } from './db/repos/documents.repo';
+export { FoldersRepo, MAX_FOLDER_DEPTH } from './db/repos/folders.repo';
 export type { DocumentRow, CreatePendingInput, CommitInput } from './db/repos/documents.repo';
 export { TenantsRepo } from './db/repos/tenants.repo';
 export type { TenantRow } from './db/repos/tenants.repo';

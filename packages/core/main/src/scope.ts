@@ -3,7 +3,7 @@
  *
  * Every resource acquisition registers its release into the owning scope at
  * the acquisition site (`scope.defer(release)` on the line after acquiring),
- * so no exit path can forget it. `dispose()` unwinds the stack LIFO, awaits
+ * so no exit path can forget it. `destroy()` unwinds the stack LIFO, awaits
  * asynchronous teardowns, and is idempotent — every call returns the same
  * promise.
  *
@@ -33,9 +33,9 @@ export const isCancelled = (error: unknown): error is CancelledError =>
   error instanceof CancelledError;
 
 export interface Scope {
-  readonly disposed: boolean;
+  readonly destroyed: boolean;
   defer(teardown: Teardown): void;
-  dispose(): Promise<void>;
+  destroy(): Promise<void>;
 }
 
 export function createScope(report: (error: unknown) => void): Scope {
@@ -43,14 +43,14 @@ export function createScope(report: (error: unknown) => void): Scope {
   let disposal: Promise<void> | null = null;
 
   return {
-    get disposed() {
+    get destroyed() {
       return disposal !== null;
     },
     defer(teardown) {
       if (disposal) void disposal.then(() => Promise.resolve().then(teardown).catch(report));
       else teardowns.push(teardown);
     },
-    dispose() {
+    destroy() {
       return (disposal ??= (async () => {
         while (teardowns.length) {
           try {

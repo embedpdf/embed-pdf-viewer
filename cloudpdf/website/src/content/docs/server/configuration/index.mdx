@@ -123,9 +123,17 @@ It is disposable — the server rebuilds it from the object store.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CLOUDPDF_FALLBACK_FONTS` | — | JSON array of fallback fonts (`{ key, path, … }`) for glyphs a document's own fonts are missing. |
+| `CLOUDPDF_FONTS` | — | JSON array of the server's fonts (`{ key, path, … }`): to write text in, to fill in characters a document's own fonts lack, and, with `serve`, to send to browsers. |
 
-See [Fallback fonts](/docs/server/configuration/fonts).
+See [Fonts](/docs/server/configuration/fonts).
+
+## Modules
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_MODULES` | — | Comma-separated server modules to load: package names, or paths from the working directory. Each module reads its own settings from `CLOUDPDF_<ID>_*`. |
+
+See [Modules](/docs/server/configuration/modules).
 
 ## Lifecycle & migrations
 

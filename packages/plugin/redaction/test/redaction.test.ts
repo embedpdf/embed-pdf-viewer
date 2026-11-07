@@ -20,7 +20,7 @@ import {
   type RedactionConfig,
 } from '../src/contract';
 import { createRedactionController } from '../src/controller';
-import { initialRedactionState } from '../src/model';
+import { initialRedactionModel } from '../src/model';
 import { redactionState } from '../src/state';
 
 const PAGE = toPageRef(7);
@@ -29,16 +29,16 @@ const MARK: AnnotationRef = { kind: 'objectNumber', objectNumber: 41, page: PAGE
 const LOCAL_ORIGIN = {
   kind: 'local',
   sessionId: 'session-a',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 } as const;
 const REMOTE_ORIGIN = {
   kind: 'remote',
   sessionId: 'session-b',
-  sub: 'user-b',
-  ts: 0,
-  serverId: 7,
+  subject: 'user-b',
+  at: new Date(0).toISOString(),
+  serverSequence: 7,
 } as const;
 const APPLY_CAPABILITIES = ['doc.redact', 'doc.pages.modify', 'doc.annotate.modify'] as const;
 
@@ -147,7 +147,7 @@ function harness(
   );
   const ctx = createTestContext({
     id: 'redaction',
-    state: initialRedactionState(),
+    state: initialRedactionModel(),
     settings: { defaults: REDACTION_DEFAULTS, registered: options.config },
     pages: [{ ref: PAGE }, { ref: OTHER_PAGE }],
     capabilities: [

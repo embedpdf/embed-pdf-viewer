@@ -6,24 +6,30 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   COMMANDS_DEFAULTS,
-  type CommandDef,
+  type CommandContext,
+  type CommandDefinition,
   type CommandFamily,
   type CommandsConfig,
 } from '../src/contract';
 import { createCommandsController } from '../src/controller';
 
 /** The controller over a real test context: workspace-scoped, no document, no siblings. */
-function harness(config: CommandsConfig = {}) {
+function harness<AppState>(config: CommandsConfig<AppState> = {}) {
   const ctx = createTestContext({
     id: 'commands',
-    settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+    settings: {
+      defaults: COMMANDS_DEFAULTS,
+      registered: config as CommandsConfig,
+      whole: ['appState'],
+    },
     doc: null,
   });
   const commands = ctx.connect(createCommandsController(ctx));
   return { ctx, commands };
 }
 
-const capabilityWith = (definition: CommandDef) => harness({ commands: [definition] }).commands;
+const capabilityWith = (definition: CommandDefinition) =>
+  harness({ commands: [definition] }).commands;
 
 describe('resolution carries iconAccent', () => {
   it('lands a derived accent on the resolved command', () => {
@@ -59,11 +65,38 @@ describe('resolution carries iconAccent', () => {
   });
 });
 
+describe('enabled, active and visible', () => {
+  it('count as false when they throw, and as their default when they are not given', async () => {
+    const MissingToken = createCapabilityToken<{ ready(): boolean }>('missing');
+    const reads = (context: CommandContext) => context.get(MissingToken).ready();
+    const { commands } = harness({
+      commands: [
+        { id: 'acme:thrown', label: 'thrown', enabled: reads, active: reads, run: () => {} },
+        { id: 'acme:hidden', label: 'hidden', visible: reads },
+        { id: 'acme:plain', label: 'plain' },
+      ],
+    });
+    expect(commands.resolveCommand('acme:thrown')).toMatchObject({
+      enabled: false,
+      active: false,
+      visible: true,
+    });
+    expect(commands.resolveCommand('acme:hidden')).toMatchObject({ visible: false });
+    expect(commands.resolveCommand('acme:plain')).toMatchObject({
+      enabled: true,
+      active: false,
+      visible: true,
+    });
+    expect(commands.canExecute('acme:thrown')).toBe(false);
+    expect(await commands.execute('acme:thrown')).toMatchObject({ status: 'rejected' });
+  });
+});
+
 describe('registry', () => {
   it('rejects a duplicate id unless replaced, and a remover owns only its registration', () => {
     const { commands } = harness();
-    const first: CommandDef = { id: 'zoom:in', label: 'first' };
-    const second: CommandDef = { id: 'zoom:in', label: 'second' };
+    const first: CommandDefinition = { id: 'zoom:in', label: 'first' };
+    const second: CommandDefinition = { id: 'zoom:in', label: 'second' };
     const removeFirst = commands.registerCommand(first);
     expect(() => commands.registerCommand(second)).toThrow(
       expect.objectContaining({ code: 'conflict' }),
@@ -172,6 +205,70 @@ describe('execution', () => {
   });
 });
 
+describe("your app's state", () => {
+  interface Review {
+    done: string[];
+    status: 'review' | 'approved';
+    approve(): void;
+  }
+
+  /** A command over an app's checklist: enabled once all four are done, active once approved. */
+  const approve: CommandDefinition<Review> = {
+    id: 'acme:approve',
+    label: 'Approve',
+    enabled: ({ appState }) => appState.done.length === 4,
+    active: ({ appState }) => appState.status === 'approved',
+    run: ({ appState }) => appState.approve(),
+  };
+
+  it('gives every command the appState setting, and asks again when a new value replaces it', () => {
+    const review: Review = { done: [], status: 'review', approve: () => {} };
+    const { ctx, commands } = harness({ appState: review, commands: [approve] });
+    expect(commands.resolveCommand('acme:approve')).toMatchObject({
+      enabled: false,
+      active: false,
+    });
+
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    commands.updateSettings({ appState: { ...review, done: ['a', 'b', 'c', 'd'] } });
+    expect(listener).toHaveBeenCalled();
+    expect(commands.resolveCommand('acme:approve')).toMatchObject({ enabled: true, active: false });
+    // Replaced whole, never merged: what the new value leaves out is gone.
+    commands.updateSettings({ appState: { done: [] } });
+    expect(commands.getSettings().appState).toEqual({ done: [] });
+  });
+
+  it('wakes every reader once a command ran, so state its run changed outside the viewer shows', async () => {
+    let status: Review['status'] = 'review';
+    // The app changes its own state in place, without giving the viewer a new value.
+    const review: Review = {
+      done: ['a', 'b', 'c', 'd'],
+      get status() {
+        return status;
+      },
+      approve: () => (status = 'approved'),
+    };
+    const { ctx, commands } = harness({ appState: review, commands: [approve] });
+    expect(commands.resolveCommand('acme:approve')?.active).toBe(false);
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    await commands.execute('acme:approve');
+    expect(listener).toHaveBeenCalled();
+    expect(commands.resolveCommand('acme:approve')?.active).toBe(true);
+  });
+
+  it('wakes the readers after a run that fails too', async () => {
+    const { ctx, commands } = harness({
+      commands: [{ id: 'acme:fail', run: () => Promise.reject(new Error('no')) }],
+    });
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    await expect(commands.execute('acme:fail')).rejects.toThrow();
+    expect(listener).toHaveBeenCalled();
+  });
+});
+
 describe('what a command opens', () => {
   it('toggles its panel with its group, asking for focus when the panel says so', async () => {
     const toggle = vi.fn();
@@ -200,6 +297,26 @@ describe('what a command opens', () => {
       ['notes', { exclusive: 'end', focus: undefined }],
       ['outline', { exclusive: undefined, focus: undefined }],
     ]);
+  });
+
+  it('is a toggle when it has an active of its own or opens a panel, never for a menu or dialog', () => {
+    const commands = harness({
+      commands: [
+        { id: 'tool:pan', label: 'Pan', active: () => false },
+        { id: 'panel:search', label: 'Search', panel: 'search' },
+        { id: 'zoom:in', label: 'Zoom in', run: () => undefined },
+        { id: 'menu:zoom', label: 'Zoom', menu: 'zoom-menu' },
+        { id: 'menu:more', label: 'More', menu: 'more-menu', active: () => true },
+        { id: 'dialog:print', label: 'Print', modal: 'print' },
+      ],
+    }).commands;
+    const pressable = (id: string) => commands.resolveCommand(id)?.pressable;
+    expect(pressable('tool:pan')).toBe(true);
+    expect(pressable('panel:search')).toBe(true);
+    expect(pressable('zoom:in')).toBe(false);
+    expect(pressable('menu:zoom')).toBe(false);
+    expect(pressable('menu:more')).toBe(false);
+    expect(pressable('dialog:print')).toBe(false);
   });
 });
 
@@ -247,7 +364,7 @@ describe('turning features off', () => {
 });
 
 describe('turning single commands off', () => {
-  const definitions: CommandDef[] = [
+  const definitions: CommandDefinition[] = [
     { id: 'tool:highlight', label: 'Highlight', categories: ['annotations.highlight'] },
     { id: 'tool:underline', label: 'Underline', categories: ['annotations.markup'] },
   ];
@@ -277,7 +394,7 @@ describe('turning single commands off', () => {
   it('turns commands off and on through the setting, live', () => {
     const { ctx, commands } = harness({ commands: definitions });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 
@@ -300,6 +417,113 @@ describe('turning single commands off', () => {
     commands.enableCommand('tool:highlight'); // not in the list: nothing to turn on
     expect(commands.isCommandDisabled('tool:highlight')).toBe(true);
     expect(commands.isCommandDisabled('acme:unknown')).toBe(false);
+  });
+});
+
+describe('locked settings', () => {
+  /** The controller with an i18n stand-in that knows `strings`. */
+  function harnessWith(config: CommandsConfig, strings: Record<string, string> = {}) {
+    const i18n = {
+      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+        const text = strings[key] ?? options?.fallback ?? key;
+        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
+      },
+    };
+    const ctx = createTestContext({
+      id: 'commands',
+      settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+      doc: null,
+      capabilities: [[I18nToken, i18n]],
+    });
+    return ctx.connect(createCommandsController(ctx));
+  }
+
+  // A spread setting the test holds or lets go, as the Stage's getLock() would answer.
+  let held: { by: string; reasonKey?: string } | null = null;
+  let spread = 'none';
+  const choice = (id: string, value: string): CommandDefinition => ({
+    id,
+    label: id === 'view:single-page' ? 'Single page' : 'Two pages',
+    run: () => {
+      spread = value;
+    },
+    active: () => spread === value,
+    locked: () => held,
+  });
+  const single = choice('view:single-page', 'none');
+  const two = choice('view:two-pages', 'odd');
+
+  it('shows a command disabled while a lock holds its setting, and still active for its value', async () => {
+    held = { by: 'protected-display', reasonKey: 'protectedDisplay.onePageAtATime' };
+    spread = 'none';
+    const commands = harnessWith(
+      { commands: [single, two] },
+      {
+        'protectedDisplay.onePageAtATime': 'Protected pages show one at a time',
+      },
+    );
+    expect(commands.resolveCommand('view:single-page')).toMatchObject({
+      visible: true,
+      enabled: false,
+      active: true,
+      disabledReason: 'Protected pages show one at a time',
+    });
+    expect(commands.resolveCommand('view:two-pages')).toMatchObject({
+      visible: true,
+      enabled: false,
+      active: false,
+    });
+    expect(commands.getRefusal('view:two-pages')).toEqual({
+      reason: 'locked',
+      message: 'Protected pages show one at a time',
+    });
+    await expect(commands.execute('view:two-pages')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'disabled',
+    });
+    expect(spread).toBe('none');
+  });
+
+  it('says the general sentence without a reason of its own, and runs again once it goes', async () => {
+    held = { by: 'kiosk' };
+    spread = 'none';
+    const commands = harnessWith({ commands: [single, two] });
+    expect(commands.resolveCommand('view:two-pages')?.disabledReason).toBe(
+      "Two pages can't be changed in this document",
+    );
+    held = null;
+    expect(commands.getRefusal('view:two-pages')).toBeNull();
+    await expect(commands.execute('view:two-pages')).resolves.toMatchObject({ status: 'executed' });
+    expect(spread).toBe('odd');
+  });
+
+  it("shows disabled even under notAllowed: 'hide', and turned off stays hidden", () => {
+    held = { by: 'kiosk' };
+    const hidden = harnessWith({ commands: [single], notAllowed: 'hide' });
+    expect(hidden.resolveCommand('view:single-page')).toMatchObject({
+      visible: true,
+      enabled: false,
+    });
+    const off = harnessWith({ commands: [single], disabledCommands: ['view:single-page'] });
+    expect(off.resolveCommand('view:single-page')).toMatchObject({ visible: false });
+    expect(off.getRefusal('view:single-page')?.reason).toBe('turned-off');
+    held = null;
+  });
+
+  it('counts a locked check that throws as unlocked', () => {
+    const commands = harnessWith({
+      commands: [
+        {
+          id: 'view:odd',
+          label: 'Odd',
+          run: () => {},
+          locked: () => {
+            throw new Error('no stage');
+          },
+        },
+      ],
+    });
+    expect(commands.resolveCommand('view:odd')).toMatchObject({ enabled: true });
   });
 });
 
@@ -331,8 +555,16 @@ describe('permissions', () => {
     return ctx.connect(createCommandsController(ctx));
   }
 
-  const print: CommandDef = { id: 'document:print', label: 'Print', requires: ['doc.print'] };
-  const note: CommandDef = { id: 'tool:note', label: 'Note', requires: ['annotations:create'] };
+  const print: CommandDefinition = {
+    id: 'document:print',
+    label: 'Print',
+    requires: ['doc.print'],
+  };
+  const note: CommandDefinition = {
+    id: 'tool:note',
+    label: 'Note',
+    requires: ['annotations:create'],
+  };
 
   it('hides a command whose permission the scope leaves out, and refuses it', async () => {
     const commands = harnessWith({ commands: [print, note] }, securityWithout('doc.print'));
@@ -402,6 +634,11 @@ describe('permissions', () => {
           { id: 'acme:save', label: 'Save', shortcut: 'Mod+S', categories: ['acme.saving'] },
           { id: 'acme:send', label: 'Send', shortcut: 'Mod+E', categories: ['acme'] },
           { id: 'acme:mail', label: 'Mail', shortcut: 'Mod+E' },
+          { id: 'acme:cancel', label: 'Cancel', shortcut: 'Mod+K', enabled: () => false },
+          { id: 'acme:close', label: 'Close', shortcut: 'Mod+K', visible: () => false },
+          { id: 'acme:dismiss', label: 'Dismiss', shortcut: 'Mod+K' },
+          { id: 'acme:undo', label: 'Undo', shortcut: 'Mod+J', enabled: () => false },
+          { id: 'acme:redo', label: 'Redo', shortcut: 'Mod+J', enabled: () => false },
         ],
         disabledCategories: ['acme'],
       },
@@ -426,7 +663,17 @@ describe('permissions', () => {
       commandId: 'acme:mail',
       refusal: null,
     });
-    expect(commands.matchStroke(stroke('k'), options)).toBeNull();
+    // Of commands that share keys, the one that can run now wins, wherever it is in the list.
+    expect(commands.matchStroke(stroke('k'), options)).toEqual({
+      commandId: 'acme:dismiss',
+      refusal: null,
+    });
+    // When none can run now, the first one still takes the key, which keeps its default.
+    expect(commands.matchStroke(stroke('j'), options)).toEqual({
+      commandId: 'acme:undo',
+      refusal: null,
+    });
+    expect(commands.matchStroke(stroke('l'), options)).toBeNull();
   });
 
   it('matches a key typed in a text field only for a command that runs from text fields', () => {
@@ -460,20 +707,20 @@ describe('permissions', () => {
 
   it('refuses a command its allowed check says no to, with the sentence its key names', async () => {
     let canPrint = false;
-    const checked: CommandDef = {
+    const checked: CommandDefinition = {
       id: 'document:print',
       label: 'Print',
       allowed: () => canPrint,
       notAllowedKey: 'commands.notAllowed.doc-print',
     };
-    const thrown: CommandDef = {
+    const thrown: CommandDefinition = {
       id: 'acme:thrown',
       label: 'Thrown',
       allowed: () => {
         throw new Error('no plugin');
       },
     };
-    const general: CommandDef = { id: 'acme:general', label: 'Send', allowed: () => false };
+    const general: CommandDefinition = { id: 'acme:general', label: 'Send', allowed: () => false };
     const strings = { 'commands.notAllowed.doc-print': "Printing isn't allowed" };
     const hidden = harnessWith(
       { commands: [checked, thrown, general] },
@@ -559,7 +806,7 @@ describe('settings', () => {
   it('takes its commands and categories from the settings, live', () => {
     const { ctx, commands } = harness({ commands: [{ id: 'zoom:in', label: 'In' }] });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 

@@ -1,5 +1,230 @@
 # @embedpdf/web
 
+## 3.0.0
+
+### Major Changes
+
+- [#711](https://github.com/embedpdf/embed-pdf-viewer/pull/711) by [@bobsingor](https://github.com/bobsingor) – Introduces framework-independent browser adapters for EmbedPDF v3. It centralizes DOM-facing services such as file selection, clipboard access, printing, downloads, and external navigation so core packages remain platform-neutral.
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Add framework-neutral anchored-overlay projection and placement utilities for Stage and standalone page surfaces. Add browser clipboard helpers for selected-text prefetch, native copy events, keyboard fallback, and user-initiated clipboard writes while keeping selection plugins DOM-free.
+
+- [#975](https://github.com/embedpdf/embed-pdf-viewer/pull/975) by [@bobsingor](https://github.com/bobsingor) – The rich text editor keeps up with fast typing: an update that brings back text the editor already reported is late, not a change, so it no longer undoes the keystrokes typed after it. `RichTextEditorHost.onInput` may return the document the host keeps (text typed at the caret in a style chosen there), which the editor shows at once, and `TextBoxEditorAnnotation.draftRichText` returns it. A format shortcut reports the selection as it is before the command runs, and the caret is reported once an input method composition ends instead of while it moves through it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `epdfThemeVariables(theme)` turns a theme written with setting names (`{ accent, search: { highlight: { color } } }`) into the `--epdf-*` variables, typed from `EPDF_VARIABLES`. `bindCommandShortcuts()` and `isMacPlatform()` are the browser's part of command shortcuts.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – `StageSurfaceHost` and `StageGestureHost` follow the stage host contract: `setViewportSize`, `getPageAt`, `viewportToPage`, `isMoving`; `StageSurfaceHub` is `{ dispatchPointer, getActiveTool, wouldClaimTouch }`. `ClipboardSelectionSource` subscribes through `onChanged` / `onCommitted`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add `EPDF_VARIABLES`, the list of every `--epdf-*` CSS variable that themes EmbedPDF: the setting each one overrides, the part its default follows (another part, or an accent), and its built-in value. `paint(name, settingValue)` gives the CSS value a painted part uses, so any variable wins over its setting: the part's own variable, then the variable of the part it follows, its plugin's accent variable such as `--epdf-annotation-accent`, and `--epdf-accent`, then the setting's value. The rotation handle follows the other handles, so `--epdf-annotation-handle-fill` and `--epdf-annotation-handle-stroke` reach it too. A dash style paints as a dash array (`'dashed'` is `4 3`). `mixAccent()` builds a translucent default such as "the accent at 35%" with `color-mix()`, so it follows the accent variables too, and `paintDefault()` gives the CSS value of a part you style yourself, which has no setting.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `createDefaultActionsUiAdapter` — the actions UI adapter's DEFAULT policy (the origin×phase visibility matrix: hover/lifecycle prints suppressed, boot/lifecycle alerts suppressed, sanitizeExternalUri URI opens, browser fallbacks), hoisted here and written ONCE so every framework binding (react, angular) ships the same behavior instead of forking it. Structural twins keep this package plugin-free per the layering law; `overrides` accepts a getter for late-bound handlers.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The rich text editor draws each run in its whole face (`RichTextEditorFace`: family, weight and italic over the body's), so a bold run draws in the bold program instead of a faked bold. `RichTextEditorHost.cssFontFamily(face)` takes the face, `RichTextEditorProps.body` the box's body face, and `familyOfCss` reads back a family for a span the browser made itself. A drawn span keeps its run's family as data (`data-family`), so a program's CSS family never reads back as a family. `restyleFaces()` draws the spans again when the fonts change, without touching the text or the caret. `TextBoxEditorItem.face` is the box's body face. Text box and text field editors draw with `font-synthesis: none`.
+
+  Add `browserTextMeasurer()`, the browser's text measuring for the kernel (`createKernel({ measurer: browserTextMeasurer() })`): canvas `measureText` in a font program, mounted the first time it's asked about. A program the browser refuses is never ready, and the measurer says it's refused. `mountFontProgram` rejects when the browser refuses a font, instead of resolving with nothing mounted.
+
+  `svgShapesOf` draws a `textRun` scene node as one `<text>` at its left edge, shaped by the browser in its direction (`unicode-bidi: bidi-override`; a right-to-left run anchored by its end), with its spaces kept (`white-space: pre`) and kerning and ligatures off for a plain run. `SvgShape.style` replaces `blend`: the CSS a shape needs that has no attribute, `mix-blend-mode` among it; `styleText(style)` writes it as one attribute.
+
+  A text field's editor reads its line in the engine's direction (`direction` from the layout's `rtl`): text that starts in Hebrew or Arabic is ordered right to left as the engine orders it, and typing at the end of a right-to-left word continues it. The field's alignment is unchanged.
+
+  `svgShapesOf` draws a `textRun` that joins its neighbours (`joinsPrevious`, `joinsNext`) with a joiner (U+200D) on each side it joins, embedded rather than overridden (`unicode-bidi: embed`; Firefox ignores a joiner at the edge of an overridden run), so an Arabic letter in a comb's cell takes its joined form, as the engine draws it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – What the layers on a page paint, and the form fields' pictures:
+  - **`pageLayersOf(page.ref)`:** a layer says which part of the page it paints (`paint('annotations' | 'formFields')`), and the render layer reads `painted()`. `pictureLayerOptionsOf(painted, props, rights)` gives the picture's options, and `partsDrawnTwice` names what a prop draws twice.
+  - **`loadFieldPictureUrls`** loads a page's field pictures, every state, and **`shownFieldPicture`** picks the one a widget shows.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – One way to mount fonts: by program (`mountFontProgram`, `createFontMounts`). `mountWebFont`, `webFontFamily` and `fontKeyOfWebFamily` are gone, and so is `cssFontOf`: `textFieldStyleOf` names no font (the editor's layout does), and `listBoxStyleOf` and `listBoxControlStyleOf` take the widget's font as the form plugin gives it. The free text line model keeps the engine's metrics for the standard families by the family a CSS family stands for (`lineModelFor` and `firstLineShiftFor` take `familyOf`, `FamilyOfCss`; the rich text editor passes its host's `familyOfCss`); `styleDeltaOf` reads a family back as it is by default. A `text` scene node's `program` is mounted like a `textRun`'s.
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – The Stage keeps the pages where it put them when the browser scrolls inside it: a field reached with Tab, an element your code calls `focus()` or `scrollIntoView()` on, or the cursor at the edge of a text box now moves the Stage's view that far, instead of shifting the pages under it so the top of the document could no longer be reached. `bindFieldFocus()` binds a form field's box to the form's cursor: `focus()` and `focusNext()` put the cursor in its control, Tab and Shift+Tab go through the form in the document's order, and the arrow keys move between a radio group's buttons.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - A text field keeps the typed text when it loses focus until the field shows it, so it never flashes the old value; a value the form's validation refuses stays typed, as in Acrobat. `TextFieldDrafts.commitDraftText()` resolves with how the write ended (`{ status }`) or `null`.
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Add shared browser Stage surface and touch gesture controllers with lens-scoped input, pan, pinch, fling, double-tap, long-press, and wheel handling. Export vibration and native-shell feedback providers.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A layer's pictures stay valid until the next ones are shown: `createShownUrls()` makes one holder per layer, passed first to `loadAppearanceUrls(shown, …)` and `loadFieldPictureUrls(shown, …)`, and `release()`d when the layer goes. Cancelling a load drops only the URLs it hadn't shown, so a picture that shows again before the next set arrives (an annotation an undo brings back) is never a revoked URL. A load makes its URLs side by side, not one after another.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `fitAnchoredRect(box, placement, gap, { size, view })` places anchored UI of a known size: on the side asked for when it fits, else on the opposite side when that fits or has more room, then moved to stay inside the view while its box is in view. `projectAnchoredTarget()` takes the same `fit` as an optional last argument, and every `AnchoredPosition` says which `placement` it used. The stage surface reads a tool's `touch: 'draw'` where it read `touchDirect`.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `wireSelectionClipboard(selection, { target })` takes an element as well as a document. With an element, Ctrl/Cmd+C and Edit → Copy copy only while focus is inside it, so two viewers on a page never both copy and the page keeps its own copying. Whether the browser copies a live DOM selection itself is read from the element's shadow root or document.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `createSurfaceFocusFollower()` is the rule the surface-focus hooks share: an element takes focus when its surface's `focusRequest` changes to a new value above 0, and when it starts following while a request is up (a panel whose code loads on its first open); another document's shell starts over. `moveFocusInto(container, initialFocus?)` moves focus into a container unless it's there already, and `attachFocusTrap` uses it, so a field that took the cursor as its dialog opened keeps it. `containsFocus(container)` says whether focus is inside an element, through shadow roots and from a slotted element to its slot. `bindCommandShortcuts` passes `inTextField` to `matchStroke`, so a command that runs from text fields gets its key there.
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Editors on a page no longer make iOS Safari zoom the page in when they take focus. A text field's editor (`textFieldEditorStyleOf()`) and a free text box's editor lay their text out at 16 px or more and draw it back at the page's size with a transform, so they look the same in every browser. New: `freeTextBoxOf()`, the layer's own text box (its place on the plate, its turn and its style, in place of `textPlateInPixels()`); `ownTextBoxOf()`, your own element as a text box's editor, filling its parent; `legibleScaleOf()`, `legibleShrinkOf()`, `LEGIBLE_FONT_PX` and `textFieldFontPxOf()`. `textFieldStyleOf()` takes the legible scale. `textPlateInPixels()`, `TextPlatePixels` and the `textBoxStyleOf()` export are removed.
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – Theming for the zoom tool's box: `--epdf-zoom-box-fill` and `--epdf-zoom-box-stroke`, which win over the stage's `zoomBox` setting, plus `zoomBoxPaint(colors, accent)` and `ZOOM_BOX_DASH` to draw it.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A scene paint's `hairline` draws a stroke one pixel wide at any zoom: a line, polyline or ink at width 0, as the engine and Acrobat draw it.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – `whenPresented(image, run)` runs once an `<img>` has loaded and the browser had a frame to present it, and `afterPresented(run)` runs after the next presentation opportunity; `bindPaintedImage` uses the same rule. The page layers report their page's picture on screen with it.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – `AnchorTarget` and the `ViewProjector` methods identify pages with `page: PageRef`; the structural `PageRef` type is exported.
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Add `bindPaintedImage`, a framework-neutral browser adapter for binding object-URL raster sources to image elements. It hides incomplete images, owns abort and URL-revocation cleanup, and reports painted and unpainted state around the image's presented lifetime so React, Vue, Svelte, and Angular adapters can share the same minimal lifecycle.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Annotation and form widget pictures load the same way: `loadAppearanceUrls` keys each picture by its item and state, with the version of its item it shows; `shownAppearance(urls, key, state)` picks the one an item shows, and `bakedAppearanceOf` takes the state. `loadFieldPictureUrls`, `shownFieldPicture` and `FieldPicture` are removed. `pictureOrPainting` is the one rule that picks an item's picture or its live drawing. `createFontMounts` holds the faces a layer mounted, `svgShapesOf` passes a `glyphs` node's font program on to its `text` shape, and `fontProgramsOf(shapes)` lists the faces shapes draw their text in, and `textFieldEditorStyleOf` takes the engine's layout of the text being typed (`TextEditorLayout`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Anchored placement lines up with a side's start or end (`'top-start'`, `'top-end'`, `'right-start'` and so on), takes a negative `gap` to overlap the box, and can be `pinned`: it then stays where it's put, with no flipping and no moving to stay in view. `projectAnchoredTarget` takes its options as one object (`{ placement, gap, pinned }`) and returns `null` once the box is too far out of view for the UI to reach into it; a `ViewProjector` reports its visible area with `view()`. An anchor can carry `boundsIn(view)` for a box that depends on the view, such as a note that keeps its size on screen.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Update browser interaction, page gestures, selection handles, and rich-text
+  editing for durable page references and page-space coordinates. Web helpers
+  now use the revised plugin and engine contracts across viewer surfaces.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Add `browserPrinter()`, the browser's print dialog for `createKernel({ printer })`. Where the browser's own PDF viewer prints PDFs (a desktop browser with it on), it prints the kernel's PDF copy from a hidden frame, keeping the frame until the next PDF so the browser can finish; a print the browser refuses rejects, so the kernel prints pictures instead. Everywhere else it prints pictures: one sheet per page, sized to the page with a named `@page`, from a hidden frame, or from the page itself on iOS, which prints a frame as a picture of the page around it. In Safari's engine it `needsTap`: Safari prints only from a tap (later, iOS refuses the print dialog and the Mac prints blank pages). `standardCommandsBrowser` no longer has `print`: printing goes through the kernel.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add `frameInPixels(frame, page)`, a render item's frame in the page layer's pixels with its CSS turn, its turn on screen, and the size and scale a look is drawn at, and `rasterInFrame(raster, frame)`, the raster inside its frame as CSS percentages, so it lands in place at any frame size. The same for every framework adapter.
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add a framework-independent rich-text editor binding with styled paragraph rendering, DOM serialization, selection mapping, formatting commands, and plain-text paste handling.
+
+- [#776](https://github.com/embedpdf/embed-pdf-viewer/pull/776) by [@bobsingor](https://github.com/bobsingor) – Add a shared native DOM binding for selection-handle drags that shields Stage gestures and handles pointer capture and client-delta tracking.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – A keyboard shortcut's refusal can now say `'locked'`: its command changes a setting a lock holds for the document.
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – New `copyImage(image)`: copies a picture to the clipboard as PNG, starting the write at once, so it works in a click before the picture is there (Safari copies only then). New `snapshotBoxPaint` and `SNAPSHOT_BOX_DASH`, the look of the snapshot tool's box, with the `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` variables. `standardCommandsBrowser` has `copyImage`, and its `saveFile` takes the content type.
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – `indexedDbByteStore(dbName, { storeName? })` is the browser's bytes-by-id store: one IndexedDB object store with `list`, `put`, and `delete`. It is the adapter for any plugin's DOM-free persistence port (structurally `StampLibraryStore` from `@embedpdf/plugin-stamp`), written once here so every framework binding shares it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `mountFontProgram(program)`: mount a font program under its own family, in its own weight and style, so the browser never fakes a bold or an italic. Refcounted per document: a face leaves when its last holder lets go.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – An actions adapter's page move is `goToPage(pageIndex, context)`. Follows core-geometry: `Rotation`.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `focusablesIn` and `tabbablesIn` see through a `<slot>`: the elements a web component's slot shows (its slotted children) count in their place, and the slot's own fallback content doesn't while something is slotted. So a toolbar's arrow keys reach a slotted item's first control, and a focus trap keeps slotted controls in its Tab order.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Toolbar measuring works along either axis: `createToolbarLengths()` replaces `createToolbarWidths()` and keeps each orientation's lengths apart (`report(orientation, key, length)`, `metrics(orientation, gap, separatorWidth)`), next to the new `observeHeight`, `observeContentHeight`, and `observeLength` / `observeContentLength`, which pick the side from the orientation.
+
+  Add a framework-free keyboard model. `attachRovingFocus(container, { orientation, stops })` makes a row one tab stop with arrow keys along its orientation, Home and End, passing over disabled controls, Left and Right swapped in right-to-left text, and leaving a text field or select its own keys; `attachToolbarFocus(toolbar, orientation)` does it for a toolbar whose items are marked with `TOOLBAR_ITEM_ATTRIBUTE` (each item's first focusable element is its stop). `attachMenuKeys(menu, { trigger, close })` drives an open menu: focus on its first item, arrow keys, typeahead, Enter and Space, Escape and Tab closing it with focus back on its button, and `aria-expanded` on the button. `attachFocusTrap(container)` keeps focus in a dialog or sheet and returns it on release, nesting. The pieces underneath are exported too: `focusablesIn`, `tabbablesIn`, `canTakeFocus`, `isTabbable`, `isUnavailable`, `usesKey`, `deepActiveElementOf`, `directionOf`, `rovingMoveOf`, `rovingTargetOf`, `typeaheadMatchOf`, `menuItemLabelOf` and the `Orientation` type.
+
+  `bindCommandShortcuts` takes the key of a command that's turned off or not allowed, so the browser doesn't act on it (Ctrl/Cmd+P no longer prints the page when printing isn't allowed), and reports why through the new `onRefused(commandId, refusal)` option. `ShortcutCommands.matchStroke` returns `{ commandId, refusal }`. `wireSelectionClipboard` prevents Ctrl/Cmd+C and the browser's copy of a selection the user may not copy, and calls the new `onRefused` option. Both leave keys and copies in a text field alone, inside a shadow root too.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – Export `isFromTextField(event)`, which tells a key or a copy typed in a text field (an input, a text area, a select or editable content, inside a shadow root too) from one meant for the viewer around it.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – Add `ownLengthOf(element, orientation)` and `observeOwnLength(element, orientation, onLength)`: a toolbar item's length without the room it grew into, so a toolbar fits an item that grows at its own length.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The printer ends with `destroy()`. A page projector's stage is read through `getPageBox()`, and a link anchor dispatches `{ type: 'annotation', annotation }`, as the actions plugin's triggers are.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Add `observeOutsidePress(element, onPress)`: calls `onPress` for a pointer press anywhere in the document outside `element`, read from the press's composed path so it works for an element inside a shadow root.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `svgShapesOf` draws `glyphs` nodes as SVG text with one position per character (a space, which draws nothing, left out) and puts a clipped node inside an `svg` of its clip box.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add the framework-neutral parts of the page layers, so every framework adapter shares one implementation: page boxes and quads in a layer's pixels (`rectInPixels`, `quadInPixels`, `svgPoints`, `isUprightQuad`); an annotation scene as SVG element descriptions (`svgShapesOf`, `sceneViewBox`, `ghostOpacity`); the selection chrome's paint and pixels (`annotationChromePaint`, `chromeInPixels`); the free-text editor controller (`attachTextBoxEditor`, `textBoxStyleOf`, `textPlateInPixels`); renderer behaviors and drawing ownership (`registerRendererBehaviors`, `rendererBehaviorId`, `lookRendererFor`, `annotationDrawingOf`, `lookFrameOf`); object URLs for previews and baked appearances (`objectUrlOf`, `loadObjectUrl`, `loadAppearanceUrls`); comment threads with page positions (`enrichCommentThreads`); anchor equality (`samePageBounds`, `sameSelectionAnchor`, `sameAnnotationAnchor`, `sameCreationDraftAnchor`, `sameRotationAnchor`, `sameSelectionEndpoints`); form field colors, looks, widget events and editing policies (`formColorsOf`, `textFieldStyleOf`, `listBoxStyleOf`, `bindWidgetEvents`, `pressToggle`, `createTextFieldEditor`, `createOptimisticSelection`); event isolation (`isolatePointerDown`, `isolateWheel`); link anchors (`linkHrefOf`, `navigableLinksOf`, `isModifiedClick`, `openExternalUri`); click detection (`createClickDetector`); a standalone page's projector (`clientPageProjector`); toolbar measuring (`createToolbarWidths`, `observeWidth`, `observeContentWidth`, `toolbarMeasureKey`); the default file prompt (`pickRequestedFile`); and the browser's part of the standard commands (`standardCommandsBrowser`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add the annotation, form and signature parts every framework adapter wrote for itself, so they share one implementation:
+  - Text boxes: `createTextBoxEditorFollower()` keeps an element the editor of a text box while the element, the plugin, the box and the scale change; `textBoxEditorScaleOf(item, page, lookScale)` is the pixels per point of an editor element a renderer draws itself; `editingTextKeyOf(texts, keyOf)` names the text box being typed in; `layerTextBoxesOf(texts, items, renderers, keyOf)` leaves out the text boxes a look of yours edits.
+  - `bakedAppearanceOf(urls, key)`: an annotation's loaded picture as a renderer's `appearance`.
+  - `installFilePickerProvider(annotation, provider, onRepeat)`: one file picker per document, and a call when a second install replaces the first.
+  - The form layer's styles as style records: `widgetBoxStyleOf`, `textFieldEditorStyleOf`, `listBoxControlStyleOf`, `formFocusRingStyleOf` and `FORM_CONTROL_FILL`; and `showSelectedOptions(select, values)`, a selection shown on a native `<select>`'s options.
+  - `cssText(style)`: a style record as CSS text, for a framework whose `style` is a string.
+
+  `CssFont`, `FieldTextStyle`, `TextFieldStyle` and `ListBoxStyle` are type aliases now, so they fit a style type with an index signature for custom properties (Vue's `CSSProperties`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add what every framework's page surfaces share:
+  - `makePageContext`, `livePageContext`, `pageClientSpace` and the `PageContext` type: the page context a Stage page or a page view hands its layers, and its client-space conversions.
+  - `pageSurfaceLayout(transform, frame, footprint?)`: a page surface's outer, shadow and turned content boxes. `stagePageDemand(stage, page, deviceWidth)`: what a Stage page's view wants rendered. `pageViewTransformInput(page, width, dpr)`: a page view's transform input, with 100% at 96/72 CSS pixels per point times the page's /UserUnit.
+  - `stageViewProjector(() => stage)`: the Stage's projector for anchored UI. `clientPageProjector` also takes a page whose `transform` is a function (a signal).
+  - `attachPagePointer(element, hub, page)` and `createClickCounter()`: a page's pointer listener for the interaction plugin.
+  - `scrollbarLayout(...)` and `createScrollbarPresses(onDragging)`: a Stage scrollbar's thumb geometry, drags, and track paging.
+  - `toolCursorsOf(cursors)` with the `ToolCursorImage` and `ToolCursorSpec` types: a tool's cursors as CSS cursor values.
+  - `anchoredViewOf`, `sameAnchoredFit` and `observeAnchoredFit`: measuring anchored UI and the area it stays inside.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add the search and link layers' parts every framework adapter wrote for itself: `searchHighlightsOf(hits, options)` (each line of each match as a box or a polygon, in the active or the plain color); `linkAnchorOf(link, page, labelOf)` (a link's box, `href` and label); `linkActivateContextOf(link, page, stage)`, `sendLinkEvent(actions, link, page, event)` and `hoverLink(pump, link, page)` (what a link's anchor tells the link and actions plugins). `copySelection(selection)` takes anything with `readText()`.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – A PDF link without a scheme no longer opens relative to the page around the viewer. An address starting with `//` or `www.` opens on https; any other, such as `/admin` or `page2.html`, is relative to the document and opens nothing (it used to open that path on the app's own site).
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – The rich text editor reads a hard line break, however the browser spells it, as `\n`, and its offsets count paragraphs joined by `\n`, matching the rich text the engine returns.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – New `isolatePointerDown(element, onPress)`: a press inside a control (a link, a form field) stops there instead of reaching the Stage below, and `onPress` takes it for the control. A framework that dispatches from its root, as React does, sees the press only after the Stage has, so its control takes the press here.
+
+- [#962](https://github.com/embedpdf/embed-pdf-viewer/pull/962) by [@bobsingor](https://github.com/bobsingor) – `createSurfaceFocusFollower()` puts the cursor in its element without scrolling. A panel that takes focus as it opens, such as Find, no longer shifts the page around the viewer sideways when the viewer sits in a box that can scroll, such as one with `overflow: hidden` and content off to one side.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The file dialog (`pickFile`, `pickImageFile`, `pickRequestedFile`) keeps the file the user picks. It took the window getting its focus back for a closed dialog and, 300 ms later, answered "no file", so a pick that came later than that (a file in iCloud Drive or on a network drive, an app's embedded browser) was dropped: the viewer's Open, the image tool and file attachments did nothing. It now goes by the dialog's own `change` and `cancel` events, which every supported browser fires.
+
+- [#938](https://github.com/embedpdf/embed-pdf-viewer/pull/938) by [@bobsingor](https://github.com/bobsingor) – `attachFocusTrap` leaves focus where your code moved it as the trap is released: focus that lands
+  outside comes back a microtask later, unless the trap is released by then, and the release gives
+  focus back to where it was only from inside the trap or from nowhere. A click that closes a dialog
+  and puts the cursor in a field keeps it there.
+
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – An actions adapter's page move is `goToPage(pageIndex, context)`. Follows core-geometry: `Rotation`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The printer ends with `destroy()`. A page projector's stage is read through `getPageBox()`, and a link anchor dispatches `{ type: 'annotation', annotation }`, as the actions plugin's triggers are.
+
+### Patch Changes
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – The rich text editor reads a hard line break, however the browser spells it, as `\n`, and its offsets count paragraphs joined by `\n`, matching the rich text the engine returns.
+
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#975](https://github.com/embedpdf/embed-pdf-viewer/pull/975) by [@bobsingor](https://github.com/bobsingor) – The rich text editor keeps up with fast typing: an update that brings back text the editor already reported is late, not a change, so it no longer undoes the keystrokes typed after it. `RichTextEditorHost.onInput` may return the document the host keeps (text typed at the caret in a style chosen there), which the editor shows at once, and `TextBoxEditorAnnotation.draftRichText` returns it. A format shortcut reports the selection as it is before the command runs, and the caret is reported once an input method composition ends instead of while it moves through it.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A scene paint's `hairline` draws a stroke one pixel wide at any zoom: a line, polyline or ink at width 0, as the engine and Acrobat draw it.
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – New `copyImage(image)`: copies a picture to the clipboard as PNG, starting the write at once, so it works in a click before the picture is there (Safari copies only then). New `snapshotBoxPaint` and `SNAPSHOT_BOX_DASH`, the look of the snapshot tool's box, with the `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` variables. `standardCommandsBrowser` has `copyImage`, and its `saveFile` takes the content type.
+
+## 3.0.0-next.21
+
+### Patch Changes
+
+- [#962](https://github.com/embedpdf/embed-pdf-viewer/pull/962) by [@bobsingor](https://github.com/bobsingor) – `createSurfaceFocusFollower()` puts the cursor in its element without scrolling. A panel that takes focus as it opens, such as Find, no longer shifts the page around the viewer sideways when the viewer sits in a box that can scroll, such as one with `overflow: hidden` and content off to one side.
+
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The rich text editor draws each run in its whole face (`RichTextEditorFace`: family, weight and italic over the body's), so a bold run draws in the bold program instead of a faked bold. `RichTextEditorHost.cssFontFamily(face)` takes the face, `RichTextEditorProps.body` the box's body face, and `familyOfCss` reads back a family for a span the browser made itself. A drawn span keeps its run's family as data (`data-family`), so a program's CSS family never reads back as a family. `restyleFaces()` draws the spans again when the fonts change, without touching the text or the caret. `TextBoxEditorItem.face` is the box's body face. Text box and text field editors draw with `font-synthesis: none`.
+
+  Add `browserTextMeasurer()`, the browser's text measuring for the kernel (`createKernel({ measurer: browserTextMeasurer() })`): canvas `measureText` in a font program, mounted the first time it's asked about. A program the browser refuses is never ready, and the measurer says it's refused. `mountFontProgram` rejects when the browser refuses a font, instead of resolving with nothing mounted.
+
+  `svgShapesOf` draws a `textRun` scene node as one `<text>` at its left edge, shaped by the browser in its direction (`unicode-bidi: bidi-override`; a right-to-left run anchored by its end), with its spaces kept (`white-space: pre`) and kerning and ligatures off for a plain run. `SvgShape.style` replaces `blend`: the CSS a shape needs that has no attribute, `mix-blend-mode` among it; `styleText(style)` writes it as one attribute.
+
+  A text field's editor reads its line in the engine's direction (`direction` from the layout's `rtl`): text that starts in Hebrew or Arabic is ordered right to left as the engine orders it, and typing at the end of a right-to-left word continues it. The field's alignment is unchanged.
+
+  `svgShapesOf` draws a `textRun` that joins its neighbours (`joinsPrevious`, `joinsNext`) with a joiner (U+200D) on each side it joins, embedded rather than overridden (`unicode-bidi: embed`; Firefox ignores a joiner at the edge of an overridden run), so an Arabic letter in a comb's cell takes its joined form, as the engine draws it.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – One way to mount fonts: by program (`mountFontProgram`, `createFontMounts`). `mountWebFont`, `webFontFamily` and `fontKeyOfWebFamily` are gone, and so is `cssFontOf`: `textFieldStyleOf` names no font (the editor's layout does), and `listBoxStyleOf` and `listBoxControlStyleOf` take the widget's font as the form plugin gives it. The free text line model keeps the engine's metrics for the standard families by the family a CSS family stands for (`lineModelFor` and `firstLineShiftFor` take `familyOf`, `FamilyOfCss`; the rich text editor passes its host's `familyOfCss`); `styleDeltaOf` reads a family back as it is by default. A `text` scene node's `program` is mounted like a `textRun`'s.
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – The Stage keeps the pages where it put them when the browser scrolls inside it: a field reached with Tab, an element your code calls `focus()` or `scrollIntoView()` on, or the cursor at the edge of a text box now moves the Stage's view that far, instead of shifting the pages under it so the top of the document could no longer be reached. `bindFieldFocus()` binds a form field's box to the form's cursor: `focus()` and `focusNext()` put the cursor in its control, Tab and Shift+Tab go through the form in the document's order, and the arrow keys move between a radio group's buttons.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – `whenPresented(image, run)` runs once an `<img>` has loaded and the browser had a frame to present it, and `afterPresented(run)` runs after the next presentation opportunity; `bindPaintedImage` uses the same rule. The page layers report their page's picture on screen with it.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – A keyboard shortcut's refusal can now say `'locked'`: its command changes a setting a lock holds for the document.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – Add `ownLengthOf(element, orientation)` and `observeOwnLength(element, orientation, onLength)`: a toolbar item's length without the room it grew into, so a toolbar fits an item that grows at its own length.
+
+### Patch Changes
+
+- [#938](https://github.com/embedpdf/embed-pdf-viewer/pull/938) by [@bobsingor](https://github.com/bobsingor) – `attachFocusTrap` leaves focus where your code moved it as the trap is released: focus that lands
+  outside comes back a microtask later, unless the trap is released by then, and the release gives
+  focus back to where it was only from inside the trap or from nowhere. A click that closes a dialog
+  and puts the cursor in a field keeps it there.
+
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – Theming for the zoom tool's box: `--epdf-zoom-box-fill` and `--epdf-zoom-box-stroke`, which win over the stage's `zoomBox` setting, plus `zoomBoxPaint(colors, accent)` and `ZOOM_BOX_DASH` to draw it.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – Export `isFromTextField(event)`, which tells a key or a copy typed in a text field (an input, a text area, a select or editable content, inside a shadow root too) from one meant for the viewer around it.
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Editors on a page no longer make iOS Safari zoom the page in when they take focus. A text field's editor (`textFieldEditorStyleOf()`) and a free text box's editor lay their text out at 16 px or more and draw it back at the page's size with a transform, so they look the same in every browser. New: `freeTextBoxOf()`, the layer's own text box (its place on the plate, its turn and its style, in place of `textPlateInPixels()`); `ownTextBoxOf()`, your own element as a text box's editor, filling its parent; `legibleScaleOf()`, `legibleShrinkOf()`, `LEGIBLE_FONT_PX` and `textFieldFontPxOf()`. `textFieldStyleOf()` takes the legible scale. `textPlateInPixels()`, `TextPlatePixels` and the `textBoxStyleOf()` export are removed.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Add `browserPrinter()`, the browser's print dialog for `createKernel({ printer })`. Where the browser's own PDF viewer prints PDFs (a desktop browser with it on), it prints the kernel's PDF copy from a hidden frame, keeping the frame until the next PDF so the browser can finish; a print the browser refuses rejects, so the kernel prints pictures instead. Everywhere else it prints pictures: one sheet per page, sized to the page with a named `@page`, from a hidden frame, or from the page itself on iOS, which prints a frame as a picture of the page around it. In Safari's engine it `needsTap`: Safari prints only from a tap (later, iOS refuses the print dialog and the Mac prints blank pages). `standardCommandsBrowser` no longer has `print`: printing goes through the kernel.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

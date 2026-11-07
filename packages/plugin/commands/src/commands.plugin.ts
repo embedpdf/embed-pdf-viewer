@@ -13,7 +13,7 @@ import { CommandsToken } from './host-contract';
  * functions. `config` is the settings the app registers, over
  * {@link COMMANDS_DEFAULTS}.
  */
-export const commandsPlugin = (config?: CommandsConfig) =>
+export const commandsPlugin = <AppState = any>(config?: CommandsConfig<AppState>) =>
   definePlugin({
     id: 'commands',
     scope: 'workspace',
@@ -24,7 +24,12 @@ export const commandsPlugin = (config?: CommandsConfig) =>
     optional: [I18nToken, ShellToken],
     // Command definitions come from the app and may use any capability.
     resolvesAnyCapability: true,
-    settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+    // Your app's state is replaced whole, never merged: a new value is the whole new state.
+    settings: {
+      defaults: COMMANDS_DEFAULTS,
+      registered: config as CommandsConfig | undefined,
+      whole: ['appState'],
+    },
     create: createCommandsController,
     // Inside a document's scope, a call that leaves out the document is for that one.
     inScope: (commands, documentId) => ({

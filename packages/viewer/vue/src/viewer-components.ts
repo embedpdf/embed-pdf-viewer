@@ -1,9 +1,10 @@
 /**
- * The viewer's own components, for yours: `Button`, `Menu` and `MenuItem`
- * render the viewer's `<epdf-button>`, `<epdf-menu>` and `<epdf-menu-item>`
- * elements, which the viewer draws like its own toolbar buttons and menus.
- * Use them inside the viewer: in a `ToolbarItem`, a `Panel` or a `Region`.
- * The elements come with the viewer, so this module imports nothing from it.
+ * The viewer's own components, for yours: `Button`, `Menu`, `MenuItem` and
+ * `Icon` render the viewer's `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`
+ * and `<epdf-icon>` elements, which the viewer draws like its own toolbar
+ * buttons, menus and icons. Use them inside the viewer: in a `ToolbarItem`, a
+ * `Panel` or a `Region`. The elements come with the viewer, so this module
+ * imports nothing from it.
  */
 import { defineComponent, h, type SlotsType, type VNode } from 'vue';
 
@@ -23,7 +24,15 @@ export interface ButtonProps {
   icon?: string;
   /** The name of a button of your own, for its tooltip and screen readers. */
   label?: string;
+  /** Shown pressed, as a command's button is while its command is active. */
+  active?: boolean;
 }
+
+/**
+ * `active` as the elements read it: there or not. The prop is a `Boolean`, so `<Button active>`
+ * is `true`; `null` takes the attribute away, set as the element's property or as the attribute.
+ */
+const activeOf = (active: boolean | undefined): true | null => (active ? true : null);
 
 /** A toolbar button, the viewer's own. `@click` for a button of your own. */
 export const Button = defineComponent<ButtonProps, { click: (event: MouseEvent) => true }>(
@@ -31,9 +40,14 @@ export const Button = defineComponent<ButtonProps, { click: (event: MouseEvent) 
     () =>
       h('epdf-button', {
         ...given({ command: props.command, icon: props.icon, label: props.label }),
+        active: activeOf(props.active),
         onClick: (event: MouseEvent) => emit('click', event),
       }),
-  { name: 'Button', props: ['command', 'icon', 'label'], emits: ['click'] },
+  {
+    name: 'Button',
+    props: { command: String, icon: String, label: String, active: Boolean },
+    emits: ['click'],
+  },
 );
 
 export interface MenuProps {
@@ -63,6 +77,8 @@ export interface MenuItemProps {
   command?: string;
   /** An icon by name, the viewer's or yours. */
   icon?: string;
+  /** Shown checked, as a command's row is while its command is active. */
+  active?: boolean;
 }
 
 /** A row in a `Menu`, with its text in its slot. `@select` when the row is picked. */
@@ -77,8 +93,35 @@ export const MenuItem = defineComponent<
       h(
         'epdf-menu-item',
         // The element's own `select` event, which Vue listens to as it would a native one.
-        { ...given({ command: props.command, icon: props.icon }), onSelect: () => emit('select') },
+        {
+          ...given({ command: props.command, icon: props.icon }),
+          active: activeOf(props.active),
+          onSelect: () => emit('select'),
+        },
         slots.default?.(),
       ),
-  { name: 'MenuItem', props: ['command', 'icon'], emits: ['select'] },
+  {
+    name: 'MenuItem',
+    props: { command: String, icon: String, active: Boolean },
+    emits: ['select'],
+  },
+);
+
+export interface IconProps {
+  /** The icon, by name: the viewer's or one of yours (`icons`). */
+  name: string;
+  /** Its width and height in px. Default `20`, a toolbar button's icon. */
+  size?: number;
+  /** What it shows, for screen readers; without one, they skip it. */
+  label?: string;
+}
+
+/** One of the viewer's icons, or yours, in the color of the text around it. */
+export const Icon = defineComponent(
+  (props: IconProps) => () =>
+    h('epdf-icon', {
+      ...given({ name: props.name, label: props.label }),
+      size: props.size ?? null,
+    }),
+  { name: 'Icon', props: { name: { type: String, required: true }, size: Number, label: String } },
 );

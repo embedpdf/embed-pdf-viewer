@@ -5,7 +5,11 @@ import type { TextRange } from '../text/TextRange';
  * to both the page text and the needle so that "Café" finds "cafe" and a
  * line-wrapped "hello\n  world" finds "hello world".
  *
- * Fold version 1:
+ * Fold version 2:
+ *   - invisible characters are ignored, so a match runs straight across
+ *     them: format characters (soft hyphen, zero-width space and joiners,
+ *     bidi marks, `U+FEFF`), control codes other than whitespace, and
+ *     noncharacters,
  *   - whitespace runs collapse to a single space (any `\s`, including the
  *     spaces some compatibility decompositions emit) — or are dropped
  *     entirely with `dropWhitespace` (ignoreWhitespace),
@@ -25,8 +29,11 @@ import type { TextRange } from '../text/TextRange';
  * rebuilt instead of silently mismatching fresh needles.
  */
 
-/** Version stamp for persisted pre-folded corpus artifacts. */
-export const SEARCH_FOLD_VERSION = 1;
+/**
+ * The fold's version: stamps persisted pre-folded corpora, and a server's
+ * engine value for search changes with it, so cached searches run again.
+ */
+export const SEARCH_FOLD_VERSION = 2;
 
 export interface FoldOptions {
   /** Preserve case (matchCase). */
@@ -46,6 +53,9 @@ export interface FoldedText {
 
 const WHITESPACE = /\s/;
 const MARKS = /\p{M}/gu;
+// Invisible in print and meaningless to a reader. Tab and line breaks are
+// whitespace instead.
+const IGNORABLE = /^(?![\t\n\v\f\r])[\p{Cf}\p{Cc}\p{Noncharacter_Code_Point}]$/u;
 
 export function foldText(original: string, options: FoldOptions = {}): FoldedText {
   const units: string[] = [];
@@ -54,6 +64,11 @@ export function foldText(original: string, options: FoldOptions = {}): FoldedTex
 
   let index = 0;
   for (const cp of original) {
+    // Before the whitespace test: JavaScript's `\s` includes `U+FEFF`.
+    if (IGNORABLE.test(cp)) {
+      index += cp.length;
+      continue;
+    }
     let piece: string;
     if (WHITESPACE.test(cp)) {
       piece = ' ';

@@ -173,10 +173,10 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document.state).toBe('ready');
-    expect(body.document.baseSha).toBe(PDF_SHA);
-    expect(body.document.storageSizeBytes).toBe(PDF.byteLength);
+    expect(body.document.baseSha256).toBe(PDF_SHA);
+    expect(body.document.sizeBytes).toBe(PDF.byteLength);
 
     const dl = await fx.bundle.app.inject({
       method: 'GET',
@@ -244,10 +244,10 @@ describe('documents.importFrom E2E', () => {
     });
     expect(retry.statusCode, retry.body).toBe(200);
     const body = JSON.parse(retry.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document.id).toBe('imp-flaky');
     expect(body.document.state).toBe('ready');
-    expect(body.document.baseSha).toBe(PDF_SHA);
+    expect(body.document.baseSha256).toBe(PDF_SHA);
   });
 
   test('replaying a completed import with the same idempotency key dedupes without a transfer', async () => {
@@ -258,7 +258,7 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('deduped');
+    expect(body.status).toBe('deduped');
     expect(body.document.id).toBe('imp-flaky');
     expect(hits.filter((u) => u.startsWith('/flaky')).length).toBe(before);
   });
@@ -272,8 +272,8 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('deduped');
-    expect(body.document.baseSha).toBe(PDF_SHA);
+    expect(body.status).toBe('deduped');
+    expect(body.document.baseSha256).toBe(PDF_SHA);
     expect(hits.filter((u) => u.startsWith('/ok')).length).toBe(before);
   });
 
@@ -411,9 +411,9 @@ describe('documents.importFrom connection sources E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document['state']).toBe('ready');
-    expect(body.document['baseSha']).toBe(PDF_SHA);
+    expect(body.document['baseSha256']).toBe(PDF_SHA);
 
     const row = await provenance('imp-conn-happy');
     expect(row).toMatchObject({
@@ -487,7 +487,7 @@ describe('documents.importFrom connection sources E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(202);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('accepted');
+    expect(body.status).toBe('accepted');
     expect(body.document['state']).toBe('pending');
 
     await vi.waitFor(
@@ -499,7 +499,7 @@ describe('documents.importFrom connection sources E2E', () => {
         });
         const doc = (JSON.parse(poll.body) as { document: Record<string, unknown> }).document;
         expect(doc['state']).toBe('ready');
-        expect(doc['baseSha']).toBe(PDF_SHA);
+        expect(doc['baseSha256']).toBe(PDF_SHA);
       },
       { timeout: 8000, interval: 100 },
     );
@@ -567,9 +567,9 @@ describe('documents.importFrom fs connection E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document['state']).toBe('ready');
-    expect(body.document['baseSha']).toBe(PDF_SHA);
+    expect(body.document['baseSha256']).toBe(PDF_SHA);
 
     const row = await fx.db
       .selectFrom('document_imports')
@@ -598,7 +598,12 @@ describe('documents.importFrom fs connection E2E', () => {
 
   test('a revision on an fs connection is refused with the sha256 hint', async () => {
     const res = await importVia(ROOT_API_TOKEN, {
-      source: { kind: 'connection', connectionId: 'local-drop', key: 'inbox/scan-001.pdf', revision: 'v1' },
+      source: {
+        kind: 'connection',
+        connectionId: 'local-drop',
+        key: 'inbox/scan-001.pdf',
+        revision: 'v1',
+      },
     });
     expect(res.statusCode, res.body).toBe(400);
     expect(res.body).toContain('expected.sha256');

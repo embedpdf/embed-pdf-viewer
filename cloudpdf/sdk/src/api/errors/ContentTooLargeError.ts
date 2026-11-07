@@ -5,9 +5,9 @@ import * as errors from "../../errors/index.js";
 import type * as CloudPDF from "../index.js";
 
 export class ContentTooLargeError extends errors.CloudPDFError {
-    public declare readonly body: CloudPDF.DocChanges413Response;
+    public declare readonly body: CloudPDF.ErrorResponse;
 
-    constructor(body: CloudPDF.DocChanges413Response, rawResponse?: core.RawResponse) {
+    constructor(body: CloudPDF.ErrorResponse, rawResponse?: core.RawResponse) {
         super({
             message: "ContentTooLargeError",
             statusCode: 413,

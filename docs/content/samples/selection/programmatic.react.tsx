@@ -17,14 +17,17 @@ import './programmatic.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-// On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 10, count: 52 };
+// On the cover: the characters of its first word, "Documents", and a point on its word "web",
+// in page coordinates.
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 const POINT = { x: 260, y: 242 };
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -34,9 +37,9 @@ function SelectionToolbar() {
   const { hasSelection, range, pages } = useSelectionState();
   const cover = usePageList()[0]?.ref;
 
-  // The title is selected on load.
+  // The first word is selected on load.
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   }, [selection, cover]);
 
   const canSelect = selection.canSelect();
@@ -50,9 +53,9 @@ function SelectionToolbar() {
         type="button"
         className="button"
         disabled={!canSelect || !cover}
-        onClick={() => cover && selection.select({ page: cover, ...TITLE })}
+        onClick={() => cover && selection.select({ page: cover, ...FIRST_WORD })}
       >
-        Title
+        Characters
       </button>
       <button
         type="button"
@@ -101,7 +104,7 @@ function SelectionToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectionToolbar />
         <Stage className="stage">

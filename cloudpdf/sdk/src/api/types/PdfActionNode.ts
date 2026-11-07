@@ -2,6 +2,9 @@
 
 import type * as CloudPDF from "../index.js";
 
+/**
+ * An action, by its `type`. A newer server can add types: read one your client doesn't know as `unknown`, keeping its `subtype` and `next`.
+ */
 export type PdfActionNode =
     | CloudPDF.PdfActionNode.Javascript
     | CloudPDF.PdfActionNode.Goto
@@ -108,40 +111,33 @@ export namespace PdfActionNode {
         export interface Payload {
             url: string;
             fields: CloudPDF.PdfActionTargetRef[] | null;
-            flags: Payload.Flags;
+            exclude: boolean;
+            includeNoValueFields: boolean;
+            format: Payload.Format;
+            method: Payload.Method;
+            submitCoordinates: boolean;
+            includeAppendSaves: boolean;
+            includeAnnotations: boolean;
+            canonicalFormat: boolean;
+            exclNonUserAnnots: boolean;
+            exclFKey: boolean;
+            embedForm: boolean;
             charSet?: string | undefined;
         }
 
         export namespace Payload {
-            export interface Flags {
-                raw: number;
-                exclude: boolean;
-                includeNoValueFields: boolean;
-                format: Flags.Format;
-                method: Flags.Method;
-                submitCoordinates: boolean;
-                includeAppendSaves: boolean;
-                includeAnnotations: boolean;
-                canonicalFormat: boolean;
-                exclNonUserAnnots: boolean;
-                exclFKey: boolean;
-                embedForm: boolean;
-            }
-
-            export namespace Flags {
-                export const Format = {
-                    Fdf: "fdf",
-                    Html: "html",
-                    Xfdf: "xfdf",
-                    Pdf: "pdf",
-                } as const;
-                export type Format = (typeof Format)[keyof typeof Format];
-                export const Method = {
-                    Post: "post",
-                    Get: "get",
-                } as const;
-                export type Method = (typeof Method)[keyof typeof Method];
-            }
+            export const Format = {
+                Fdf: "fdf",
+                Html: "html",
+                Xfdf: "xfdf",
+                Pdf: "pdf",
+            } as const;
+            export type Format = (typeof Format)[keyof typeof Format];
+            export const Method = {
+                Post: "post",
+                Get: "get",
+            } as const;
+            export type Method = (typeof Method)[keyof typeof Method];
         }
     }
 

@@ -20,8 +20,9 @@ export interface PDFViewerExtras {
   /** The `<embedpdf-viewer>` element, for its imperative surface: `bind:element`. */
   element?: EmbedPdfViewerElement | null;
   /**
-   * Called with the `viewer` once it's live, before any document has opened: capabilities
-   * resolve from then on, and document-scoped calls wait for their document.
+   * Called with the `viewer` once it's live, before any document has opened: the viewer's own
+   * plugins (`documents`, `commands`) are there from then on, a document's plugins once it has
+   * opened (`documents.onOpened`; `watch()` waits for them).
    */
   onready?: (viewer: Viewer) => void;
   /**

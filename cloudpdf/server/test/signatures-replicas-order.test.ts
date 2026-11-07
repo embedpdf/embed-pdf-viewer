@@ -184,11 +184,11 @@ test('B publishes first; A (the preparer) replays and then reads the published v
     ['a', a],
     ['b', b],
   ] as const) {
-    const manifest = await json<{ baseSha: string; layerVersion: number; working: boolean }>(
+    const manifest = await json<{ baseSha256: string; layerVersion: number; working: boolean }>(
       await call(r, 'GET', `${layer}/manifest`, 'alice'),
     );
     expect(manifest, name).toMatchObject({
-      baseSha: first.version.sha256,
+      baseSha256: first.version.sha256,
       layerVersion: 3,
       working: false,
     });

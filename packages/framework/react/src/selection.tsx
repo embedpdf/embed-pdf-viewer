@@ -28,7 +28,7 @@ import {
   SelectionToken,
   armSelectionHandle,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
   selectionState,
   type SelectionHandleEndpoints,
@@ -140,7 +140,7 @@ export function useSelectionEvent<T>(
  */
 export const useSelectionState = stateHook(selectionState);
 
-/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. Takes a selector. */
+/** The selection settings (`dragThresholdPx`, `color`, `handles`), with or without a document. Takes a selector. */
 export const useSelectionSettings = settingsHook(SelectionToken);
 
 export interface SelectionMenuProps {
@@ -291,7 +291,7 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   const shadow = paint('text-selection-handle-shadow', handles.shadow);
 
   const renderHandle = (role: 'start' | 'end') => {
-    const geometry = selectionHandleGeom(view, endpoints[role], role);
+    const geometry = selectionHandleGeometry(view, endpoints[role], role);
     if (!geometry) return null; // endpoint page not laid out right now
     // The shell is laid out upright in its own frame — bar of the edge's
     // length, head stacked above (start) or below (end) — then rotated onto
@@ -361,8 +361,10 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   );
 }
 
-export interface SelectionClipboardProps
-  extends Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'> {
+export interface SelectionClipboardProps extends Pick<
+  SelectionClipboardOptions,
+  'prefetch' | 'onRefused'
+> {
   /**
    * Copy only while focus is inside this element, for a page with more than one viewer.
    * Default: anywhere on the page.

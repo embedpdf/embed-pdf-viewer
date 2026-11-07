@@ -4,7 +4,7 @@
  */
 import type { PluginClock, PluginContext } from '@embedpdf/core';
 
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { createEvents, type StageEvents } from './events';
 import { createPlacementLatch, type PlacementLatch } from './placement-latch';
 import { createScene, type StageScene } from './scene';
@@ -17,7 +17,7 @@ export interface StageServices {
   readonly scene: StageScene;
 }
 
-export function createServices(ctx: PluginContext<StageState>): StageServices {
+export function createServices(ctx: PluginContext<StageModel>): StageServices {
   return {
     events: createEvents(ctx),
     clock: ctx.clock,

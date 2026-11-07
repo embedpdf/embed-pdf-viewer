@@ -66,6 +66,42 @@ import down033 from './033_change_outcomes.down.sql';
 import sql033 from './033_change_outcomes.sql';
 import down034 from './034_forms_version.down.sql';
 import sql034 from './034_forms_version.sql';
+import down035 from './035_outline_version.down.sql';
+import sql035 from './035_outline_version.sql';
+import down036 from './036_object_numbers_by_layer_name.down.sql';
+import sql036 from './036_object_numbers_by_layer_name.sql';
+import down037 from './037_layer_tombstones.down.sql';
+import sql037 from './037_layer_tombstones.sql';
+import down038 from './038_visitor_layers.down.sql';
+import sql038 from './038_visitor_layers.sql';
+import down039 from './039_visitor_layer_deletion_opt_in.down.sql';
+import sql039 from './039_visitor_layer_deletion_opt_in.sql';
+import down040 from './040_layers_list_index.down.sql';
+import sql040 from './040_layers_list_index.sql';
+import down041 from './041_share_grants_archived.down.sql';
+import sql041 from './041_share_grants_archived.sql';
+import down042 from './042_share_visitors.down.sql';
+import sql042 from './042_share_visitors.sql';
+import down043 from './043_share_grants_identity.down.sql';
+import sql043 from './043_share_grants_identity.sql';
+import down044 from './044_versions_by_layer.down.sql';
+import sql044 from './044_versions_by_layer.sql';
+import down045 from './045_document_names.down.sql';
+import sql045 from './045_document_names.sql';
+import down046 from './046_folders.down.sql';
+import sql046 from './046_folders.sql';
+import down047 from './047_grants.down.sql';
+import sql047 from './047_grants.sql';
+import down048 from './048_upload_tokens.down.sql';
+import sql048 from './048_upload_tokens.sql';
+import down049 from './049_fonts_version.down.sql';
+import sql049 from './049_fonts_version.sql';
+import down050 from './050_tenant_features.down.sql';
+import sql050 from './050_tenant_features.sql';
+import down051 from './051_tenant_usage_days.down.sql';
+import sql051 from './051_tenant_usage_days.sql';
+import down052 from './052_contents_version.down.sql';
+import sql052 from './052_contents_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -133,5 +169,113 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '034_forms_version.sql',
     sql: sql034,
     down: down034,
+  },
+  {
+    version: '035',
+    name: '035_outline_version.sql',
+    sql: sql035,
+    down: down035,
+  },
+  {
+    version: '036',
+    name: '036_object_numbers_by_layer_name.sql',
+    sql: sql036,
+    down: down036,
+  },
+  {
+    version: '037',
+    name: '037_layer_tombstones.sql',
+    sql: sql037,
+    down: down037,
+  },
+  {
+    version: '038',
+    name: '038_visitor_layers.sql',
+    sql: sql038,
+    down: down038,
+  },
+  {
+    version: '039',
+    name: '039_visitor_layer_deletion_opt_in.sql',
+    sql: sql039,
+    down: down039,
+  },
+  {
+    version: '040',
+    name: '040_layers_list_index.sql',
+    sql: sql040,
+    down: down040,
+  },
+  {
+    version: '041',
+    name: '041_share_grants_archived.sql',
+    sql: sql041,
+    down: down041,
+  },
+  {
+    version: '042',
+    name: '042_share_visitors.sql',
+    sql: sql042,
+    down: down042,
+  },
+  {
+    version: '043',
+    name: '043_share_grants_identity.sql',
+    sql: sql043,
+    down: down043,
+  },
+  {
+    version: '044',
+    name: '044_versions_by_layer.sql',
+    sql: sql044,
+    down: down044,
+  },
+  {
+    version: '045',
+    name: '045_document_names.sql',
+    sql: sql045,
+    down: down045,
+  },
+  {
+    version: '046',
+    name: '046_folders.sql',
+    sql: sql046,
+    down: down046,
+  },
+  {
+    version: '047',
+    name: '047_grants.sql',
+    sql: sql047,
+    down: down047,
+  },
+  {
+    version: '048',
+    name: '048_upload_tokens.sql',
+    sql: sql048,
+    down: down048,
+  },
+  {
+    version: '049',
+    name: '049_fonts_version.sql',
+    sql: sql049,
+    down: down049,
+  },
+  {
+    version: '050',
+    name: '050_tenant_features.sql',
+    sql: sql050,
+    down: down050,
+  },
+  {
+    version: '051',
+    name: '051_tenant_usage_days.sql',
+    sql: sql051,
+    down: down051,
+  },
+  {
+    version: '052',
+    name: '052_contents_version.sql',
+    sql: sql052,
+    down: down052,
   },
 ];

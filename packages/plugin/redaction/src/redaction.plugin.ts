@@ -5,7 +5,7 @@ import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 
 import { REDACTION_DEFAULTS, RedactionToken, type RedactionConfig } from './contract';
 import { createRedactionController } from './controller';
-import { initialRedactionState } from './model';
+import { initialRedactionModel } from './model';
 
 /**
  * Document-scoped redaction plugin: the destructive half of the two-stage
@@ -25,7 +25,7 @@ export const redactionPlugin = (config?: RedactionConfig) =>
     scope: 'document',
     requires: [AnnotationToken],
     optional: [SelectionToken, SearchToken],
-    state: initialRedactionState,
+    state: initialRedactionModel,
     settings: { defaults: REDACTION_DEFAULTS, registered: config },
     create: createRedactionController,
   });

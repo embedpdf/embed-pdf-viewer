@@ -2,6 +2,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { OutlineItemRef } from '../identity/OutlineItemRef';
 import type { PageRef } from '../identity/PageRef';
 
 /**
@@ -12,8 +13,9 @@ import type { PageRef } from '../identity/PageRef';
  *
  * Each list is in its own order: a document's pages in display order; a
  * page's annotations, and its widgets, each in paint order, later over
- * earlier. Widgets always paint above annotations, so the two are separate
- * lists and a position names a neighbour of the same kind.
+ * earlier; an outline item's children in reading order. Widgets always paint
+ * above annotations, so the two are separate lists and a position names a
+ * neighbour of the same kind.
  */
 export type ListPosition<Ref> =
   | { readonly before: Ref }
@@ -29,6 +31,13 @@ export type AnnotationPosition = ListPosition<AnnotationRef>;
 
 /** Where fields go in the form's calculation order. */
 export type FieldPosition = ListPosition<FormFieldRef>;
+
+/**
+ * Where outline items go among one parent's children: the parent is named
+ * beside the position (an op's `parent`), so `'start'` and `'end'` mean that
+ * parent's, and a neighbour must be one of its children.
+ */
+export type OutlinePosition = ListPosition<OutlineItemRef>;
 
 /** The neighbour a position names, or `null` for `'start'` and `'end'`. */
 export function anchorOf<Ref>(position: ListPosition<Ref>): Ref | null {

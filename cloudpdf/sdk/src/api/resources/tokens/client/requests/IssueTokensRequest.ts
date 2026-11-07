@@ -11,7 +11,7 @@ import type * as CloudPDF from "../../../../index.js";
  *             sub: "sub",
  *             docId: "docId",
  *             scope: ["scope"],
- *             expiresIn: 1
+ *             expiresInSeconds: 1
  *         }
  *     }
  */

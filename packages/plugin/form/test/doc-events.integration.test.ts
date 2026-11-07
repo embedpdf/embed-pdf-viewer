@@ -165,7 +165,7 @@ describe('document lifecycle actions (WS/DS/WP/DP/WC) on a real document', () =>
       openSequence: 'off',
       scope: ['doc.open', 'doc.render', 'doc.forms.read', 'doc.annotate.read'],
     });
-    const result = await harness.actions.dispatch({ scope: 'document', event: 'will-save' });
+    const result = await harness.actions.dispatch({ type: 'document', event: 'will-save' });
     expect(result.status).not.toBe('executed'); // the script's commit failed
     await harness.form.refresh();
     expect(harness.valueOf('eventLog')).toBe(''); // byte-stable

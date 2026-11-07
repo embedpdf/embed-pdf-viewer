@@ -19,10 +19,10 @@ export const initialSession: Session = {
   editing: null,
   snap: {
     alignment: true,
-    alignmentThreshold: 6,
+    alignmentThresholdPx: 6,
     rotation: true,
     rotationAngles: [0, 90, 180, 270],
-    rotationThreshold: 4,
+    rotationThresholdDeg: 4,
   },
   editable: true,
 };
@@ -46,8 +46,16 @@ export { lineEndingsOf };
 
 /** Merge fields into a tool's defaults; each value is whole, as in a patch. */
 export function setDefaults(model: Model, preset: string, patch: FieldValues): [Model, Effect[]] {
-  const next = { ...defaultsFor(model, preset), ...patch };
-  return [{ ...model, defaults: { ...model.defaults, [preset]: next } }, []];
+  return replaceDefaults(model, preset, { ...defaultsFor(model, preset), ...patch });
+}
+
+/** Set a tool's defaults to exactly `defaults`. */
+export function replaceDefaults(
+  model: Model,
+  preset: string,
+  defaults: FieldValues,
+): [Model, Effect[]] {
+  return [{ ...model, defaults: { ...model.defaults, [preset]: defaults } }, []];
 }
 
 /** Ids a gesture in progress works on. */

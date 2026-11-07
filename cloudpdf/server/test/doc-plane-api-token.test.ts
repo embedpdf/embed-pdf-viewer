@@ -305,6 +305,43 @@ describe('X-Document-Password (API token only)', () => {
     }
   });
 
+  test('the download, sent without the engine, checks the password as an open does', async () => {
+    const url = `${fx.baseUrl}/v1/docs/${docId}/layers/downloads/download`;
+    const refused = await fetch(url, { headers: apiHeaders() });
+    expect(refused.status).toBe(422);
+    expect(((await refused.json()) as { error?: { code?: string } }).error?.code).toBe(
+      'DocPasswordRequired',
+    );
+
+    const sent = await fetch(url, { headers: apiHeaders(passwordHeader('Test')) });
+    expect(sent.status, await sent.clone().text()).toBe(200);
+    const base = await new FsObjectStore({ root: fx.storageRoot }).get(
+      StorageKeys.basePdf(tenantId, docId),
+    );
+    expect(new Uint8Array(await sent.arrayBuffer())).toEqual(new Uint8Array(base!));
+  });
+
+  test('a download link is made with the password, and downloads without it', async () => {
+    const mint = (headers: Record<string, string>) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/linked/download-link`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    const refused = await mint(apiHeaders());
+    expect(refused.status).toBe(422);
+
+    const made = await mint(apiHeaders(passwordHeader('Test')));
+    expect(made.status, await made.clone().text()).toBe(200);
+    const { url } = (await made.json()) as { url: string };
+    const downloaded = await fetch(url);
+    expect(downloaded.status, await downloaded.clone().text()).toBe(200);
+    const base = await new FsObjectStore({ root: fx.storageRoot }).get(
+      StorageKeys.basePdf(tenantId, docId),
+    );
+    expect(new Uint8Array(await downloaded.arrayBuffer())).toEqual(new Uint8Array(base!));
+  });
+
   test('without the header, an encrypted doc asks for it', async () => {
     const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, {
       headers: apiHeaders(),

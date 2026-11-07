@@ -26,13 +26,15 @@ vi.mock('../src/worker-files', async () => {
 const BUNDLED_FILE = 'https://app.test/assets/encoder-worker-abc.js';
 
 const constructed: string[] = [];
+const workerTypes: (WorkerType | undefined)[] = [];
 let respond = true;
 
 class FakeWorker {
   onmessage: ((e: { data: unknown }) => void) | null = null;
   onerror: ((e: { message: string }) => void) | null = null;
-  constructor(url: string | URL) {
+  constructor(url: string | URL, options?: WorkerOptions) {
     constructed.push(String(url));
+    workerTypes.push(options?.type);
   }
   postMessage(msg: { id: string }): void {
     if (!respond) return;
@@ -56,6 +58,7 @@ const options = { format: 'webp' as const };
 
 beforeEach(() => {
   constructed.length = 0;
+  workerTypes.length = 0;
   respond = true;
   files.encoder = BUNDLED_FILE;
   (globalThis as Record<string, unknown>).Worker = FakeWorker;
@@ -103,6 +106,21 @@ describe('BrowserImageEncoder worker sourcing', () => {
     await encoder.encode(raster, options, new AbortController().signal);
     expect(constructed.length).toBeGreaterThan(0);
     expect(constructed.every((u) => u.endsWith('/workers/encoder-worker.js'))).toBe(true);
+    encoder.destroy();
+  });
+
+  // A classic worker can't even parse a file a dev server appended `import.meta` code to
+  // (`next dev` with Fast Refresh does), so every worker the encoder starts is a module.
+  it.each([
+    ['the bundled file', undefined, BUNDLED_FILE],
+    ['a blob: URL', 'inline', null],
+    ['a configured URL', '/workers/encoder-worker.js', null],
+  ] as const)('starts %s as a module worker', async (_, worker, file) => {
+    files.encoder = file;
+    const encoder = new BrowserImageEncoder(worker === undefined ? {} : { worker });
+    await encoder.encode(raster, options, new AbortController().signal);
+    expect(workerTypes.length).toBeGreaterThan(0);
+    expect(workerTypes.every((type) => type === 'module')).toBe(true);
     encoder.destroy();
   });
 

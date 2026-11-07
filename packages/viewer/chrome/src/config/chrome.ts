@@ -7,8 +7,8 @@
  * a `mode`).
  *
  * `importance` (1 makes room first … 5 never leaves the bar) is the only
- * responsive knob. The bar, group and menu ids are API: they don't change
- * between minor versions.
+ * responsive knob; a group's is its items' unless they have their own. The
+ * bar, group and menu ids are API: they don't change between minor versions.
  */
 import { createLayout, type LayoutData, type LayoutGroupObject } from '@embedpdf/core-ui';
 
@@ -33,19 +33,21 @@ export const DEFAULT_LAYOUT: LayoutData = {
       place: 'top',
       // The start section sits left-aligned: document menu, view, the zoom
       // field, pan and pointer. Only the mode tabs are truly centered.
+      // On a phone, after pan and pointer, the View menu and zoom make room
+      // (a finger pinches to zoom) before the folded mode tabs.
       start: [
         { id: 'document', items: ['menu:document'], importance: 5 },
         {
           id: 'view',
           items: [{ command: 'panel:thumbnails', importance: 5 }, 'menu:view'],
-          importance: 4,
+          importance: 3,
         },
         // The zoom field; when it can't fit it draws its 'button' variant,
         // and in the "More" menu it stands in as menu:zoom.
         {
           id: 'zoom',
           items: [{ custom: 'zoom', command: 'menu:zoom', variants: ['inline', 'button'] }],
-          importance: 4,
+          importance: 3,
         },
         { id: 'tools', items: ['tool:pan', 'tool:pointer'], importance: 2 },
       ],
@@ -182,11 +184,17 @@ export const DEFAULT_LAYOUT: LayoutData = {
         style,
       ],
     },
-
     // ── over the pages ────────────────────────────────────────────────────────
+    // The page number and its arrows are one: none of them moves into "More".
     pager: {
       place: { float: 'bottom' },
-      center: [{ id: 'pages', items: [{ custom: 'page-number' }] }],
+      center: [
+        {
+          id: 'pages',
+          items: ['page:previous', { custom: 'page-number' }, 'page:next'],
+          importance: 5,
+        },
+      ],
     },
     // Which actions show is each command's `visible` (group only when
     // groupable, style only when the kind has editable properties…), so one
@@ -206,6 +214,11 @@ export const DEFAULT_LAYOUT: LayoutData = {
         },
       ],
     },
+    // Under the box the snapshot tool holds: copy it, or save it as a PNG.
+    snapshot: {
+      place: { at: 'snapshot' },
+      center: [{ id: 'snapshot', items: ['snapshot:copy', 'snapshot:save'], importance: 4 }],
+    },
     annotation: {
       place: { at: 'annotation' },
       center: [
@@ -217,20 +230,64 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:stamp-from-selection',
             'annotation:link',
             'annotation:goto-link',
+            'annotation:save-file',
             'annotation:remove-link',
             'annotation:group',
             'annotation:ungroup',
           ],
           importance: 4,
         },
-        // Its own group, so a line sets delete apart.
-        { id: 'danger', items: ['annotation:delete'], importance: 5 },
+        // Its own group, so a line sets apart what removes: applying a redaction, and delete.
+        { id: 'danger', items: ['annotation:apply-redaction', 'annotation:delete'], importance: 5 },
       ],
+    },
+
+    // ── the bars at the top of a panel, under its title, named after it ──────
+    thumbnails: {
+      place: { panel: 'thumbnails' },
+      start: [
+        {
+          id: 'edit',
+          items: [
+            'page:insert-blank',
+            'page:rotate-counterclockwise',
+            'page:rotate-clockwise',
+            'page:delete',
+          ],
+          importance: 4,
+        },
+        // The page menu's other actions: buttons with room to spare, else the "More" menu.
+        {
+          id: 'more',
+          items: ['page:insert-file', 'page:duplicate', 'page:extract'],
+          importance: 1,
+        },
+      ],
+      end: [history],
+    },
+    outline: {
+      place: { panel: 'outline' },
+      start: [
+        {
+          id: 'filter',
+          items: [{ custom: 'outline-filter', variants: ['wide', 'narrow'] }],
+        },
+      ],
+      end: [{ id: 'items', items: ['outline:add', 'outline:expand-all', 'outline:collapse-all'] }],
+    },
+    attachments: {
+      place: { panel: 'attachments' },
+      // Dependent: the count shows beside the button that adds a file, never on its own.
+      start: [{ id: 'count', items: [{ custom: 'attachments-count' }], dependent: true }],
+      end: [{ id: 'files', items: ['attachment:add'] }],
     },
   },
 
   menus: {
-    document: [['document:open', 'document:download', 'document:print'], ['view:fullscreen']],
+    document: [
+      ['document:open', 'document:download', 'document:print', 'tool:snapshot'],
+      ['view:fullscreen'],
+    ],
     view: [
       {
         titleKey: 'commands.spread.group',
@@ -238,7 +295,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
       },
       {
         titleKey: 'commands.scroll.group',
-        items: ['view:scroll-vertical', 'view:scroll-horizontal'],
+        items: ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'],
       },
       {
         titleKey: 'commands.rotate.group',
@@ -251,26 +308,55 @@ export const DEFAULT_LAYOUT: LayoutData = {
         titleKey: 'commands.zoom.level',
         items: ['zoom:50', 'zoom:100', 'zoom:150', 'zoom:200', 'zoom:400'],
       },
-      ['zoom:in', 'zoom:out'],
+      ['zoom:in', 'zoom:out', 'tool:zoom'],
       ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'],
+    ],
+    // A row of the outline panel: its menu button and a right-click on it open this.
+    'outline-item': [
+      ['outline:add', 'outline:add-child'],
+      ['outline:rename', 'outline:set-destination', 'outline:properties'],
+      ['outline:delete'],
+    ],
+    // A file of the attachments panel: its menu button and a right-click on it open this.
+    'attachment-item': [['attachment:save', 'attachment:go-to'], ['attachment:delete']],
+    // A card of the comments panel: its menu button and a right-click on it open this.
+    'comment-item': [
+      {
+        titleKey: 'comments.status',
+        items: [
+          'comment:status-accepted',
+          'comment:status-rejected',
+          'comment:status-cancelled',
+          'comment:status-completed',
+          'comment:status-none',
+        ],
+      },
+      ['comment:delete-thread'],
+    ],
+    // A page of the thumbnails panel: its menu button, a right-click and a long-press open this.
+    page: [
+      ['page:rotate-clockwise', 'page:rotate-counterclockwise'],
+      ['page:insert-blank', 'page:insert-file', 'page:duplicate'],
+      ['page:extract'],
+      ['page:delete'],
     ],
   },
 
-  // Each panel's button is its `panel:<id>` command, titled and drawn as the panel is
-  // (config/panels.ts); the panels on one side take turns.
+  // Each panel's button is its `panel:<id>` command; a built-in panel brings its title and icon
+  // wherever its id is (config/panels.ts). The panels on one side take turns.
   panels: {
-    thumbnails: { side: 'start', titleKey: 'panels.thumbnails', icon: 'sidebar' },
-    outline: { side: 'start', titleKey: 'panels.outline', icon: 'listTree' },
-    attachments: { side: 'start', titleKey: 'panels.attachments', icon: 'paperclip' },
-    search: { side: 'end', titleKey: 'panels.search', icon: 'search' },
-    comments: { side: 'end', titleKey: 'panels.comments', icon: 'comment' },
-    style: { side: 'end', titleKey: 'panels.style', icon: 'palette' },
-    stamps: { side: 'end', titleKey: 'panels.stamps', icon: 'rubberStamp' },
-    signatures: { side: 'end', titleKey: 'panels.signatures', icon: 'signature' },
-    redaction: { side: 'end', titleKey: 'panels.redaction', icon: 'redactionSidebar' },
-    measurement: { side: 'end', titleKey: 'panels.measurement', icon: 'updateScale' },
+    thumbnails: { side: 'start' },
+    outline: { side: 'start' },
+    attachments: { side: 'start' },
+    search: { side: 'end' },
+    comments: { side: 'end' },
+    style: { side: 'end' },
+    stamps: { side: 'end' },
+    signatures: { side: 'end' },
+    redaction: { side: 'end' },
+    measurement: { side: 'end' },
     // The form designer's sidebar: the document's fields, and what the selected one is.
-    'form-design': { side: 'end', titleKey: 'panels.formDesign', icon: 'formDesign' },
+    'form-design': { side: 'end' },
   },
 };
 

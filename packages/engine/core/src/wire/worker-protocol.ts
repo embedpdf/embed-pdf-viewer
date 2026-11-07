@@ -9,13 +9,16 @@ import type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
+import type { Attachment, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
+import type { CodePointRange, FontResolveRun } from '../dto/DocumentFonts';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
+import type { DocumentOutline } from '../dto/DocumentOutline';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { MetadataPatch } from '../dto/MetadataPatch';
+import type { PageExtractFlatten } from '../dto/PageExtract';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
@@ -25,11 +28,17 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
+import type {
+  EngineFontFacts,
+  FallbackTier,
+  FontListFacts,
+  ResolvedRunFacts,
+} from '../fonts/fontList';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
-import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
+import type { PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { ObjectNumberRange } from '../identity/ObjectNumbers';
@@ -42,10 +51,6 @@ import type {
   AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
-import type {
-  AttachmentCreateResult,
-  AttachmentDeleteResult,
-} from '../mutation/AttachmentMutationResults';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
@@ -61,17 +66,12 @@ import type {
   FormWidgetDeleteResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
-import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
-import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { AnnotationPosition, FieldPosition, PagePosition } from '../mutation/ListPosition';
-import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type { AnnotationPosition, FieldPosition } from '../mutation/ListPosition';
 import type { PageNameResult } from '../mutation/PageNameResult';
-import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
-import type { WireResourceMap } from '../resource/BinarySource';
 import type { WorkingSetPage } from '../scheduling/facts';
 import type { SearchRequest, SearchSlice } from '../search/types';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -82,7 +82,7 @@ import type {
   SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepareInput,
   SignaturePrepared,
   SignatureSnapshot,
@@ -363,7 +363,7 @@ export interface SignaturesFinalizeCandidateWorkerRequest {
   /** The /ByteRange the prepare reported — the fence every check is made against. */
   byteRange: [number, number, number, number];
   /** The reserved /Contents size the prepare reported (the hole holds twice as many hex digits). */
-  contentsSize: number;
+  contentsSizeBytes: number;
   fieldObjectNumber: number;
   /** The detached CMS over the prepared digest. */
   cms: ArrayBuffer;
@@ -408,6 +408,15 @@ export interface MetadataUpdateCustomWorkerRequest extends WriteJobFields {
 
 export interface ActionsReadWorkerRequest {
   kind: 'actions.read';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/** The document's outline: every item, depth first (no page is loaded). */
+export interface OutlineReadWorkerRequest {
+  kind: 'outline.read';
   effect: 'read';
   jobId: WorkerJobId;
   docId: string;
@@ -500,17 +509,20 @@ export interface AnnotationsUpdateWorkerRequest<
  * One change (`doc.apply`): its ops in order, as one transaction, or the
  * reverse of an earlier write (`{ undoOf }`). Each op is checked as its
  * single verb's job checks it, inside the write.
+ *
+ * A change stays in page space across the worker, both ways: each op's places
+ * turn into the file's coordinates right before it runs, and its answer's
+ * back right after, against the document as it is then. An earlier op of the
+ * same change can add, remove or put back a page a later one names.
  */
-export interface DocumentApplyWorkerRequest<
-  C extends Coordinates = PageCoordinates,
-> extends WriteJobFields {
+export interface DocumentApplyWorkerRequest extends WriteJobFields {
   kind: 'document.apply';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   /** The ops, with their bytes by role on the transfer list, as the single verbs send them. */
-  change: Change<C, WireAnnotationResources>;
+  change: Change<PageCoordinates, WireAnnotationResources>;
   /**
    * Who the change acts for, what they may do and what the document's
    * signatures forbid, checked inside the write against each op (the ops of
@@ -534,10 +546,10 @@ export interface ChangeRecordPayload {
 }
 
 /** One change of a server request (see `DocumentApplyChangesWorkerRequest`). */
-export interface ServerChange<C extends Coordinates = PageCoordinates> {
+export interface ServerChange {
   opId: string;
   /** Its ops (a single-verb route's one op, an import's among them), or an undo. */
-  change: RecordedChange<C, WireAnnotationResources>;
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>;
   /** Who the change acts for (see `DocumentApplyWorkerRequest.authority`). */
   authority: ChangeAuthority;
   /**
@@ -554,26 +566,27 @@ export interface ServerChange<C extends Coordinates = PageCoordinates> {
  * A server request's changes, as one job: each runs in its own layer
  * transaction, committed or rolled back on its own, in order. A refusal is
  * that change's answer; anything else fails the job. The job saves one
- * artifact for the changes that applied.
+ * artifact for the changes that applied. Page space both ways, each op
+ * converted as it runs (see `DocumentApplyWorkerRequest`).
  */
-export interface DocumentApplyChangesWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface DocumentApplyChangesWorkerRequest {
   kind: 'document.applyChanges';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  changes: ServerChange<C>[];
+  changes: ServerChange[];
   /** See `WriteJobFields.objectNumberFloor`. */
   objectNumberFloor?: number;
   artifactPath?: string;
 }
 
 /** What one change of a server request answered. */
-export type ServerChangeOutcome<C extends Coordinates = PageCoordinates> =
+export type ServerChangeOutcome =
   | {
       opId: string;
       status: 'applied';
-      result: ChangeResult<C>;
+      result: ChangeResult;
       /** What undoes it, for the caller to keep; null when nothing can. */
       record: ChangeRecordPayload | null;
     }
@@ -1034,7 +1047,7 @@ export interface RenderEncode {
  *  own its buffer — it rides the transfer manifest zero-copy, so a pooled
  *  view (e.g. a Node `Buffer` slab slice) would detach unrelated data. */
 export interface EncodedImageWire {
-  contentType: string;
+  mimeType: string;
   width: number;
   height: number;
   bytes: Uint8Array;
@@ -1093,39 +1106,6 @@ export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = 
   appearances: EncodedAppearanceWire<C>[];
 }
 
-export interface PagesReorderWorkerRequest extends WriteJobFields {
-  kind: 'pages.reorder';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  position: PagePosition;
-  artifactPath?: string;
-}
-
-export interface PagesRotateWorkerRequest extends WriteJobFields {
-  kind: 'pages.rotate';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  /** Absolute rotation in degrees clockwise — see `PageRotateInput`. */
-  rotation: PdfRotation;
-  artifactPath?: string;
-}
-
-export interface PagesDeleteWorkerRequest extends WriteJobFields {
-  kind: 'pages.delete';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  artifactPath?: string;
-}
-
 /** Register/rename a `/Names /Pages` entry — see `PageNameInput`. */
 export interface PagesSetNameWorkerRequest extends WriteJobFields {
   kind: 'pages.setName';
@@ -1180,6 +1160,9 @@ export interface PagesExtractWorkerRequest {
   docId: string;
   layerName?: string;
   pages: PageRef[];
+  /** A flattened copy: what it paints, already checked against the caller's
+   *  rights (`resolvePageExtract`). Absent for a plain copy. */
+  flatten?: PageExtractFlatten;
 }
 
 /** List the document catalog's `/EmbeddedFiles` name tree (a read). */
@@ -1212,36 +1195,6 @@ export interface AttachmentsReadFileWorkerRequest {
   maxDecodedBytes?: number;
 }
 
-/**
- * Create a document-level embedded file (a mutation — layer sessions
- * persist an artifact). `file` is the same post-normalization wire shape
- * the file-attachment annotation draft uses: metadata in JSON, bytes
- * out-of-band under the referenced resource key. `file.name` becomes the
- * name-tree key.
- */
-export interface AttachmentsCreateWorkerRequest extends WriteJobFields {
-  kind: 'attachments.create';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  file: WireAttachmentFile;
-  /** Binary payload referenced by `file.resources.file` — transfer-list bytes. */
-  resources?: WireResourceMap;
-  artifactPath?: string;
-}
-
-/** Delete a document-level embedded file by key (a mutation). */
-export interface AttachmentsDeleteWorkerRequest extends WriteJobFields {
-  kind: 'attachments.delete';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  ref: AttachmentRef;
-  artifactPath?: string;
-}
-
 /** Decode the file embedded in a FileAttachment annotation's `/FS`.
  *  Same read semantics and delivery modes as `attachments.readFile`. */
 export interface AnnotationsReadFileWorkerRequest {
@@ -1255,38 +1208,6 @@ export interface AnnotationsReadFileWorkerRequest {
   path?: string;
   /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
   maxDecodedBytes?: number;
-}
-
-/** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `position` (omitted → `'end'`). A structural mutation: layer sessions
- *  persist an artifact like reorder/rotate/delete. */
-export interface PagesInsertWorkerRequest extends WriteJobFields {
-  kind: 'pages.insert';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  bytes: ArrayBuffer;
-  position?: PagePosition;
-  artifactPath?: string;
-}
-
-/** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `position` (omitted → `'end'`). A structural mutation exactly like
- *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
- *  layer sessions persist an artifact identically. */
-export interface PagesInsertBlankWorkerRequest extends WriteJobFields {
-  kind: 'pages.insertBlank';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  size: PdfSize;
-  count?: number;
-  position?: PagePosition;
-  /** The object numbers the new pages get, one per page; the next free ones when absent. */
-  objectNumbers?: number[];
-  artifactPath?: string;
 }
 
 /**
@@ -1433,6 +1354,8 @@ export interface FontsRegisterWorkerRequest {
   /** `-1` → infer / `0` non-italic / `1` italic. */
   italic: number;
   data: ArrayBuffer;
+  /** One of the fallback fonts the engine adds on its own; absent for the app's. */
+  builtIn?: boolean;
 }
 
 export interface FontsAddFallbackWorkerRequest {
@@ -1440,6 +1363,8 @@ export interface FontsAddFallbackWorkerRequest {
   effect: 'runtimeWrite';
   jobId: WorkerJobId;
   fontKey: string;
+  /** Tried after every font of a lower tier (`FALLBACK_TIERS`). */
+  tier: FallbackTier;
 }
 
 export interface FontsClearFallbacksWorkerRequest {
@@ -1470,6 +1395,27 @@ export interface FontsClearWorkerRequest {
   jobId: WorkerJobId;
 }
 
+/**
+ * The engine's fonts as a document's font list names them, and its fallbacks
+ * in the order they're tried: what the server's fonts' fingerprint is made of.
+ */
+export interface FontsListWorkerRequest {
+  kind: 'fonts.list';
+  effect: 'read';
+  jobId: WorkerJobId;
+}
+
+/**
+ * A served engine font's bytes, by the SHA-256 of its program: the server's
+ * one URL for it, whatever the document. `NotFound` for a font not served.
+ */
+export interface FontsProgramWorkerRequest {
+  kind: 'fonts.program';
+  effect: 'read';
+  jobId: WorkerJobId;
+  sha256: string;
+}
+
 /** The application asserts a licence permitting editing with a font. */
 export interface FontsAuthorizeEditingWorkerRequest {
   kind: 'fonts.authorizeEditing';
@@ -1491,6 +1437,46 @@ export interface DocumentSetFontSettingsWorkerRequest {
   layerName?: string;
   embeddingPolicy?: 'default' | 'subset' | 'full';
   typographicFeatures?: boolean;
+}
+
+/** The facts a document's font list is made from (a read). */
+export interface DocumentFontsListWorkerRequest {
+  kind: 'document.fonts.list';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/**
+ * The fonts a write would draw each run in: the write's own resolution, run
+ * without writing (a read).
+ */
+export interface DocumentFontsResolveWorkerRequest {
+  kind: 'document.fonts.resolve';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  /** The box being edited; absent for a new one. */
+  annotation?: AnnotationRef;
+  runs: FontResolveRun[];
+}
+
+/**
+ * A program the document's fonts name, by its display hash: its coverage and
+ * metrics (`'info'`) or the bytes a browser loads (`'data'`). The engine's own
+ * built-in programs (the standard faces, the last resort) never get here (a
+ * read).
+ */
+export interface DocumentFontsProgramWorkerRequest {
+  kind: 'document.fonts.program';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  displaySha256: string;
+  part: 'info' | 'data';
 }
 
 export interface CloseWorkerRequest {
@@ -1542,6 +1528,18 @@ export interface ShutdownWorkerRequest {
   jobId: WorkerJobId;
 }
 
+/**
+ * What a write's payload says beside its result: the layer it saved (a
+ * session that persists its layer, the server's), and whether the write
+ * changed the fonts that can be named in the document (a session that tracks
+ * them: on the server from its first write, locally once they were listed).
+ */
+export interface WritePayloadFacts {
+  artifact?: LayerArtifactWorkerPayload;
+  artifactFile?: LayerArtifactFileWorkerPayload;
+  fontsChanged?: true;
+}
+
 export interface LayerArtifactWorkerPayload {
   bytes: ArrayBuffer;
   size: number;
@@ -1581,6 +1579,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | MetadataReadCustomWorkerRequest
   | MetadataUpdateCustomWorkerRequest
   | ActionsReadWorkerRequest
+  | OutlineReadWorkerRequest
   | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
   | AnnotationsRenderAppearancesEncodedWorkerRequest
@@ -1588,8 +1587,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AnnotationsUpdateWorkerRequest<C>
   | AnnotationsDeleteWorkerRequest
   | AnnotationsReorderWorkerRequest
-  | DocumentApplyWorkerRequest<C>
-  | DocumentApplyChangesWorkerRequest<C>
+  | DocumentApplyWorkerRequest
+  | DocumentApplyChangesWorkerRequest
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
@@ -1608,9 +1607,6 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsReorderCalculationsWorkerRequest
   | FormsUpdateWidgetWorkerRequest<C>
   | PagesListWorkerRequest
-  | PagesReorderWorkerRequest
-  | PagesRotateWorkerRequest
-  | PagesDeleteWorkerRequest
   | AnnotationsFlattenWorkerRequest
   | AnnotationsExportAppearanceWorkerRequest
   | PagesSetNameWorkerRequest
@@ -1618,12 +1614,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | PagesFlattenWorkerRequest
   | RedactionApplyWorkerRequest
   | PagesExtractWorkerRequest
-  | PagesInsertWorkerRequest
-  | PagesInsertBlankWorkerRequest
   | AttachmentsListWorkerRequest
   | AttachmentsReadFileWorkerRequest
-  | AttachmentsCreateWorkerRequest
-  | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
   | AnnotationsExportWorkerRequest
@@ -1661,8 +1653,13 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
   | FontsAuthorizeEditingWorkerRequest
+  | FontsListWorkerRequest
+  | FontsProgramWorkerRequest
   | ObjectNumbersReserveWorkerRequest
   | DocumentSetFontSettingsWorkerRequest
+  | DocumentFontsListWorkerRequest
+  | DocumentFontsResolveWorkerRequest
+  | DocumentFontsProgramWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
   | WorkerControlMessage;
@@ -1710,12 +1707,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.version'; version: BaseVersionInfo }
   | { tag: 'signatures.prepare'; result: SignaturePrepared }
-  | {
+  | ({
       tag: 'signatures.complete';
       result: SignatureCompleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'signatures.cancel'; result: SignatureCancelResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
@@ -1724,7 +1719,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
        * The installed signature as the sealed file reports it, in page space:
        * the finalizer measures it while its own session is open.
        */
-      signature: SignatureDTO;
+      signature: Signature;
       /** The sealed file's last object number: every object it has is at or below it. */
       lastObjectNumber: number;
       /** What the sealed file's signatures forbid from now on. */
@@ -1734,19 +1729,16 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot<C['destination']> }
-  | {
+  | { tag: 'outline.read'; outline: DocumentOutline<C['destination']> }
+  | ({
       tag: 'metadata.update';
       result: MetadataUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'metadata.readCustom'; custom: CustomMetadata }
-  | {
+  | ({
       tag: 'metadata.updateCustom';
       result: CustomMetadataUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'annotations.list'; list: AnnotationList<C> }
   | { tag: 'annotations.renderAppearances'; page: PageRef; result: AnnotationAppearancesResult<C> }
   | {
@@ -1754,255 +1746,153 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       page: PageRef;
       result: AnnotationAppearancesEncodedResultWire<C>;
     }
-  | {
+  | ({
       tag: 'annotations.create';
       result: AnnotationCreateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.update';
       result: AnnotationUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.delete';
       result: AnnotationDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.flatten';
       result: AnnotationFlattenResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
   /** A bundle is page space on both sides: the exporter measures what leaves. */
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
-  | {
+  | ({
       tag: 'annotations.import';
       result: AnnotationImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.reorder';
       result: AnnotationReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'document.applyChanges';
       /** One per change, in order. */
-      outcomes: ServerChangeOutcome<C>[];
+      outcomes: ServerChangeOutcome[];
       /** The artifact, when at least one change applied. */
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'document.apply';
-      result: ChangeResult<C>;
+      result: ChangeResult;
       /**
        * True when this answers an `opId` that already had one: nothing ran
        * again, so nothing is published again.
        */
       replayed: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'forms.list'; snapshot: FormSnapshot<C> }
-  | {
+  | ({
       tag: 'forms.setValue';
       result: FormSetValueResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reset';
       result: FormResetResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'forms.export'; bundle: WireFormBundle }
-  | {
+  | ({
       tag: 'forms.import';
       result: FormImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.importValues';
       result: FormValuesImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.repair';
       result: FormRepairResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.createField';
       result: FormFieldCreateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.updateField';
       result: FormFieldUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.setSignatureAppearance';
       result: FormFieldUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.deleteField';
       result: FormFieldDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.addWidget';
       result: FormWidgetLinkResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.detachWidget';
       result: FormWidgetLinkResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reorderWidgets';
       result: FormWidgetsReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reorderCalculations';
       result: FormCalculationsReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.updateWidget';
       result: FormWidgetUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.deleteWidget';
       result: FormWidgetDeleteResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.list'; snapshot: PageListSnapshot<C> }
-  | {
-      tag: 'pages.reorder';
-      result: PageReorderResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.rotate';
-      result: PageRotateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.delete';
-      result: PageDeleteResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+  | ({
       tag: 'pages.setName';
       result: PageNameResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.removeName';
       result: PageNameResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.flatten';
       result: PageFlattenResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'redaction.apply';
       result: RedactionApplyResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
   | { tag: 'attachments.list'; attachments: Attachment[] }
   | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
-  | {
-      tag: 'attachments.create';
-      result: AttachmentCreateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'attachments.delete';
-      result: AttachmentDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
-  | {
-      tag: 'pages.insert';
-      result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.insertBlank';
-      result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
   | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
-  | {
+  | ({
       tag: 'measure.setScale';
       result: PageScaleResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pieceInfo.read'; snapshot: PieceInfoSnapshot | null }
-  | {
+  | ({
       tag: 'pieceInfo.update';
       result: PieceInfoUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pieceInfo.applications'; applications: string[] }
-  | {
+  | ({
       tag: 'pieceInfo.delete';
       result: PieceInfoDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
   | {
@@ -2042,7 +1932,24 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'fonts.clearFallbacks' }
   | { tag: 'fonts.clear' }
   | { tag: 'fonts.authorizeEditing'; identity: FontIdentityInfo }
+  | { tag: 'fonts.list'; engineFonts: EngineFontFacts[]; fallbacks: string[] }
+  | { tag: 'fonts.program'; bytes: ArrayBuffer }
   | { tag: 'document.setFontSettings' }
+  | { tag: 'document.fonts.list'; facts: FontListFacts }
+  | {
+      tag: 'document.fonts.resolve';
+      runs: ResolvedRunFacts[];
+      missingCharacters: string[];
+      facts: FontListFacts;
+    }
+  | {
+      tag: 'document.fonts.program';
+      covers: CodePointRange[];
+      ascent: number;
+      descent: number;
+      /** The bytes, for `part: 'data'`; on the transfer list. */
+      bytes: ArrayBuffer | null;
+    }
   | { tag: 'close' }
   | { tag: 'shutdown' };
 

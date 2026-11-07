@@ -12,8 +12,10 @@
  */
 import {
   deserializeError,
+  FALLBACK_TIERS,
   wirePack,
   type EngineRenderPolicy,
+  type FallbackTier,
   type FontSpec,
   type WirePack,
   type WorkerRequest,
@@ -83,14 +85,14 @@ export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'tran
  * Synchronous: the runtime (WASM compile / native load) boots lazily on the
  * first operation, inside the engine's {@link LazyTransport}.
  */
-export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEngine {
-  const transport = new LazyTransport(() => startInlineTransport(opts.runtime));
+export function createLocalEngine(options: CreateLocalEngineOptions = {}): LocalEngine {
+  const transport = new LazyTransport(() => startInlineTransport(options.runtime));
   return LocalEngine.fromTransport({
     transport,
-    concurrency: opts.concurrency,
-    imageEncoder: opts.imageEncoder,
-    renderPolicy: opts.renderPolicy,
-    signedDocumentPolicy: opts.signedDocumentPolicy,
+    concurrency: options.concurrency,
+    imageEncoder: options.imageEncoder,
+    renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
   });
 }
 
@@ -109,15 +111,17 @@ export interface CreateLocalEngineWithWorkerOptions
  * {@link watchWorkerReady}) so a worker that finishes booting before the first
  * engine operation cannot hang the lazy boot.
  */
-export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOptions): LocalEngine {
-  const boot = workerBoot(opts.worker, opts);
+export function createLocalEngineWithWorker(
+  options: CreateLocalEngineWithWorkerOptions,
+): LocalEngine {
+  const boot = workerBoot(options.worker, options);
   const transport = new LazyTransport(boot.spawn, boot.lazyOptions);
   return LocalEngine.fromTransport({
     transport,
-    concurrency: opts.concurrency,
-    imageEncoder: opts.imageEncoder,
-    renderPolicy: opts.renderPolicy,
-    signedDocumentPolicy: opts.signedDocumentPolicy,
+    concurrency: options.concurrency,
+    imageEncoder: options.imageEncoder,
+    renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
   });
 }
 
@@ -202,10 +206,10 @@ function workerBoot(
       postWorkerInit(spawned.worker, wasm);
       try {
         const transport = await BrowserWorkerTransport.spawn(spawned.worker);
-        spawned.dispose();
+        spawned.destroy();
         return transport;
       } catch (error) {
-        spawned.dispose();
+        spawned.destroy();
         spawned.worker.terminate();
         if (spawned.file === null) throw error;
         throw new Error(
@@ -230,7 +234,7 @@ function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
 interface CreatedWorker {
   worker: Worker;
   /** Runs once the handshake settles: revokes a blob: URL. */
-  dispose: () => void;
+  destroy: () => void;
   /** The bundled file it started from, for the error when it never starts. */
   file: string | null;
 }
@@ -249,18 +253,18 @@ async function createEngineWorker(
   configuredUrl: string | null,
 ): Promise<CreatedWorker> {
   if (typeof delivery === 'function') {
-    return { worker: delivery(), dispose: () => {}, file: null };
+    return { worker: delivery(), destroy: () => {}, file: null };
   }
   if (configuredUrl !== null) {
     return {
       worker: startWorker(configuredUrl, { type: 'module' }),
-      dispose: () => {},
+      destroy: () => {},
       file: null,
     };
   }
   const file = delivery === undefined ? findEngineWorkerFile() : null;
   if (file !== null) {
-    return { worker: startWorker(file, { type: 'module' }), dispose: () => {}, file };
+    return { worker: startWorker(file, { type: 'module' }), destroy: () => {}, file };
   }
 
   let source: string;
@@ -277,7 +281,7 @@ async function createEngineWorker(
   const blob = createWorkerBlobUrl(source);
   try {
     const worker = startWorker(blob.url, { type: 'module' });
-    return { worker, dispose: blob.revoke, file: null };
+    return { worker, destroy: blob.revoke, file: null };
   } catch (cause) {
     blob.revoke();
     throw new Error(
@@ -343,6 +347,14 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * automatic substitution.
    */
   fonts?: RecipeFontSpec[];
+  /**
+   * The fonts the engine fills in Hebrew and Arabic with
+   * (`@embedpdf/default-fallback-fonts`: Noto Sans Hebrew and Noto Naskh
+   * Arabic, regular and bold), tried after your `fallbackFonts`. They load at
+   * boot, alongside the worker, as lazy chunks of your build (about 320 KB).
+   * `false` leaves them out. Default: `true`.
+   */
+  defaultFallbackFonts?: boolean;
   /** WorkerQueue concurrency (default 1). */
   concurrency?: number;
   /** Custom raster encoder (thumbnails / image export). */
@@ -463,11 +475,14 @@ function runsInThisThread(options: LocalEngineRecipeOptions): boolean {
 interface ResolvedRecipeFont {
   spec: FontSpec;
   fallback: boolean;
+  tier: FallbackTier;
+  /** One of the default fallback fonts, not the app's. */
+  builtIn: boolean;
 }
 
 /** Resolve every configured font's bytes (fetching `url` entries) in declared
- *  order: plain fonts first, then fallback fonts — fallback precedence is
- *  registration order (first font covering a missing glyph wins). */
+ *  order: plain fonts first, then fallback fonts, then the default fallback
+ *  fonts, which are tried after the app's whatever their style. */
 async function resolveRecipeFonts(
   options: LocalEngineRecipeOptions,
 ): Promise<ResolvedRecipeFont[]> {
@@ -475,8 +490,39 @@ async function resolveRecipeFonts(
     ...(options.fonts ?? []).map((raw) => ({ raw, fallback: false })),
     ...(options.fallbackFonts ?? []).map((raw) => ({ raw, fallback: true })),
   ];
+  const [own, defaults] = await Promise.all([
+    Promise.all(
+      entries.map(async ({ raw, fallback }) => ({
+        spec: await toFontSpec(raw),
+        fallback,
+        tier: FALLBACK_TIERS.own,
+        builtIn: false,
+      })),
+    ),
+    options.defaultFallbackFonts === false ? [] : loadDefaultFallbackFonts(),
+  ]);
+  // A key of the app's own keeps its font.
+  const taken = new Set(own.map((font) => font.spec.key));
+  return [...own, ...defaults.filter((font) => !taken.has(font.spec.key))];
+}
+
+/** The default fallback fonts, from `@embedpdf/default-fallback-fonts`: lazy chunks of the app's build. */
+async function loadDefaultFallbackFonts(): Promise<ResolvedRecipeFont[]> {
+  const { DEFAULT_FALLBACK_FONTS, loadFallbackFont } =
+    await import('@embedpdf/default-fallback-fonts/library');
   return Promise.all(
-    entries.map(async ({ raw, fallback }) => ({ spec: await toFontSpec(raw), fallback })),
+    DEFAULT_FALLBACK_FONTS.map(async (font) => ({
+      spec: {
+        key: font.key,
+        familyName: font.familyName,
+        weight: font.weight,
+        italic: font.italic,
+        data: await loadFallbackFont(font.key),
+      },
+      fallback: true,
+      tier: FALLBACK_TIERS.builtIn,
+      builtIn: true,
+    })),
   );
 }
 
@@ -496,32 +542,45 @@ async function registerBootFonts(
   fontService: LocalFontService,
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
-  for (const { spec, fallback } of fonts) {
+  // A key in both `fonts` and `fallbackFonts` is one font: registered once,
+  // then added to the fallback chain where `fallbackFonts` lists it.
+  const sent = new Set<string>();
+  for (const { spec, fallback, tier, builtIn } of fonts) {
     // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
-    fontService.seedRegistered(spec, { fallback });
-    const bytes = toStandaloneArrayBuffer(spec.data);
-    const registered = await requestOverTransport(transport, (jobId) =>
-      wirePack(
-        {
-          kind: 'fonts.register',
-          effect: 'runtimeWrite',
-          jobId,
-          fontKey: spec.key,
-          familyName: spec.familyName ?? '',
-          weight: spec.weight ?? 0,
-          italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
-          data: bytes,
-        },
-        [bytes],
-      ),
-    );
-    if (registered.tag === 'fonts.register') {
-      fontService.applyIdentity(spec.key, registered.identity);
+    fontService.seedRegistered(spec, { fallback, tier, builtIn });
+    if (!sent.has(spec.key)) {
+      sent.add(spec.key);
+      const bytes = toStandaloneArrayBuffer(spec.data);
+      const registered = await requestOverTransport(transport, (jobId) =>
+        wirePack(
+          {
+            kind: 'fonts.register',
+            effect: 'runtimeWrite',
+            jobId,
+            fontKey: spec.key,
+            familyName: spec.familyName ?? '',
+            weight: spec.weight ?? 0,
+            italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
+            data: bytes,
+            ...(builtIn ? { builtIn: true } : {}),
+          },
+          [bytes],
+        ),
+      );
+      if (registered.tag === 'fonts.register') {
+        fontService.applyIdentity(spec.key, registered.identity);
+      }
     }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>
-        wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: spec.key }),
+        wirePack({
+          kind: 'fonts.addFallback',
+          effect: 'runtimeWrite',
+          jobId,
+          fontKey: spec.key,
+          tier,
+        }),
       );
     }
   }

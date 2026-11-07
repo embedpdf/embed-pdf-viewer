@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/react",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
   "type": "module",
@@ -13,7 +13,9 @@
     "./actions": "./src/actions.tsx",
     "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
+    "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
+    "./fonts": "./src/fonts.ts",
     "./form": "./src/form.tsx",
     "./history": "./src/history.ts",
     "./i18n": "./src/i18n.ts",
@@ -21,6 +23,7 @@
     "./link": "./src/link.tsx",
     "./measurement": "./src/measurement.tsx",
     "./metadata": "./src/metadata.ts",
+    "./outline": "./src/outline.ts",
     "./page-edit": "./src/page-edit.ts",
     "./page-view": "./src/page-view.tsx",
     "./redaction": "./src/redaction.tsx",
@@ -57,9 +60,17 @@
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
       },
+      "./attachment": {
+        "import": "./dist/attachment.js",
+        "require": "./dist/attachment.cjs"
+      },
       "./commands": {
         "import": "./dist/commands.js",
         "require": "./dist/commands.cjs"
+      },
+      "./fonts": {
+        "import": "./dist/fonts.js",
+        "require": "./dist/fonts.cjs"
       },
       "./form": {
         "import": "./dist/form.js",
@@ -88,6 +99,10 @@
       "./metadata": {
         "import": "./dist/metadata.js",
         "require": "./dist/metadata.cjs"
+      },
+      "./outline": {
+        "import": "./dist/outline.js",
+        "require": "./dist/outline.cjs"
       },
       "./page-edit": {
         "import": "./dist/page-edit.js",
@@ -158,12 +173,14 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
@@ -180,7 +197,8 @@
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/web": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
-    "@embedpdf/plugin-measurement": "workspace:*"
+    "@embedpdf/plugin-measurement": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

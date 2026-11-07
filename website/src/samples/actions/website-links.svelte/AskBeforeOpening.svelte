@@ -8,17 +8,22 @@
     type PdfActionTree,
   } from '@embedpdf/svelte/actions';
 
-  // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+  // A link to a website, as a PDF carries it: what readActionTree() reads from a link.
   const websiteLink: PdfActionTree = {
-    root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+    root: {
+      type: 'uri',
+      subtype: 'URI',
+      uri: 'https://www.w3.org/TR/WCAG22/',
+      isMap: false,
+      next: [],
+    },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   const actions = useActions();
@@ -39,7 +44,7 @@
 
 <section class="panel">
   <p class="lead">
-    The document links to <code>https://www.embedpdf.com</code>.
+    The document links to <code>https://www.w3.org/TR/WCAG22/</code>.
   </p>
   <button type="button" class="button" onclick={() => actions.execute(websiteLink, click)}>
     Click the link
@@ -51,9 +56,7 @@
       </p>
       <div class="prompt-actions">
         <button type="button" class="button" onclick={() => (asking = null)}>Stay here</button>
-        <button type="button" class="button primary" onclick={openSite}>
-          Open in a new tab
-        </button>
+        <button type="button" class="button primary" onclick={openSite}> Open in a new tab </button>
       </div>
     </div>
   {/if}

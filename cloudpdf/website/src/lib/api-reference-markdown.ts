@@ -265,7 +265,7 @@ function projectApiResources(absoluteContentUrl: (url: string) => string): AstNo
 }
 
 function projectApiCredentials(): AstNode[] {
-  const order = ['apiToken', 'tenantToken', 'docToken'];
+  const order = ['apiToken', 'tenantToken', 'docToken', 'uploadToken'];
   return [
     list(
       order.flatMap((name) => {

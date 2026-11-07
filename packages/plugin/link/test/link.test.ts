@@ -70,7 +70,13 @@ const PAGE_ONE_LINKS = [
   ),
 ];
 
-const ORIGIN = { kind: 'local', sessionId: 'session', sub: null, ts: 0, serverId: null };
+const ORIGIN = {
+  kind: 'local',
+  sessionId: 'session',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 
 async function boot() {
   const listeners = new Set<(event: unknown) => void>();
@@ -83,10 +89,11 @@ async function boot() {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: {
-      list: () => Promise.resolve({ pageCount: 2, pages: [pageLayout(1, 0), pageLayout(2, 1)] }),
+      list: () =>
+        Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(1, 0), pageLayout(2, 1)] }),
     },
     security: { allows: () => true },
     page: (ref: { objectNumber: number }) => ({
@@ -148,14 +155,14 @@ describe('link plugin', () => {
     await harness.kernel.destroy();
   });
 
-  it('hit-tests to the smallest link under the point; listAllLinks loads every page', async () => {
+  it('hit-tests to the smallest link under the point; readAllLinks loads every page', async () => {
     const harness = await boot();
     await harness.link.ensureLoaded(toPageRef(1));
     // Both obj:10 and the nested obj:11 contain (130, 70); the smaller wins.
     expect(harness.link.getLinkAt(toPageRef(1), { x: 130, y: 70 })?.id).toBe('obj:11');
     expect(harness.link.getLinkAt(toPageRef(1), { x: 250, y: 50 })?.id).toBe('obj:10');
     expect(harness.link.getLinkAt(toPageRef(1), { x: 10, y: 10 })).toBeNull();
-    const all = await harness.link.listAllLinks();
+    const all = await harness.link.readAllLinks();
     expect(all).toHaveLength(3);
     expect(harness.link.isLoaded(toPageRef(2))).toBe(true);
     await harness.kernel.destroy();
@@ -166,7 +173,7 @@ describe('link plugin', () => {
     await harness.link.ensureLoaded(toPageRef(1));
     const log: string[] = [];
     harness.link.onActivated((event) =>
-      log.push(`${event.target.kind}:${event.activation.outcome}`),
+      log.push(`${event.target.kind}:${event.activation.status}`),
     );
     expect(harness.link.resolve({ kind: 'uri', uri: 'https://x' })).toEqual({
       kind: 'uri',
@@ -175,11 +182,11 @@ describe('link plugin', () => {
     expect(
       harness.link.resolve({
         kind: 'goto',
-        destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
+        destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50, zoom: null },
       }),
     ).toEqual({
       kind: 'destination',
-      destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
+      destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50, zoom: null },
     });
     // A page the document doesn't have can't be gone to: the target is reported.
     expect(
@@ -187,11 +194,11 @@ describe('link plugin', () => {
         .kind,
     ).toBe('reported');
     expect(harness.link.activate({ kind: 'uri', uri: 'https://x' })).toEqual({
-      outcome: 'uri',
+      status: 'uri',
       uri: 'https://x',
     });
     // No stage installed: a goto is reported as a destination for the host.
-    expect(harness.link.activateAt(toPageRef(1), { x: 450, y: 650 })?.outcome).toBe('destination');
+    expect(harness.link.activateAt(toPageRef(1), { x: 450, y: 650 })?.status).toBe('destination');
     expect(harness.link.activateAt(toPageRef(1), { x: 10, y: 10 })).toBeNull();
     expect(harness.link.getLabel(harness.link.getLink(toPageRef(1), 'obj:10')!)).toBe(
       'https://example.com',
@@ -216,13 +223,13 @@ describe('link plugin', () => {
 
   it('re-reads the page whose annotations were reordered', async () => {
     const harness = await boot();
-    await harness.link.listAllLinks();
+    await harness.link.readAllLinks();
     expect(harness.reads).toEqual([1, 2]);
     harness.emit({
       type: 'annotations.reordered',
       page: toPageRef(1),
       order: [PAGE_ONE_LINKS[1]!.ref, PAGE_ONE_LINKS[0]!.ref],
-      meta: { changed: [PAGE_ONE_LINKS[1]!.ref] },
+      meta: { changedRefs: [PAGE_ONE_LINKS[1]!.ref] },
       origin: ORIGIN,
     });
     await settle();
@@ -232,7 +239,7 @@ describe('link plugin', () => {
 
   it('re-reads the loaded pages a redaction or a flatten applied to', async () => {
     const harness = await boot();
-    await harness.link.listAllLinks();
+    await harness.link.readAllLinks();
     expect(harness.reads).toEqual([1, 2]);
     harness.emit({
       type: 'redaction.applied',
@@ -258,7 +265,11 @@ describe('link plugin', () => {
   it('re-reads loaded pages when the event stream desyncs', async () => {
     const harness = await boot();
     await harness.link.ensureLoaded(toPageRef(1));
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
     await settle();
     expect(harness.reads).toEqual([1, 1]);
     await harness.kernel.destroy();
@@ -273,7 +284,7 @@ describe('link plugin', () => {
     expect(harness.link.getStatus(toPageRef(1))).toBe('error');
     expect(harness.link.isLoaded(toPageRef(1))).toBe(false);
     expect(loaded).toEqual([]);
-    await expect(harness.link.listAllLinks()).rejects.toBeDefined();
+    await expect(harness.link.readAllLinks()).rejects.toBeDefined();
 
     // The next attempt reads again and announces the page once it succeeds.
     harness.failReads(false);
@@ -314,13 +325,13 @@ describe('following a link', () => {
       return true;
     });
     const log: string[] = [];
-    harness.link.onActivated((event) => log.push(event.activation.outcome));
+    harness.link.onActivated((event) => log.push(event.activation.status));
 
     expect(harness.link.activate({ kind: 'uri', uri: 'https://x' })).toEqual({
-      outcome: 'uri',
+      status: 'uri',
       uri: 'https://x',
     });
-    expect(harness.link.activate({ kind: 'uri', uri: 'javascript:alert(1)' }).outcome).toBe(
+    expect(harness.link.activate({ kind: 'uri', uri: 'javascript:alert(1)' }).status).toBe(
       'reported',
     );
     expect(opened).toEqual(['https://x']);
@@ -339,7 +350,7 @@ describe('following a link', () => {
     const calls: unknown[][] = [];
     const view = { goToDestination: (...args: unknown[]) => calls.push(args) };
     const activation = harness.link.activateAt(0, { x: 450, y: 650 }, { stage: view as never });
-    expect(activation?.outcome).toBe('revealed');
+    expect(activation?.status).toBe('revealed');
     expect(calls).toEqual([[{ page: toPageRef(2), kind: 'fit' }]]);
     await harness.kernel.destroy();
   });
@@ -367,7 +378,7 @@ describe('following a link', () => {
   it('cancels a read when the signal fires', async () => {
     const harness = await boot();
     const controller = new AbortController();
-    const all = harness.link.listAllLinks({ signal: controller.signal });
+    const all = harness.link.readAllLinks({ signal: controller.signal });
     controller.abort();
     await expect(all).rejects.toMatchObject({ code: 'operation-cancelled' });
     await harness.kernel.destroy();
@@ -415,7 +426,7 @@ describe('link plugin with the annotation plugin', () => {
     expect(behavior.matches(link)).toBe(true);
     expect(behavior.matches({ subtype: 'square' } as unknown as Annotation)).toBe(false);
     expect(behavior.engaged(link)).toBe(true);
-    await ctx.dispose();
+    await ctx.destroy();
     expect(unregister).toHaveBeenCalledOnce();
   });
 });

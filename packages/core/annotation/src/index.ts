@@ -37,6 +37,7 @@ export {
   chrome,
   selectedItems,
   textBoxes,
+  textBoxOf,
   selectionBoundsOnPage,
   selectionAnchor,
   selectionKnob,
@@ -66,17 +67,20 @@ export {
   paragraphsFromPlainText,
   plainTextOf,
   rangeHasStyle,
+  restyleRuns,
   richDocOf,
   richTextLength,
   sameStyleDelta,
   splitRunsAt,
   styleAt,
+  typeWithStyle,
+  withoutStyle,
   type FontLookup,
+  type NamedFont,
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
 // The CSS family the browser draws an annotation's font with.
-export { STANDARD_FONT_STACKS, cssFontFamilyForFont, mountedFontFamily } from './font-css';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';
@@ -108,15 +112,15 @@ export {
   type MeasurementIntent,
 } from './editable';
 // Screen-anchored (`noZoom`/`noRotate`) bodies: display-transform exemptions.
-// One projection (`anchoredGeom`) + its exact inverse (`unanchoredGeom`),
+// One projection (`anchoredGeometry`) + its exact inverse (`unanchoredGeometry`),
 // shared by render / hit / chrome / gestures.
 export {
   anchorModeOf,
   anchorOf,
   anchoredBox,
-  anchoredGeom,
+  anchoredGeometry,
   anchoredStrokeWidth,
-  unanchoredGeom,
+  unanchoredGeometry,
   type AnchorMode,
   type ViewEnv,
 } from './anchor';
@@ -132,7 +136,13 @@ export {
   type FlagKey,
   type KindCaps,
 } from './kinds';
-export { initialTextStyle, kindTakesLink, propertiesOf, sharedProperties } from './props';
+export {
+  initialTextStyle,
+  kindTakesLink,
+  propertiesOf,
+  selectionProperties,
+  sharedProperties,
+} from './props';
 export { FLAG_PROPERTIES, LINE_ENDING_NAMES } from './kinds/fields';
 export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {
@@ -152,11 +162,11 @@ export {
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
-  obbFromGeom,
+  obbFromGeometry,
   rotateKnob,
   placeRotateKnob,
   DEFAULT_CHROME_GEOMETRY,
-  isRotatableGeom,
+  isRotatableGeometry,
   // upright placement
   uprightRotation,
   uprightAnchoredRect,
@@ -227,7 +237,13 @@ export { bodyPieces, paintedNear, paintedTouches, type PaintedPiece } from './pa
 export * from './measurement';
 export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).
-export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
+export {
+  drawnAfter,
+  drawsLive,
+  sourceOfConfirmed,
+  sourceOfNew,
+  type DrawState,
+} from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { hasLiveDrawing, scene } from './scene';
 export { straightenInkStroke } from './ink';

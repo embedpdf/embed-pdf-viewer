@@ -2,7 +2,8 @@
  * `onReady` and `onDocumentChange` in the config: `onReady` gets the `viewer` once it's live,
  * before any document change; `onDocumentChange` gets the active document's id, the first one
  * included, whether it came from `src` or `documents`. The element's `epdf:ready` and
- * `epdf:documentchange` say the same, at the same moments.
+ * `epdf:documentchange` say the same, at the same moments. A `watch()` begun in `onReady` waits
+ * for the document's plugin it reads.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -50,9 +51,43 @@ const page = (config: string) => `<!doctype html><html><head><meta charset="utf-
 </script>
 </body></html>`;
 
+/** A page that follows the current page from `onReady`, before any document has opened. */
+const WATCH_PAGE = `<!doctype html><html><head><meta charset="utf-8">
+<title>watch from onReady</title>
+<style>
+  body { margin: 0; }
+  #viewer { position: absolute; left: 0; top: 0; width: 1100px; height: 700px; display: block; }
+</style></head>
+<body>
+<div id="viewer"></div>
+<script type="module">
+  import EmbedPDF from '/embedpdf.js';
+  window.heard = [];
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    onReady: (viewer) => {
+      try {
+        viewer.get('stage');
+        window.heard.push('get');
+      } catch (error) {
+        window.heard.push('get ' + error.code);
+      }
+      window.heard.push('tryGet ' + viewer.tryGet('stage'));
+      viewer.watch(
+        () => viewer.get('stage').getCurrentPageIndex(),
+        (index, previous) => window.heard.push('page ' + index + ' after ' + previous),
+        { immediate: true },
+      );
+    },
+  });
+</script>
+</body></html>`;
+
 const PAGES = {
   '/src.html': page("{ src: '/sample.pdf' }"),
   '/documents.html': page("{ documents: [{ src: '/sample.pdf', name: 'Sample' }] }"),
+  '/watch.html': WATCH_PAGE,
 };
 
 /** What a page of this test keeps on `window`. */
@@ -120,6 +155,23 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('onReady and onDocumentC
       await tab.close();
     });
   }
+
+  it("waits in watch() for the document's plugin, and starts with its value", async () => {
+    const tab = await open('/watch.html');
+    const heard = await tab.evaluate(() => (window as unknown as Heard).heard);
+    expect(heard).toEqual(['get not-ready', 'tryGet null', 'page 0 after undefined']);
+    await tab.evaluate(() => {
+      const viewer = (window as unknown as Heard).element.viewer as unknown as {
+        get(name: 'stage'): { goToPage(index: number): void };
+      };
+      viewer.get('stage').goToPage(2);
+    });
+    await tab.waitForFunction(() => (window as unknown as Heard).heard.length > 3);
+    expect(await tab.evaluate(() => (window as unknown as Heard).heard.at(-1))).toBe(
+      'page 2 after 0',
+    );
+    await tab.close();
+  });
 
   it('calls onDocumentChange with null once the last document closes', async () => {
     const tab = await open('/src.html');

@@ -17,10 +17,10 @@ export class EngineError extends Error {
   readonly code: EngineErrorCode;
   readonly details?: Record<string, unknown>;
 
-  constructor(code: EngineErrorCode, message?: string, opts: EngineErrorOptions = {}) {
-    super(message ?? code, opts.cause === undefined ? undefined : { cause: opts.cause });
+  constructor(code: EngineErrorCode, message?: string, options: EngineErrorOptions = {}) {
+    super(message ?? code, options.cause === undefined ? undefined : { cause: options.cause });
     this.code = code;
-    this.details = opts.details;
+    this.details = options.details;
   }
 
   static is(value: unknown, code?: EngineErrorCode): value is EngineError {
@@ -34,14 +34,8 @@ export class EngineError extends Error {
     return (value as EngineError).code === code;
   }
 
-  toJSON(): {
-    name: 'EngineError';
-    code: EngineErrorCode;
-    message: string;
-    details?: Record<string, unknown>;
-  } {
+  toJSON(): SerializedEngineError {
     return {
-      name: 'EngineError',
       code: this.code,
       message: this.message,
       details: this.details,
@@ -49,8 +43,8 @@ export class EngineError extends Error {
   }
 }
 
+/** An error as it crosses a wire: the `error` of an error response, a refused change. */
 export interface SerializedEngineError {
-  name: 'EngineError';
   code: EngineErrorCode;
   message: string;
   details?: Record<string, unknown>;
@@ -63,10 +57,9 @@ export function serializeError(err: unknown): SerializedEngineError {
   if (err instanceof Error) {
     const code: EngineErrorCode =
       err.name === 'AbortError' ? EngineErrorCode.Aborted : EngineErrorCode.Unknown;
-    return { name: 'EngineError', code, message: err.message };
+    return { code, message: err.message };
   }
   return {
-    name: 'EngineError',
     code: EngineErrorCode.Unknown,
     message: String(err ?? 'unknown error'),
   };

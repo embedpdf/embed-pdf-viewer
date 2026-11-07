@@ -44,19 +44,19 @@ export interface PageRenderConformanceOptions {
  */
 export function runPageRenderConformance(
   runner: ConformanceTestRunner,
-  opts: PageRenderConformanceOptions,
+  options: PageRenderConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page render conformance: ${opts.label}`, () => {
+  describe(`page render conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let page: PageHandle;
     let layout: PageLayout;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine);
+      engine = await options.makeEngine();
+      doc = await options.open(engine);
       const { pages } = await doc.pages.list();
       layout = pages[0]!;
       page = doc.page(layout.ref);
@@ -199,7 +199,7 @@ export function runPageRenderConformance(
         viewport: { kind: 'scale', scale: 0.25 },
       });
       const blob = await image.blob();
-      expect(blob.type).toBe(image.contentType);
+      expect(blob.type).toBe(image.mimeType);
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const decoded = await decodePng(bytes);
       expect([decoded.width, decoded.height]).toEqual([image.width, image.height]);

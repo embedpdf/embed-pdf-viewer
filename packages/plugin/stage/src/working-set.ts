@@ -15,7 +15,7 @@ import type { PluginContext, WorkingSetPage } from '@embedpdf/core';
 
 import type { VisiblePage } from './contract';
 import type { StageHostCapability } from './host-contract';
-import type { StageState } from './model';
+import type { StageModel } from './model';
 
 /** A lens's working set, from the pages it lays out. */
 export function workingSetOf(pages: readonly VisiblePage[]): WorkingSetPage[] {
@@ -33,7 +33,7 @@ export function workingSetOf(pages: readonly VisiblePage[]): WorkingSetPage[] {
  * camera move, so at most once per input event while the camera moves.
  */
 export function connectWorkingSet(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   stage: Pick<StageHostCapability, 'listVisiblePages'>,
 ): void {
   let told = '';

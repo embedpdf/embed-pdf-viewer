@@ -1,8 +1,9 @@
-import type { PdfCoordinates, SignatureDTO } from '@embedpdf/engine-core/runtime';
+import type { PdfCoordinates, Signature } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readContentsAt, readRevisions, readSignaturesFromModel } from './readSignatureModel';
+import { bytesEqual } from '../../../shared/bytesEqual';
 
 /** What a completion installed, as the sealed bytes must report it back. */
 export interface SealExpectation {
@@ -28,7 +29,7 @@ export function assertSealedSignature(
   docPtr: Ptr,
   model: Ptr,
   expected: SealExpectation,
-): SignatureDTO {
+): Signature {
   const refuse = (why: string) =>
     new EngineError(EngineErrorCode.SignatureRefused, `the sealed bytes ${why}`);
   const signatures = readSignaturesFromModel(runtime, model);
@@ -62,10 +63,4 @@ export function sameRange(
   b: readonly [number, number, number, number],
 ): boolean {
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
-}
-
-export function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false;
-  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
-  return true;
 }

@@ -17,6 +17,7 @@ describe("AnnotationsClient", () => {
                     page: { kind: "objectNumber", objectNumber: 1 },
                     hasAppearance: true,
                     appearanceState: "appearanceState",
+                    structurePosition: [1],
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     contents: "contents",
@@ -46,6 +47,22 @@ describe("AnnotationsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
+                    richText: {
+                        body: {
+                            family: "family",
+                            weight: 1,
+                            italic: true,
+                            size: 1.1,
+                            color: "color",
+                            decoration: ["underline"],
+                            script: "normal",
+                            letterSpacing: 1.1,
+                            horizontalScale: 1.1,
+                            align: "left",
+                            dir: "ltr",
+                        },
+                        paragraphs: [{ runs: [{ text: "text" }] }],
+                    },
                     color: "color",
                     opacity: 1.1,
                     quadPoints: [
@@ -81,7 +98,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -103,7 +120,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -133,6 +150,7 @@ describe("AnnotationsClient", () => {
                     page: { kind: "objectNumber", objectNumber: 1 },
                     hasAppearance: true,
                     appearanceState: "appearanceState",
+                    structurePosition: [1],
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     contents: "contents",
@@ -162,6 +180,22 @@ describe("AnnotationsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
+                    richText: {
+                        body: {
+                            family: "family",
+                            weight: 1,
+                            italic: true,
+                            size: 1.1,
+                            color: "color",
+                            decoration: ["underline"],
+                            script: "normal",
+                            letterSpacing: 1.1,
+                            horizontalScale: 1.1,
+                            align: "left",
+                            dir: "ltr",
+                        },
+                        paragraphs: [{ runs: [{ text: "text" }] }],
+                    },
                     color: "color",
                     opacity: 1.1,
                     quadPoints: [
@@ -198,7 +232,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -228,6 +262,7 @@ describe("AnnotationsClient", () => {
                 page: { kind: "objectNumber", objectNumber: 1 },
                 hasAppearance: true,
                 appearanceState: "appearanceState",
+                structurePosition: [1],
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 contents: "contents",
@@ -257,17 +292,33 @@ describe("AnnotationsClient", () => {
                 modifiedBy: "modifiedBy",
                 importedBy: "importedBy",
                 actions: {
-                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    activate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                },
+                richText: {
+                    body: {
+                        family: "family",
+                        weight: 1,
+                        italic: true,
+                        size: 1.1,
+                        color: "color",
+                        decoration: ["underline"],
+                        script: "normal",
+                        letterSpacing: 1.1,
+                        horizontalScale: 1.1,
+                        align: "left",
+                        dir: "ltr",
+                    },
+                    paragraphs: [{ runs: [{ text: "text" }] }],
                 },
                 color: "color",
                 opacity: 1.1,
@@ -290,6 +341,9 @@ describe("AnnotationsClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -301,7 +355,10 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                missingCharacters: ["missingCharacters"],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
@@ -329,7 +386,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -358,7 +415,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -398,6 +455,9 @@ describe("AnnotationsClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -409,13 +469,16 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                missingCharacters: ["missingCharacters"],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -425,7 +488,7 @@ describe("AnnotationsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -434,11 +497,11 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -449,7 +512,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -465,6 +528,7 @@ describe("AnnotationsClient", () => {
                 page: { kind: "objectNumber", objectNumber: 1 },
                 hasAppearance: true,
                 appearanceState: "appearanceState",
+                structurePosition: [1],
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 contents: "contents",
@@ -494,17 +558,33 @@ describe("AnnotationsClient", () => {
                 modifiedBy: "modifiedBy",
                 importedBy: "importedBy",
                 actions: {
-                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    activate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                },
+                richText: {
+                    body: {
+                        family: "family",
+                        weight: 1,
+                        italic: true,
+                        size: 1.1,
+                        color: "color",
+                        decoration: ["underline"],
+                        script: "normal",
+                        letterSpacing: 1.1,
+                        horizontalScale: 1.1,
+                        align: "left",
+                        dir: "ltr",
+                    },
+                    paragraphs: [{ runs: [{ text: "text" }] }],
                 },
                 color: "color",
                 opacity: 1.1,
@@ -528,6 +608,9 @@ describe("AnnotationsClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -539,13 +622,16 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                missingCharacters: ["missingCharacters"],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -556,7 +642,7 @@ describe("AnnotationsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
             body: {
                 key: "value",
             },
@@ -568,11 +654,11 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -584,7 +670,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 body: {
                     string: {
                         key: "value",
@@ -598,11 +684,11 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -614,7 +700,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 body: {
                     string: {
                         key: "value",
@@ -647,6 +733,9 @@ describe("AnnotationsClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -658,6 +747,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -685,7 +775,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -714,7 +804,7 @@ describe("AnnotationsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -758,6 +848,9 @@ describe("AnnotationsClient", () => {
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -769,7 +862,10 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                missingCharacters: ["missingCharacters"],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
@@ -811,7 +907,7 @@ describe("AnnotationsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -860,7 +956,7 @@ describe("AnnotationsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

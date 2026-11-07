@@ -10,6 +10,9 @@ export interface CacheDelta {
     layoutVersion?: number | undefined;
     metadataVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
+    outlineVersion?: number | undefined;
+    fontsVersion?: number | undefined;
+    contentsVersion?: number | undefined;
     layerVersion?: number | undefined;
     working?: boolean | undefined;
     pages: CacheDelta.Pages.Item[];

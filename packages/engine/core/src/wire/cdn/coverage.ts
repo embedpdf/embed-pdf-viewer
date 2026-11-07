@@ -14,9 +14,9 @@
  * Never imported by engine-local — this is HTTP-wire territory.
  */
 
-import type { PdfBits } from '../../auth/scope';
+import type { PdfPermissionFlags } from '../../auth/scope';
 import type { LayerScopePlane, LayerScopes } from '../../dto/LayerScopes';
-import { PAGE_RENDER_FAMILIES } from '../renderFamilies';
+import { PAGE_PICTURES } from '../renderFamilies';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../resources';
 
 /**
@@ -70,10 +70,8 @@ export interface CdnCoverageEntry {
  * as every edge grant.
  */
 const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>> = {
-  'page-render': PAGE_RENDER_FAMILIES.pages.planes,
-  'page-render-annotations': PAGE_RENDER_FAMILIES.annotations.planes,
-  'page-render-fields': PAGE_RENDER_FAMILIES.fields.planes,
-  'page-render-all': PAGE_RENDER_FAMILIES.all.planes,
+  // Every page picture, screen and print, from the one table.
+  ...Object.fromEntries(PAGE_PICTURES.map((picture) => [picture.resource, picture.planes])),
   'page-text': ['content'],
   'page-geometry': ['content'],
   'page-annotations': ['annotations'],
@@ -88,11 +86,16 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   actions: ['actions'],
   attachments: ['attachments'],
   'attachment-files': ['attachments'],
+  // Read in page space: a page delete or a box change moves it too.
+  outline: ['outline', 'layout'],
+  // A document's fonts are wherever its drawings are: its pages, its
+  // annotations' appearances, its form.
+  fonts: ['content', 'annotations', 'forms'],
 };
 
 export function cdnCoverageForScope(
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   context: {
     docId: string;
     layerName?: string;
@@ -112,7 +115,7 @@ export function cdnCoverageForScope(
     if (!r.cdnCacheable) continue;
     const planes = RESOURCE_PLANES[id];
     if (planes && scopes && planes.some((plane) => scopes[plane] === 'layer')) continue;
-    if (!checkResourceAccess(id, rawScope, pdfBits)) continue;
+    if (!checkResourceAccess(id, rawScope, permissionFlags)) continue;
     out.push({
       resourceId: id,
       pathPattern: r.resolvePathPattern(context.docId, context.layerName),

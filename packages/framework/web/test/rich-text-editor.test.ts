@@ -8,19 +8,22 @@ import {
   serializeRichText,
   styleDeltaOf,
   type EditorNode,
+  type EditorRoot,
   type RichTextEditorDocument,
+  type RichTextEditorFace,
   type RichTextEditorHost,
+  restyleFaces,
 } from '../src/rich-text-editor';
 import { element, elementTree, emptyStyle, fakeEditor, root, text } from './helpers/fake-editor';
 
-const cssFontFamily = (family: string) =>
-  family === 'Helvetica' ? 'Helvetica, Arial, sans-serif' : `"${family}"`;
+const cssFontFamily = (face: RichTextEditorFace) =>
+  face.family === 'Helvetica' ? 'Helvetica, Arial, sans-serif' : `"${face.family}"`;
 
 function projection(node: EditorNode): string {
   const doc = serializeRichText(node, 1);
   return doc.paragraphs
     .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-    .join('\r');
+    .join('\n');
 }
 
 // ---- Render + serialise -------------------------------------------------------
@@ -39,7 +42,7 @@ describe('renderRichText', () => {
               { text: 'bold', style: { weight: 700, color: '#FF0000', size: 14 } },
             ],
           },
-          { runs: [{ text: 'a\rb' }] },
+          { runs: [{ text: 'a\nb' }] },
           { runs: [{ text: '' }] },
         ],
       },
@@ -101,13 +104,71 @@ describe('serializeRichText', () => {
             { text: ' sub', style: { script: 'sub' } },
           ],
         },
-        { dir: 'rtl', runs: [{ text: 'line\rbreak', style: { family: 'Helvetica' } }] },
+        { dir: 'rtl', runs: [{ text: 'line\nbreak', style: { family: 'Helvetica' } }] },
         { runs: [{ text: '' }] },
       ],
     };
     const element = root();
     renderRichText(element, doc, { scale: 1.5, cssFontFamily });
     expect(serializeRichText(element, 1.5)).toEqual(doc);
+  });
+
+  it("draws a run in its face's family and reads back only the family it names", () => {
+    const faces: RichTextEditorFace[] = [];
+    const programFamily = (face: RichTextEditorFace) => {
+      faces.push(face);
+      return `"epdf-${face.family.toLowerCase()}-${face.weight}${face.italic ? 'i' : ''}"`;
+    };
+    const doc: RichTextEditorDocument = {
+      paragraphs: [
+        {
+          runs: [
+            { text: 'body ' },
+            { text: 'bold', style: { weight: 700 } },
+            { text: ' brand', style: { family: 'Brand Sans' } },
+          ],
+        },
+      ],
+    };
+    const element = root();
+    const body = { family: 'Roboto', weight: 400, italic: false };
+    renderRichText(element, doc, { scale: 1, cssFontFamily: programFamily, body });
+    const [, bold, brand] = element.childNodes[0]!.childNodes;
+    // A bold run draws in the body family's bold program, not a faked bold.
+    expect(bold!.style!.fontFamily).toBe('"epdf-roboto-700"');
+    expect(brand!.style!.fontFamily).toBe('"epdf-brand sans-400"');
+    expect(faces).toEqual([
+      { family: 'Roboto', weight: 700, italic: false },
+      { family: 'Brand Sans', weight: 400, italic: false },
+    ]);
+    // The program families never read back as families: the spans keep theirs.
+    expect(serializeRichText(element, 1, () => 'Wrong')).toEqual(doc);
+  });
+
+  it("reads a family from CSS only for a span the browser made, through the host's mapping", () => {
+    const element = root(
+      elementTree('div', {}, elementTree('span', { fontFamily: '"epdf-0123", "epdf-ffff"' }, 'a')),
+    );
+    expect(
+      serializeRichText(element, 1, (css) => (css === 'epdf-0123' ? 'Roboto' : undefined)),
+    ).toEqual({ paragraphs: [{ runs: [{ text: 'a', style: { family: 'Roboto' } }] }] });
+  });
+
+  it('draws the spans again in the families the host answers now, the text untouched', () => {
+    const doc: RichTextEditorDocument = {
+      paragraphs: [
+        { runs: [{ text: 'a' }, { text: 'b', style: { family: 'Brand', italic: true } }] },
+      ],
+    };
+    const element = root();
+    const body = { family: 'Helvetica', weight: 400, italic: false };
+    renderRichText(element, doc, { scale: 1, cssFontFamily, body });
+    const span = element.childNodes[0]!.childNodes[1]!;
+    const textNode = span.childNodes[0];
+    expect(span.style!.fontFamily).toBe('"Brand"');
+    restyleFaces(element, body, (face) => `"loaded-${face.family}-${face.italic}"`);
+    expect(span.style!.fontFamily).toBe('"loaded-Brand-true"');
+    expect(span.childNodes[0]).toBe(textNode);
   });
 
   it('reads inline styles only (never invents an inherited value)', () => {
@@ -117,6 +178,11 @@ describe('serializeRichText', () => {
     expect(serializeRichText(element, 1)).toEqual({
       paragraphs: [{ runs: [{ text: 'a', style: { weight: 700 } }, { text: 'b' }] }],
     });
+  });
+
+  it('reads a line break in a text node, however spelled, as a hard break', () => {
+    const el = root(elementTree('div', {}, 'a\r\nb\rc\nd'));
+    expect(serializeRichText(el, 1)).toEqual({ paragraphs: [{ runs: [{ text: 'a\nb\nc\nd' }] }] });
   });
 
   it('understands what a browser produces while editing', () => {
@@ -140,7 +206,7 @@ describe('serializeRichText', () => {
       paragraphs: [
         { runs: [{ text: 'first' }] },
         { runs: [{ text: '' }] },
-        { runs: [{ text: 'a\rb\r' }] },
+        { runs: [{ text: 'a\nb\n' }] },
         {
           runs: [
             { text: 'strong', style: { weight: 700 } },
@@ -196,9 +262,9 @@ describe('styleDeltaOf', () => {
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"My Font", serif' }, 1)).toEqual({
       family: 'My Font',
     });
-    // A registered font's mounted family reads back as its key.
+    // Without a host to read it back, a family reads back as it is.
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"epdf-brand-sans"' }, 1)).toEqual({
-      family: 'brand-sans',
+      family: 'epdf-brand-sans',
     });
   });
 });
@@ -209,7 +275,7 @@ describe('offsets', () => {
   const doc: RichTextEditorDocument = {
     paragraphs: [
       { runs: [{ text: 'ab' }, { text: 'cd', style: { weight: 700 } }] },
-      { runs: [{ text: 'e\rf' }] },
+      { runs: [{ text: 'e\nf' }] },
       { runs: [{ text: '' }] },
     ],
   };
@@ -223,7 +289,7 @@ describe('offsets', () => {
   const fText = p2!.childNodes[2]!;
 
   it('counts like the plain projection', () => {
-    expect(projection(element)).toBe('abcd\re\rf\r');
+    expect(projection(element)).toBe('abcd\ne\nf\n');
     expect(offsetOfPosition(element, { node: ab, offset: 0 })).toBe(0);
     expect(offsetOfPosition(element, { node: ab, offset: 2 })).toBe(2);
     expect(offsetOfPosition(element, { node: cd, offset: 0 })).toBe(2);
@@ -255,7 +321,7 @@ describe('offsets', () => {
 
   it('places the caret after a trailing hard break', () => {
     const el2 = root();
-    renderRichText(el2, { paragraphs: [{ runs: [{ text: 'a\r' }] }] }, { scale: 1, cssFontFamily });
+    renderRichText(el2, { paragraphs: [{ runs: [{ text: 'a\n' }] }] }, { scale: 1, cssFontFamily });
     const block = el2.childNodes[0]!;
     expect(block.childNodes.map((node) => node.nodeName)).toEqual(['#text', 'BR', 'BR']);
     expect(positionOfOffset(el2, 2)).toEqual({ node: block, offset: 2 });
@@ -264,7 +330,7 @@ describe('offsets', () => {
     const el3 = root();
     renderRichText(
       el3,
-      { paragraphs: [{ runs: [{ text: 'a\rb\r', style: { weight: 700 } }] }] },
+      { paragraphs: [{ runs: [{ text: 'a\nb\n', style: { weight: 700 } }] }] },
       { scale: 1, cssFontFamily },
     );
     const b3 = el3.childNodes[0]!;
@@ -276,7 +342,7 @@ describe('offsets', () => {
       'BR',
     ]);
     expect(serializeRichText(el3, 1)).toEqual({
-      paragraphs: [{ runs: [{ text: 'a\rb\r', style: { weight: 700 } }] }],
+      paragraphs: [{ runs: [{ text: 'a\nb\n', style: { weight: 700 } }] }],
     });
     expect(positionOfOffset(el3, 4)).toEqual({ node: b3.childNodes[0], offset: 4 });
   });
@@ -301,7 +367,9 @@ function host(): RichTextEditorHost & {
     inputs,
     selections,
     commands,
-    onInput: (doc) => inputs.push(doc),
+    onInput: (doc) => {
+      inputs.push(doc);
+    },
     onSelectionChange: (range) => selections.push(range),
     onCommand: (command) => commands.push(command),
     cssFontFamily,
@@ -329,6 +397,7 @@ describe('attachRichTextEditor', () => {
     const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
       document: rich,
       scale: 1,
+      body: { family: 'Custom', weight: 400, italic: true },
     });
     const block = element.childNodes[0]!;
     const span = block.childNodes[1]!;
@@ -551,5 +620,125 @@ describe('attachRichTextEditor', () => {
     element.dispatch('input');
     expect(h1.selections).toHaveLength(1);
     expect(h1.inputs).toEqual([]);
+  });
+
+  it('reports the selection as it is now before a command', () => {
+    const { el: element, document } = fakeEditor();
+    const h1 = host();
+    const order: string[] = [];
+    h1.onSelectionChange = (range) => {
+      h1.selections.push(range);
+      order.push('selection');
+    };
+    h1.onCommand = (command) => {
+      h1.commands.push(command);
+      order.push('command');
+    };
+    const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
+      document: initial,
+      scale: 1,
+    });
+    document.activeElement = element;
+    // The caret moved, and the browser hasn't sent its selectionchange yet.
+    binding.select({ start: 5, end: 5 });
+    element.dispatch('keydown', {
+      key: 'b',
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      preventDefault: () => {},
+    });
+    expect(h1.selections).toEqual([{ start: 5, end: 5 }]);
+    expect(order).toEqual(['selection', 'command']);
+    binding.detach();
+  });
+
+  it('shows the document the host keeps before the next keystroke, caret kept', () => {
+    const { el: element, document } = fakeEditor();
+    const h1 = host();
+    // The host gives the typed "!" a style chosen at the caret.
+    const kept: RichTextEditorDocument = {
+      paragraphs: [{ runs: [{ text: 'hello' }, { text: '!', style: { weight: 700 } }] }],
+    };
+    h1.onInput = (doc) => {
+      h1.inputs.push(doc);
+      return kept;
+    };
+    const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
+      document: initial,
+      scale: 1,
+    });
+    document.activeElement = element;
+    element.childNodes[0]!.childNodes[0]!.nodeValue = 'hello!';
+    binding.select({ start: 6, end: 6 });
+    element.dispatch('input');
+    // Drawn at once, no update from the host needed: the next keystroke reads it.
+    expect(serializeRichText(element as unknown as EditorRoot, 1)).toEqual(kept);
+    expect(binding.selection()).toEqual({ start: 6, end: 6 });
+    // The host's update with the same document is its echo: nothing is drawn again.
+    const drawn = element.childNodes[0];
+    binding.update({ document: kept, scale: 1 });
+    expect(element.childNodes[0]).toBe(drawn);
+    binding.detach();
+  });
+
+  it('keeps newer typing when the host draws an earlier keystroke back late', () => {
+    const { el: element, document } = fakeEditor();
+    const h1 = host();
+    const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
+      document: initial,
+      scale: 1,
+    });
+    document.activeElement = element;
+    const node = element.childNodes[0]!.childNodes[0]!;
+    node.nodeValue = 'helloa';
+    element.dispatch('input');
+    node.nodeValue = 'helloab';
+    element.dispatch('input');
+    node.nodeValue = 'helloabx';
+    element.dispatch('input');
+    const [typedA, typedAB, typedABX] = h1.inputs;
+    // The host draws "a", then "b", back after "x" was typed: late, not changes.
+    binding.update({ document: typedA!, scale: 1 });
+    expect(projection(element)).toBe('helloabx');
+    binding.update({ document: typedAB!, scale: 1 });
+    expect(projection(element)).toBe('helloabx');
+    binding.update({ document: typedABX!, scale: 1 });
+    node.nodeValue = 'helloab';
+    element.dispatch('input');
+    expect(h1.inputs[3]).toEqual(typedAB);
+    // A zoom draws the newest text, even when the update that brings it is late.
+    node.nodeValue = 'helloabc';
+    element.dispatch('input');
+    node.nodeValue = 'helloabcd';
+    element.dispatch('input');
+    binding.update({ document: h1.inputs[4]!, scale: 2 });
+    expect(projection(element)).toBe('helloabcd');
+    // Once drawn back, an earlier text is the host going back (an undo), and is drawn.
+    binding.update({ document: h1.inputs[5]!, scale: 2 });
+    binding.update({ document: typedAB!, scale: 2 });
+    expect(projection(element)).toBe('helloab');
+    binding.detach();
+  });
+
+  it('reports the caret once a composition ends, never while it moves through it', () => {
+    const { el: element, document } = fakeEditor();
+    const h1 = host();
+    const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
+      document: initial,
+      scale: 1,
+    });
+    document.activeElement = element;
+    binding.select({ start: 5, end: 5 });
+    element.dispatch('compositionstart');
+    element.childNodes[0]!.childNodes[0]!.nodeValue = 'hello日本';
+    binding.select({ start: 7, end: 7 });
+    document.dispatch('selectionchange');
+    expect(h1.selections).toEqual([]);
+    element.dispatch('compositionend');
+    // The composed text first, then where the caret ended up.
+    expect(h1.inputs).toEqual([{ paragraphs: [{ runs: [{ text: 'hello日本' }] }] }]);
+    expect(h1.selections).toEqual([{ start: 7, end: 7 }]);
+    binding.detach();
   });
 });

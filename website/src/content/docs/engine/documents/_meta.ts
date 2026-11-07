@@ -6,6 +6,7 @@ export default {
   saving: 'Saving',
   changes: 'Changes & undo',
   metadata: 'Metadata',
+  outline: 'Outline',
   attachments: 'Attachments',
   redaction: 'Redaction',
   fonts: 'Fonts',

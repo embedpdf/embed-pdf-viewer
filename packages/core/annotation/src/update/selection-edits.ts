@@ -5,7 +5,13 @@
  * They are changes by hand: a record the session's `editable` rule freezes
  * is skipped (editable.ts).
  */
-import type { AnnotationFlags, PdfLinkTarget, RichTextBody } from '@embedpdf/engine-core/runtime';
+import type {
+  Annotation,
+  AnnotationFlags,
+  PdfLinkTarget,
+  RichTextBody,
+  RichTextRunStyle,
+} from '@embedpdf/engine-core/runtime';
 
 import { isDeletableByHand, isEditableByHand, isTransformableByHand } from '../editable';
 import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
@@ -13,6 +19,7 @@ import { groupUnionBounds } from '../hit';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
 import { kindOf, shapeOf, withShape, withValues, writableTarget } from '../record';
+import { restyleRuns, withoutStyle, type RichTextStyleDelta } from '../richtext';
 import { annotationTurnPivot } from '../selection';
 import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
 import { withoutRecords } from './changes';
@@ -44,7 +51,9 @@ function changeRecords(
 /**
  * Write engine fields to records, a patch per id, each through `withValues`:
  * a record takes the fields its kind has and may change now, so one message
- * restyles a mixed selection, and a `rect` the engine would refuse throws.
+ * restyles a mixed selection, and a `rect` the engine would refuse throws. A
+ * new kind is taken by hand only when people may change that kind too. A free
+ * text's font, size and text color are all its text's (`withWordsFollowing`).
  * The tool defaults are never touched: editing existing annotations doesn't
  * change the next one drawn.
  */
@@ -52,10 +61,40 @@ export function setFields(
   model: Model,
   patches: Readonly<Record<Id, FieldValues>>,
 ): [Model, Effect[]] {
-  const next = changeRecords(model, Object.keys(patches), (record) =>
-    withValues(record, patches[record.id]!),
-  );
+  const next = changeRecords(model, Object.keys(patches), (record) => {
+    const { subtype, ...fields } = patches[record.id]!;
+    const byHand =
+      subtype === undefined ||
+      isEditableByHand(model, { ...record.annotation, subtype } as ModelAnnotation['annotation']);
+    const own = withWordsFollowing(record.annotation, fields);
+    return withValues(record, byHand ? { subtype, ...own } : own);
+  });
   return [next, []];
+}
+
+/** The run style each of a free text's text fields sets. */
+const RUN_STYLE_OF_FIELD: Readonly<Record<string, keyof RichTextRunStyle>> = {
+  fontFamily: 'family',
+  fontSize: 'size',
+  fontColor: 'color',
+};
+
+/**
+ * A free text's `fields` with its words following them: a font, size or text
+ * color set on the whole box is every word's, so a word with its own stops
+ * naming it, as a format does (`setTextFormat`). The engine keeps the PDF's
+ * rule, where these fields move only the body.
+ */
+function withWordsFollowing(annotation: Annotation, fields: FieldValues): FieldValues {
+  if (annotation.subtype !== 'free-text') return fields;
+  const keys = Object.keys(fields)
+    .filter((field) => fields[field] !== undefined && RUN_STYLE_OF_FIELD[field])
+    .map((field) => RUN_STYLE_OF_FIELD[field]!);
+  if (!keys.length) return fields;
+  const { body, paragraphs } = annotation.richText;
+  const following = restyleRuns({ paragraphs }, (style) => withoutStyle(style, keys));
+  if (following.paragraphs === paragraphs) return fields;
+  return { ...fields, richText: { body, paragraphs: following.paragraphs } };
 }
 
 /** Does a free text's body carry `format`, as the sidebar shows it? */
@@ -74,17 +113,36 @@ function bodyWith(body: RichTextBody, format: TextFormat, on: boolean): RichText
 }
 
 /**
- * Bold, italic or underline on or off for the selection's free texts. A
- * format is the rich text's body, so every run that doesn't set its own
- * follows; the editor's range formats runs instead.
+ * A run's own style with `format` the body's: no weight or italic of its own,
+ * and an underline taken off the lines it draws itself, or added to them.
+ */
+function runFollowing(
+  style: RichTextStyleDelta,
+  format: TextFormat,
+  on: boolean,
+): RichTextStyleDelta {
+  if (format === 'bold') return withoutStyle(style, ['weight']);
+  if (format === 'italic') return withoutStyle(style, ['italic']);
+  if (!style.decoration || style.decoration.includes('underline') === on) return style;
+  const lines = style.decoration.filter((line) => line !== 'underline');
+  return { ...style, decoration: on ? [...lines, 'underline'] : lines };
+}
+
+/**
+ * Bold, italic or underline on or off for all the text of the selection's
+ * free texts: the body takes the format, and a word with its own follows it
+ * (`runFollowing`). The editor's caret and range format runs instead.
  */
 export function setTextFormat(model: Model, format: TextFormat, on: boolean): [Model, Effect[]] {
   const next = changeRecords(model, model.selected, (record) => {
     const annotation = record.annotation;
     if (annotation.subtype !== 'free-text') return record;
     const { body, paragraphs } = annotation.richText;
-    if (bodyHas(body, format) === on) return record;
-    return withValues(record, { richText: { body: bodyWith(body, format, on), paragraphs } });
+    const following = restyleRuns({ paragraphs }, (style) => runFollowing(style, format, on));
+    if (bodyHas(body, format) === on && following.paragraphs === paragraphs) return record;
+    return withValues(record, {
+      richText: { body: bodyWith(body, format, on), paragraphs: following.paragraphs },
+    });
   });
   return [next, []];
 }

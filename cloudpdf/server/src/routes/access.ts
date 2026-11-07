@@ -1,13 +1,14 @@
 import {
   EngineError,
   EngineErrorCode,
-  decodePdfBits,
+  permissionFlagsOf,
   expandRawScope,
-  permissionInfoWithAdvisory,
+  permissionInfoFromProbe,
+  pluginPermissionsOf,
   type BundleLimits,
   type DocumentAccessInfo,
   type DocumentProtection,
-  type PdfBits,
+  type PdfPermissionFlags,
 } from '@embedpdf/engine-core/runtime';
 import {
   AccessRequestSchema,
@@ -25,15 +26,19 @@ import {
   requireLayerDocAccessOnly,
   type RequestJwtContext,
 } from '../app/jwt-plugin';
+import type { PermissionRegistry } from '../auth/permission-registry';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
+import { isoTimeOfSeconds } from '../time';
 
 export interface AccessRouteDeps {
   service: DocumentService;
+  /** The installed plugins' permissions: the ones a session's effective scope can hold. */
+  permissions: PermissionRegistry;
   /** Opens the editing sessions of callers that may create. */
   layers: LayerService;
   cdnSigner: CdnSigner;
@@ -49,8 +54,16 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, layers, cdnSigner, derivedRenders, usageMeters, tenantUsage, bundleLimits } =
-    deps;
+  const {
+    service,
+    layers,
+    cdnSigner,
+    derivedRenders,
+    usageMeters,
+    tenantUsage,
+    bundleLimits,
+    permissions,
+  } = deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -105,7 +118,7 @@ export async function registerAccessRoutes(
     // caller see right now." Driving both `pdfPermissions` and the
     // `effectiveScope` expansion from the same source keeps the
     // response internally consistent.
-    const pdfBits = decodePdfBits(unlocked.probe.pdfPermissionsBits);
+    const permissionFlags = permissionFlagsOf(unlocked.probe.pdfPermissionsBits);
     // Plane-scoped edge grant: each doc-level shared prefix rides this caller's CDN
     // credential only while every plane it depends on is inherited by the
     // pinned layer — the same scopes the manifest advertises and the origin
@@ -118,7 +131,7 @@ export async function registerAccessRoutes(
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
-      pdfBits,
+      permissionFlags,
       protection,
       cdnSigner,
       ctx.tenantId,
@@ -128,12 +141,13 @@ export async function registerAccessRoutes(
       bundleLimits,
       derivedRenders?.policy(),
       layerScopes,
+      permissions.documentPermissions(),
     );
     // A caller that may create gets its editing session: made, revived or
     // kept alive, and handed the object numbers it asks for.
     const session = editSessionOf(req);
     const edit =
-      session.originSessionId && mayCreateObjects(ctx, pdfBits, protection)
+      session.originSessionId && mayCreateObjects(ctx, permissionFlags, protection)
         ? await layers.openEditSession(
             { ...ctx, ...session },
             {
@@ -145,10 +159,10 @@ export async function registerAccessRoutes(
         : undefined;
     // A view is a successfully authorized viewer access grant. Counting at
     // this choke point avoids charging internal render/cache operations.
-    // Share sessions (`sub: share:<id>`) were already counted at exchange —
+    // Grant sessions (`sub: grant:<id>`) were already counted at exchange —
     // skipping them here is the two-choke-point dedupe, applied to both the
     // deployment-wide license meter and the per-tenant fact.
-    if (!ctx.jwt.claims.sub.startsWith('share:')) {
+    if (!ctx.jwt.claims.sub.startsWith('grant:')) {
       await usageMeters?.recordView();
       await tenantUsage?.recordView(ctx.tenantId);
     }
@@ -186,7 +200,7 @@ export async function registerAccessRoutes(
 function buildAccessResponse(
   unlocked: Awaited<ReturnType<DocumentService['unlockLayerAccess']>>,
   jwt: RequestJwtContext,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
   cdnSigner: CdnSigner,
   tenantId: string,
@@ -196,6 +210,7 @@ function buildAccessResponse(
   bundleLimits: BundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
+  pluginPermissions: ReadonlySet<string> = new Set(),
 ): DocumentAccessInfo {
   if (!jwt.exp || jwt.exp <= 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'doc token exp is required for access');
@@ -208,9 +223,14 @@ function buildAccessResponse(
   // also applies implication rules (e.g. annotations collab scopes
   // imply doc.annotate.read) and takes away what the document's
   // signatures forbid.
-  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits, protection)].sort();
+  // Plugin permissions ride along: the installed ones the token names, or all
+  // of them under `*`. The core never interprets them; their plugins do.
+  const effectiveScope = [
+    ...expandRawScope(jwt.scope, permissionFlags, protection),
+    ...pluginPermissionsOf(jwt.scope, pluginPermissions),
+  ].sort();
 
-  const coverage = cdnCoverageForScope(jwt.scope, pdfBits, {
+  const coverage = cdnCoverageForScope(jwt.scope, permissionFlags, {
     docId,
     layerName,
     ...(layerScopes ? { scopes: layerScopes } : {}),
@@ -227,10 +247,7 @@ function buildAccessResponse(
   return {
     cdn,
     passwordGrant: unlocked.passwordGrant,
-    // Enriched permission info: includes flags (typed bit view) and
-    // advisory (capability-shaped booleans for UI badges) on top of
-    // the raw bits/openedAs already in PdfPermissionInfo.
-    pdfPermissions: permissionInfoWithAdvisory(unlocked.probe, pdfBits),
+    pdfPermissions: permissionInfoFromProbe(unlocked.probe),
     scope: [...jwt.scope],
     effectiveScope,
     protection,
@@ -241,7 +258,7 @@ function buildAccessResponse(
     originPasswordPolicy: {
       mode: unlocked.probe.encryptionState === 'encrypted' ? 'server-session' : 'not-needed',
     },
-    expiresAt,
+    expiresAt: isoTimeOfSeconds(expiresAt),
     // The render lattice rides /access, never the manifest: manifests are
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.

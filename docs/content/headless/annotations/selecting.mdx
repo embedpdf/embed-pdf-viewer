@@ -24,7 +24,7 @@ and a turn snaps to 0°, 90°, 180° and 270°. Hold Shift to move or turn freel
 ## Select with code
 
 ```ts
-annotation.selection.set([ref]); // select these
+annotation.selection.select([ref]); // select these
 annotation.selection.add([otherRef]); // add to the selection
 annotation.selection.selectAll(page.ref); // everything on a page (or leave out the page)
 annotation.selection.selectInRect(page.ref, { x: 50, y: 50, width: 200, height: 100 });
@@ -85,12 +85,12 @@ shows both:
 
 <Example name="annotation/style-panel" />
 
-> **Try it:** change the rectangle's colors and width, then select the arrow or the text box: the
+> **Try it:** change the rectangle's colors and width, then select the arrow or the circle: the
 > panel shows what each one has. Shift-click two to see what they share.
 
 | `property.control` | What to show                                                                                                | Also on the property |
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
-| `'color'`       | A color picker. `null` means no color.                                                                         |                      |
+| `'color'`       | A color picker, and a "none" choice that writes `null` when `allowsNone` is `true`: no line around a shape, no fill. | `allowsNone`         |
 | `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
 | `'choice'`      | A list, such as fonts or line endings. Each option is `{ value, label, labelKey }`: write `value`, show `label`. | `options`            |
 | `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
@@ -98,7 +98,13 @@ shows both:
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
 | `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
 
+Marks over text, and rectangles and ellipses, also have `subtype`: a `'choice'` of the kinds they
+can become, such as highlight, underline, squiggly and strikeout. Choosing one turns each selected
+annotation into that kind, as the same annotation. A strikeout that is part of a replacement has no
+`subtype` property, because it keeps its kind while it belongs to the suggestion.
+
 `selection.update()` gives each selected annotation the properties its kind has, and skips the rest.
+A new `subtype` goes to each annotation that can become that kind, and the rest keep theirs.
 To change each annotation relative to itself, pass a function. For example, to set only the end
 arrow of lines that keep their own start:
 
@@ -204,10 +210,10 @@ the viewer still decides where a handle can be grabbed, so what you draw can't b
 annotationPlugin({
   snap: {
     alignment: true, // snap to other annotations and the page while moving
-    alignmentThreshold: 6, // how close, in screen pixels, before it snaps
+    alignmentThresholdPx: 6, // how close, in screen pixels, before it snaps
     rotation: true,
     rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
-    rotationThreshold: 4, // degrees
+    rotationThresholdDeg: 4, // degrees
   },
 });
 
@@ -219,8 +225,8 @@ what an annotation snaps to are `--epdf-annotation-guide`.
 
 <Example name="annotation/snapping" />
 
-> **Try it:** drag the red rectangle until its edge lines up with the blue one, then turn it with
-> the round handle.
+> **Try it:** drag the blue circle until its edge lines up with the red rectangle, then turn it
+> with the round handle.
 
 ## Turn and group
 
@@ -250,7 +256,7 @@ A double-click on a text box starts typing in it; a click outside ends it. From 
 
 ```ts
 annotation.text.begin(ref);
-await annotation.text.toggleFormat('bold'); // the selected words, or the whole box
+await annotation.text.toggleFormat('bold'); // the selected words, what's typed next at a caret, or the whole box
 await annotation.text.end();
 ```
 
@@ -274,7 +280,8 @@ annotation.updateSettings({ editable: true }); // everything again, the default
 The list names kinds by their `subtype`. A measurement goes by its `intent` instead
 (`'line-dimension'`, `'polyline-dimension'` or `'polygon-dimension'`), so `['line']` keeps
 measurements still and `['line-dimension']` lets only them change. `annotation.isEditable(ref)` says
-whether people may change one.
+whether people may change one. Changing a kind by hand needs both kinds in the list: with
+`['highlight']`, people restyle highlights but can't turn one into an underline.
 
 It's only about people: your code still changes any annotation with `update()` and `delete()`, and
 `canUpdate(ref)` and `canDelete(ref)` stay the same. To stop your code too, leave the permission out
@@ -306,7 +313,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 
 | Method                                                     | What it does                                                                                                                     |
 | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
-| `selection.set(refs)`, `selection.add(refs)`               | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
+| `selection.select(refs)`, `selection.add(refs)`            | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
 | `selection.selectAll(page?)`                               | Selects everything that can be selected, on one page or in the whole document                                                    |
 | `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches of what it paints, with the rest of each one's group, as dragging on empty space does |
 | `selection.clear()`                                        | Clears the selection                                                                                                             |
@@ -322,7 +329,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `draft.get()`                                              | The polygon or polyline being drawn (`{ page, bounds, pointCount, canFinish }`), or `null`. `<AnnotationDraftMenu>` uses it. [Shapes with many points](#shapes-with-many-points) |
 | `draft.finish()`, `draft.cancel()`                         | Ends the shape and creates it, as a double-click does, or drops it                                                               |
 | `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |
-| `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words or the whole box                                   |
+| `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words, what's typed next at a caret, or the whole box. [Rich text](../concepts/rich-text#format-from-your-toolbar) |
 | `isEditable(ref)`                                          | Whether people may change this annotation by hand, as the `editable` setting says. [What people may change](#what-people-may-change) |
 | `cancel()`                                                 | Stops a drag, or a polygon in progress. [Keyboard](#keyboard)                                                                    |
 
@@ -335,7 +342,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | Field      | What it is                                                                                                | Read once           |
 | :--------- | :-------------------------------------------------------------------------------------------------------- | :------------------ |
 | `status`   | `'loading'` until every annotation is in, then `'ready'`; `'forbidden'` or `'error'` when they can't load | `getStatus()`       |
-| `selected` | The selected annotations                                                                                  | `selection.list()`  |
+| `selected` | The selected annotations                                                                                  | `selection.getSelected()` |
 | `hovered`  | The annotation under the pointer, or `null`                                                               | `getHovered()`      |
 | `editing`  | The text box being typed in, or `null`                                                                    | `text.getEditing()` |
 

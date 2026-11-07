@@ -28,7 +28,7 @@ const plugins = [
   renderPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function Toolbar({ narrow, onNarrow }: { narrow: boolean; onNarrow: (narrow: boolean) => void }) {
   const stage = useStage();
@@ -50,7 +50,8 @@ function Toolbar({ narrow, onNarrow }: { narrow: boolean; onNarrow: (narrow: boo
         compact <strong>{compact ? 'on' : 'off'}</strong>
       </output>
       <output className="badge">
-        padding <strong>{padding}</strong> · spread <strong>{spread}</strong>
+        padding <strong>{typeof padding === 'number' ? padding : 'by side'}</strong> · spread{' '}
+        <strong>{spread}</strong>
       </output>
       <div className="pager">
         <button type="button" className="button" onClick={() => stage.previousPage()}>
@@ -68,7 +69,7 @@ export default function App() {
   const [narrow, setNarrow] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar narrow={narrow} onNarrow={setNarrow} />
         <div className="frame" data-width={narrow ? 'narrow' : 'full'}>

@@ -22,7 +22,7 @@ export interface SelectionRange {
 /** Page object number → that page's segments, in page space. */
 export type SegmentsByPage = Readonly<Record<PageObjectNumber, readonly SelectionSegment[]>>;
 
-export interface SelectionState {
+export interface SelectionModel {
   readonly selection: SelectionRange | null;
   /** Per-line segments derived from the range, per page, in page space. */
   readonly segments: SegmentsByPage;
@@ -32,7 +32,7 @@ export interface SelectionState {
   readonly selecting: boolean;
 }
 
-export const initialSelectionState = (): SelectionState => ({
+export const initialSelectionModel = (): SelectionModel => ({
   selection: null,
   segments: {},
   highlightHidden: false,
@@ -71,10 +71,10 @@ const sameSegments = (
  * recompute that changes nothing returns the same state.
  */
 export function setSelection(
-  state: SelectionState,
+  state: SelectionModel,
   selection: SelectionRange,
   segments: SegmentsByPage,
-): SelectionState {
+): SelectionModel {
   const pages = Object.keys(segments).map(Number);
   let segmentsChanged = pages.length !== Object.keys(state.segments).length;
   const merged: Record<PageObjectNumber, readonly SelectionSegment[]> = {};
@@ -97,16 +97,16 @@ export function setSelection(
   };
 }
 
-export function clearSelection(state: SelectionState): SelectionState {
+export function clearSelection(state: SelectionModel): SelectionModel {
   return state.selection === null && Object.keys(state.segments).length === 0
     ? state
     : { ...state, selection: null, segments: {} };
 }
 
-export const setHighlightHidden = (state: SelectionState, hidden: boolean): SelectionState =>
+export const setHighlightHidden = (state: SelectionModel, hidden: boolean): SelectionModel =>
   state.highlightHidden === hidden ? state : { ...state, highlightHidden: hidden };
 
-export const setSelecting = (state: SelectionState, selecting: boolean): SelectionState =>
+export const setSelecting = (state: SelectionModel, selecting: boolean): SelectionModel =>
   state.selecting === selecting ? state : { ...state, selecting };
 
 /**

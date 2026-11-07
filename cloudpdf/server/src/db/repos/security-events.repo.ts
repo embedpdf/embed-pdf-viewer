@@ -3,9 +3,9 @@ import type { Kysely } from 'kysely';
 import type { Database as Schema } from '../schema';
 
 /**
- * Share-grant lifecycle rides the same trail as token issuance — a
+ * The grant lifecycle rides the same trail as token issuance — a
  * grant is standing authority (its id travels in the `jti` column as
- * the credential identifier of the share family). Exchange itself is
+ * the credential identifier of the grant family). Exchange itself is
  * deliberately not an event kind: it is usage, metered per tenant,
  * and would drown the trail. Tenant suspension is here because it
  * gates every credential in the namespace.
@@ -13,9 +13,10 @@ import type { Database as Schema } from '../schema';
 export type SecurityEventKind =
   | 'token.issued'
   | 'token.revoked'
-  | 'share.created'
-  | 'share.updated'
-  | 'share.revoked'
+  | 'grant.created'
+  | 'grant.updated'
+  | 'grant.revoked'
+  | 'grant.archived'
   | 'tenant.suspended'
   | 'tenant.resumed';
 

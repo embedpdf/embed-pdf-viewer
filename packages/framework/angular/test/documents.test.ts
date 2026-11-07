@@ -233,19 +233,37 @@ describe('EpdfPageEdit', () => {
     expect(pageEdit.canEdit()).toBe(false);
     expect(pageEdit.canExtract()).toBe(false);
   });
+
+  it('has the selection as a signal, which follows select()', async () => {
+    const fixture = await mount(
+      viewerHost({
+        template: '',
+        features: [withPageEdit()],
+        config: { engine: documentsEngine() },
+      }),
+    );
+    const pageEdit = fixture.debugElement.injector.get(EpdfPageEdit);
+    expect(pageEdit.selected()).toEqual([]);
+    const kernel = kernelOf(fixture);
+    await kernel.documents.open(bytesInput('a'));
+    const [, second] = kernel.documents.listPages();
+    pageEdit.select([1]);
+    expect(pageEdit.selected()).toEqual([second!.ref]);
+    pageEdit.select([]);
+    expect(pageEdit.selected()).toEqual([]);
+  });
 });
 
 /** A link to a website, as a PDF carries it, and a click on it. */
 const websiteLink: PdfActionTree = {
   root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 /** An app's own service that the handlers of `withActionsUi()` use. */

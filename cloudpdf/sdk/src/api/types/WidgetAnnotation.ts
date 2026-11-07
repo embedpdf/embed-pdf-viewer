@@ -8,6 +8,7 @@ export interface WidgetAnnotation {
     page: CloudPDF.PageRef;
     hasAppearance: boolean;
     appearanceState: string | null;
+    structurePosition: number[] | null;
     nm: string | null;
     rect: WidgetAnnotation.Rect;
     contents: string | null;
@@ -48,7 +49,9 @@ export interface WidgetAnnotation {
     caption: string | null;
     checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
-    fieldFamily: WidgetAnnotation.FieldFamily;
+    /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
+    fieldKind: WidgetAnnotation.FieldKind;
+    hasMark: boolean;
 }
 
 export namespace WidgetAnnotation {
@@ -127,7 +130,8 @@ export namespace WidgetAnnotation {
         Diamond: "diamond",
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
-    export const FieldFamily = {
+    /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
+    export const FieldKind = {
         Text: "text",
         Checkbox: "checkbox",
         Radio: "radio",
@@ -137,5 +141,5 @@ export namespace WidgetAnnotation {
         Signature: "signature",
         Unknown: "unknown",
     } as const;
-    export type FieldFamily = (typeof FieldFamily)[keyof typeof FieldFamily];
+    export type FieldKind = (typeof FieldKind)[keyof typeof FieldKind];
 }

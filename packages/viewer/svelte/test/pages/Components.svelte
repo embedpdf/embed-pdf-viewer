@@ -2,6 +2,7 @@
 <script lang="ts">
   import {
     Button,
+    Icon,
     Menu,
     MenuItem,
     PDFViewer,
@@ -17,6 +18,7 @@
   let { record }: { record: ComponentsRecord } = $props();
 
   let width = $state('100%');
+  let night = $state(false);
   // The test drives the page through its record.
   $effect.pre(() => {
     record.setWidth = (next) => (width = next);
@@ -31,6 +33,7 @@
       )
       .add({ custom: 'zoom-in' }, { to: 'main', section: 'start' })
       .add({ custom: 'share' }, { to: 'main', section: 'start' })
+      .add({ custom: 'toggle' }, { to: 'main', section: 'end' })
       .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
       .add('panel:notes', { to: 'main', section: 'end' });
     return env.width < 900 ? placed.place('main', 'start') : placed;
@@ -59,7 +62,12 @@
     <Menu icon="link" label="Share">
       <MenuItem icon="copy" onselect={() => record.picked.push('copy')}>Copy link</MenuItem>
       <MenuItem icon="message" onselect={() => record.picked.push('email')}>Email a link</MenuItem>
+      <MenuItem active>Show notes</MenuItem>
     </Menu>
+  </ToolbarItem>
+  <ToolbarItem id="toggle">
+    <Button icon="eye" label="Night" active={night} onclick={() => (night = !night)} />
+    <Icon name="check" size={16} label="Saved" />
   </ToolbarItem>
   <Panel id="notes">
     <textarea data-check="notes" placeholder="Your notes"></textarea>

@@ -18,7 +18,7 @@ import type { ResourceStatus } from '@embedpdf/core';
 
 import type { CalibrationRequest, PageScale, ScaleChangeReport } from './contract';
 
-export interface MeasurementState {
+export interface MeasurementModel {
   /** Scale changes in flight. */
   readonly pending: number;
   readonly calibration: CalibrationRequest | null;
@@ -32,7 +32,7 @@ export interface MeasurementState {
 /** No reports yet: the same array every time. */
 export const NO_REPORTS: readonly ScaleChangeReport[] = Object.freeze([]);
 
-export const initialMeasurementState = (): MeasurementState => ({
+export const initialMeasurementModel = (): MeasurementModel => ({
   pending: 0,
   calibration: null,
   reports: NO_REPORTS,
@@ -40,47 +40,47 @@ export const initialMeasurementState = (): MeasurementState => ({
   localViewports: {},
 });
 
-export const beginScaleChange = (state: MeasurementState): MeasurementState => ({
+export const beginScaleChange = (state: MeasurementModel): MeasurementModel => ({
   ...state,
   pending: state.pending + 1,
 });
 
-export const endScaleChange = (state: MeasurementState): MeasurementState =>
+export const endScaleChange = (state: MeasurementModel): MeasurementModel =>
   state.pending === 0 ? state : { ...state, pending: state.pending - 1 };
 
 export const setCalibration = (
-  state: MeasurementState,
+  state: MeasurementModel,
   calibration: CalibrationRequest | null,
-): MeasurementState => (state.calibration === calibration ? state : { ...state, calibration });
+): MeasurementModel => (state.calibration === calibration ? state : { ...state, calibration });
 
 export const setReports = (
-  state: MeasurementState,
+  state: MeasurementModel,
   reports: readonly ScaleChangeReport[],
-): MeasurementState => (state.reports === reports ? state : { ...state, reports });
+): MeasurementModel => (state.reports === reports ? state : { ...state, reports });
 
 export const recordLoadError = (
-  state: MeasurementState,
+  state: MeasurementModel,
   pageObjectNumber: number,
   error: SerializedEngineError,
-): MeasurementState => ({
+): MeasurementModel => ({
   ...state,
   loadErrors: { ...state.loadErrors, [pageObjectNumber]: error },
 });
 
 export const clearLoadError = (
-  state: MeasurementState,
+  state: MeasurementModel,
   pageObjectNumber: number,
-): MeasurementState => {
+): MeasurementModel => {
   if (!(pageObjectNumber in state.loadErrors)) return state;
   const { [pageObjectNumber]: _cleared, ...loadErrors } = state.loadErrors;
   return { ...state, loadErrors };
 };
 
 export const setLocalViewports = (
-  state: MeasurementState,
+  state: MeasurementModel,
   pageObjectNumber: number,
   viewports: readonly PageMeasurementViewport[],
-): MeasurementState => ({
+): MeasurementModel => ({
   ...state,
   localViewports: { ...state.localViewports, [pageObjectNumber]: viewports },
 });

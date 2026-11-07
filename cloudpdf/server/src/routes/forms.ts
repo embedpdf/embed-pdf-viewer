@@ -42,6 +42,7 @@ import {
   decodeFormToken,
   decodeWidgetAppearancesRenderToken,
   type FormExportToken,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import {
   changeAuthorityOf,
@@ -64,6 +65,7 @@ import {
   objectNumbersQuery,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
@@ -119,7 +121,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
-      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+      requested: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
     });
   });
 
@@ -127,14 +129,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const { token } = req.params as { token: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-form', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-form', permissionFlags);
     return readForm({
       documentService,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
-      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+      requested: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
     });
   });
 
@@ -191,8 +197,12 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const { pageKey, token } = req.params as { pageKey: string; token: string };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', permissionFlags);
       return renderWidgets(
         reply,
         { kind: 'layer', ctx, docId, layerName },
@@ -210,18 +220,25 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const { pageKey } = req.params as { pageKey: string };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', permissionFlags);
       return renderWidgets(reply, { kind: 'layer', ctx, docId, layerName }, pageKey, req.query);
     },
   );
 
   // A widget's place and look: a form write (`doc.forms.updateWidget`).
   app.patch(
-    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
-      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const { pageKey, annotationKey: annotKey } = req.params as {
+        pageKey: string;
+        annotationKey: string;
+      };
       const widget = decodeAnnotKey(
         { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
         annotKey,
@@ -230,14 +247,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         throw new EngineError(EngineErrorCode.InvalidArg, `malformed widget key: ${annotKey}`);
       }
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.forms.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const { patch } = parseOrInvalidArg<{ patch: WidgetPatch }>(
@@ -247,7 +268,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       );
       // An action that runs a script, submits or links takes doc.forms.script too.
       if (writesScripts(patch.actions)) {
-        requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+        requireLayerCapability(
+          req,
+          docId,
+          layerName,
+          'doc.forms.script',
+          permissionFlags,
+          protection,
+        );
       }
       setNoStore(reply);
       return layerService.updateFormWidget(
@@ -262,14 +290,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/calculations/reorder', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const { fields, position } = parseOrInvalidArg<{
@@ -299,14 +331,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { pageKey } = req.params as { pageKey: string };
       const page = toPageRef(resolvePageKeyParam(pageKey));
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.forms.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const { widgets, position } = parseOrInvalidArg<{
@@ -331,10 +367,13 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
 
   // A widget leaves its page and its field: a form write (`doc.forms.deleteWidget`).
   app.delete(
-    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
-      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const { pageKey, annotationKey: annotKey } = req.params as {
+        pageKey: string;
+        annotationKey: string;
+      };
       const widget = decodeAnnotKey(
         { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
         annotKey,
@@ -343,14 +382,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         throw new EngineError(EngineErrorCode.InvalidArg, `malformed widget key: ${annotKey}`);
       }
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.forms.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
       setNoStore(reply);
@@ -361,8 +404,12 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/form', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', permissionFlags);
     setNoStore(reply);
     return layerService.getFormSnapshot(ctx, { docId, layerName }, abortSignalOf(reply));
   });
@@ -371,8 +418,12 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', permissionFlags);
     const snapshot = await layerService.getFormSnapshot(
       ctx,
       { docId, layerName },
@@ -428,8 +479,12 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const { token } = req.params as { token: string };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-form-export', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-form-export', permissionFlags);
       return exportForm({
         documentService,
         limits: bundleLimits,
@@ -449,10 +504,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-form-export', pdfBits);
-      const request = parseOrInvalidArg<FormExportToken>(
-        FormExportRequestSchema as unknown as SchemaLike<FormExportToken>,
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-form-export', permissionFlags);
+      const request = parseOrInvalidArg<Omit<FormExportToken, 'pin'>>(
+        FormExportRequestSchema as unknown as SchemaLike<Omit<FormExportToken, 'pin'>>,
         req.body,
         'request body',
       );
@@ -474,7 +533,11 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/import', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const { body, resources } = await readBundleImportRequest(req, bundleLimits, {
       kind: 'form',
@@ -486,12 +549,19 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     // Restoring writes attribution that isn't the caller's.
     if (attribution === 'restore') {
-      requireLayerCapability(req, docId, layerName, 'doc.forms.import', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.import',
+        permissionFlags,
+        protection,
+      );
     }
     setNoStore(reply);
     return layerService.importForm(
@@ -504,9 +574,9 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         attribution,
         values: body.options.values ?? true,
         // Without it, scripts, submits and links are left out, not refused.
-        mayScript: holdsCapability(ctx, 'doc.forms.script', pdfBits, protection),
+        mayScript: holdsCapability(ctx, 'doc.forms.script', permissionFlags, protection),
         limits: bundleLimits,
-        authority: changeAuthorityOf(ctx, pdfBits, protection),
+        authority: changeAuthorityOf(ctx, permissionFlags, protection),
       },
       abortSignalOf(reply),
     );
@@ -517,7 +587,11 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/import-values', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const { body, resources } = await readBundleImportRequest(req, bundleLimits, {
       kind: 'form',
@@ -525,10 +599,17 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     });
     const attribution = body.options.attribution ?? 'restore';
     // A field the token may not fill is left out (`fill-not-allowed`), checked in the write.
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', permissionFlags, protection);
     // Restoring writes attribution that isn't the caller's.
     if (attribution === 'restore') {
-      requireLayerCapability(req, docId, layerName, 'doc.forms.import', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.import',
+        permissionFlags,
+        protection,
+      );
     }
     setNoStore(reply);
     return layerService.importFormValues(
@@ -548,14 +629,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/repair', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const body = (req.body ?? {}) as { bakeAppearances?: unknown };
@@ -573,14 +658,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/fields', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const draft = parseOrInvalidArg<FormFieldDraft>(
@@ -590,7 +679,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     );
     // Writing a script, the field's or a widget's, takes doc.forms.script too.
     if (draftWritesScripts(draft)) {
-      requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.script',
+        permissionFlags,
+        protection,
+      );
     }
     const objectNumber = objectNumberQuery(req.query, 'objectNumber');
     const widgetObjectNumbers = objectNumbersQuery(req.query, 'widgetObjectNumbers');
@@ -604,7 +700,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         ...(objectNumber !== undefined ? { objectNumber } : {}),
         ...(widgetObjectNumbers ? { widgetObjectNumbers } : {}),
         // Which group the field may go in is checked in the write.
-        authority: changeAuthorityOf(ctx, pdfBits, protection),
+        authority: changeAuthorityOf(ctx, permissionFlags, protection),
       },
       abortSignalOf(reply),
     );
@@ -614,14 +710,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const patch = parseOrInvalidArg<FormFieldPatch>(
@@ -631,12 +731,25 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     );
     // Writing a script takes doc.forms.script too; removing one doesn't.
     if (writesScripts(patch.actions)) {
-      requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.script',
+        permissionFlags,
+        protection,
+      );
     }
     setNoStore(reply);
     return layerService.updateFormField(
       ctx,
-      { docId, layerName, ref, patch, authority: changeAuthorityOf(ctx, pdfBits, protection) },
+      {
+        docId,
+        layerName,
+        ref,
+        patch,
+        authority: changeAuthorityOf(ctx, permissionFlags, protection),
+      },
       abortSignalOf(reply),
     );
   });
@@ -645,14 +758,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.forms.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     setNoStore(reply);
@@ -663,10 +780,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     // Whether this field is the token's to fill (its group) is checked in the write.
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', permissionFlags, protection);
     const body = (req.body ?? {}) as { value?: unknown };
     const value = parseOrInvalidArg<FormFieldValue>(
       FormFieldValueSchema as unknown as SchemaLike<FormFieldValue>,
@@ -684,10 +805,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/form/reset', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     // Each field it resets must be the token's to fill, checked in the write.
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', permissionFlags, protection);
     const body = parseOrInvalidArg<{ refs?: FormFieldRef[] }>(
       FormResetBodySchema as unknown as SchemaLike<{ refs?: FormFieldRef[] }>,
       req.body ?? {},
@@ -706,10 +831,21 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       // A signature's look is signing: the field must be the token's to sign, checked in the write.
-      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, protection);
+      const ctx = requireLayerFieldWrite(
+        req,
+        docId,
+        layerName,
+        'sign',
+        permissionFlags,
+        protection,
+      );
       const ref = fieldRefFromParams(req);
       // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
       const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
@@ -745,14 +881,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const ref = fieldRefFromParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.forms.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const placement = parseOrInvalidArg<WidgetPlacement>(
@@ -762,7 +902,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       );
       // An action that runs a script, submits or links takes doc.forms.script too.
       if (writesScripts(placement.actions)) {
-        requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+        requireLayerCapability(
+          req,
+          docId,
+          layerName,
+          'doc.forms.script',
+          permissionFlags,
+          protection,
+        );
       }
       const objectNumber = objectNumberQuery(req.query, 'objectNumber');
       const splitObjectNumber = objectNumberQuery(req.query, 'splitObjectNumber');
@@ -788,14 +935,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const ref = fieldRefFromParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.forms.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const body = (req.body ?? {}) as { widget?: unknown };
@@ -834,65 +985,73 @@ function fieldRefFromParams(req: FastifyRequest): FormFieldRef {
 
 /**
  * The form at a pinned `formsVersion` (immutable, CDN-cacheable), read on
- * the base session or the layer's. The pin is checked before and after the
- * worker read, so a write that landed in between is a 404 into the client's
- * manifest refresh, never a body filed under the wrong pin.
+ * the base session or the layer's at its pin (see `readAtPins`): a write
+ * that landed meanwhile is a 404 into the client's manifest refresh, never a
+ * body filed under the wrong pin.
  */
 async function readForm(input: {
   documentService: DocumentService;
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  requestedVersion: number;
+  requested: { formsVersion: number; pin: TokenPin };
 }): Promise<FormSnapshot> {
   const { scope } = input;
   const getManifest = () =>
     scope.kind === 'layer'
       ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
       : input.documentService.getManifest(scope.ctx, scope.docId);
-  const assertCurrent = (current: number) => {
-    if (input.requestedVersion === current) return;
-    setNoStore(input.reply);
+  const assertCurrent = async () => {
+    const current = (await getManifest()).formsVersion;
+    if (input.requested.formsVersion === current) return;
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requestedVersion} no longer current (current=${current})`,
+      `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requested.formsVersion} no longer current (current=${current})`,
     );
   };
-
-  assertCurrent((await getManifest()).formsVersion);
-  if (scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'forms.list' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: scope.docId,
-      ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'forms.list') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected forms.list payload: ${result.tag}`,
+  const read = async () => {
+    if (scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'forms.list' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: scope.docId,
+        ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
-  assertCurrent((await getManifest()).formsVersion);
+    if (result.tag !== 'forms.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected forms.list payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+    assertCurrent,
+    read,
+    token: { kind: 'form', pin: input.requested.pin },
+  });
   setImmutableCache(input.reply);
-  return result.snapshot;
+  return snapshot;
 }
 
 /**
- * One export job at the token's pins, checked before and after the job so an
- * immutable body never belongs to another version: a stale pin is a 404 the
- * client answers by refreshing its manifest. The response is the bundle as
+ * One export job, read at the token's pins (see `readAtPins`): a stale pin
+ * is a 404 the client answers by refreshing its manifest. The response is the bundle as
  * `sendBundle` writes it.
  */
 async function exportForm(input: {
@@ -901,7 +1060,8 @@ async function exportForm(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  token: FormExportToken;
+  /** A POST carries its pins in its body, without an engine value or shape. */
+  token: Omit<FormExportToken, 'pin'> & { pin?: TokenPin };
   /** A GET at its token is immutable; a POST is answered uncached. */
   cache?: 'immutable' | 'no-store';
 }) {
@@ -914,7 +1074,6 @@ async function exportForm(input: {
         : await input.documentService.getManifest(scope.ctx, scope.docId);
     const layoutVersion = manifest.layoutVersion ?? 1;
     if (token.formsVersion !== manifest.formsVersion || token.layoutVersion !== layoutVersion) {
-      setNoStore(input.reply);
       throw new EngineError(
         EngineErrorCode.NotFound,
         `form export at formsVersion ${token.formsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${manifest.formsVersion}, ${layoutVersion})`,
@@ -922,33 +1081,43 @@ async function exportForm(input: {
     }
   };
 
-  await assertCurrent();
-  if (layerName !== undefined) {
-    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, layerName);
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'forms.export' as const,
-      effect: 'snapshot' as const,
-      jobId,
-      docId: scope.docId,
-      ...(layerName !== undefined ? { layerName } : {}),
-      selection: token.selection,
-      limits: input.limits,
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    layerName,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'forms.export') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected forms.export payload: ${result.tag}`,
+  const read = async () => {
+    if (layerName !== undefined) {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, layerName);
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'forms.export' as const,
+        effect: 'snapshot' as const,
+        jobId,
+        docId: scope.docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+        selection: token.selection,
+        limits: input.limits,
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      layerName,
+      build,
+      input.signal,
     );
-  }
-  await assertCurrent();
-  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
+    if (result.tag !== 'forms.export') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected forms.export payload: ${result.tag}`,
+      );
+    }
+    return result.bundle;
+  };
+  const bundle = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName,
+    assertCurrent,
+    read,
+    token: { kind: 'formExport', pin: token.pin },
+  });
+  return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }

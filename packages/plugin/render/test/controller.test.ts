@@ -1,181 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createKernel,
-  toPageRef,
-  type DocumentEvent,
-  type CallFacts,
-  type DocumentHandle,
-  type Engine,
-  type PageLayout,
-  type PageRef,
-} from '@embedpdf/core';
-import type { RenderConfig } from '../src/contract';
-import { RenderToken } from '../src/host-contract';
-import { renderPlugin } from '../src/render.plugin';
-
-/** A page whose every box is its crop box, in page space: measured from that box's top-left. */
-const everyBoxIsTheCrop = (crop: { left: number; bottom: number; right: number; top: number }) => {
-  const box = { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom };
-  return { media: box, crop: box, bleed: box, trim: box, art: box };
-};
+import { toPageRef } from '@embedpdf/core';
+import { boot, documentEvent, image, LATTICE } from './harness';
 
 /** The render plugin through the real kernel: the ledger, the two raster
  *  doors, policy conformance, the tile surface, the permission twin. */
-
-const PAGE_OBJECT_NUMBERS = [11, 22, 33];
-const CROP = { left: 0, bottom: 0, right: 612, top: 792 };
-
-/** Minimal event shapes — only the fields the controller reads. */
-const documentEvent = (partial: Record<string, unknown>): DocumentEvent =>
-  partial as unknown as DocumentEvent;
-
-const LATTICE = {
-  kind: 'lattice',
-  fullPage: { widths: [320, 640, 1280, 2560] },
-  appearances: { scales: [1, 2, 4] },
-  formats: ['webp'],
-  background: 'white',
-  enforced: false,
-} as const;
-
-/** A controllable AbortablePromise-shaped render task. */
-function makeTask() {
-  let resolvePromise!: (value: unknown) => void;
-  let rejectPromise!: (error: unknown) => void;
-  const promise = new Promise((resolve, reject) => {
-    resolvePromise = resolve;
-    rejectPromise = reject;
-  });
-  const task = Object.assign(promise, {
-    aborted: undefined as unknown,
-    abort(reason?: unknown) {
-      task.aborted = reason ?? new Error('aborted');
-      rejectPromise(task.aborted);
-    },
-  });
-  return {
-    task,
-    resolve: (value: unknown) => resolvePromise(value),
-    reject: (error: unknown) => rejectPromise(error),
-  };
-}
-
-const image = (key = 'handle') =>
-  ({ source: { kind: 'bytes', bytes: new Uint8Array(4) }, format: 'png', key }) as unknown;
-
-async function boot(
-  options: {
-    policy?: unknown;
-    config?: RenderConfig;
-    allow?: boolean;
-    /** What the session may do, by capability; `allow` for every one when absent. */
-    allows?: (capability: string) => boolean;
-    crop?: typeof CROP;
-  } = {},
-) {
-  const crop = options.crop ?? CROP;
-  const pages = PAGE_OBJECT_NUMBERS.map(
-    (pageObjectNumber, index) =>
-      ({
-        index,
-        ref: toPageRef(pageObjectNumber),
-        label: null,
-        size: { width: crop.right - crop.left, height: crop.top - crop.bottom },
-        rotation: 0,
-        userUnit: 1,
-        boxes: everyBoxIsTheCrop(crop),
-        pdfCropBox: { ...crop },
-      }) as PageLayout,
-  );
-  const listeners = new Set<(event: unknown) => void>();
-  const imageCalls: Array<{
-    pageObjectNumber: number;
-    options: Record<string, unknown>;
-    /** The view the render was asked for (`doc.with({ view })`), if any. */
-    view?: string;
-    /** Its priority (`doc.with({ priority })`), if any. */
-    priority?: string;
-  }> = [];
-  const tasks: Array<ReturnType<typeof makeTask>> = [];
-  const appearanceCalls: Array<{
-    pageObjectNumber: number;
-    family: 'annotations' | 'widgets';
-    options: Record<string, unknown>;
-  }> = [];
-  const appearanceTasks: Array<ReturnType<typeof makeTask>> = [];
-  // The document as a call with these facts sees it.
-  const documentWith = (facts: CallFacts): DocumentHandle =>
-    ({
-      ...shared,
-      with: (more: CallFacts) => documentWith({ ...facts, ...more }),
-      setWorkingSet: () => {},
-      page: (ref: PageRef) => ({
-        render: {
-          image: (imageOptions: Record<string, unknown>) => {
-            imageCalls.push({
-              pageObjectNumber: ref.objectNumber,
-              options: imageOptions,
-              ...(facts.view !== undefined ? { view: facts.view } : {}),
-              ...(facts.priority !== undefined ? { priority: facts.priority } : {}),
-            });
-            const pending = makeTask();
-            tasks.push(pending);
-            return pending.task;
-          },
-        },
-        ...Object.fromEntries(
-          (['annotations', 'widgets'] as const).map((family) => [
-            family === 'widgets' ? 'forms' : 'annotations',
-            {
-              renderAppearances: (appearanceOptions: Record<string, unknown>) => {
-                appearanceCalls.push({
-                  pageObjectNumber: ref.objectNumber,
-                  family,
-                  options: appearanceOptions,
-                });
-                const pending = makeTask();
-                appearanceTasks.push(pending);
-                return pending.task;
-              },
-            },
-          ]),
-        ),
-      }),
-    }) as unknown as DocumentHandle;
-  const shared = {
-    id: 'd',
-    events: {
-      subscribe: (listener: (event: unknown) => void) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      },
-      lastServerId: () => null,
-    },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
-    security: {
-      allows: (capability: string) => options.allows?.(capability) ?? options.allow ?? true,
-    },
-    render: { getPolicy: () => Promise.resolve(options.policy ?? { kind: 'continuous' }) },
-    close: () => Promise.resolve(),
-  };
-  const handle = documentWith({});
-  const engine = {
-    open: () => Promise.resolve(handle),
-    destroy: () => Promise.resolve(),
-  } as unknown as Engine;
-  const kernel = createKernel({ engine, plugins: [renderPlugin(options.config)] });
-  await kernel.start();
-  await kernel.documents.open({ kind: 'bytes', id: 'd', bytes: new Uint8Array() });
-  return {
-    kernel,
-    render: kernel.capability(RenderToken, 'd'),
-    imageCalls,
-    tasks,
-    appearanceCalls,
-    appearanceTasks,
-    emit: (event: DocumentEvent) => listeners.forEach((listener) => listener(event)),
-  };
-}
 
 describe('the ledger — confirmed events and the invalidate verb', () => {
   it('a confirmed annotation event bumps the epoch for that page only, annotated product only', async () => {
@@ -207,7 +35,13 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
       documentEvent({
         type: 'annotations.reordered',
         page: toPageRef(11),
-        origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
+        origin: {
+          kind: 'remote',
+          sessionId: 'other',
+          subject: 'alice',
+          at: new Date(1).toISOString(),
+          serverSequence: 7,
+        },
       }),
     );
     fixture.emit(documentEvent({ type: 'forms.repaired', origin: { kind: 'local' } }));
@@ -243,10 +77,35 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     const fixture = await boot();
     const seen: { scope: string; origin: unknown }[] = [];
     fixture.render.onInvalidated((event) => seen.push(event));
-    fixture.emit(documentEvent({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 1 }));
+    fixture.emit(
+      documentEvent({
+        type: 'stream.desynced',
+        reason: 'backlog-overflow',
+        at: new Date(0).toISOString(),
+      }),
+    );
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ scope: 'content', origin: null });
     expect(fixture.render.getRenderEpoch(toPageRef(11), { includeAnnotations: false })).toBe(1);
+    await fixture.kernel.destroy();
+  });
+
+  it('the engine’s fonts changing repaints the content of every page; a write’s font change, only its own facts', async () => {
+    const fixture = await boot();
+    const contentEpochs = () =>
+      [11, 22, 33].map((page) =>
+        fixture.render.getRenderEpoch(toPageRef(page), { includeAnnotations: false }),
+      );
+    // A font registered after the first pages were drawn: no write behind it.
+    fixture.emit(documentEvent({ type: 'fonts.changed', origin: { kind: 'local' } }));
+    expect(contentEpochs()).toEqual([1, 1, 1]);
+    fixture.emit(
+      documentEvent({
+        type: 'fonts.changed',
+        origin: { kind: 'local', transaction: { id: 'op-1', index: 1, count: 2 } },
+      }),
+    );
+    expect(contentEpochs()).toEqual([1, 1, 1]);
     await fixture.kernel.destroy();
   });
 
@@ -309,6 +168,58 @@ describe('policy conformance — the host door', () => {
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 2.2 })).toBe('11|w2560|a1f1|e0');
     fixture.render.invalidate({ pages: [toPageRef(11)], scope: 'content' });
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 1.2 })).not.toBe(at12);
+    await fixture.kernel.destroy();
+  });
+
+  it('asks for a page a pending change makes once the engine has it, and never for one that went first', async () => {
+    const fixture = await boot();
+    const blank = (objectNumber: number) => ({
+      label: { key: 'pages.insertBlank' },
+      ops: [
+        {
+          type: 'pages.insertBlank' as const,
+          spec: { size: { width: 612, height: 792 } },
+          objectNumbers: [objectNumber],
+        },
+      ],
+    });
+    fixture.stage(blank(44));
+    const picture = fixture.render.renderSource(toPageRef(44), { scale: 1 });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fixture.imageCalls).toHaveLength(0);
+
+    // The engine has the page once its event lands.
+    const shown = fixture.kernel.documents.listPages('d');
+    fixture.emit(
+      documentEvent({
+        type: 'pages.inserted',
+        layout: { pageCount: shown.length, labels: [], pages: shown, namedPages: [] },
+        origin: { kind: 'local' },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fixture.imageCalls.map((call) => call.pageObjectNumber)).toEqual([44]);
+    fixture.tasks[0]!.resolve(image());
+    await picture;
+
+    const refused = fixture.stage(blank(45));
+    const never = fixture.render.renderSource(toPageRef(45), { scale: 1 });
+    refused.reject(new Error('refused'));
+    await expect(never).rejects.toMatchObject({ code: 'not-found' });
+    expect(fixture.imageCalls).toHaveLength(1);
+    await fixture.kernel.destroy();
+  });
+
+  it('draws a pending copy as the page it copies, before the engine has it', async () => {
+    const fixture = await boot();
+    fixture.stage({
+      label: { key: 'pages.duplicate' },
+      ops: [{ type: 'pages.copy', pages: [toPageRef(11)], objectNumbers: [46] }],
+    });
+    const picture = fixture.render.renderSource(toPageRef(46), { scale: 1 });
+    expect(fixture.imageCalls.map((call) => call.pageObjectNumber)).toEqual([11]);
+    fixture.tasks[0]!.resolve(image());
+    await picture;
     await fixture.kernel.destroy();
   });
 
@@ -391,6 +302,62 @@ describe('the public door — exact sizes', () => {
     await fixture.kernel.destroy();
   });
 
+  it('renders part of a page at its own size, cut at the page’s edge, outside the store', async () => {
+    const fixture = await boot({ policy: LATTICE });
+    const rect = { x: 100, y: 50, width: 200, height: 100 };
+    void fixture.render.renderPage(toPageRef(11), { rect, scale: 2 }).catch(() => {});
+    void fixture.render.renderPage(toPageRef(11), { rect, scale: 2 }).catch(() => {});
+    void fixture.render
+      .renderPage(toPageRef(11), { rect: { x: 500, y: 700, width: 300, height: 300 }, width: 90 })
+      .catch(() => {});
+    expect(fixture.imageCalls.map((call) => [call.options.target, call.options.viewport])).toEqual([
+      [
+        { kind: 'rect', rect },
+        { kind: 'scale', scale: 2 },
+      ],
+      // A part is for its caller alone: the same ask renders again.
+      [
+        { kind: 'rect', rect },
+        { kind: 'scale', scale: 2 },
+      ],
+      [
+        { kind: 'rect', rect: { x: 500, y: 700, width: 112, height: 92 } },
+        { kind: 'width', width: 90 },
+      ],
+    ]);
+    expect(fixture.imageCalls.every((call) => call.priority === 'high')).toBe(true);
+    await fixture.kernel.destroy();
+  });
+
+  it('refuses a rect that misses the page, and turns a picture without the store', async () => {
+    const fixture = await boot();
+    await expect(
+      fixture.render.renderPage(toPageRef(11), { rect: { x: 700, y: 0, width: 50, height: 50 } }),
+    ).rejects.toMatchObject({ code: 'invalid-input' });
+    expect(fixture.imageCalls).toHaveLength(0);
+
+    void fixture.render.renderPage(toPageRef(11), { rotation: 90, width: 300 }).catch(() => {});
+    void fixture.render.renderPage(toPageRef(11), { rotation: 90, width: 300 }).catch(() => {});
+    expect(fixture.imageCalls.map((call) => [call.options.rotation, call.options.target])).toEqual([
+      [90, undefined],
+      [90, undefined],
+    ]);
+    await fixture.kernel.destroy();
+  });
+
+  it('a part stops its engine call when the signal fires', async () => {
+    const fixture = await boot();
+    const stop = new AbortController();
+    const part = fixture.render.renderPage(toPageRef(11), {
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      signal: stop.signal,
+    });
+    stop.abort();
+    await expect(part).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(fixture.tasks[0]!.task.aborted).toBeDefined();
+    await fixture.kernel.destroy();
+  });
+
   it('shares the raster store with the host door when the size matches', async () => {
     const fixture = await boot({ policy: LATTICE });
     const conformed = fixture.render.renderSource(toPageRef(11), { scale: 1 }); // w640
@@ -406,10 +373,10 @@ describe('the public door — exact sizes', () => {
     await fixture.kernel.destroy();
   });
 
-  it('renderThumbnail is a width render; renderPages reports in input order with per-page failures', async () => {
+  it('renderThumbnail asks for the thumbnail; renderPages reports in input order with per-page failures', async () => {
     const fixture = await boot();
-    void fixture.render.renderThumbnail(toPageRef(11), { maxWidth: 120 }).catch(() => {});
-    expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'width', width: 120 });
+    void fixture.render.renderThumbnail(toPageRef(11)).catch(() => {});
+    expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'thumbnail' });
 
     const batch = fixture.render.renderPages([toPageRef(22), toPageRef(99), toPageRef(33)], {
       width: 100,
@@ -431,6 +398,34 @@ describe('the public door — exact sizes', () => {
       [33, 'operation-failed'],
     ]);
     await fixture.kernel.destroy();
+  });
+
+  it('thumbnails need doc.render.thumbnail, not doc.render, by either door', async () => {
+    const fixture = await boot({ allows: (capability) => capability !== 'doc.render' });
+    expect(fixture.render.canRender()).toBe(false);
+    expect(fixture.render.canRenderThumbnail()).toBe(true);
+    void fixture.render.renderThumbnail(toPageRef(11)).catch(() => {});
+    void fixture.render.renderSource(toPageRef(22), { scale: 1, thumbnail: true }).catch(() => {});
+    expect(fixture.imageCalls.map((call) => call.options.viewport)).toEqual([
+      { kind: 'thumbnail' },
+      { kind: 'thumbnail' },
+    ]);
+    // One thumbnail per page, whatever the scale: the key has no width.
+    expect(fixture.render.getSourceKey(toPageRef(22), { scale: 1, thumbnail: true })).toBe(
+      fixture.render.getSourceKey(toPageRef(22), { scale: 3, thumbnail: true }),
+    );
+    await expect(fixture.render.renderPage(toPageRef(11))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    await fixture.kernel.destroy();
+
+    const screenOnly = await boot({
+      allows: (capability) => capability !== 'doc.render.thumbnail',
+    });
+    await expect(screenOnly.render.renderThumbnail(toPageRef(11))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    await screenOnly.kernel.destroy();
   });
 
   it('unknown pages are not-found; completed and failed renders are announced', async () => {
@@ -458,7 +453,7 @@ describe('the tile surface — pure reads, page-space regions', () => {
   const deep = { desiredDeviceWidth: 612 * 8, visibleRect: { x: 0, y: 0, width: 80, height: 80 } };
 
   it('createViewDemand is stable per view and reference-counted; getPlan is pure', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const main = fixture.render.createViewDemand('stage');
     expect(fixture.render.createViewDemand('stage')).toBe(main);
     expect(fixture.render.createViewDemand('stage-thumbs')).not.toBe(main);
@@ -475,15 +470,15 @@ describe('the tile surface — pure reads, page-space regions', () => {
     const before = fixture.imageCalls.length;
     expect(main.getPlan(toPageRef(11))).toBe(main.getPlan(toPageRef(11)));
     expect(fixture.imageCalls.length).toBe(before); // reads never fetch
-    main.dispose();
-    main.dispose();
-    main.dispose(); // the last reference releases the view's pages
+    main.destroy();
+    main.destroy();
+    main.destroy(); // the last reference releases the view's pages
     await fixture.kernel.destroy();
   });
 
   it('tile regions are asked for in page space — a crop offset changes nothing', async () => {
     const crop = { left: 10, bottom: 20, right: 622, top: 812 };
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } }, crop });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } }, crop });
     const view = fixture.render.createViewDemand('stage');
     view.setDemand(toPageRef(11), deep);
     const first = fixture.imageCalls[0]!.options.target as {
@@ -495,12 +490,12 @@ describe('the tile surface — pure reads, page-space regions', () => {
     expect(first.rect.x).toBe(0);
     expect(first.rect.y).toBe(0);
     expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'scale', scale: 8 });
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 
   it('a tile arrival re-plans outside any read and wakes subscribers', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const view = fixture.render.createViewDemand('stage');
     view.setDemand(toPageRef(11), deep);
     const planned = view.getPlan(toPageRef(11));
@@ -511,7 +506,7 @@ describe('the tile surface — pure reads, page-space regions', () => {
     await vi.waitFor(() => expect(view.getPlan(toPageRef(11)).paint.length).toBeGreaterThan(0));
     expect(view.getPlan(toPageRef(11))).not.toBe(planned);
     expect(wakes).toBeGreaterThan(0);
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 });
@@ -553,7 +548,7 @@ describe('settings', () => {
   it('apply at once: a new budget changes the conformed width, and reset goes back', async () => {
     const fixture = await boot();
     const changed: string[][] = [];
-    fixture.render.onSettingsChanged((event) => changed.push([...event.changed]));
+    fixture.render.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1f1|e0');
 
     fixture.render.updateSettings({ fullPage: { maxWidth: 1000 } });
@@ -610,7 +605,7 @@ describe('page arguments and cancelling', () => {
 
 describe('the view a render is for, and its priority', () => {
   it('a layer’s base and tiles name its view, an app’s render names none; every render asks high', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const sources = [
       fixture.render.renderSource(toPageRef(11), { scale: 1, view: 'stage' }),
       fixture.render.renderPage(toPageRef(22), { width: 300 }),
@@ -637,7 +632,7 @@ describe('the view a render is for, and its priority', () => {
 
     fixture.tasks.forEach((pending) => pending.resolve(image()));
     await Promise.all(sources);
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 });
@@ -698,6 +693,47 @@ describe('what a picture draws', () => {
     );
     expect(keyOf({ includeFormFields: false })).toBe('11|w612|a1f0|e0');
     expect(keyOf({})).toBe('11|w612|a1f1|e1');
+    await fixture.kernel.destroy();
+  });
+});
+
+describe('painting the pictures another way', () => {
+  const painter = (views: string[] = ['main']) => ({
+    paints: (view: string) => views.includes(view),
+    paint: () => ({ update: () => {}, destroy: () => {} }),
+  });
+
+  it('holds one painter, wakes the views, and gives it back once', async () => {
+    const fixture = await boot();
+    const woken = vi.fn();
+    fixture.kernel.subscribe(woken);
+    expect(fixture.render.getPicturePainter()).toBeNull();
+    const held = painter();
+    const giveBack = fixture.render.handOverPictures(held);
+    expect(fixture.render.getPicturePainter()).toBe(held);
+    expect(woken).toHaveBeenCalled();
+
+    woken.mockClear();
+    giveBack();
+    expect(fixture.render.getPicturePainter()).toBeNull();
+    expect(woken).toHaveBeenCalled();
+    woken.mockClear();
+    giveBack(); // giving it back twice is harmless
+    expect(woken).not.toHaveBeenCalled();
+    await fixture.kernel.destroy();
+  });
+
+  it('refuses a second painter, and a stale give-back never drops the next one', async () => {
+    const fixture = await boot();
+    const giveBack = fixture.render.handOverPictures(painter());
+    expect(() => fixture.render.handOverPictures(painter(['thumbnails']))).toThrow(
+      expect.objectContaining({ code: 'conflict' }),
+    );
+    giveBack();
+    const next = painter();
+    fixture.render.handOverPictures(next);
+    giveBack();
+    expect(fixture.render.getPicturePainter()).toBe(next);
     await fixture.kernel.destroy();
   });
 });
@@ -784,11 +820,11 @@ describe('appearance pictures', () => {
     });
     fixture.appearanceTasks[0]!.resolve({ appearances: [drawn(5, 'Off'), drawn(5, 'Yes')] });
     await asked;
-    expect(fixture.render.keptAppearances('widgets', ref(5))).toEqual([
+    expect(fixture.render.getKeptAppearances('widgets', ref(5))).toEqual([
       { ...drawn(5, 'Off'), version: 1 },
       { ...drawn(5, 'Yes'), version: 1 },
     ]);
-    expect(fixture.render.keptAppearances('annotations', ref(5))).toEqual([]);
+    expect(fixture.render.getKeptAppearances('annotations', ref(5))).toEqual([]);
     await fixture.kernel.destroy();
   });
 

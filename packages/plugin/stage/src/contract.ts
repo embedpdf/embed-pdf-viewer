@@ -7,8 +7,9 @@ import type {
   PageDestination,
   PageInfo,
   PageRef,
+  SettingLock,
 } from '@embedpdf/core';
-import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
+import type { Rotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
   Alignment,
   AlignmentValue,
@@ -18,6 +19,8 @@ import type {
   Camera,
   PageBox,
   PageFrame,
+  Padding,
+  PaddingSides,
   Point,
   ScrollMetrics,
   Size,
@@ -39,6 +42,8 @@ export type {
   Point,
   Direction,
   PageFrame,
+  Padding,
+  PaddingSides,
   ScrollMetrics,
   SpreadMode,
   SizingMode,
@@ -82,19 +87,19 @@ export type Gap = number | { px: number };
  * instance resolves against its own box.
  */
 export interface StageBox {
-  width: number;
-  height: number;
+  readonly width: number;
+  readonly height: number;
   /** Of the container, not the device. A square box is 'portrait' (the CSS rule). */
-  orientation: 'portrait' | 'landscape';
+  readonly orientation: 'portrait' | 'landscape';
 }
 
 /** Declarative box query: all bounds inclusive, all fields optional, every condition must hold. */
 export interface BoxQuery {
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
-  orientation?: 'portrait' | 'landscape';
+  readonly minWidth?: number;
+  readonly maxWidth?: number;
+  readonly minHeight?: number;
+  readonly maxHeight?: number;
+  readonly orientation?: 'portrait' | 'landscape';
 }
 
 /**
@@ -117,11 +122,11 @@ export interface BoxQuery {
  * both the layout math and the UI.
  */
 export interface ResponsiveRule {
-  name?: string;
+  readonly name?: string;
   /** Declarative box query, or a predicate for anything the box can answer. */
-  when: BoxQuery | ((box: StageBox) => boolean);
+  readonly when: BoxQuery | ((box: StageBox) => boolean);
   /** The settings this situation asserts. Omit for a pure named query. */
-  settings?: StageSettingsPatch;
+  readonly settings?: StageSettingsPatch;
 }
 
 /**
@@ -132,8 +137,8 @@ export interface ResponsiveRule {
  */
 export type ArrivalAlignValue = AlignValue | 'keep';
 export interface ArrivalAlignment {
-  x: ArrivalAlignValue;
-  y: ArrivalAlignValue;
+  readonly x: ArrivalAlignValue;
+  readonly y: ArrivalAlignValue;
 }
 
 /**
@@ -144,27 +149,29 @@ export interface ArrivalAlignment {
  */
 export interface StageSettings {
   /** Continuous scroll, or one item at a time. */
-  flow: FlowMode;
-  layout: LayoutKind;
-  spread: SpreadMode;
+  readonly flow: FlowMode;
+  readonly layout: LayoutKind;
+  readonly spread: SpreadMode;
   /** Page sizing: true PDF sizes, or equalize the cross axis so pages sit flush. */
-  sizing: SizingMode;
+  readonly sizing: SizingMode;
   /** Grid column policy (grid layout only): 'square', 'auto' (wrapped), or a count. */
-  columns: GridColumns;
+  readonly columns: GridColumns;
   /** Clamp the camera to the content? Off = free infinite pan (construction drawings). */
-  bounded: boolean;
+  readonly bounded: boolean;
   /**
    * Breathing room (screen px) around the content — the one spacing concept.
    * Fit-modes inset by it, arrivals leave it as a gutter, and the clamp lets the
-   * camera reveal exactly this much beyond each content edge.
+   * camera reveal exactly this much beyond each content edge. A number is every
+   * side; `{ top, right, bottom, left }` gives each side its own, as room for a
+   * toolbar floating over one edge.
    */
-  padding: number;
+  readonly padding: Padding;
   /**
    * Space between items — and between the halves of a spread. A number is world
    * units (scales with zoom — the canvas feel); `{ px }` is screen px (UI-stable
    * — the thumbnail feel). See {@link Gap}.
    */
-  gap: Gap;
+  readonly gap: Gap;
   /**
    * Reserved chrome real estate around each page, in screen px — one thickness
    * per side. The page content is inset by these; the bands hold box-space
@@ -176,13 +183,13 @@ export interface StageSettings {
    * (the container) — `padding`, `gap`, `layout`, … The rare setting owned by the
    * page carries the `page` prefix (`pageFrame`; `pageWidth` in zoom).
    */
-  pageFrame: PageFrame;
+  readonly pageFrame: PageFrame;
   /**
    * Reading direction. RTL: horizontal items advance leftward, spreads bind on the
    * right, grid rows fill right→left, and alignment 'start' on x means the right
    * edge (logical, CSS-style). Navigation is index-based and never changes.
    */
-  direction: Direction;
+  readonly direction: Direction;
   /**
    * The alignment family — every camera move is defined by what it holds
    * fixed. Gestures (pan/pinch/wheel) hold the pointer: physics, no setting.
@@ -218,13 +225,13 @@ export interface StageSettings {
    * Named x values are logical (CSS-style: 'start' = reading start — the
    * right edge in RTL); fractions are physical, like screen coordinates.
    */
-  fitAlign: Alignment;
+  readonly fitAlign: Alignment;
   /** See {@link StageSettings.fitAlign} — where navigation lands, per axis. */
-  arrivalAlign: ArrivalAlignment;
+  readonly arrivalAlign: ArrivalAlignment;
   /** See {@link StageSettings.fitAlign} — the pointer-less zoom focal point. */
-  zoomAlign: AlignmentValue;
+  readonly zoomAlign: AlignmentValue;
   /** See {@link StageSettings.fitAlign} — the viewport point reframes hold. */
-  anchorAlign: AlignmentValue;
+  readonly anchorAlign: AlignmentValue;
   /**
    * A non-persistent view rotation: a quarter-turn (clockwise) applied to how
    * every page is displayed in this lens, on top of each page's own /Rotate —
@@ -234,11 +241,20 @@ export interface StageSettings {
    * counterpart — writing /Rotate into the PDF — is plugin-page-edit's
    * `rotateBy`/`setRotation`.
    */
-  viewRotation: PageRotation;
+  readonly viewRotation: Rotation;
   /** Zoom intent: a fit-mode (automatic/fit-page/fit-width/fit-all) or a fixed level. */
-  zoom: ZoomSpec;
+  readonly zoom: ZoomSpec;
+  /**
+   * The zoom range this view allows, as levels like `camera.zoom` (1 = 100%).
+   * Every zoom stays inside it: the buttons, a pinch or wheel, `zoomTo`, a
+   * reveal, and the fit modes, which stop at a limit rather than fit. Within
+   * 0.05 to 64; a `minZoom` above `maxZoom` counts as `maxZoom`.
+   */
+  readonly minZoom: number;
+  /** See {@link StageSettings.minZoom}. */
+  readonly maxZoom: number;
   /** Default behavior for goToPage, nextPage and previousPage. */
-  scrollBehavior: ScrollBehaviorKind;
+  readonly scrollBehavior: ScrollBehaviorKind;
   /**
    * Whether this view's pointer input reaches the interaction hub: a drag
    * selects text or draws with the active tool, and the `pan` tool pans.
@@ -246,19 +262,31 @@ export interface StageSettings {
    * thumbnail strip. Without the interaction plugin the view only scrolls
    * either way.
    */
-  interaction: boolean;
+  readonly interaction: boolean;
   /**
    * With `interaction`: a drag in the space between pages pans whatever the
    * tool, with a grab cursor there; there is nothing to select or draw off a
    * page.
    */
-  panFallback: boolean;
+  readonly panFallback: boolean;
   /**
    * Whether a pinch, Ctrl+wheel (Cmd on a Mac) or a trackpad pinch zooms this
    * view. Off, a zoom wheel scrolls instead, for a view with a fixed
    * magnification; a pinch never zooms the browser page either way.
    */
-  zoomGestures: boolean;
+  readonly zoomGestures: boolean;
+  /**
+   * With `flow: 'paged'`: scrolling, swiping or flicking past the page's edge
+   * turns to the next or previous page. Off, only `nextPage()`,
+   * `previousPage()` and navigation turn pages, which suits a presentation.
+   */
+  readonly turnGestures: boolean;
+  /**
+   * The look of the box you drag with the `zoom` tool. A color left `null`
+   * follows the viewer's accent (the fill at 8%); CSS `--epdf-zoom-box-fill`
+   * and `--epdf-zoom-box-stroke` win over both.
+   */
+  readonly zoomBox: ZoomBoxLook;
   /**
    * View pixels per PDF point — the platform's physical unit factor, folded into
    * the layout so 100% (zoom 1) is physically accurate. Web = 96/72 (1 pt = 1/72",
@@ -267,16 +295,41 @@ export interface StageSettings {
    * `gap`/`padding`/`pageFrame` (world units), and absolute-px zoom modes
    * (`pageWidth`) are all unaffected — only the pages themselves resize.
    */
-  viewUnitsPerPoint: number;
+  readonly viewUnitsPerPoint: number;
+}
+
+/** The colors of the zoom tool's box: see {@link StageSettings.zoomBox}. */
+export interface ZoomBoxLook {
+  /** Inside the box; `null` is the viewer's accent at 8%. */
+  readonly fill: string | null;
+  /** Its dashed edge; `null` is the viewer's accent. */
+  readonly stroke: string | null;
 }
 
 /**
  * A change to the settings: any of them, each replacing the current value
- * whole. A `pageFrame` names only the sides it reserves (`{ bottom: 20 }`);
- * the sides it leaves out are 0.
+ * whole. A `pageFrame`, or a `padding` given by side, names only the sides it
+ * sets (`{ bottom: 20 }`); the sides it leaves out are 0. A `zoomBox` names
+ * only the colors it sets; the ones it leaves out follow the accent.
  */
-export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame'>> {
+export interface StageSettingsPatch extends Partial<
+  Omit<StageSettings, 'padding' | 'pageFrame' | 'zoomBox'>
+> {
+  padding?: number | Partial<PaddingSides>;
   pageFrame?: Partial<PageFrame>;
+  zoomBox?: Partial<ZoomBoxLook>;
+}
+
+/**
+ * Settings held at a value for one document: they keep it over every other
+ * writer (`updateSettings()`, the responsive rules, a restored view state,
+ * `resetSettings()`) until the function `lockSettings()` returns is called.
+ * Those still change the settings underneath, so the user's own choice is back
+ * when the lock goes. Every setting but `zoom`, which gestures set too.
+ */
+export interface StageSettingsLock extends SettingLock {
+  /** The settings it holds, at these values. */
+  readonly settings: Omit<StageSettingsPatch, 'zoom'>;
 }
 
 /**
@@ -290,16 +343,16 @@ export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFra
  *    camera/pan-invariant.
  */
 export interface VisiblePage extends PageBox {
-  ref: PageRef;
+  readonly ref: PageRef;
   /**
    * The page's display-box (footprint) top-left in screen px, camera-resolved and
    * snapped to the device grid. The shell positions the page container at this —
    * snapping here (not in the adapter) keeps a CSS-rotated page on the pixel grid
    * for every framework, with no hand-rounding.
    */
-  screenX: number;
-  screenY: number;
-  transform: PageTransform;
+  readonly screenX: number;
+  readonly screenY: number;
+  readonly transform: PageTransform;
   /**
    * The page region actually on screen, in un-rotated page points (y-down) —
    * viewport ∩ footprint inverted through the transform (exact for
@@ -308,7 +361,7 @@ export interface VisiblePage extends PageBox {
    * virtualize); adapters and demand consumers (tiling's `PageViewDemand`)
    * read it instead of re-deriving camera math per framework.
    */
-  visibleRect: Rect;
+  readonly visibleRect: Rect;
 }
 
 /**
@@ -318,14 +371,14 @@ export interface VisiblePage extends PageBox {
  * because the anchor is page-relative and fit-modes re-resolve.
  */
 export interface Viewpoint {
-  anchor: Anchor;
-  zoom: ZoomSpec;
+  readonly anchor: Anchor;
+  readonly zoom: ZoomSpec;
 }
 
 /** Durable, serializable view state — the unit of session persistence. */
 export interface StageViewState extends StageSettings {
-  cursor: number;
-  anchor: Anchor;
+  readonly pageIndex: number;
+  readonly anchor: Anchor;
 }
 
 /**
@@ -357,7 +410,7 @@ export interface GoToOptions {
 }
 
 /**
- * One axis of a reveal arrival — `scrollIntoView` vocabulary plus two
+ * Where a reveal lands, per axis — `scrollIntoView` vocabulary plus two
  * PDF-protocol necessities:
  *   absent     → minimal movement: scroll only if the target is off-screen
  *                (CSS 'nearest', as a bare reveal does)
@@ -368,11 +421,9 @@ export interface GoToOptions {
  *   number 0–1 → target center at this viewport fraction (0.35 = "top middle",
  *                the browser find-bar feel)
  */
-export type RevealAnchorValue = 'keep' | 'start' | 'center' | 'end' | number;
-
-export interface RevealAnchor {
-  x?: RevealAnchorValue;
-  y?: RevealAnchorValue;
+export interface RevealAlignment {
+  readonly x?: ArrivalAlignValue;
+  readonly y?: ArrivalAlignValue;
 }
 
 /**
@@ -390,25 +441,24 @@ export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' | { level: 
  * Options for `reveal`: bring a page or a spot on it into view (a search hit,
  * "jump to comment"). A destination goes through `goToDestination`.
  *
- * With none of `rect`/`zoom`/`anchor` set, a reveal is minimal movement to
+ * With none of `rect`/`zoom`/`align` set, a reveal is minimal movement to
  * make the page visible, with the cursor untouched.
  * A positioned reveal (any of the three set) is "you are now looking at
- * this spot": the camera places the target per the anchor, a zoom
+ * this spot": the camera places the target per the alignment, a zoom
  * directive resolves to a concrete level (recorded as the zoom intent),
  * and the cursor follows the camera — while still clamping against the
- * normal camera bounds, so anchors are best-effort near document edges.
+ * normal camera bounds, so alignments are best-effort near document edges.
  */
 export interface RevealOptions {
   behavior?: ScrollBehaviorKind;
   /**
    * Target rect in page space (points from the page's top-left, y down; the
-   * space annotation, selection and search rects use).
-   * Absent or `null` → the whole page (null accepted so nullable sources flow
-   * in directly). A zero-size rect is a point.
+   * space annotation, selection and search rects use). Left out: the whole
+   * page. A zero-size rect is a point.
    */
-  rect?: Rect | null;
+  rect?: Rect;
   zoom?: RevealZoom;
-  anchor?: RevealAnchor;
+  align?: RevealAlignment;
 }
 
 // ── events ──
@@ -431,7 +481,7 @@ export interface StageMotionEndedEvent {
 }
 export interface StageSettingsChangedEvent {
   readonly settings: StageSettings;
-  readonly changed: readonly (keyof StageSettings)[];
+  readonly changedKeys: readonly (keyof StageSettings)[];
 }
 export interface StageViewportChangedEvent {
   readonly size: Size;
@@ -465,7 +515,7 @@ export interface StageCapability {
   /** The active zoom intent: a fit mode, or 'custom' for a fixed level. */
   getZoomMode(): ZoomModeValue | 'custom';
   /** The lens's view rotation — see {@link StageSettings.viewRotation}. */
-  getViewRotation(): PageRotation;
+  getViewRotation(): Rotation;
   /** The current page's ref, or null before the document has pages. */
   getCurrentPage(): PageRef | null;
   /** The current page's display index, from 0. */
@@ -474,12 +524,26 @@ export interface StageCapability {
   getPageCount(): number;
   /** Pages of the current item (one page, or a spread / grid row). */
   listCurrentItemPages(): readonly PageInfo[];
+  /**
+   * The pages you're on: the current item's pages while the item fits across
+   * the view (a spread you see side by side, however tall), else the current
+   * page alone. What a page number names, and what `nextPage` and
+   * `previousPage` step past.
+   */
+  listCurrentPages(): readonly PageInfo[];
   /** Pages on screen, with their viewport rects and visible page-space rect. Reference-stable. */
   listVisiblePages(): readonly VisiblePage[];
   /** Is any part of the page (its ref or its index) on screen. False for a page that isn't in the document. */
   isPageVisible(page: PageRef | number): boolean;
   /** What the viewer is looking at plus the zoom intent, for per-page view memory. */
   getViewpoint(): Viewpoint;
+  /**
+   * Where the view is, as a destination: the first page on screen, the point
+   * of it at the viewport's top-left corner, and no zoom, so following it
+   * keeps the reader's zoom. What `goToDestination` takes, and what a new
+   * outline item goes to. `null` before a page is on screen.
+   */
+  getCurrentDestination(): PageDestination | null;
   /** Serialisable view state — the unit of session persistence. */
   getViewState(): StageViewState;
   /** Restore a saved view state; the responsive rules re-assert on top of its settings. */
@@ -494,10 +558,21 @@ export interface StageCapability {
   zoomTo(zoom: number | ZoomSpec, options?: ZoomToOptions): void;
   /** Multiply the zoom, holding a viewport point fixed (default: the `zoomAlign` point). */
   zoomBy(factor: number, options?: ZoomToOptions): void;
-  /** Zoom in one step around the `zoomAlign` point. */
-  zoomIn(): void;
-  /** Zoom out one step around the `zoomAlign` point. */
-  zoomOut(): void;
+  /**
+   * Zoom in one step to the next round level (100%, 125%, 150%, 200%, …), or
+   * `maxZoom` when that comes first, holding a viewport point fixed (default:
+   * the `zoomAlign` point).
+   */
+  zoomIn(options?: ZoomToOptions): void;
+  /**
+   * Zoom out one step: the round levels down, to `minZoom`, holding a viewport
+   * point fixed (default: the `zoomAlign` point).
+   */
+  zoomOut(options?: ZoomToOptions): void;
+  /** The zoom is below `maxZoom`, so `zoomIn()` moves. */
+  canZoomIn(): boolean;
+  /** The zoom is above `minZoom`, so `zoomOut()` moves. */
+  canZoomOut(): boolean;
   /** Zoom so the page width fills the viewport. */
   fitWidth(): void;
   /** Zoom so the whole page fits the viewport. */
@@ -524,12 +599,15 @@ export interface StageCapability {
   goToDestination(destination: PageDestination, options?: GoToDestinationOptions): void;
   goToFirstPage(options?: GoToOptions): void;
   goToLastPage(options?: GoToOptions): void;
-  /** Step forward / backward by the navigation unit (the item if it fits the viewport, else the page). */
+  /**
+   * Step past the pages you're on (`listCurrentPages`): forward to the page
+   * after them, back to the spread or page before them.
+   */
   nextPage(options?: GoToOptions): void;
   previousPage(options?: GoToOptions): void;
-  /** The cursor is before the last page. */
+  /** There's a page after the pages you're on. */
   canGoNext(): boolean;
-  /** The cursor is after the first page. */
+  /** There's a page before the pages you're on. */
   canGoPrevious(): boolean;
   /**
    * Bring a page, or a spot on it, into view: its `PageRef` or its display
@@ -548,7 +626,7 @@ export interface StageCapability {
 
   // ── rotation ──
   /** Set the lens's view rotation (see {@link StageSettings.viewRotation}). */
-  setViewRotation(rotation: PageRotation): void;
+  setViewRotation(rotation: Rotation): void;
   /** Turn the view rotation a quarter clockwise (90) or counter-clockwise (-90). */
   rotateViewBy(delta: 90 | -90): void;
 
@@ -565,6 +643,17 @@ export interface StageCapability {
   resetSettings(): void;
   /** Replace the container-query rules (see {@link ResponsiveRule}). */
   setResponsiveRules(rules: readonly ResponsiveRule[]): void;
+  /**
+   * Hold settings at a value for this document until the returned function is
+   * called, or the document closes (see {@link StageSettingsLock}). Call it
+   * only to let go while the document stays open. A lock on a setting another
+   * lock holds at a different value is refused (`conflict`), naming the
+   * holder; at the same value both hold, until both let go. `getViewState()`
+   * keeps the locked settings as they are underneath.
+   */
+  lockSettings(lock: StageSettingsLock): () => void;
+  /** Who holds a setting and why, or `null` when it isn't locked. */
+  getLock(setting: keyof StageSettings): SettingLock | null;
   /** Names of the responsive rules matching the current box, in source order. */
   listActiveRules(): readonly string[];
   /** Whether the named responsive rule matches the current box. */
@@ -577,7 +666,7 @@ export interface StageCapability {
     point: Point;
     scale: number;
     /** The hit page's total display rotation (document /Rotate + view rotation). */
-    rotation: PageRotation;
+    rotation: Rotation;
     /** The hit page's zoom relative to its 100% baseline. */
     zoom: number;
   } | null;
@@ -591,7 +680,7 @@ export interface StageCapability {
   /** A page-space rect → its viewport-space bounding box; null when the page is not laid out. */
   pageRectToViewport(page: PageRef | number, rect: Rect): ViewportRect | null;
   /** The laid-out box for a page (its ref or its index), on screen or not; null before placement. */
-  getPageFrame(page: PageRef | number): VisiblePage | null;
+  getPageBox(page: PageRef | number): VisiblePage | null;
 
   // ── events ──
   /** The cursor page changed. */

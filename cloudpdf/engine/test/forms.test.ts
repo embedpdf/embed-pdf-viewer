@@ -186,7 +186,7 @@ test('dynamic-stamp script effects apply as one change and persist in its layer'
     });
     expect((await doc.download({ mode: 'rewrite' })).byteLength).toBeGreaterThan(0);
   } finally {
-    sandbox.dispose();
+    sandbox.destroy();
     await doc.close();
     await engine.destroy();
   }

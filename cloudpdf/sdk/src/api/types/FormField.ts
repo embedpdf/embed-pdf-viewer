@@ -2,6 +2,9 @@
 
 import type * as CloudPDF from "../index.js";
 
+/**
+ * A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none.
+ */
 export type FormField =
     | CloudPDF.FormField.Text
     | CloudPDF.FormField.Checkbox
@@ -14,7 +17,7 @@ export type FormField =
 
 export namespace FormField {
     export interface Text {
-        family: "text";
+        kind: "text";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldText.Origin;
@@ -23,8 +26,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldTextValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldTextDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -51,7 +54,7 @@ export namespace FormField {
     }
 
     export interface Checkbox {
-        family: "checkbox";
+        kind: "checkbox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldCheckbox.Origin;
@@ -60,8 +63,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldCheckboxValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldCheckboxDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -96,7 +99,7 @@ export namespace FormField {
     }
 
     export interface Radio {
-        family: "radio";
+        kind: "radio";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldRadio.Origin;
@@ -105,8 +108,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldRadioValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldRadioDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -142,7 +145,7 @@ export namespace FormField {
     }
 
     export interface Combobox {
-        family: "combobox";
+        kind: "combobox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldCombobox.Origin;
@@ -151,8 +154,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldComboboxValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldComboboxDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -186,7 +189,7 @@ export namespace FormField {
     }
 
     export interface Listbox {
-        family: "listbox";
+        kind: "listbox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldListbox.Origin;
@@ -195,8 +198,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldListboxValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldListboxDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -231,7 +234,7 @@ export namespace FormField {
     }
 
     export interface Pushbutton {
-        family: "pushbutton";
+        kind: "pushbutton";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldPushbutton.Origin;
@@ -240,8 +243,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldPushbuttonValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldPushbuttonDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -262,7 +265,7 @@ export namespace FormField {
     }
 
     export interface Signature {
-        family: "signature";
+        kind: "signature";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldSignature.Origin;
@@ -271,8 +274,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldSignatureValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldSignatureDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;
@@ -293,7 +296,7 @@ export namespace FormField {
     }
 
     export interface Unknown {
-        family: "unknown";
+        kind: "unknown";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldUnknown.Origin;
@@ -302,8 +305,8 @@ export namespace FormField {
         noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
-        valueEntry: CloudPDF.FormFieldUnknownValueEntry;
-        defaultValueEntry: CloudPDF.FormFieldUnknownDefaultValueEntry;
+        valueEntry: CloudPDF.FormValueEntry;
+        defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         createdBy: string | null;

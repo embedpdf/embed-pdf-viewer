@@ -2,7 +2,11 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { Stage, StageToken, stagePlugin } from '@embedpdf/svelte/stage';
-  import { commandsPlugin, standardCommands, type CommandDef } from '@embedpdf/svelte/commands';
+  import {
+    commandsPlugin,
+    standardCommands,
+    type CommandDefinition,
+  } from '@embedpdf/svelte/commands';
   import { cloudEngine } from '@cloudpdf/engine';
   import Toolbar from './Toolbar.svelte';
 
@@ -11,7 +15,7 @@
   const engine = cloudEngine();
 
   // A command of your own: pressed while the pages show two at a time.
-  const twoPages: CommandDef = {
+  const twoPages: CommandDefinition = {
     id: 'layout:two-pages',
     label: 'Two pages',
     categories: ['layout'],
@@ -28,10 +32,10 @@
     commandsPlugin({ commands: [...standardCommands, twoPages] }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

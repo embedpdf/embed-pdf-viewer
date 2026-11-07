@@ -21,7 +21,7 @@ import { ThumbsToken } from './thumbnail-strip-token';
           (click)="main.goToPage(page.ref)"
           [attr.aria-current]="page.pageIndex() === main.currentPageIndex()"
         >
-          <epdf-render-layer />
+          <epdf-render-layer thumbnail />
         </button>
       </ng-template>
       <ng-template epdfPageChrome let-page>

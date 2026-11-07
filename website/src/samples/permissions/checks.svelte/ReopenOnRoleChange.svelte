@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { useDocument, useDocuments, type OpenSource } from '@embedpdf/svelte/runtime';
 
-  let { role, ebook }: { role: string; ebook: OpenSource } = $props();
+  let { role, welcome }: { role: string; welcome: OpenSource } = $props();
 
   const documents = useDocuments();
   const document = useDocument();
@@ -14,6 +14,6 @@
     const id = document.id;
     if (role === opened || !id) return;
     opened = role;
-    void documents.close(id).then(() => documents.open(ebook, { name: 'ebook.pdf' }));
+    void documents.close(id).then(() => documents.open(welcome, { name: 'welcome.pdf' }));
   });
 </script>

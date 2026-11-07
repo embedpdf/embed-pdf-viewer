@@ -81,7 +81,9 @@ afterEach(async () => {
   await rm(dropRoot, { recursive: true, force: true });
 });
 
-function enqueue(overrides: Record<string, unknown> = {}): ReturnType<typeof lifecycle.importFromSource> {
+function enqueue(
+  overrides: Record<string, unknown> = {},
+): ReturnType<typeof lifecycle.importFromSource> {
   return lifecycle.importFromSource({
     tenantId: TENANT,
     sub: 'op',
@@ -96,7 +98,7 @@ function enqueue(overrides: Record<string, unknown> = {}): ReturnType<typeof lif
 describe('async enqueue', () => {
   test('creates the pending document and the queued job atomically', async () => {
     const res = await enqueue({ docId: 'wrk-a' });
-    expect(res.tag).toBe('accepted');
+    expect(res.status).toBe('accepted');
     expect(res.doc.state).toBe('pending');
     const job = await jobs.findByDoc('wrk-a', TENANT);
     expect(job).toMatchObject({ state: 'queued', attempts: 0, connectionId: 'drop' });
@@ -134,7 +136,12 @@ describe('worker poll', () => {
     expect(doc?.state).toBe('ready');
     expect(doc?.baseSha).toBe(PDF_SHA);
     const job = await jobs.findByDoc('wrk-happy', TENANT);
-    expect(job).toMatchObject({ state: 'succeeded', attempts: 1, lastError: null, sourceKind: 'fs' });
+    expect(job).toMatchObject({
+      state: 'succeeded',
+      attempts: 1,
+      lastError: null,
+      sourceKind: 'fs',
+    });
     expect(await worker.poll()).toBe('idle');
   });
 
@@ -194,7 +201,7 @@ describe('worker poll', () => {
       via: 'api-token',
       source: { kind: 'connection', connectionId: 'drop', key: 'inbox/a.pdf' },
     });
-    expect(sync.tag).toBe('imported');
+    expect(sync.status).toBe('imported');
     // …then a queued job appears pointing at a missing file: only the
     // reconcile path (no transfer) can succeed it.
     await jobs.enqueue({
@@ -236,12 +243,16 @@ describe('fencing', () => {
     expect(second?.leaseToken).toBeTruthy();
     expect(second?.attempts).toBe(2);
     // The stale holder's transitions are no-ops.
-    expect(await jobs.succeed(first!.id, first!.leaseToken!, { resolvedRevision: null })).toBe(false);
+    expect(await jobs.succeed(first!.id, first!.leaseToken!, { resolvedRevision: null })).toBe(
+      false,
+    );
     expect(await jobs.failJob(first!.id, first!.leaseToken!, 'stale')).toBe(false);
     const row = await jobs.findByDoc('wrk-fence', TENANT);
     expect(row).toMatchObject({ state: 'running', leaseOwner: 'w2' });
     // The live holder's transition lands.
-    expect(await jobs.succeed(second!.id, second!.leaseToken!, { resolvedRevision: null })).toBe(true);
+    expect(await jobs.succeed(second!.id, second!.leaseToken!, { resolvedRevision: null })).toBe(
+      true,
+    );
   });
 });
 
@@ -252,7 +263,11 @@ describe('sweeper ownership', () => {
       source: { kind: 'connection', connectionId: 'ghost', key: 'inbox/a.pdf' },
       expected: { sha256: PDF_SHA },
     });
-    await db.updateTable('documents').set({ updated_at: 1 }).where('id', '=', 'wrk-sweep').execute();
+    await db
+      .updateTable('documents')
+      .set({ updated_at: 1 })
+      .where('id', '=', 'wrk-sweep')
+      .execute();
     expect(await lifecycle.sweepStalePending({ olderThanMs: 1000 })).toBe(0);
     expect(await documents.findById('wrk-sweep')).not.toBeNull();
     // Once the job is terminal, the sweeper may reap the abandoned pending.

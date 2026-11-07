@@ -10,7 +10,7 @@ import {
   checkSetGroup,
   collabTargetOf,
 } from './resolver';
-import type { AnnotationActor, DocCapability, Identity, PdfBits } from './types';
+import type { AnnotationActor, DocCapability, Identity, PdfPermissionFlags } from './types';
 import { describeProtection, protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
 
@@ -28,7 +28,10 @@ export interface AnnotationAuthority {
    * write changes; `null` when nothing is checked (a tenant writing its
    * own document).
    */
-  readonly grants: { readonly scope: readonly string[]; readonly pdfBits: PdfBits } | null;
+  readonly grants: {
+    readonly scope: readonly string[];
+    readonly permissionFlags: PdfPermissionFlags;
+  } | null;
 }
 
 /**
@@ -49,7 +52,7 @@ export interface ChangeAuthority extends AnnotationAuthority {
 export function authorizeCapability(authority: ChangeAuthority, capability: DocCapability): void {
   authorizeUnprotected(authority, capability);
   const { grants, protection } = authority;
-  if (grants && !checkCapability(capability, grants.scope, grants.pdfBits, protection)) {
+  if (grants && !checkCapability(capability, grants.scope, grants.permissionFlags, protection)) {
     throw new PermissionDenied(capability, 'target');
   }
 }
@@ -58,7 +61,7 @@ export function authorizeCapability(authority: ChangeAuthority, capability: DocC
 export function allowsCapability(authority: ChangeAuthority, capability: DocCapability): boolean {
   const { grants, protection } = authority;
   if (protection && protectedCapabilities(protection).has(capability)) return false;
-  return !grants || checkCapability(capability, grants.scope, grants.pdfBits, protection);
+  return !grants || checkCapability(capability, grants.scope, grants.permissionFlags, protection);
 }
 
 /**
@@ -111,7 +114,7 @@ function authorizeWidgetWrite(
   groupId: string | null | undefined,
 ): AnnotationActor | undefined {
   const { identity, grants } = authority;
-  if (grants && !checkCapability('doc.forms.modify', grants.scope, grants.pdfBits)) {
+  if (grants && !checkCapability('doc.forms.modify', grants.scope, grants.permissionFlags)) {
     throw new PermissionDenied('doc.forms.modify', 'target');
   }
   if (typeof groupId === 'string') {
@@ -128,10 +131,12 @@ function authorizeWidgetWrite(
 }
 
 /**
- * Check a create of a `subtype` annotation in `groupId` (the identity's own
- * group without one) and return the actor the write stamps: the creator, in
- * that group. A group other than the identity's takes the authority a
- * reassignment takes. A widget takes form design instead, in no group.
+ * Check a create of a `subtype` annotation in `groupId` and return the actor
+ * the write stamps: the creator, in that group. Left out is the identity's own
+ * group; `null` is no group, which an identity with a group can't choose, as
+ * an update can't remove one. A group other than the identity's takes the
+ * authority a reassignment takes. A widget takes form design instead, in no
+ * group.
  */
 export function authorizeAnnotationCreate(
   authority: AnnotationAuthority,
@@ -140,7 +145,14 @@ export function authorizeAnnotationCreate(
 ): AnnotationActor | undefined {
   if (subtype === 'widget') return authorizeWidgetWrite(authority, groupId);
   const { identity, grants } = authority;
-  const group = groupId ?? identity.groupId;
+  if (groupId === null && identity.groupId !== undefined) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'your annotations have a group: leave groupId out for your own, or name another',
+      { details: { field: 'groupId' } },
+    );
+  }
+  const group = groupId === undefined ? identity.groupId : (groupId ?? undefined);
   if (grants) {
     if (
       group !== undefined &&
@@ -149,7 +161,7 @@ export function authorizeAnnotationCreate(
       throw new PermissionDenied(`annotations:set-group:group=${group}`, 'target');
     }
     const target = collabTargetOf({ userId: identity.userId, groupId: group });
-    if (!checkCollab('create', target, grants.scope, identity, grants.pdfBits)) {
+    if (!checkCollab('create', target, grants.scope, identity, grants.permissionFlags)) {
       throw new PermissionDenied('annotations:create', 'target');
     }
   }
@@ -175,7 +187,7 @@ export function authorizeAnnotationUpdate(
   if (owner.subtype === 'widget') return authorizeWidgetWrite(authority, patchGroupId);
   const { identity, grants } = authority;
   const target = collabTargetOf(owner);
-  if (grants && !checkCollab('update', target, grants.scope, identity, grants.pdfBits)) {
+  if (grants && !checkCollab('update', target, grants.scope, identity, grants.permissionFlags)) {
     throw new PermissionDenied('annotations:update', 'target');
   }
   if (patchGroupId === null && target.groupId !== undefined) {
@@ -208,11 +220,17 @@ export function authorizeAnnotationDelete(
 ): void {
   const { identity, grants } = authority;
   if (!grants) return;
-  const mayDesign = checkCapability('doc.forms.modify', grants.scope, grants.pdfBits);
+  const mayDesign = checkCapability('doc.forms.modify', grants.scope, grants.permissionFlags);
   const refused = members.filter((member) =>
     member.subtype === 'widget'
       ? !mayDesign
-      : !checkCollab('delete', collabTargetOf(member), grants.scope, identity, grants.pdfBits),
+      : !checkCollab(
+          'delete',
+          collabTargetOf(member),
+          grants.scope,
+          identity,
+          grants.permissionFlags,
+        ),
   );
   if (refused.length > 0) {
     throw new PermissionDenied(
@@ -255,7 +273,9 @@ export function allowsFieldWrite(
 ): boolean {
   const { grants, protection } = authority;
   if (protection && protectedCapabilities(protection).has(fieldCapability(action))) return false;
-  return !grants || checkFieldAction(action, groupId, grants.scope, grants.pdfBits, protection);
+  return (
+    !grants || checkFieldAction(action, groupId, grants.scope, grants.permissionFlags, protection)
+  );
 }
 
 /**
@@ -269,7 +289,7 @@ export function allowsSomeFieldWrite(
 ): boolean {
   const { grants, protection } = authority;
   if (protection && protectedCapabilities(protection).has(fieldCapability(action))) return false;
-  return !grants || checkAnyFieldAction(action, grants.scope, grants.pdfBits, protection);
+  return !grants || checkAnyFieldAction(action, grants.scope, grants.permissionFlags, protection);
 }
 
 /**

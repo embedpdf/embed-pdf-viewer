@@ -3,10 +3,11 @@ import {
   type AnnotationOwner,
   checkCapability,
   checkCollab,
+  checkPluginPermission,
   checkFieldAction,
   checkSetGroup,
   collabTargetOf,
-  decodePdfBits,
+  permissionFlagsOf,
   type DocCapability,
   type DocumentAccessInfo,
   type DocumentProtection,
@@ -22,8 +23,11 @@ import {
   fieldRightsOf,
   type Identity,
   type PageLayerRights,
+  type PagePictureRights,
   type PasswordPrompt,
   passwordPromptFromState,
+  pluginOfPermission,
+  type PluginPermission,
   protectedCapabilities,
   securityStateFromHead,
 } from '@embedpdf/engine-core/runtime';
@@ -45,7 +49,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /**
    * Parsed JWT identity + scope, decoded once at construction. Used by
    * the local-fallback path for `scope` and `identity` when
-   * /access hasn't run yet (public-share with no CDN, password not
+   * /access hasn't run yet (a grant with no CDN, password not
    * yet supplied, etc.).
    */
   private readonly tokenScope: ReadonlyArray<string>;
@@ -89,6 +93,20 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     };
   }
 
+  /**
+   * Which kinds of page picture the caller may make, when the client can know
+   * it (as for {@link pageLayerRights}). Null leaves it to the server.
+   */
+  pagePictureRights(): PagePictureRights | null {
+    if (!this.access && !this.tokenHasDocScope) return null;
+    return {
+      render: this.allows('doc.render'),
+      thumbnail: this.allows('doc.render.thumbnail'),
+      print: this.allows('doc.print'),
+      printHigh: this.allows('doc.print.high'),
+    };
+  }
+
   get state(): DocumentSecurityState {
     return this.securityState;
   }
@@ -105,7 +123,9 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    */
   get scope(): ReadonlyArray<string> {
     if (this.access) return this.access.effectiveScope;
-    return Array.from(expandRawScope(this.tokenScope, this.pdfBits(), this.protection)).sort();
+    return Array.from(
+      expandRawScope(this.tokenScope, this.permissionFlags(), this.protection),
+    ).sort();
   }
 
   /**
@@ -113,10 +133,23 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * document's signatures forbid first, then the scope (the server's copy
    * once `/access` answered, else the JWT's), wildcard included, against the
    * PDF bits. `scope` alone can't gate UI: it enumerates concrete grants and
-   * drops the `*` admin wildcard.
+   * drops the `*` admin wildcard. A plugin's permission is the server's
+   * answer once `/access` gave it (`effectiveScope` lists the installed
+   * plugins' permissions the session holds, `*` expanded); before, the token's
+   * scope names it, or `*`.
    */
-  allows(cap: DocCapability): boolean {
-    return checkCapability(cap, this.rawScope(), this.pdfBits(), this.protection);
+  allows(permission: DocCapability | PluginPermission): boolean {
+    if (pluginOfPermission(permission) !== null) {
+      return this.access
+        ? this.access.effectiveScope.includes(permission)
+        : checkPluginPermission(permission, this.tokenScope, new Set([permission]));
+    }
+    return checkCapability(
+      permission as DocCapability,
+      this.rawScope(),
+      this.permissionFlags(),
+      this.protection,
+    );
   }
 
   /**
@@ -151,7 +184,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     switch (action) {
       case 'create':
         if (annotationsProtected) return false;
-        return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
+        return checkCollab('create', selfTarget(id), this.rawScope(), id, this.permissionFlags());
       case 'set-group':
         return checkSetGroup(
           'annotations',
@@ -164,7 +197,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
         if (annotation.subtype === 'widget') return this.allows('doc.forms.modify');
         if (annotationsProtected) return false;
         const owner = collabTargetOf(annotation);
-        return checkCollab(action, owner, this.rawScope(), id, this.pdfBits());
+        return checkCollab(action, owner, this.rawScope(), id, this.permissionFlags());
       }
     }
   }
@@ -181,14 +214,19 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       action,
       target.groupId,
       this.rawScope(),
-      this.pdfBits(),
+      this.permissionFlags(),
       this.protection,
     );
   }
 
   /** The same inputs as `allowsField`, as lists. */
   fieldRights(): FieldRights {
-    return fieldRightsOf(this.rawScope(), this.pdfBits(), this.protection, this.identity?.groupId);
+    return fieldRightsOf(
+      this.rawScope(),
+      this.permissionFlags(),
+      this.protection,
+      this.identity?.groupId,
+    );
   }
 
   /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */
@@ -196,8 +234,8 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     return this.access?.scope ?? this.tokenScope;
   }
 
-  private pdfBits() {
-    return decodePdfBits(this.securityState.permissions.bits);
+  private permissionFlags() {
+    return this.securityState.permissions.flags ?? permissionFlagsOf(null);
   }
 
   /**

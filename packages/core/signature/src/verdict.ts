@@ -1,8 +1,4 @@
-import type {
-  DocumentHandle,
-  SignatureDTO,
-  SignatureSnapshot,
-} from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Signature, SignatureSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal, type ParsedCms, type ParsedCmsInternal } from './cms/parse';
@@ -18,7 +14,7 @@ export type ModificationsVerdict = 'unchanged' | 'permitted' | 'forbidden' | 'in
  * changes allowed") and the shape a UI can explain.
  */
 export interface SignatureVerdict {
-  signature: SignatureDTO;
+  signature: Signature;
   /** The sealed bytes are intact: whole-revision coverage and the CMS message digest matches them. */
   integrity: IntegrityVerdict;
   /** The CMS verifies with its own certificate. */
@@ -26,7 +22,7 @@ export interface SignatureVerdict {
   /** The certificate chains to one of the caller's anchors. */
   trust: TrustStatus;
   trustReason?: string;
-  validatedAt: ValidationTime;
+  validationTime: ValidationTime;
   /**
    * What changed after the signature, and which bytes were judged: the loaded
    * file (`persisted`), or the session's unsaved edits snapshotted as one
@@ -48,7 +44,7 @@ export interface SignatureVerdict {
 
 export interface ValidateSignaturesOptions {
   trust?: TrustPort | null;
-  at?: ValidationTime;
+  validationTime?: ValidationTime;
   /**
    * `persisted` (default): the loaded bytes — what a file on disk says.
    * `working-copy`: unsaved edits are judged too, as the revision a save would
@@ -78,10 +74,10 @@ export async function validateSignatures(
 async function validateOne(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
-  signature: SignatureDTO,
+  signature: Signature,
   options: ValidateSignaturesOptions,
 ): Promise<SignatureVerdict> {
-  const at = options.at ?? { kind: 'now' };
+  const validationTime = options.validationTime ?? { kind: 'now' };
   let integrity: IntegrityVerdict = 'indeterminate';
   let cryptography: CryptographyVerdict = 'unsupported';
   let trust: TrustStatus = 'unknown';
@@ -109,7 +105,7 @@ async function validateOne(
 
   if (internal) {
     cryptography = await verifyCmsSignature(internal);
-    const chain = await validateChain(internal, options.trust, at);
+    const chain = await validateChain(internal, options.trust ?? null, validationTime);
     trust = chain.status;
     trustReason = chain.reason;
   }
@@ -144,7 +140,7 @@ async function validateOne(
     cryptography,
     trust,
     trustReason,
-    validatedAt: at,
+    validationTime,
     modifications,
     summary,
     cms,
@@ -160,7 +156,7 @@ async function validateOne(
 async function modificationsOf(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
-  signature: SignatureDTO,
+  signature: Signature,
   until: 'persisted' | 'working-copy',
 ): Promise<SignatureVerdict['modifications']> {
   if (signature.revisionIndex === null) {

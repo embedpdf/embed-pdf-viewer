@@ -44,7 +44,7 @@ export function createOpenSequence(
     const openContext: ActionContext = {
       origin: 'lifecycle',
       source: { kind: 'document' },
-      event: { scope: 'document', name: 'open' },
+      event: { type: 'document', event: 'open' },
     };
     try {
       const snapshot = await readDocumentActions();
@@ -59,7 +59,6 @@ export function createOpenSequence(
             next: [],
           },
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
         };
         steps.push({

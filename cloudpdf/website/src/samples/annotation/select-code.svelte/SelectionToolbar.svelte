@@ -2,29 +2,29 @@
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useAnnotation, useAnnotationState } from '@embedpdf/svelte/annotation';
 
-  // The top half of the cover, where the box selects.
+  // The top half of a page, where the box selects: on the home page, the image and the button.
   const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };
 
   const annotation = useAnnotation();
   const annotations = useAnnotationState(); // annotations.selected: the selected annotations
   const pages = usePageList();
-  const cover = $derived(pages.current[0]?.ref);
+  const page = $derived(pages.current[0]?.ref); // the home page wireframe
 </script>
 
 <div class="toolbar">
   <button
     type="button"
     class="button"
-    disabled={!cover}
-    onclick={() => cover && annotation.selection.selectAll(cover)}
+    disabled={!page}
+    onclick={() => page && annotation.selection.selectAll(page)}
   >
-    Everything on the cover
+    Everything on the page
   </button>
   <button
     type="button"
     class="button"
-    disabled={!cover}
-    onclick={() => cover && annotation.selection.selectInRect(cover, TOP_HALF)}
+    disabled={!page}
+    onclick={() => page && annotation.selection.selectInRect(page, TOP_HALF)}
   >
     The top half
   </button>

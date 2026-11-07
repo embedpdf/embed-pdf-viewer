@@ -12,21 +12,20 @@ import type {
   WidgetActionsPatch,
 } from './PdfAction';
 import { PageDestinationSchema, PdfDestinationSchema } from './PdfDestination.schema';
+import { closed, withCatchAll } from '../wire/reading';
 
-export const PdfActionTargetRefSchema: z.ZodType<PdfActionTargetRef> = z.discriminatedUnion(
-  'kind',
-  [
+export const PdfActionTargetRefSchema: z.ZodType<PdfActionTargetRef> = closed(
+  z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('name'), name: z.string() }),
     z.object({ kind: z.literal('objectNumber'), objectNumber: z.number().int().positive() }),
-  ],
+  ]),
 ) as unknown as z.ZodType<PdfActionTargetRef>;
 
-const SubmitFormFlagsSchema = z.object({
-  raw: z.number().int().nonnegative(),
+const submitFormFlags = {
   exclude: z.boolean(),
   includeNoValueFields: z.boolean(),
-  format: z.enum(['fdf', 'html', 'xfdf', 'pdf']),
-  method: z.enum(['post', 'get']),
+  format: closed(z.enum(['fdf', 'html', 'xfdf', 'pdf'])),
+  method: closed(z.enum(['post', 'get'])),
   submitCoordinates: z.boolean(),
   includeAppendSaves: z.boolean(),
   includeAnnotations: z.boolean(),
@@ -34,7 +33,12 @@ const SubmitFormFlagsSchema = z.object({
   exclNonUserAnnots: z.boolean(),
   exclFKey: z.boolean(),
   embedForm: z.boolean(),
-});
+};
+
+/** A write's flags: each optional, off (or `'fdf'`, `'post'`) when left out. */
+const submitFormFlagWrites = Object.fromEntries(
+  Object.entries(submitFormFlags).map(([name, schema]) => [name, schema.optional()]),
+) as { [Name in keyof typeof submitFormFlags]: z.ZodOptional<(typeof submitFormFlags)[Name]> };
 
 /**
  * The action schemas for one kind of destination: in the file's coordinates
@@ -71,7 +75,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
         .object({
           url: z.string(),
           fields: z.array(PdfActionTargetRefSchema).nullable(),
-          flags: SubmitFormFlagsSchema,
+          ...submitFormFlags,
           charSet: z.string().optional(),
         })
         .optional(),
@@ -85,15 +89,22 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     arm('goto-3d-view'),
     arm('unknown'),
   ] as const;
-  const node: z.ZodType<PdfActionNode<Destination>> = z.lazy(
-    () =>
+  /** An action of a type this client doesn't know reads as `unknown`, with its `subtype` and `next`. */
+  const node: z.ZodType<PdfActionNode<Destination>> = z.lazy(() =>
+    withCatchAll(
       z.discriminatedUnion('type', [...arms]) as unknown as z.ZodType<PdfActionNode<Destination>>,
+      'unknown',
+    ).describe(
+      'An action, by its `type`. A newer server can add types: read one your client ' +
+        "doesn't know as `unknown`, keeping its `subtype` and `next`.",
+    ),
   );
   const tree: z.ZodType<PdfActionTree<Destination>> = z.object({
     root: node.nullable(),
     incomplete: z.boolean(),
-    warningFlags: z.number().int().nonnegative(),
-    warnings: z.array(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
+    warnings: z.array(
+      closed(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
+    ),
   });
   const fieldActions = z.object({
     keystroke: tree.optional(),
@@ -122,9 +133,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     .object({
       nameTreeScripts: z.array(z.object({ name: z.string(), action: tree })),
       openAction: tree.nullable(),
-      // Defaulted so a pre-payload server response (field absent) still parses
-      // and every parsed snapshot carries the key.
-      openDestination: destination.nullable().default(null),
+      openDestination: destination.nullable(),
       willClose: tree.optional(),
       willSave: tree.optional(),
       didSave: tree.optional(),
@@ -134,7 +143,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     .superRefine((snapshot, context) => {
       // `/OpenAction` is one catalog entry — a dictionary (action) or an array
       // (destination). Both non-null cannot come from a correct reader.
-      if (snapshot.openAction !== null && (snapshot.openDestination ?? null) !== null) {
+      if (snapshot.openAction !== null && snapshot.openDestination !== null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'openAction and openDestination are mutually exclusive',
@@ -177,7 +186,7 @@ function actionWriteSchemasFor<Destination>(destination: z.ZodType<Destination>)
       type: z.literal('submit-form'),
       url: z.string().min(1),
       fields: z.array(PdfActionTargetRefSchema).nullable(),
-      flags: z.number().int().nonnegative().optional(),
+      ...submitFormFlagWrites,
       ...next(),
     }),
   ] as const;

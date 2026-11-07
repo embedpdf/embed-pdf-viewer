@@ -101,7 +101,7 @@ SHA=$(shasum -a 256 "$PDF" | cut -d' ' -f1)
 # 1. announce the upload
 DOC=$(curl -s -X POST localhost:3000/v1/tenants/default/documents/init \
   -H "Authorization: Bearer $API_TOKEN" -H 'content-type: application/json' \
-  -d "{\"contentLength\":$(wc -c < "$PDF"),\"contentSha256\":\"$SHA\",\"uploadPreference\":\"proxy\"}" \
+  -d "{\"sizeBytes\":$(wc -c < "$PDF"),\"contentSha256\":\"$SHA\",\"uploadPreference\":\"proxy\"}" \
   | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
 
 # 2. send the bytes

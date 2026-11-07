@@ -10,8 +10,8 @@ export interface ParsedCms {
   digestAlgorithm: DigestAlgorithm;
   /** The `message-digest` signed attribute: what the signer claims the content hashes to. */
   messageDigest: Uint8Array;
-  /** The CMS `signing-time` signed attribute, when present (PAdES forbids it; the PDF's `/M` is the claim there). */
-  signingTime: Date | null;
+  /** The CMS `signing-time` signed attribute as an ISO 8601 string, when present (PAdES forbids it; the PDF's `/M` is the claim there). */
+  signingTime: string | null;
   /** DER of the signer's certificate. */
   signerCertificate: Uint8Array;
   /** DER of every certificate carried by the CMS, signer first. */
@@ -146,11 +146,11 @@ export function parseCmsInternal(
   }
   const messageDigest = new Uint8Array(messageDigestValue.valueBlock.valueHexView);
 
-  let signingTime: Date | null = null;
+  let signingTime: string | null = null;
   const signingTimeAttr = attr(OID.signingTime);
   const timeValue = signingTimeAttr?.values[0];
   if (timeValue instanceof asn1js.UTCTime || timeValue instanceof asn1js.GeneralizedTime) {
-    signingTime = timeValue.toDate();
+    signingTime = timeValue.toDate().toISOString();
   }
 
   const essAttr = attr(OID.signingCertificateV2);

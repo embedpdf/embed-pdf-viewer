@@ -27,15 +27,15 @@ const square = (x: number, y: number, size = 40): SquareDraft => ({
  */
 export function runAnnotationAppearanceExportConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation appearance export conformance: ${opts.label}`, () => {
+  describe(`annotation appearance export conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -43,7 +43,7 @@ export function runAnnotationAppearanceExportConformance(
     });
 
     test('returns a single-page PDF sized to the union rect; source untouched', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       let exported: DocumentHandle | null = null;
       try {
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
@@ -60,9 +60,9 @@ export function runAnnotationAppearanceExportConformance(
         const after = await page.annotations.list();
         expect(after.annotations).toEqual(before.annotations);
 
-        if (opts.openKind !== 'bytes') return;
+        if (options.openKind !== 'bytes') return;
         exported = await engine.open(
-          { kind: 'bytes', id: `${opts.fixture.id}-appearance`, bytes },
+          { kind: 'bytes', id: `${options.fixture.id}-appearance`, bytes },
           EVERY_PERMISSION,
         );
         const layout = await exported.pages.list();
@@ -79,7 +79,7 @@ export function runAnnotationAppearanceExportConformance(
     });
 
     test('a ref on another page and an empty list reject InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const layout = await doc.pages.list();
         const page0 = doc.page(layout.pages[0].ref);

@@ -22,7 +22,19 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
     | CloudPDF.ChangeOp.MetadataUpdate
-    | CloudPDF.ChangeOp.MetadataUpdateCustom;
+    | CloudPDF.ChangeOp.MetadataUpdateCustom
+    | CloudPDF.ChangeOp.OutlineCreate
+    | CloudPDF.ChangeOp.OutlineUpdate
+    | CloudPDF.ChangeOp.OutlineMove
+    | CloudPDF.ChangeOp.OutlineDelete
+    | CloudPDF.ChangeOp.PagesRotate
+    | CloudPDF.ChangeOp.PagesReorder
+    | CloudPDF.ChangeOp.PagesDelete
+    | CloudPDF.ChangeOp.PagesInsertBlank
+    | CloudPDF.ChangeOp.PagesInsert
+    | CloudPDF.ChangeOp.PagesCopy
+    | CloudPDF.ChangeOp.AttachmentsCreate
+    | CloudPDF.ChangeOp.AttachmentsDelete;
 
 export namespace ChangeOp {
     export interface AnnotationsCreate {
@@ -183,5 +195,122 @@ export namespace ChangeOp {
     export interface MetadataUpdateCustom {
         type: "metadata.updateCustom";
         patch: Record<string, string | null>;
+    }
+
+    export interface OutlineCreate {
+        type: "outline.create";
+        parent: CloudPDF.OutlineItemRef | null;
+        position?: CloudPDF.OutlinePosition | undefined;
+        data: CloudPDF.OutlineItemDraft;
+        objectNumber?: number | undefined;
+    }
+
+    export interface OutlineUpdate {
+        type: "outline.update";
+        ref: CloudPDF.OutlineItemRef;
+        patch: CloudPDF.OutlineItemPatch;
+        expect?: CloudPDF.OutlineItemPatch | undefined;
+    }
+
+    export interface OutlineMove {
+        type: "outline.move";
+        refs: CloudPDF.OutlineItemRef[];
+        parent: CloudPDF.OutlineItemRef | null;
+        position: CloudPDF.OutlinePosition;
+    }
+
+    export interface OutlineDelete {
+        type: "outline.delete";
+        ref: CloudPDF.OutlineItemRef;
+        expect?: CloudPDF.OutlineItemPatch | undefined;
+    }
+
+    export interface PagesRotate {
+        type: "pages.rotate";
+        pages: CloudPDF.PageRef[];
+        rotation: number;
+    }
+
+    export interface PagesReorder {
+        type: "pages.reorder";
+        pages: CloudPDF.PageRef[];
+        position: CloudPDF.PagePosition;
+    }
+
+    export interface PagesDelete {
+        type: "pages.delete";
+        pages: CloudPDF.PageRef[];
+    }
+
+    export interface PagesInsertBlank {
+        type: "pages.insertBlank";
+        spec: ChangeOpPagesInsertBlank.Spec;
+        position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpPagesInsertBlank {
+        export interface Spec {
+            size: Spec.Size;
+            count?: number | undefined;
+        }
+
+        export namespace Spec {
+            export interface Size {
+                width: number;
+                height: number;
+            }
+        }
+    }
+
+    export interface PagesInsert {
+        type: "pages.insert";
+        resources: ChangeOpPagesInsert.Resources;
+        position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpPagesInsert {
+        export interface Resources {
+            source: string;
+        }
+    }
+
+    export interface PagesCopy {
+        type: "pages.copy";
+        pages: CloudPDF.PageRef[];
+        position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export interface AttachmentsCreate {
+        type: "attachments.create";
+        file: CloudPDF.AttachmentFileBase;
+        resources: ChangeOpAttachmentsCreate.Resources;
+    }
+
+    export namespace ChangeOpAttachmentsCreate {
+        export interface Resources {
+            file: string;
+        }
+    }
+
+    export interface AttachmentsDelete {
+        type: "attachments.delete";
+        ref: ChangeOpAttachmentsDelete.Ref;
+    }
+
+    export namespace ChangeOpAttachmentsDelete {
+        export interface Ref {
+            kind: Ref.Kind;
+            key: string;
+        }
+
+        export namespace Ref {
+            export const Kind = {
+                Key: "key",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 }

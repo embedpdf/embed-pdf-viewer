@@ -74,6 +74,8 @@ jobs:
         run: |
           pnpm --filter @embedpdf/engine-runtime build
           pnpm --filter @embedpdf/engine-core build
+          pnpm --filter @embedpdf/core-fonts build
+          pnpm --filter @embedpdf/default-fallback-fonts build
           pnpm --filter @embedpdf/engine-services build
           pnpm --filter @embedpdf/engine build
           pnpm --filter @cloudpdf/contract build

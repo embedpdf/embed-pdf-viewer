@@ -7,35 +7,43 @@
  */
 import {
   anchorFromCamera,
+  clampZoom,
   gridLayout,
   groupPages,
   linearLayout,
+  paddingSidesOf,
+  resolveZoomLimits,
   ZoomMode,
   type AlignmentValue,
   type AlignValue,
   type Anchor,
   type CameraConstraint,
+  type PaddingSides,
   type PageFrame,
   type Point,
   type Rect as StageRect,
   type Scene,
   type SceneItem,
   type Size,
+  type ZoomLimits,
 } from '@embedpdf/core-stage';
 import { addRotations, applyRect, displaySize, rotateScaleMatrix } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
 import { memo, type PluginContext, type PageRef } from '@embedpdf/core';
 
 import type { StageSettings } from '../contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { SETTINGS_EFFECT, SETTING_KEYS } from '../settings';
 
-export function createScene(ctx: PluginContext<StageState>) {
+export function createScene(ctx: PluginContext<StageModel>) {
   const state = () => ctx.state.get();
   const camera = () => state().camera;
   const viewport = () => state().viewport;
   const dpr = () => state().dpr;
-  const padding = () => state().padding;
+  /** The padding, side by side (screen px). */
+  const padding = (): PaddingSides => paddingSidesOf(state().padding);
+  /** The `minZoom`/`maxZoom` range every zoom this view chooses is clamped into. */
+  const zoomLimits = (): ZoomLimits => resolveZoomLimits(state().minZoom, state().maxZoom);
   const paged = () => state().flow === 'paged';
   const isFitAll = () => {
     const zoom = state().zoom;
@@ -73,12 +81,16 @@ export function createScene(ctx: PluginContext<StageState>) {
   // way a scene depends on the viewport or the zoom.
   const effectiveZoom = (): number => {
     const zoom = state().zoom;
-    return 'level' in zoom ? zoom.level : Math.max(state().camera.zoom, 0.0001);
+    return 'level' in zoom
+      ? clampZoom(zoom.level, zoomLimits())
+      : Math.max(state().camera.zoom, 0.0001);
   };
 
   // Wrapped grid: the line width (world units) the columns must fit.
-  const wrapLineWidth = (): number =>
-    Math.max(1, (viewport().width - 2 * padding()) / effectiveZoom());
+  const wrapLineWidth = (): number => {
+    const { left, right } = padding();
+    return Math.max(1, (viewport().width - left - right) / effectiveZoom());
+  };
 
   // pageFrame (screen px) → world units at the effective zoom.
   const worldPageFrame = (): PageFrame => {
@@ -190,18 +202,18 @@ export function createScene(ctx: PluginContext<StageState>) {
   // unbounded pan is free, and coordinates stay local.
   let sceneCache: { key: string; scene: Scene } | null = null;
   // The registry signature: page count plus the kernel's monotonic
-  // `revision`. The revision changes on every page mutation (rotate, move,
+  // `pagesSequence`. It changes on every page mutation (rotate, move,
   // delete), so a change that keeps the page count (a rotation) still re-keys
   // the scene instead of rendering the page in its stale box.
   const documentKey = (): string => {
     const document = ctx.document();
-    return document ? `${document.pageCount}.${document.revision}` : '0.0';
+    return document ? `${document.pageCount}.${document.pagesSequence}` : '0.0';
   };
   const buildScene = (): Scene => {
     const { grouping: groups } = grouping();
     if (state().flow === 'paged') {
       const index = groups.length
-        ? Math.min(itemIndexOfPage(state().cursor), groups.length - 1)
+        ? Math.min(itemIndexOfPage(state().pageIndex), groups.length - 1)
         : 0;
       const key = `paged|${documentKey()}|${settingsKey()}|${index}`;
       if (sceneCache && sceneCache.key === key) return sceneCache.scene;
@@ -240,7 +252,35 @@ export function createScene(ctx: PluginContext<StageState>) {
   /** The item shown for the cursor: the slice's only item (paged) or the full-scene item. */
   const cursorItem = (): SceneItem => {
     const scene = buildScene();
-    return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().cursor)];
+    return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().pageIndex)];
+  };
+
+  /** Whether an item is one navigation unit now: it fits across the view, or fit-all shows all. */
+  const isWhole = (item: SceneItem): boolean =>
+    isFitAll() || fitsAcross(itemRect(item), camera().zoom);
+
+  /**
+   * The pages you're on, the navigation unit: the cursor's item while it is
+   * whole (a spread you see side by side), else the cursor page alone. The
+   * page number names them, and nextPage and previousPage step past them.
+   */
+  const currentPages = (): readonly number[] => {
+    const item = cursorItem();
+    if (!item) return [];
+    return isWhole(item) ? item.pageIndexes : [state().pageIndex];
+  };
+
+  /**
+   * Where the unit that holds `pageIndex` starts: its item's first page while
+   * that item is whole, else the page itself. A paged scene holds only the
+   * cursor's item, so there it measures that one.
+   */
+  const unitStartOf = (pageIndex: number): number => {
+    const group = grouping().grouping[itemIndexOfPage(pageIndex)];
+    if (!group || group.length === 1) return pageIndex;
+    const scene = buildScene();
+    const item = paged() ? scene.items[0] : scene.items[itemIndexOfPage(pageIndex)];
+    return item && isWhole(item) ? group[0] : pageIndex;
   };
 
   /**
@@ -256,16 +296,14 @@ export function createScene(ctx: PluginContext<StageState>) {
     return { x: box.x + world.x, y: box.y + world.y, width: world.width, height: world.height };
   };
 
-  // Does this rect fit the padded viewport at this zoom? It decides the
-  // navigation step size and the arrival subject, never the alignment.
-  const fits = (rect: StageRect, zoom: number): boolean => {
+  // Does this rect fit across the padded viewport at this zoom: its width, the
+  // axis an item's pages sit side by side on? An item that fits across is seen
+  // whole, however tall it is, the way a tall page is still one page. It
+  // decides the navigation unit and the arrival subject, never the alignment.
+  const fitsAcross = (rect: StageRect, zoom: number): boolean => {
     const size = viewport();
     const inset = padding();
-    const tolerance = 0.5;
-    return (
-      rect.width * zoom <= size.width - 2 * inset + tolerance &&
-      rect.height * zoom <= size.height - 2 * inset + tolerance
-    );
+    return rect.width * zoom <= size.width - inset.left - inset.right + 0.5;
   };
   // An alignment policy → a concrete viewport point: a fraction per axis
   // (start = 0, center = ½, end = 1; named x stops are logical under RTL).
@@ -287,8 +325,8 @@ export function createScene(ctx: PluginContext<StageState>) {
       rtl && alignment.x === 'start' ? 'end' : rtl && alignment.x === 'end' ? 'start' : alignment.x;
     const inset = padding();
     return {
-      x: inset + (size.width - 2 * inset) * alignFraction(alignX),
-      y: inset + (size.height - 2 * inset) * alignFraction(alignment.y),
+      x: inset.left + (size.width - inset.left - inset.right) * alignFraction(alignX),
+      y: inset.top + (size.height - inset.top - inset.bottom) * alignFraction(alignment.y),
     };
   };
   const anchorPoint = (): Point => alignPoint(state().anchorAlign, viewport());
@@ -316,7 +354,7 @@ export function createScene(ctx: PluginContext<StageState>) {
     const scene = buildScene();
     return scene.itemCount
       ? anchorFromCamera(camera(), scene, viewport(), at)
-      : { pageIndex: state().cursor, fx: 0.5, fy: 0 };
+      : { pageIndex: state().pageIndex, fractionX: 0.5, fractionY: 0 };
   };
   const currentAnchor = (): Anchor => anchorAt(anchorPoint());
 
@@ -337,6 +375,7 @@ export function createScene(ctx: PluginContext<StageState>) {
     viewport,
     dpr,
     padding,
+    zoomLimits,
     paged,
     isFitAll,
     grouping,
@@ -350,8 +389,10 @@ export function createScene(ctx: PluginContext<StageState>) {
     itemRect,
     pageRectOf,
     cursorItem,
+    currentPages,
+    unitStartOf,
     worldRectForContent,
-    fits,
+    fitsAcross,
     alignPoint,
     anchorPoint,
     fitBox,

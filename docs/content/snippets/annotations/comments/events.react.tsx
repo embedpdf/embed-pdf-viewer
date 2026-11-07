@@ -4,7 +4,7 @@ import { notifyThreadAuthor } from './notifications'; // your own
 export function CommentsSidebar() {
   useAnnotationEvent(
     (annotation) => annotation.comments.onThreadChanged,
-    ({ rootRef, change }) => change === 'reply' && notifyThreadAuthor(rootRef),
+    ({ rootRef, type }) => type === 'reply' && notifyThreadAuthor(rootRef),
   );
 
   return <aside>{/* … */}</aside>;

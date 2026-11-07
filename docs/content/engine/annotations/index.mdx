@@ -125,8 +125,15 @@ Besides `subtype`, `rect` and `ref`, every kind has these fields:
 | `reply`    | The annotation it answers, or `null`. See [Notes & replies](/docs/engine/annotations/notes-and-replies). |
 | `popup`    | The ref of its popup window, or `null`. See [Popups](/docs/engine/annotations/notes-and-replies#popups). |
 | `groupId`  | The group it belongs to, when you work with groups.                                                      |
+| `structurePosition` | Where it sits in the document's tags (its logical structure), or `null` when it isn't tagged. See [Keyboard order](/docs/engine/documents/pages#keyboard-order). |
 
 Each annotation also has the [flags](#flags) and the fields that say [who wrote it](#who-wrote-it).
+
+Every kind but a link, a popup and a form widget also has `richText`: its comment with bold,
+italic or colored words, or `null` when the comment is plain text. `contents` is then the same
+text without the formatting. See
+[Formatted comments](/docs/engine/annotations/notes-and-replies#formatted-comments). A free text
+draws its rich text in the box; see [Free text](/docs/engine/annotations/free-text#rich-text).
 
 ## Add an annotation
 
@@ -169,8 +176,9 @@ accepts. That makes "change a copy, then save it" code simple:
 await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
 ```
 
-Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. For
-free text, send `contents` or `richText`, not both with different text.
+Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. Send
+`contents` or `richText`, not both with different text: a read sent back after the text changed
+fails with `InvalidArg` instead of putting the old text back.
 
 ### Move or resize by `rect`
 
@@ -216,6 +224,49 @@ A create works out a drawn annotation's `rect` from its shape, whatever `rect` y
 copy of another app's drawing keeps its shape exactly. A box turned a quarter can be created by
 its `rect` instead of its `box`; see [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
 
+### Change the kind
+
+Some kinds take the same fields, and an update turns one into another when you send a new
+`subtype`:
+
+| Kinds                                                     | What they draw                         |
+| :-------------------------------------------------------- | :------------------------------------- |
+| `'highlight'`, `'underline'`, `'squiggly'`, `'strikeout'` | Marks over text                        |
+| `'square'`, `'circle'`                                    | A rectangle or an ellipse inside `box` |
+
+```ts
+await page.annotations.update(highlight.ref, { subtype: 'squiggly' });
+```
+
+It stays the same annotation: its `ref`, `nm`, place in the drawing order, replies, popup and
+group, and who wrote it and when. `modifiedAt` and `modifiedBy` change, as on any update. The
+engine draws it as its new kind, and `annotations.updated` carries the annotation as it now reads.
+Undoing the update turns it back.
+
+The update takes the new kind's fields, so other fields can change with it:
+
+```ts
+await page.annotations.update(highlight.ref, { subtype: 'underline', color: '#1d4ed8' });
+```
+
+Other kinds keep their `subtype`: a highlight can't become ink, and a line can't become a polyline,
+because they keep their shapes in different fields. Create a new annotation for those. A `subtype`
+the annotation can't become fails with `InvalidArg`, and the message lists the kinds it can become.
+
+A value the new kind has no field for is never dropped. The update fails with `InvalidArg` naming
+the field, and you clear it first, in the same [change](/docs/engine/documents/changes), so both
+writes are one step to undo. The one such value today is the `intent` of a strikeout that is part
+of a [replacement](/docs/engine/annotations/text-markup#suggest-an-insertion-or-a-replacement):
+
+```ts
+await doc.apply({
+  ops: [
+    { type: 'annotations.update', ref: strikeout.ref, patch: { intent: null } },
+    { type: 'annotations.update', ref: strikeout.ref, patch: { subtype: 'highlight' } },
+  ],
+});
+```
+
 ## Delete and reorder
 
 ```ts
@@ -248,17 +299,26 @@ Most kinds share the same style fields:
 | `opacity`       | From `0` (invisible) to `1` (solid)                     | `1`       |
 | `strokeWidth`   | Line width in points                                    | `1`       |
 | `borderStyle`   | `'solid'` or `'dashed'`                                 | `'solid'` |
-| `dashArray`     | The pattern a `'dashed'` border draws, such as `[3, 2]` | `[3]`     |
+| `dashArray`     | The pattern a `'dashed'` border draws, such as `[3, 2]` | `[3, 3]`  |
 
 A pattern alone doesn't make a border dashed: a `'solid'` border keeps its `dashArray` and draws
-solid. `dashArray: null` on a dashed border draws the default `[3]`, 3 points on and 3 off. A
-border from another app can read `'beveled'` or `'inset'`; only form widgets draw those, so a
-write takes them only sent back unchanged.
+solid. A dashed border whose `dashArray` is left out gets the default `[3, 3]`, 3 points on and 3
+off, written into the file, because Acrobat redraws a dashed border whose file names no pattern as
+a solid line. `dashArray: null` is no pattern: the file gets none and the border reads back
+`null`; the engine draws it with the default, as ISO 32000 says, and Acrobat draws it solid. A
+border from another app that names no pattern reads the same way. A pattern needs at least one
+length, so `[]` is refused: an empty pattern is a solid line, which is `borderStyle: 'solid'`, and
+a border from another app with an empty pattern reads `'solid'`. A border from another app can
+also read `'beveled'` or `'inset'`; only form widgets draw those, so a write takes them only sent
+back unchanged.
 
 Colors are `'#rrggbb'`, as in CSS: the engine gives them in lowercase and takes either case. They
 never include transparency: that's what `opacity` is for. The default color depends on the kind
 (yellow for a highlight, red for a shape, black for free text); each kind's page lists its
 defaults.
+
+On a shape, a line or ink, `color: null` draws no line at all, and `strokeWidth` keeps its value:
+see [Without a line](/docs/engine/annotations/shapes#without-a-line).
 
 A PDF can store a color as gray or CMYK. It reads as the same color in `'#rrggbb'`, and sent back
 unchanged it stays as the file has it, so passing a read straight back rewrites nothing.

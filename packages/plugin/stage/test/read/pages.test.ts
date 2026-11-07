@@ -25,7 +25,7 @@ describe('page reads', () => {
     const { stage } = placedStage(5);
     const ref = toPageRef(1);
     const boxOf = (page: number | typeof ref) => {
-      const frame = stage.getPageFrame(page)!;
+      const frame = stage.getPageBox(page)!;
       return { ref: frame.ref, x: frame.x, y: frame.y, screenX: frame.screenX, width: frame.width };
     };
     expect(boxOf(0)).toEqual(boxOf(ref));
@@ -42,8 +42,8 @@ describe('page reads', () => {
 
   it('answer empty for a page that isn’t in the document', () => {
     const { stage } = placedStage(5);
-    expect(stage.getPageFrame(9)).toBeNull();
-    expect(stage.getPageFrame(toPageRef(99))).toBeNull();
+    expect(stage.getPageBox(9)).toBeNull();
+    expect(stage.getPageBox(toPageRef(99))).toBeNull();
     expect(stage.isPageVisible(9)).toBe(false);
     expect(stage.viewportToPage(9, { x: 0, y: 0 })).toBeNull();
     expect(stage.pageToViewport(toPageRef(99), { x: 0, y: 0 })).toBeNull();

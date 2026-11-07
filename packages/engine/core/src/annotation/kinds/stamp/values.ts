@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { closed } from '../../../wire/reading';
+
 /**
  * How a stamp's appearance is scaled into its box (CSS `object-fit`
  * vocabulary): `'contain'` keeps the aspect ratio and stays fully visible,
@@ -8,4 +10,4 @@ import { z } from 'zod';
  */
 export type StampFit = 'contain' | 'cover' | 'fill';
 
-export const StampFitSchema: z.ZodType<StampFit> = z.enum(['contain', 'cover', 'fill']);
+export const StampFitSchema: z.ZodType<StampFit> = closed(z.enum(['contain', 'cover', 'fill']));

@@ -134,6 +134,23 @@ Current cloud-SDK adapters using the pattern (all match exactly):
 
 Any new cloud-SDK adapter (CDN CloudFront / CloudCDN / AzureFD purge) follows the same shape.
 
+### Faking an SDK in tests
+
+A cloud SDK's test fake is one file per package in `cloudpdf/server/__mocks__/`
+(`__mocks__/@azure/storage-blob.ts`). A test file opts in with
+`vi.mock('@azure/storage-blob')`, with no factory, and imports the state the
+fake exports (`blobs`, `gcs`, `awsKms`, …) from that file to seed and inspect
+it. When a test needs something the fake can't do yet, extend the shared
+fake.
+
+Never give `vi.mock` a factory for an SDK an adapter imports lazily. While a
+factory resolves, vitest 2 marks it as in progress on the importing module's
+import stack, which every dynamic `import()` from that module shares. A
+second import of the same package that arrives in that window loads the real
+SDK. Every adapter instance starts its own import, so two instances built
+close together are enough, and the real client then calls the cloud. vitest
+serves a `__mocks__` file by path, with no such window.
+
 ---
 
 ## Config schema convention
@@ -256,6 +273,6 @@ No `createServerRuntime` or other bundler. Five lines of factory composition is 
 4. **Factory case** — one new `case` in `<family>/create<Family>.ts`'s switch. TypeScript fails the build if you forget.
 5. **Env loader case** — one new branch in `<family>/config/load<Family>ConfigFromEnv.ts`'s kind-specific field reader.
 6. **Optional dependency** — if the adapter wraps a cloud SDK, add the package to `cloudpdf/server/package.json`'s `optionalDependencies`.
-7. **Test** — one file at `cloudpdf/server/test/<family>-<kind>.test.ts` covering construction, key operations, and that `info` exposes only public identifiers.
+7. **Test** — one file at `cloudpdf/server/test/<family>-<kind>.test.ts` covering construction, key operations, and that `info` exposes only public identifiers. A cloud SDK is faked in `cloudpdf/server/__mocks__/` (see [Faking an SDK in tests](#faking-an-sdk-in-tests)).
 
 That's the entire surface. If a step doesn't apply (e.g., no cloud SDK → skip step 6), skip it explicitly in the PR description.

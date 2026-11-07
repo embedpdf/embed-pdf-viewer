@@ -9,7 +9,7 @@
  * document (the annotation plugin's `editable` and the form plugin's `fillable` settings).
  */
 import type { EditableKind, EditableKinds } from '@embedpdf/react/annotation';
-import type { FillableFields, FormFieldFamily } from '@embedpdf/react/form';
+import type { FillableFields, FormFieldKind } from '@embedpdf/react/form';
 
 /** Every built-in feature and its parts: the names `disable` takes, as All features lists them. */
 export const FEATURE_PARTS = {
@@ -24,9 +24,10 @@ export const FEATURE_PARTS = {
   pages: [],
   attachments: ['adding'],
   text: ['selection', 'copy'],
+  snapshots: [],
   search: [],
   thumbnails: [],
-  outline: [],
+  outline: ['editing'],
   documents: ['open', 'download', 'print', 'tabs'],
 } as const;
 
@@ -54,6 +55,7 @@ export const READ_ONLY_FEATURES: readonly Feature[] = [
   'measurement',
   'pages',
   'attachments.adding',
+  'outline.editing',
 ];
 
 const isInside = (feature: string, outer: string): boolean =>
@@ -89,7 +91,7 @@ const FEATURE_ANNOTATIONS: Readonly<Record<string, readonly EditableKind[]>> = {
 };
 
 /** The fields each feature fills in, by the families the form plugin's `fillable` setting takes. */
-const FEATURE_FIELDS: Readonly<Record<string, readonly FormFieldFamily[]>> = {
+const FEATURE_FIELDS: Readonly<Record<string, readonly FormFieldKind[]>> = {
   'forms.filling': ['text', 'checkbox', 'radio', 'combobox', 'listbox', 'pushbutton'],
   'signatures.signing': ['signature'],
 };

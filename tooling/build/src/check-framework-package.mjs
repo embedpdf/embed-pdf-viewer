@@ -326,7 +326,7 @@ function whereIs(problem) {
 /** `file(line,column): error TS1234: message`, a message's later lines indented under it. */
 function readTscDiagnostics(result, root) {
   const diagnostics = [];
-  for (const line of `${result.stdout}${result.stderr}`.split('\n')) {
+  for (const line of `${result.stdout}${result.stderr}`.split(/\r?\n/)) {
     const match = line.match(/^(.+?)\((\d+),(\d+)\): error TS\d+: (.*)$/);
     if (match) {
       const [, file, row, , message] = match;
@@ -342,7 +342,7 @@ function readTscDiagnostics(result, root) {
 function readSvelteCheckDiagnostics(result, root) {
   const diagnostics = [];
   let completed = false;
-  for (const line of result.stdout.split('\n')) {
+  for (const line of result.stdout.split(/\r?\n/)) {
     const json = line.match(/^\d+ (\{.*\})$/);
     if (json) {
       const diagnostic = JSON.parse(json[1]);

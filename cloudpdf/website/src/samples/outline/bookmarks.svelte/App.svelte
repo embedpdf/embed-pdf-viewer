@@ -1,0 +1,29 @@
+<script lang="ts" module>
+  import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
+  import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
+  import { outlinePlugin } from '@embedpdf/svelte/outline';
+  import { cloudEngine } from '@cloudpdf/engine';
+  import Bookmarks from './Bookmarks.svelte';
+
+  import '../bookmarks.css';
+
+  const engine = cloudEngine();
+  const plugins = [stagePlugin(), renderPlugin(), outlinePlugin()];
+
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+</script>
+
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
+  <DocumentGate>
+    {#snippet fallback()}
+      <p class="loading">Loading…</p>
+    {/snippet}
+    <div class="layout">
+      <Bookmarks />
+      <Stage class="stage">
+        <RenderLayer />
+      </Stage>
+    </div>
+  </DocumentGate>
+</Viewer>

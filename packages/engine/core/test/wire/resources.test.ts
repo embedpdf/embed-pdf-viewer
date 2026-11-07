@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { decodePdfBits, PDF_BITS } from '../../src/auth/scope';
+import { permissionFlagsOf, PDF_BITS } from '../../src/auth/scope';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../../src/wire/resources';
 import { cdnCoverageForScope } from '../../src/wire/cdn/coverage';
+import {
+  PAGE_PICTURES,
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
+  pagePictureOf,
+} from '../../src/wire/renderFamilies';
 
-const NO_BITS = decodePdfBits(null);
-const BIT5 = decodePdfBits(PDF_BITS.COPY);
-const BIT6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+const NO_BITS = permissionFlagsOf(null);
+const BIT5 = permissionFlagsOf(PDF_BITS.COPY);
+const BIT6 = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
 
 describe('DOC_RESOURCES — structural invariants', () => {
   it('every entry has matching id and key', () => {
@@ -152,7 +159,7 @@ describe('checkResourceAccess', () => {
     expect(checkResourceAccess('page-render', ['doc.open'], NO_BITS)).toBe(false);
   });
 
-  it('pdf.permissions + bit5 grants page-text and page-geometry', () => {
+  it('pdf.permissions + copy grants page-text and page-geometry', () => {
     expect(checkResourceAccess('page-text', ['pdf.permissions'], BIT5)).toBe(true);
     expect(checkResourceAccess('page-geometry', ['pdf.permissions'], BIT5)).toBe(true);
   });
@@ -183,7 +190,7 @@ describe('checkResourceAccess', () => {
     );
   });
 
-  it('annotations-read granted via pdf.permissions + bit6', () => {
+  it('annotations-read granted via pdf.permissions + modifyAnnotations', () => {
     expect(checkResourceAccess('annotations-read', ['pdf.permissions'], BIT6)).toBe(true);
   });
 });
@@ -213,6 +220,22 @@ describe('cdnCoverageForScope', () => {
     }
   });
 
+  it("a layer's grant covers its own versions, never another layer's", () => {
+    const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1', layerName: 'bob' });
+    const versionPrefixes = coverage
+      .filter((e) => e.resourceId.startsWith('layer-version-'))
+      .map((e) => e.pathPrefix);
+    expect(versionPrefixes.sort()).toEqual([
+      '/v1/docs/doc_1/layers/bob/versions/analysis/',
+      '/v1/docs/doc_1/layers/bob/versions/download/',
+      '/v1/docs/doc_1/layers/bob/versions/revisions/',
+      '/v1/docs/doc_1/layers/bob/versions/signatures/',
+    ]);
+    expect(coverage.some((e) => e.pathPrefix.includes('/layers/alice/'))).toBe(false);
+    // The list grows with every signature: never signed at the edge.
+    expect(coverage.some((e) => e.resourceId === 'layer-versions')).toBe(false);
+  });
+
   it('never includes head or download-current', () => {
     const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1' });
     expect(coverage.some((e) => e.resourceId === 'head')).toBe(false);
@@ -227,6 +250,7 @@ describe('cdnCoverageForScope', () => {
     attachments: 'base',
     metadata: 'base',
     actions: 'base',
+    outline: 'base',
   } as const;
 
   it('scopes: an owned plane withholds exactly the doc-level resources depending on it', () => {
@@ -250,6 +274,8 @@ describe('cdnCoverageForScope', () => {
       'actions',
       'attachments',
       'attachment-files',
+      'outline',
+      'fonts',
     ] as const) {
       expect(shared.has(id)).toBe(true);
     }
@@ -277,6 +303,19 @@ describe('cdnCoverageForScope', () => {
     expect(contentOwned.has('page-annotations')).toBe(true);
     expect(contentOwned.has('attachments')).toBe(true);
     expect(contentOwned.has('layout')).toBe(true);
+    // The fonts are wherever the drawings are: content, annotations, forms.
+    expect(contentOwned.has('fonts')).toBe(false);
+    for (const plane of ['annotations', 'forms'] as const) {
+      const owned = ids(
+        cdnCoverageForScope(['*'], NO_BITS, {
+          docId: 'doc_1',
+          layerName: 'L1',
+          scopes: { ...ALL_BASE, [plane]: 'layer' },
+        }),
+      );
+      expect(owned.has('fonts')).toBe(false);
+      expect(owned.has('layer-fonts')).toBe(true);
+    }
     // Layer-scoped variants are never plane-gated — a diverged layer still
     // reads its own view.
     expect(contentOwned.has('layer-page-render')).toBe(true);
@@ -367,13 +406,29 @@ describe('cdnCoverageForScope', () => {
     expect(metadataOwned.has('metadata')).toBe(false);
     expect(metadataOwned.has('metadata-custom')).toBe(false);
     expect(metadataOwned.has('page-render')).toBe(true);
+
+    // The outline is read in page space: owning its own plane or the layout
+    // withholds the shared outline; nothing else goes with it.
+    const outlineOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, outline: 'layer' },
+      }),
+    );
+    expect(outlineOwned.has('outline')).toBe(false);
+    expect(outlineOwned.has('layer-outline')).toBe(true);
+    expect(outlineOwned.has('metadata')).toBe(true);
+    expect(outlineOwned.has('layout')).toBe(true);
+    expect(layoutOwned.has('outline')).toBe(false);
   });
 
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
-    // doc.render → page-render (doc-level) and layer-page-render (layer-scoped).
-    // Both share the same capability gate; both get signed so the CDN
-    // covers whichever variant the SDK actually requests. Pictures with
-    // annotations aren't among them: they also take doc.annotate.read.
+    // doc.render → page-render (doc-level) and layer-page-render (layer-scoped),
+    // and their thumbnails, which doc.render includes. Both variants share the
+    // same capability gate; both get signed so the CDN covers whichever variant
+    // the SDK actually requests. Pictures with annotations aren't among them:
+    // they also take doc.annotate.read.
     const coverage = cdnCoverageForScope(['doc.render'], NO_BITS, { docId: 'doc_1' });
     expect(coverage).toEqual([
       {
@@ -382,9 +437,19 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/render/pages/',
       },
       {
+        resourceId: 'page-thumbnail',
+        pathPattern: '/v1/docs/doc_1/render/thumbnail/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/render/thumbnail/pages/',
+      },
+      {
         resourceId: 'layer-page-render',
         pathPattern: '/v1/docs/doc_1/layers/default/render/pages/*/data@*',
         pathPrefix: '/v1/docs/doc_1/layers/default/render/pages/',
+      },
+      {
+        resourceId: 'layer-page-thumbnail',
+        pathPattern: '/v1/docs/doc_1/layers/default/render/thumbnail/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/layers/default/render/thumbnail/pages/',
       },
     ]);
   });
@@ -522,8 +587,8 @@ describe('cdnCoverageForScope', () => {
     ]);
   });
 
-  it('pdf.permissions + bit5 + bit6 covers manifest, render, text, geometry, annotations (both doc-level and layer-scoped variants)', () => {
-    const bits = decodePdfBits(PDF_BITS.COPY | PDF_BITS.ANNOTATE_FILL);
+  it('pdf.permissions + copy + modifyAnnotations covers manifest, render, text, geometry, annotations (both doc-level and layer-scoped variants)', () => {
+    const bits = permissionFlagsOf(PDF_BITS.COPY | PDF_BITS.ANNOTATE_FILL);
     const coverage = cdnCoverageForScope(['pdf.permissions'], bits, {
       docId: 'doc_1',
       layerName: 'default',
@@ -544,6 +609,15 @@ describe('cdnCoverageForScope', () => {
         'layer-page-render-annotations',
         'layer-page-render-fields',
         'layer-page-render-all',
+        // doc.render includes the thumbnails.
+        'page-thumbnail',
+        'page-thumbnail-annotations',
+        'page-thumbnail-fields',
+        'page-thumbnail-all',
+        'layer-page-thumbnail',
+        'layer-page-thumbnail-annotations',
+        'layer-page-thumbnail-fields',
+        'layer-page-thumbnail-all',
         'page-text',
         'layer-page-text',
         'page-geometry',
@@ -564,13 +638,20 @@ describe('cdnCoverageForScope', () => {
         'actions',
         'attachments',
         'layer-attachments',
+        'outline',
+        'layer-outline',
+        // ...and the fonts: their list and each program's facts; a program's
+        // bytes never go through the CDN.
+        'fonts',
+        'layer-fonts',
+        'layer-font-programs',
         // doc.forms.read (bit 6) covers the signature reads: the layer's
         // snapshot and analysis, and the version-scoped families that need
         // no download right (contents/digests, history).
         'layer-signatures',
         'layer-signatures-analysis',
-        'version-signatures',
-        'version-analysis',
+        'layer-version-signatures',
+        'layer-version-analysis',
         // ...and the form: its fields and widget rows, and the widget images.
         'form',
         'page-form',
@@ -625,5 +706,159 @@ describe('DOC_RESOURCES — pathPrefix invariants (anti-drift)', () => {
       .map((r) => r.resolvePathPrefix('doc_X', 'myLayer'));
     const unique = new Set(cacheablePrefixes);
     expect(unique.size).toBe(cacheablePrefixes.length);
+  });
+
+  it("no cacheable resource's prefix opens another resource's URLs", () => {
+    // A prefix-signed token opens every URL under its prefix, so a cacheable
+    // prefix must not be the start of another resource's prefix: the edge
+    // would serve that resource to a session its own requirement refuses
+    // (a session without doc.download, say, or without doc.render).
+    const resources = Object.values(DOC_RESOURCES);
+    for (const signed of resources.filter((r) => r.cdnCacheable)) {
+      const prefix = signed.resolvePathPrefix('doc_X', 'myLayer');
+      for (const other of resources) {
+        if (other === signed) continue;
+        expect(
+          other.resolvePathPrefix('doc_X', 'myLayer').startsWith(prefix),
+          `${signed.id}'s prefix would open ${other.id}`,
+        ).toBe(false);
+      }
+    }
+  });
+});
+
+describe('thumbnails', () => {
+  const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+  const THUMBNAIL_IDS = Object.values(PAGE_THUMBNAIL_FAMILIES).map((p) => p.resource);
+  const SCREEN_IDS = Object.values(PAGE_RENDER_FAMILIES).map((p) => p.resource);
+  const READS = ['doc.open', 'doc.annotate.read', 'doc.forms.read'];
+
+  it('a thumbnail needs doc.render.thumbnail and the rights to read what it draws', () => {
+    for (const picture of Object.values(PAGE_THUMBNAIL_FAMILIES)) {
+      const reads = PAGE_RENDER_FAMILIES[picture.family].needs.filter((s) => s !== 'doc.render');
+      const needs = ['doc.render.thumbnail', ...reads];
+      expect([...picture.needs].sort()).toEqual([...needs].sort());
+      for (const id of [picture.resource, picture.layerResource]) {
+        expect(checkResourceAccess(id, needs, NO_BITS)).toBe(true);
+        // doc.render includes the thumbnails.
+        expect(checkResourceAccess(id, ['doc.render', ...reads], NO_BITS)).toBe(true);
+        for (const missing of needs) {
+          expect(
+            checkResourceAccess(
+              id,
+              needs.filter((s) => s !== missing),
+              NO_BITS,
+            ),
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('the CDN signs thumbnails for the thumbnail right, and screen pictures only for doc.render', () => {
+    const thumbnailsOnly = ids(
+      cdnCoverageForScope([...READS, 'doc.render.thumbnail'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+      }),
+    );
+    const render = ids(
+      cdnCoverageForScope([...READS, 'doc.render'], NO_BITS, { docId: 'doc_1', layerName: 'L1' }),
+    );
+    for (const id of THUMBNAIL_IDS) expect(thumbnailsOnly.has(id)).toBe(true);
+    for (const id of SCREEN_IDS) expect(thumbnailsOnly.has(id)).toBe(false);
+    for (const id of [...THUMBNAIL_IDS, ...SCREEN_IDS]) expect(render.has(id)).toBe(true);
+  });
+
+  it('a thumbnail is the picture a thumbnail viewport asks for', () => {
+    const layers = { includeAnnotations: true, includeFormFields: false };
+    expect(pagePictureOf(layers, { viewport: { kind: 'thumbnail' } })).toBe(
+      PAGE_THUMBNAIL_FAMILIES.annotations,
+    );
+    expect(pagePictureOf(layers, { viewport: { kind: 'width', width: 512 } })).toBe(
+      PAGE_RENDER_FAMILIES.annotations,
+    );
+    expect(pagePictureOf(layers, { usage: 'print', viewport: { kind: 'dpi', dpi: 150 } })).toBe(
+      PAGE_PRINT_FAMILIES.print.annotations,
+    );
+  });
+});
+
+describe('print pictures', () => {
+  const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+  const PRINT_IDS = PAGE_PICTURES.filter((p) => p.print?.tier === 'print').map((p) => p.resource);
+  const HIGH_IDS = PAGE_PICTURES.filter((p) => p.print?.tier === 'print-high').map(
+    (p) => p.resource,
+  );
+  const READS = ['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read'];
+
+  it('every picture, screen or print, has a path prefix no other picture starts with', () => {
+    const prefixes = PAGE_PICTURES.flatMap((p) => [
+      DOC_RESOURCES[p.resource].resolvePathPrefix('doc_1', 'L1'),
+      DOC_RESOURCES[p.layerResource].resolvePathPrefix('doc_1', 'L1'),
+    ]);
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    for (const a of prefixes) {
+      for (const b of prefixes) {
+        if (a !== b) expect(b.startsWith(a)).toBe(false);
+      }
+    }
+  });
+
+  it("a print picture needs its tier's rights and the rights to read what it draws, not doc.render", () => {
+    for (const picture of PAGE_PICTURES.filter((p) => p.print !== null)) {
+      const reads = PAGE_RENDER_FAMILIES[picture.family].needs.filter((s) => s !== 'doc.render');
+      const needs = [...picture.print!.needs, ...reads];
+      expect(picture.needs).not.toContain('doc.render');
+      for (const id of [picture.resource, picture.layerResource]) {
+        expect(checkResourceAccess(id, needs, NO_BITS)).toBe(true);
+        for (const missing of needs) {
+          const short = needs.filter((s) => s !== missing);
+          expect(checkResourceAccess(id, short, NO_BITS)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('the CDN signs a print tier only for a session with its right', () => {
+    const screen = ids(cdnCoverageForScope(READS, NO_BITS, { docId: 'doc_1', layerName: 'L1' }));
+    const print = ids(
+      cdnCoverageForScope([...READS, 'doc.print'], NO_BITS, { docId: 'doc_1', layerName: 'L1' }),
+    );
+    const high = ids(
+      cdnCoverageForScope([...READS, 'doc.print', 'doc.print.high'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+      }),
+    );
+    for (const id of [...PRINT_IDS, ...HIGH_IDS]) expect(screen.has(id)).toBe(false);
+    for (const id of PRINT_IDS) expect(print.has(id)).toBe(true);
+    for (const id of HIGH_IDS) expect(print.has(id)).toBe(false);
+    for (const id of [...PRINT_IDS, ...HIGH_IDS]) expect(high.has(id)).toBe(true);
+  });
+
+  it('a print picture depends on the planes its family does', () => {
+    const annotationsOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: {
+          content: 'base',
+          annotations: 'layer',
+          forms: 'base',
+          layout: 'base',
+          attachments: 'base',
+          metadata: 'base',
+          actions: 'base',
+          outline: 'base',
+        },
+      }),
+    );
+    for (const tier of ['print', 'print-high'] as const) {
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].annotations.resource)).toBe(false);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].all.resource)).toBe(false);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].fields.resource)).toBe(true);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].pages.resource)).toBe(true);
+    }
   });
 });

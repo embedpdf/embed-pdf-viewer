@@ -35,7 +35,7 @@ import {
   pagesWithHits,
   setActiveHit,
   startSession,
-  type SearchState,
+  type SearchModel,
 } from './model';
 
 const EMPTY: readonly SearchHit[] = Object.freeze([]);
@@ -64,7 +64,7 @@ interface CollectSink {
  * The settings are read where they're used, never copied, so
  * `updateSettings({ reveal })` applies to the next move at once.
  */
-export function createSearchController(ctx: PluginContext<SearchState, SearchSettings>) {
+export function createSearchController(ctx: PluginContext<SearchModel, SearchSettings>) {
   const settings = ctx.settings();
   const session = ctx.latest('session');
   const started = ctx.events.source<SearchStartedEvent>();
@@ -119,10 +119,11 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
   // ── the mechanism ────────────────────────────────────────────────────────
 
   /**
-   * One cursor loop over budgeted slices: permission fallback (snippets → none
-   * when they are denied, unless pinned), restart-once on a stale cursor,
-   * projection per slice. Returns true on exhaustion, false when the signal
-   * aborted; throws on a real error (already a PluginError: ctx.doc is guarded).
+   * One cursor loop over budgeted slices: snippets when the session may copy
+   * text (unless pinned), falling back to none if the engine still denies them,
+   * restart-once on a stale cursor, projection per slice. Returns true on
+   * exhaustion, false when the signal aborted; throws on a real error (already
+   * a PluginError: ctx.doc is guarded).
    */
   async function collect(
     query: SearchQuery,
@@ -132,7 +133,9 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
     const { signal } = options;
     sink.onStart();
 
-    let snippets = options.snippets ?? true;
+    // A snippet reproduces document text, so ask for one only where copying is allowed:
+    // the engine would refuse it, and the request would cost a round trip for nothing.
+    let snippets = options.snippets ?? ctx.allows('doc.text.copy');
     const snippetsPinned = options.snippets !== undefined;
     let cursor: string | undefined;
     let restarted = false;
@@ -157,7 +160,8 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
         );
       } catch (error) {
         if (signal?.aborted) return false;
-        // Snippets denied (no doc.text.copy)? Degrade to matches without them.
+        // Snippets denied although the session looked allowed to copy (its permissions
+        // changed on the server)? Degrade to matches without them.
         if (
           !snippetsPinned &&
           snippets &&
@@ -267,12 +271,12 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
   }
 
   function reveal(hit: SearchHit, options?: SearchRevealOptions): void {
-    // Positioned reveal: the hit (not just its page) arrives at the anchor —
+    // Positioned reveal: the hit (not just its page) arrives at the alignment —
     // the call's options over the `reveal` setting. Zoom never changes.
     const arrival = { ...settings.get().reveal, ...options };
     ctx.tryGet(StageToken)?.reveal(hit.page, {
       rect: hit.bounds,
-      anchor: arrival.anchor,
+      align: arrival.align,
       behavior: arrival.behavior,
     });
   }
@@ -296,10 +300,10 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
       ctx.allows('doc.text.search') && (!options?.snippets || ctx.allows('doc.text.copy')),
 
     search,
-    refresh: (options) => {
+    refresh: async (options) => {
       const { query, status } = state();
-      if (!query || status === 'idle') return Promise.resolve({ status: 'complete', hitCount: 0 });
-      return search(query, options);
+      if (!query || status === 'idle') return;
+      await search(query, options);
     },
     cancel: () => session.cancel('cancelled'),
     clear,
@@ -326,6 +330,8 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
     // ── the service ──────────────────────────────────────────────────────
     findAll: async (query, options = {}) => {
       ctx.assertAllowed('doc.text.search', 'findAll');
+      // Snippets pinned on are a requirement: refuse here rather than ask the engine.
+      if (options.snippets) ctx.assertAllowed('doc.text.copy', 'findAll');
       const all: SearchHit[] = [];
       const complete = await collect(
         query,

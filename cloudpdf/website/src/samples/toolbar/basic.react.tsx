@@ -23,7 +23,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Your icons, by the names the standard commands give them.
 const ICONS: Record<string, string> = {
@@ -73,7 +73,7 @@ function MainToolbar() {
           title={command.label}
           aria-label={command.label}
           disabled={!command.enabled}
-          aria-pressed={command.active}
+          aria-pressed={command.pressable ? command.active : undefined}
           onClick={run}
         >
           <span className="icon" aria-hidden>
@@ -91,7 +91,7 @@ export default function App() {
   const [width, setWidth] = useState(100);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <label className="width">
           Toolbar width

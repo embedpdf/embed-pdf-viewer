@@ -14,19 +14,59 @@ export type {
   OpenInputLayerSource,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
+  OpenInputGrant,
   OpenInputLayerFile,
   OpenInputLayerFileSource,
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';
+export type {
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityField,
+  VisitorIdentityRequest,
+} from './dto/GrantVisitor';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
+export type {
+  DocumentOutline,
+  OutlineItem,
+  OutlineItemDraft,
+  OutlineItemPatch,
+} from './dto/DocumentOutline';
+export { OUTLINE_READ_LIMITS } from './dto/DocumentOutline';
+export { outlineItemAfter, outlineItemOfDraft, outlineItemWithChildren } from './outline/predict';
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
+export type { PageLabelSection, PageLabelStyle } from './dto/PageLabelSection';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
+export {
+  compareStructurePositions,
+  tabOrderOf,
+  type TabOrderItem,
+  type TabOrderPage,
+} from './pages/tabOrder';
+export {
+  pagesAfter,
+  pagesAfterRestore,
+  pagesRelabelled,
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
+  type PageList,
+  type PredictablePageOp,
+  type RestoredPage,
+} from './pages/predict';
+export {
+  labelAt,
+  sameSections,
+  sectionsAfterDelete,
+  sectionsAfterInsert,
+  sectionsAfterMove,
+} from './pages/labels';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -51,6 +91,7 @@ export type {
 export {
   actionWriteOf,
   decodeSubmitFormFlags,
+  encodeSubmitFormFlags,
   fieldScriptOf,
   isFieldScript,
   needsScriptRight,
@@ -95,6 +136,8 @@ export {
   pdfTurnOfDrawn,
   pdfTurnOfUpright,
   renderSize,
+  PRINT_PAPER,
+  printScale,
   pageTransform,
   renderAreaTransform,
   renderMatrix,
@@ -125,6 +168,8 @@ export type {
   PageNetworkRenderFormat,
   PageRaster,
   PageLayerRights,
+  PagePictureRights,
+  PrintDpi,
   PageRenderBackground,
   PageRenderEncodedFormat,
   PageRenderFormat,
@@ -135,13 +180,24 @@ export type {
   PageRenderQuery,
   PageRenderTarget,
   PageRenderViewport,
+  PageScreenViewport,
 } from './dto/PageRender';
 export {
   checkImageQuality,
+  checkRenderUsage,
   createPageImageHandle,
+  PAGE_THUMBNAIL_SIZE,
+  printDpiOf,
   imageSourceOfBytes,
   resolvePageLayers,
 } from './dto/PageRender';
+export type {
+  PageExtractFlatten,
+  PageExtractInput,
+  PageExtractOptions,
+  PageExtractRights,
+} from './dto/PageExtract';
+export { resolvePageExtract } from './dto/PageExtract';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,
@@ -171,6 +227,20 @@ export type {
   FontSpec,
 } from './dto/FontSpec';
 export type {
+  CodePointRange,
+  Font,
+  FontFormat,
+  FontList,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontResolveRun,
+  FontRestriction,
+  FontSource,
+  ResolvedFontRun,
+} from './dto/DocumentFonts';
+export type {
   RichTextAlign,
   RichTextBody,
   RichTextDecoration,
@@ -192,12 +262,14 @@ export {
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
-export { EngineErrorCode } from './errors/EngineErrorCode';
+export { EngineErrorCode, isEngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
+export type { OutlineItemRef } from './identity/OutlineItemRef';
+export { toOutlineItemRef, outlineItemRefsEqual } from './identity/OutlineItemRef';
 export { generateUuid, generateUuidV7 } from './identity/uuid';
 export type { AnnotationRef } from './identity/AnnotationRef';
 export {
@@ -219,10 +291,6 @@ export { encodeAnnotKey, decodeAnnotKey } from './identity/AnnotationRef';
 export { colorOf, rgbOf, sameColor } from './annotation/color';
 export type {
   Color,
-  Point,
-  Rect,
-  Size,
-  Rotation,
   LineEnding,
   LineEndings,
   AnnotationFlags,
@@ -232,7 +300,7 @@ export type {
   WidgetBorderStyle,
   WidgetCheckStyle,
   StandardFont,
-  FreeTextFont,
+  FontName,
   TextAlignment,
   VerticalAlignment,
   FreeTextIntent,
@@ -261,6 +329,7 @@ export {
 export type { AnnotationSubtype } from './annotation/subtype';
 export { familyOfSubtype } from './annotation/family';
 export type { AnnotationFamily } from './annotation/family';
+export { canChangeKind, fieldTheKindCannotHold, siblingKindsOf } from './annotation/siblings';
 
 // Binary payloads — zod-free.
 export type {
@@ -365,11 +434,12 @@ export type {
   AttachmentContent,
   WireAttachmentFile,
 } from './dto/Attachment';
-export { toAttachmentRef } from './dto/Attachment';
+export { ATTACHMENT_LIMITS, toAttachmentRef } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
   AttachmentMutationMeta,
+  AttachmentRestoreResult,
 } from './mutation/AttachmentMutationResults';
 export { deletedAttachmentOf } from './mutation/AttachmentMutationResults';
 
@@ -496,6 +566,7 @@ export type {
   PdfLinkTargetWritable,
   PdfStandardNamedAction,
 } from './dto/PdfLinkTarget';
+export { actionTreeOf } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
 export type {
@@ -536,10 +607,12 @@ export {
   type AnnotationDefaults,
 } from './annotation/defaults';
 export {
-  faceForFreeTextFont,
+  faceForFontName,
   familyKey,
-  freeTextFontForFace,
+  fontNameForFace,
   isStandardFontName,
+  standardFamilyOf,
+  standardFontForFace,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,
@@ -562,21 +635,21 @@ export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldOrigin,
   ToggleFieldWidget,
   FormFieldWidget,
   FormFieldOption,
   FormFieldBase,
-  TextFieldDTO,
-  CheckboxFieldDTO,
-  RadioFieldDTO,
-  ComboBoxFieldDTO,
-  ListBoxFieldDTO,
-  PushButtonFieldDTO,
-  SignatureFieldDTO,
-  UnknownFieldDTO,
-  FormFieldDTO,
+  TextField,
+  CheckboxField,
+  RadioField,
+  ComboBoxField,
+  ListBoxField,
+  PushButtonField,
+  SignatureField,
+  UnknownField,
+  FormField,
 } from './forms/field';
 export type { FormValueEntry } from './forms/value-entry';
 export type {
@@ -585,6 +658,7 @@ export type {
   WidgetStylePatchFields,
   WidgetAppearance,
 } from './annotation/kinds/widget.shared';
+export { WIDGET_STYLE_NAMES } from './annotation/kinds/widget/styleNames';
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
   WidgetPlacement,
@@ -657,7 +731,7 @@ export type {
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignatureCoverage,
-  SignatureDTO,
+  Signature,
   SignatureKind,
   SignaturePrepareInput,
   SignaturePrepared,
@@ -773,14 +847,18 @@ export { createPdfTextLayout } from './text/layout';
 export type { PdfTextSegment, TextLayout } from './text/layout';
 export type { PageTextRange, TextRange } from './text/TextRange';
 export {
+  PAGE_TEXT_VERSION,
   boundaryTextOffset,
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
+  isNoncharacter,
   sliceText,
+  toPageText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
-export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
+export { LINE_BREAKS_VERSION, toLineBreaks } from './text/lineBreaks';
+export { canonicalSearchQuery } from './search/canonicalQuery';
 
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';
@@ -789,6 +867,7 @@ export type {
   AnnotationPosition,
   FieldPosition,
   ListPosition,
+  OutlinePosition,
   PagePosition,
 } from './mutation/ListPosition';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
@@ -804,6 +883,7 @@ export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
+export type { PageRestoreResult } from './mutation/PageRestoreResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { opIdOf } from './mutation/WriteOptions';
 export {
@@ -833,7 +913,7 @@ export type {
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   FormFieldCreateOptions,
   FormWidgetAddOptions,
 } from './mutation/WriteOptions';
@@ -853,6 +933,16 @@ export type {
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
 export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
+export type {
+  OutlineCreateResult,
+  OutlineDeleteResult,
+  OutlineMoveResult,
+  OutlineMutationMeta,
+  OutlineOrder,
+  OutlineRestoreResult,
+  OutlineUpdateResult,
+} from './mutation/OutlineMutationResults';
+export { deletedOutlineItemsOf } from './mutation/OutlineMutationResults';
 export type { CustomMetadataUpdateResult } from './mutation/CustomMetadataUpdateResult';
 
 export type {
@@ -864,15 +954,24 @@ export type {
   FieldAction,
   FieldFilter,
   Identity,
+  PluginPermission,
+  PluginPermissions,
   ParsedCapability,
   ParsedCollab,
+  ParsedPluginPermission,
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './auth/scope';
-export { PDF_BITS, decodePdfBits } from './auth/scope';
-export { parseScope, validateScopeArray } from './auth/scope';
+export { PDF_BITS, permissionFlagsOf } from './auth/scope';
+export {
+  CORE_NAMESPACES,
+  isPluginId,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
@@ -897,6 +996,7 @@ export {
   checkCapability,
   checkCollab,
   checkFieldAction,
+  checkPluginPermission,
   fieldRightsOf,
   type FieldGroupRight,
   type FieldRights,
@@ -904,6 +1004,8 @@ export {
   expandedCapabilities,
   expandRawScope,
   filterMatches,
+  pluginPermissionsOf,
+  scopeNotCovered,
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 

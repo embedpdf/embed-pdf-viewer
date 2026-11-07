@@ -8,7 +8,7 @@ import type { SearchQuery } from '@embedpdf/engine-core/runtime';
 
 import type { SearchHit, SearchProgress, SearchStatus } from './contract';
 
-export interface SearchState {
+export interface SearchModel {
   /** The query being searched, as the engine matches it. Null when idle. */
   readonly query: SearchQuery | null;
   readonly status: SearchStatus;
@@ -26,7 +26,7 @@ export interface SearchState {
 /** The progress of no search, one object for every session that hasn't searched a page yet. */
 export const NO_PROGRESS: SearchProgress = Object.freeze({ pagesSearched: 0, pageCount: 0 });
 
-export const initialSearchState = (): SearchState => ({
+export const initialSearchModel = (): SearchModel => ({
   query: null,
   status: 'idle',
   operationId: null,
@@ -39,10 +39,10 @@ export const initialSearchState = (): SearchState => ({
 
 /** A new scan starts: everything from the previous session is dropped. */
 export const startSession = (
-  _state: SearchState,
+  _state: SearchModel,
   query: SearchQuery,
   operationId: string,
-): SearchState => ({ ...initialSearchState(), query, status: 'searching', operationId });
+): SearchModel => ({ ...initialSearchModel(), query, status: 'searching', operationId });
 
 const sameProgress = (left: SearchProgress, right: SearchProgress): boolean =>
   left.pagesSearched === right.pagesSearched && left.pageCount === right.pageCount;
@@ -54,10 +54,10 @@ const sameProgress = (left: SearchProgress, right: SearchProgress): boolean =>
  * see a change only when the counts change.
  */
 export function appendHits(
-  state: SearchState,
+  state: SearchModel,
   hits: readonly SearchHit[],
   slice: SearchProgress,
-): SearchState {
+): SearchModel {
   const progress = sameProgress(state.progress, slice) ? state.progress : slice;
   if (hits.length === 0) return progress === state.progress ? state : { ...state, progress };
   const hitsByPage: Record<number, readonly SearchHit[]> = { ...state.hitsByPage };
@@ -74,27 +74,27 @@ export function appendHits(
   };
 }
 
-export const completeSession = (state: SearchState): SearchState => ({
+export const completeSession = (state: SearchModel): SearchModel => ({
   ...state,
   status: 'complete',
 });
 
-export const cancelSession = (state: SearchState): SearchState => ({
+export const cancelSession = (state: SearchModel): SearchModel => ({
   ...state,
   status: 'cancelled',
 });
 
-export const failSession = (state: SearchState, error: PluginErrorInfo): SearchState => ({
+export const failSession = (state: SearchModel, error: PluginErrorInfo): SearchModel => ({
   ...state,
   status: 'error',
   error,
 });
 
-export const setActiveHit = (state: SearchState, index: number): SearchState =>
+export const setActiveHit = (state: SearchModel, index: number): SearchModel =>
   state.activeHitIndex === index ? state : { ...state, activeHitIndex: index };
 
-export const clearSession = (state: SearchState): SearchState =>
-  state.status === 'idle' ? state : initialSearchState();
+export const clearSession = (state: SearchModel): SearchModel =>
+  state.status === 'idle' ? state : initialSearchModel();
 
 /**
  * Where `hit` is in `hits`: the same object, or else the hit that covers the
@@ -118,7 +118,7 @@ export function indexOfHit(hits: readonly SearchHit[], hit: SearchHit): number {
  * don't follow it).
  */
 export const pagesWithHits = (
-  state: SearchState,
+  state: SearchModel,
   pages: readonly { readonly ref: PageRef }[],
 ): readonly PageRef[] =>
   pages

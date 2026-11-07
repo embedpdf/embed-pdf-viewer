@@ -7,8 +7,10 @@ import { PluginError } from './errors';
 import { createEventHook, type EventHookSource } from './event-hook';
 import { guardHandle } from './guarded-handle';
 import { createLatestLane, type LatestLane } from './lanes';
+import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
+import type { PageViewController } from './page-view';
 import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
@@ -53,19 +55,25 @@ export interface SessionRef {
   readonly settleFlushes: Set<SettleFlush>;
   /** What runs around each read of the document's file, first registered outermost. */
   readonly downloadWraps: DownloadWrap[];
+  /** What runs around each print of the document, first registered outermost. */
+  readonly printWraps: PrintWrap[];
   /** The document's change queue, shared by its plugins (`ctx.changes`). */
   readonly changes: DocumentChanges;
+  /** The document's pages as the user sees them: the engine's, with the pending page changes on top. */
+  readonly pageView: PageViewController;
 }
 
 /** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
 export type DownloadWrap = (read: () => Promise<Uint8Array>) => Promise<Uint8Array>;
 
-/** `read`, inside every wrap: the first registered is the outermost. */
-export const readWrapped = (
-  wraps: readonly DownloadWrap[],
-  read: () => Promise<Uint8Array>,
-): Promise<Uint8Array> =>
-  wraps.reduceRight<() => Promise<Uint8Array>>((inner, wrap) => () => wrap(inner), read)();
+/** Something of the document's own that runs around a print: it gets the print and resolves when it did. */
+export type PrintWrap = (print: () => Promise<void>) => Promise<void>;
+
+/** `run`, inside every wrap: the first registered is the outermost. */
+export const runWrapped = <T>(
+  wraps: readonly ((inner: () => Promise<T>) => Promise<T>)[],
+  run: () => Promise<T>,
+): Promise<T> => wraps.reduceRight<() => Promise<T>>((inner, wrap) => () => wrap(inner), run)();
 
 /**
  * Everything a context needs from the kernel, injected so this module has no cycles
@@ -81,6 +89,8 @@ export interface ContextServices {
   readonly report: (error: unknown) => void;
   /** The host's time, which each instance's `ctx.clock` schedules on. */
   readonly clock: HostClock;
+  /** The host's text measuring (`ctx.measurer`); `null` when it gives none. */
+  readonly measurer: HostTextMeasurer | null;
   resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T;
   /** Total resolution (the kernel's internal rule: bring-up or ready) — what
    *  `ctx.tryGet` delegates to. Never exception-driven: a throwing capability
@@ -199,6 +209,7 @@ export function createPluginContext(
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: doc(),
     changes: session!.changes,
+    pages: session!.pageView,
     notify: () => {
       if (lease.live) store.notify();
     },
@@ -358,7 +369,7 @@ export function createPluginContext(
     events: {
       source<T>(): EventHookSource<T> {
         const hook = createEventHook<T>(services.report);
-        scope.defer(() => hook.dispose());
+        scope.defer(() => hook.destroy());
         return hook;
       },
     },
@@ -377,6 +388,7 @@ export function createPluginContext(
     },
     cleanup: (teardown) => scope.defer(teardown),
     clock: instanceClock(services.clock, lifetime),
+    measurer: services.measurer && instanceMeasurer(services.measurer, lifetime),
     onSettle(flush) {
       if (!session) {
         throw new Error(
@@ -398,6 +410,18 @@ export function createPluginContext(
       scope.defer(() => {
         const index = session.downloadWraps.indexOf(wrap);
         if (index >= 0) session.downloadWraps.splice(index, 1);
+      });
+    },
+    aroundPrint(wrap) {
+      if (!session) {
+        throw new Error(
+          `[kernel] workspace plugin "${plugin.id}" has no document to print; ctx.aroundPrint() is for document-scoped plugins.`,
+        );
+      }
+      session.printWraps.push(wrap);
+      scope.defer(() => {
+        const index = session.printWraps.indexOf(wrap);
+        if (index >= 0) session.printWraps.splice(index, 1);
       });
     },
     async acquire(get, dispose) {

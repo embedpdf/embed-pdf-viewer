@@ -1,33 +1,32 @@
 <!-- Every page as a card. Click cards to select them; the toolbar edits every selected page at once. -->
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue';
+import { computed } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import type { PageRef } from '@embedpdf/vue/runtime';
 import { PageView } from '@embedpdf/vue/page-view';
 import { RenderLayer } from '@embedpdf/vue/render';
-import { usePageEdit } from '@embedpdf/vue/page-edit';
+import { usePageEdit, usePageEditState } from '@embedpdf/vue/page-edit';
 
 const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.objectNumber;
 
 const pageEdit = usePageEdit();
 const pages = usePageList();
-const canEdit = computed(() => pageEdit.canEdit());
-// The second and third pages start selected. Refs, not indexes: they still name the
-// same pages after a reorder.
-const selected = shallowRef<readonly PageRef[]>(pages.value.slice(1, 3).map((page) => page.ref));
+const { selected, canEdit } = usePageEditState();
+// The second and third pages start selected. The selection holds refs: it names the same
+// pages after a reorder, and a deleted page leaves it.
+pageEdit.select([1, 2]);
 const count = computed(() => selected.value.length);
 
 const isSelected = (page: PageRef) => selected.value.some((each) => sameRef(each, page));
 function toggle(page: PageRef) {
-  selected.value = isSelected(page)
-    ? selected.value.filter((each) => !sameRef(each, page))
-    : [...selected.value, page];
+  pageEdit.select(
+    isSelected(page)
+      ? selected.value.filter((each) => !sameRef(each, page))
+      : [...selected.value, page],
+  );
 }
 
-async function remove() {
-  await pageEdit.delete(selected.value);
-  selected.value = [];
-}
+const remove = () => pageEdit.delete(selected.value);
 </script>
 
 <template>

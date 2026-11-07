@@ -1,3 +1,4 @@
+import { DEFAULT_DASH_ARRAY, needsDefaultDash } from '../annotation/resolve/dash';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { normalizePdfRect, pdfRectTurnedBounds } from '../geometry/convert';
@@ -13,7 +14,8 @@ export type PlacedWidget = Omit<WidgetPlacement<PdfCoordinates>, 'rect' | 'box'>
 /**
  * A placement as the file holds it: `/Rect`, where the widget stands, and
  * its turn. A `box` given is turned into the rect it stands in, as a box
- * kind's create turns it; without one, `rect` is that place.
+ * kind's create turns it; without one, `rect` is that place. A dashed border
+ * with its pattern left out states the default, `[3, 3]` (`needsDefaultDash`).
  *
  * Refused with `InvalidArg`: a placement with neither, and a turn that
  * isn't a quarter turn (a widget's contents turn only so, `/MK /R`).
@@ -35,5 +37,12 @@ export function placedWidgetOf(placement: WidgetPlacement<PdfCoordinates>): Plac
       { details: { field: 'rect' } },
     );
   }
-  return { ...rest, rect: place, ...(rotation !== undefined ? { rotation } : {}) };
+  return {
+    ...rest,
+    rect: place,
+    ...(rotation !== undefined ? { rotation } : {}),
+    ...(needsDefaultDash(rest.borderStyle, rest.dashArray)
+      ? { dashArray: [...DEFAULT_DASH_ARRAY] }
+      : {}),
+  };
 }

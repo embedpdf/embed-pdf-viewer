@@ -4,6 +4,7 @@ import {
   docToken,
   highlightDraft,
   holdNextUpload,
+  holdNextWriteAlignment,
   listAnnotations,
   makeReplicaCluster,
   type Replica,
@@ -157,10 +158,10 @@ export function runObjectNumberReplicaSuite(factory: ReplicaDbFactory): void {
       const own = await committedLastNumbers();
       expect(own).toHaveLength(8);
       expect(own.filter((number) => issued.includes(number))).toEqual([]);
-      const counter = await cluster.replicas[0]!.db.selectFrom('layers')
+      const counter = await cluster.replicas[0]!.db.selectFrom('object_number_counters')
         .select('next_object_number')
         .where('doc_id', '=', DOC)
-        .where('name', '=', LAYER)
+        .where('layer_name', '=', LAYER)
         .executeTakeFirstOrThrow();
       expect(Number(counter.next_object_number)).toBeGreaterThan(Math.max(...issued, ...own));
     });
@@ -246,6 +247,26 @@ export function runObjectNumberReplicaSuite(factory: ReplicaDbFactory): void {
         .where('idempotency_key', '=', 'paste-1')
         .execute();
       expect(rows).toHaveLength(1);
+      const listed = await listAnnotations(a!, { tenantId: TENANT, docId: DOC, layerName: LAYER });
+      expect(listed.annotations).toHaveLength(1);
+    });
+
+    test('a write whose twin on another replica committed while it opened the layer answers that commit', async () => {
+      const [a, b] = cluster.replicas;
+      const [number] = await handOut(a!, 'cloud:twin', 8);
+      const opts = { session: 'cloud:twin', headers: { 'Idempotency-Key': 'twin-1' } };
+      // B checks for an earlier answer, finds none, and waits to open the layer.
+      const hold = holdNextWriteAlignment(b!);
+      const late = create(b!, number!, opts);
+      await hold.held;
+      // Meanwhile the same write commits on A and spends the number.
+      const first = await create(a!, number!, opts);
+      expect(first.status).toBe(200);
+      hold.release();
+
+      const second = await late;
+      expect(second.status).toBe(200);
+      expect(second.body).toEqual(first.body);
       const listed = await listAnnotations(a!, { tenantId: TENANT, docId: DOC, layerName: LAYER });
       expect(listed.annotations).toHaveLength(1);
     });

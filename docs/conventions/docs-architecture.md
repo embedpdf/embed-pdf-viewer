@@ -207,6 +207,25 @@ the Angular pass compiles in the browser (JIT), so it first applies Angular's JI
 without which `input()`, `output()`, `model()` and `viewChild()` do nothing
 (`src/lib/angular-demo-samples.ts`).
 
+### The document an example opens
+
+An example opens one of the demo documents in `docs/content/documents.mjs`, through a
+`// [!doc-source <key>]` block. It picks the document that already has what it shows (links,
+form fields, annotations), so it reads them instead of making them on load: an example changes
+its document only when the reader does something. On the cloud site every reader opens the same
+stored document, and a change made on load would pile up with each visit. The documents are built
+from HTML by `docs/content/pdfs/` (see its README).
+
+Code that selects a document's characters by index, such as "Documents" on the welcome's cover,
+names them in a `// [!doc-range <key> <name>]` block around the line that holds the range. Each
+site's welcome names its own brand, so the same word starts at another index on each: the block
+holds embedpdf.com's range, and the sync gives cloudpdf.com's copy its own, both from the
+document's `ranges` in `documents.mjs`. The PDF build fails when a range no longer reads its text.
+
+A document never instructs, everything it shows works in every example that opens it, and the
+example's hint says what to try (the README has the three rules). So an example that shows text
+turns on text selection, and comments go only in a document whose examples can show them.
+
 ### A viewer example
 
 ```
@@ -217,10 +236,18 @@ samples/viewer/<page>/<name>.cloud.react.tsx   cloudpdf.com's own version, where
 
 The page shows one with `<Example name="viewer/<page>/<name>" />`, like any other. The viewer fills
 its box, so a viewer example gives it `height: 100%` and the docs give the box: a frame that suits
-the docs column, or a bigger one with `size="tall"`, or `size="wide"`, as tall and on a wide screen
-over the table of contents' column too (`src/components/docs/example.tsx`, the kit's
+the docs column, or a bigger one with `size="tall"` (`src/components/docs/example.tsx`, the kit's
 `CodeExampleCard` `frame`). A page may show several: each starts its own viewer, when it scrolls
-near. Its document is a `[!doc-source]` block holding a constant (`const ebook = '…';`, in a plain
+near.
+
+An app that needs the whole window, one of the Examples section's (`viewer/examples/<slug>`), is
+`size="page"`: it opens on a page of its own, `/examples/<slug>` (`src/lib/examples.ts`), and its
+docs page shows a screenshot of it that links there, with its code under it. The page runs the
+plain HTML build, since every integration's looks the same, and its code slides in beside it, in
+the integration the reader picks (`/api/examples/<slug>/<integration>`, built once).
+`pnpm --filter @embedpdf/docs-content screenshots` takes the screenshots from a running
+embedpdf.com into both sites' `public/screenshots/`, and `docs:check` fails while one is missing.
+Take them again when such an example changes. Its document is a `[!doc-source]` block holding a constant (`const ebook = '…';`, in a plain
 HTML page inside its module script), which cloudpdf.com's copy gives in the cloud viewer's form.
 
 The plain HTML page loads the viewer from its CDN script, as a reader's does. Its demo

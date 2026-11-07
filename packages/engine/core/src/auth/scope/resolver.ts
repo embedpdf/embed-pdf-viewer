@@ -7,7 +7,7 @@ import type {
   DocCapability,
   Identity,
   ParsedScope,
-  PdfBits,
+  PdfPermissionFlags,
 } from './types';
 import { protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
@@ -43,7 +43,7 @@ export function collabTargetOf(owner: {
 export function checkCapability(
   capability: DocCapability,
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
   // Document-derived authority comes first: what the signatures in the
@@ -51,7 +51,7 @@ export function checkCapability(
   if (protectedCapabilities(protection).has(capability)) return false;
   const parsed = rawScope.map(parseScope);
   if (parsed.some((s) => s.kind === 'wildcard')) return true;
-  return expandedCapabilities(parsed, pdfBits, protection).has(capability);
+  return expandedCapabilities(parsed, permissionFlags, protection).has(capability);
 }
 
 /**
@@ -62,10 +62,10 @@ export function checkCapability(
 export function checkAnyCapability(
   capabilities: ReadonlyArray<DocCapability>,
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
-  return capabilities.some((c) => checkCapability(c, rawScope, pdfBits, protection));
+  return capabilities.some((c) => checkCapability(c, rawScope, permissionFlags, protection));
 }
 
 /**
@@ -95,7 +95,7 @@ export function checkCollab(
   target: CollabTarget,
   rawScope: ReadonlyArray<string>,
   identity: Identity,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): boolean {
   const parsed = rawScope.map(parseScope);
   if (parsed.some((s) => s.kind === 'wildcard')) return true;
@@ -114,7 +114,7 @@ export function checkCollab(
   }
 
   // No collab scope for this action — fall back to the broad default.
-  return expandedCapabilities(parsed, pdfBits).has('doc.annotate.modify');
+  return expandedCapabilities(parsed, permissionFlags).has('doc.annotate.modify');
 }
 
 /**
@@ -122,6 +122,8 @@ export function checkCollab(
  * `pdf.permissions` and applying implication rules.
  *
  * Implications applied:
+ *   - `doc.render` implies `doc.render.thumbnail`: pictures of any size
+ *     contain the thumbnails.
  *   - `doc.annotate.modify` implies `doc.annotate.read` (you can't
  *     sensibly modify what you can't see).
  *   - `doc.forms.modify` implies `doc.forms.fill` and `doc.forms.read`.
@@ -139,7 +141,7 @@ export function checkCollab(
  */
 export function expandedCapabilities(
   parsed: ReadonlyArray<ParsedScope>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): Set<DocCapability> {
   const out = new Set<DocCapability>();
@@ -150,7 +152,7 @@ export function expandedCapabilities(
     if (s.kind === 'capability') {
       out.add(s.name);
     } else if (s.kind === 'virtual' && s.name === 'pdf.permissions') {
-      addPdfPermissions(out, pdfBits);
+      addPdfPermissions(out, permissionFlags);
     } else if (s.kind === 'collab' && s.entity === 'annotations') {
       hasAnnotationCollab = true;
     } else if (s.kind === 'collab' && s.entity === 'fields') {
@@ -159,6 +161,7 @@ export function expandedCapabilities(
   }
 
   // Implications (apply after the explicit additions above)
+  if (out.has('doc.render')) out.add('doc.render.thumbnail');
   if (out.has('doc.annotate.modify')) out.add('doc.annotate.read');
   if (out.has('doc.forms.modify')) {
     out.add('doc.forms.fill');
@@ -175,6 +178,36 @@ export function expandedCapabilities(
   return out;
 }
 
+const NO_PLUGIN_PERMISSIONS: ReadonlySet<string> = new Set();
+
+/**
+ * The plugin permissions a scope holds where `installed` are the plugin
+ * permissions the server's installed plugins declare: the ones it names, and
+ * every installed one under `*`. A named permission whose plugin isn't
+ * installed is carried by the token but takes no effect, so it's left out.
+ * Where no plugins run (the local engine), pass nothing: the answer is empty.
+ */
+export function pluginPermissionsOf(
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of rawScope.map(parseScope)) {
+    if (s.kind === 'wildcard') for (const permission of installed) out.add(permission);
+    else if (s.kind === 'plugin' && installed.has(s.name)) out.add(s.name);
+  }
+  return out;
+}
+
+/** True iff the scope holds this installed plugin permission (named, or under `*`). */
+export function checkPluginPermission(
+  permission: string,
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): boolean {
+  return pluginPermissionsOf(rawScope, installed).has(permission);
+}
+
 /**
  * Convenience wrapper: takes the raw scope array, parses each entry,
  * returns the expanded capability set. Exposed for the `/access`
@@ -182,10 +215,10 @@ export function expandedCapabilities(
  */
 export function expandRawScope(
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): Set<DocCapability> {
-  return expandedCapabilities(rawScope.map(parseScope), pdfBits, protection);
+  return expandedCapabilities(rawScope.map(parseScope), permissionFlags, protection);
 }
 
 /**
@@ -257,7 +290,7 @@ export function checkFieldAction(
   action: 'fill' | 'sign',
   groupId: string | null,
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
   const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
@@ -274,7 +307,7 @@ export function checkFieldAction(
       (s) => s.filter.kind === 'all' || (groupId !== null && s.filter.groupId === groupId),
     );
   }
-  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+  return expandedCapabilities(parsed, permissionFlags, protection).has(broad);
 }
 
 /**
@@ -304,7 +337,7 @@ export interface FieldRights {
  */
 export function fieldRightsOf(
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
   callerDefaultGroupId: string | undefined,
 ): FieldRights {
@@ -331,7 +364,9 @@ export function fieldRightsOf(
     if (wildcard) return { all: true };
     const scopes = fieldScopes(action);
     if (scopes.length > 0) return fromScopes(scopes);
-    return expandedCapabilities(parsed, pdfBits, protection).has(broad) ? { all: true } : NONE;
+    return expandedCapabilities(parsed, permissionFlags, protection).has(broad)
+      ? { all: true }
+      : NONE;
   };
 
   const own = callerDefaultGroupId !== undefined ? [callerDefaultGroupId] : [];
@@ -350,7 +385,7 @@ export function fieldRightsOf(
 export function checkAnyFieldAction(
   action: 'fill' | 'sign',
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
   const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
@@ -365,7 +400,7 @@ export function checkAnyFieldAction(
   ) {
     return true;
   }
-  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+  return expandedCapabilities(parsed, permissionFlags, protection).has(broad);
 }
 
 /**
@@ -395,6 +430,6 @@ export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Id
  * capabilities it represents under the current PDF bit configuration:
  * {@link materializePdfPermissions}, the one reading of the bits.
  */
-function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {
+function addPdfPermissions(out: Set<DocCapability>, b: PdfPermissionFlags): void {
   for (const capability of materializePdfPermissions(b)) out.add(capability);
 }

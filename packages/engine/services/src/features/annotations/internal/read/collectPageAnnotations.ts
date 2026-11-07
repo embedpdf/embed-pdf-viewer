@@ -49,7 +49,7 @@ export function collectPageAnnotations(input: {
 
   const annotations: Annotation<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
-  const readCtx = readContextFor(session, fonts);
+  const readContext = readContextFor(session, fonts);
 
   for (let i = 0; i < count; i++) {
     throwIfAborted(signal);
@@ -61,14 +61,14 @@ export function collectPageAnnotations(input: {
       const base = readAnnotationBase(
         fn,
         mem,
-        readCtx.docPtr,
+        readContext.docPtr,
         annotPtr,
         pageObjectNumber,
         i,
         actionBudget,
       );
       const { reader } = pickReader(subtypeCode);
-      const dto = reader(fn, mem, annotPtr, base, subtypeCode, readCtx);
+      const dto = reader(fn, mem, annotPtr, base, subtypeCode, readContext);
       annotations.push(dto);
     } finally {
       fn.FPDFPage_CloseAnnot(annotPtr);

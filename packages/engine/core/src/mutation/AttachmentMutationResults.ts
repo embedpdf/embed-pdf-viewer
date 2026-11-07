@@ -8,7 +8,7 @@ import type { Attachment, AttachmentRef } from '../dto/Attachment';
  * and no per-page pin.
  */
 export interface AttachmentMutationMeta extends MutationMeta {
-  changed: AttachmentRef[];
+  changedRefs: AttachmentRef[];
 }
 
 /**
@@ -17,6 +17,15 @@ export interface AttachmentMutationMeta extends MutationMeta {
  * (creating shifts other indices; refs never move).
  */
 export interface AttachmentCreateResult {
+  attachment: Attachment;
+  meta: AttachmentMutationMeta;
+}
+
+/**
+ * An undo of a delete: the file it brought back, under the key it had, read
+ * back after the write.
+ */
+export interface AttachmentRestoreResult {
   attachment: Attachment;
   meta: AttachmentMutationMeta;
 }
@@ -31,5 +40,5 @@ export interface AttachmentDeleteResult {
  * listeners that didn't make the call.
  */
 export function deletedAttachmentOf(result: AttachmentDeleteResult): AttachmentRef | null {
-  return result.meta.changed[0] ?? null;
+  return result.meta.changedRefs[0] ?? null;
 }

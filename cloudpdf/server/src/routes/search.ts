@@ -2,17 +2,27 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   EngineError,
   EngineErrorCode,
-  searchContentEpoch,
   toPageRef,
   wirePack,
   type SearchQuery,
   type SearchLimit,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
-import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
+import {
+  decodeSearchToken,
+  encodeSearchToken,
+  SHAPES,
+  type TokenPin,
+} from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
-import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import {
+  abortSignalOf,
+  parseTokenOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 
 interface SearchRouteDeps {
   documentService: DocumentService;
@@ -20,8 +30,14 @@ interface SearchRouteDeps {
 
 /** Decoded state of one search GET — the whole cache key minus the tier. */
 interface SearchGetState {
-  /** Content epoch the caller pinned; absent on the unversioned form. */
-  epoch?: string;
+  /**
+   * The document's contents and layout pins the caller read at; the
+   * unversioned form may leave them out.
+   */
+  contentsVersion?: number;
+  layoutVersion?: number;
+  /** The token's engine value and shape; absent on the unversioned form. */
+  pin?: TokenPin;
   query: SearchQuery;
   /** The scan origin, by page object number. */
   from?: number;
@@ -42,10 +58,10 @@ const RESOURCE_BY_TIER = {
  * routes' two forms.
  *
  *   - `/search/{mode}/data@:token` — versioned. The token
- *     (`encodeSearchToken`) carries the content epoch + query + position
- *     and is the cache key; the response is immutable and CDN-cacheable.
- *     A stale epoch answers `NotFound` (the standard versioned-read
- *     refresh signal), never stale results.
+ *     (`encodeSearchToken`) carries the contents and layout pins + query +
+ *     position and is the cache key; the response is immutable and
+ *     CDN-cacheable. A stale pin answers `NotFound` (the standard
+ *     versioned-read refresh signal), never stale results.
  *   - `/search/{mode}/data?…` — unversioned, flat query params (`q` as
  *     plain text), served from the current content, always `no-store`.
  *
@@ -57,7 +73,7 @@ const RESOURCE_BY_TIER = {
  * snippet is extracted text.
  *
  * Continuation: responses carry `nextCursor` = the ready-made token for
- * the next slice (same epoch, advanced `skip`) — deterministic, so the
+ * the next slice (same pins, advanced `skip`) — deterministic, so the
  * whole cursor chain of a popular query is cacheable end to end. There
  * is no server-side job; cancelling is not asking for the next slice.
  */
@@ -90,33 +106,51 @@ async function runSearchSlice(
   const { documentService } = deps;
   const { docId, layerName } = req.params as { docId: string; layerName: string };
   const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+  const permissionFlags = await documentService.getEffectivePermissionFlags(
+    accessCtx,
+    docId,
+    layerName,
+  );
   const ctx: OpenContext = requireLayerResource(
     req,
     docId,
     layerName,
     RESOURCE_BY_TIER[tier],
-    pdfBits,
+    permissionFlags,
   );
 
   const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-  const epoch = searchContentEpoch(manifest);
-  if (state.epoch !== undefined && state.epoch !== epoch) {
-    setNoStore(reply);
+  const assertCurrent = async () => {
+    const current = await documentService.getLayerManifest(ctx, docId, layerName);
+    const stale = (requested: number | undefined, now: number) =>
+      requested !== undefined && requested !== now;
+    if (
+      !stale(state.contentsVersion, current.contentsVersion) &&
+      !stale(state.layoutVersion, current.layoutVersion)
+    ) {
+      return;
+    }
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `search epoch ${state.epoch} no longer current (current=${epoch}) for layer ${layerName} of document ${docId}`,
+      `search at contentsVersion ${state.contentsVersion}, layoutVersion ${state.layoutVersion} ` +
+        `no longer current (current: ${current.contentsVersion}, ${current.layoutVersion}) ` +
+        `for layer ${layerName} of document ${docId}`,
     );
-  }
+  };
 
-  await documentService.ensureLayerOnPool(ctx, docId, layerName);
+  // A layer whose text and page order are still the base's searches the
+  // base: the same answer, without opening a session for the layer.
+  const view =
+    manifest.scopes?.content === 'base' && manifest.scopes.layout === 'base'
+      ? undefined
+      : layerName;
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'search.query' as const,
       effect: 'read' as const,
       jobId,
       docId,
-      layerName,
+      ...(view !== undefined ? { layerName: view } : {}),
       request: {
         ...state.query,
         snippets: tier === 'full',
@@ -125,31 +159,49 @@ async function runSearchSlice(
         ...(state.limit !== undefined ? { limit: state.limit } : {}),
       },
     });
-  const result = await documentService.readOnPool(
-    ctx,
+  const slice = await readAtPins({
+    documentService,
+    reply,
     docId,
-    layerName,
-    build,
-    abortSignalOf(reply),
-  );
-  if (result.tag !== 'search.query') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected search.query payload: ${result.tag}`,
-    );
-  }
+    layerName: view,
+    assertCurrent,
+    read: async () => {
+      const result = await documentService.readOnPool(
+        ctx,
+        docId,
+        view,
+        build,
+        abortSignalOf(reply),
+      );
+      if (result.tag !== 'search.query') {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `unexpected search.query payload: ${result.tag}`,
+        );
+      }
+      return result.slice;
+    },
+    token: state.pin && { kind: 'search', pin: state.pin },
+  });
 
   versioned ? setImmutableCache(reply) : setNoStore(reply);
-  const slice = result.slice;
+  // A cursor names this server's own engine value: the next slice is this
+  // server's to answer.
+  const cursorPin = {
+    engine: await documentService.engineValues.of('search'),
+    shape: SHAPES.search,
+  };
   return {
     ...slice,
     // The worker's session cursor never crosses the wire — continuation
-    // is a deterministic next token (same epoch, advanced position).
+    // is a deterministic next token (same pins, advanced position).
     nextCursor:
       slice.nextCursor === null
         ? null
         : encodeSearchToken({
-            epoch,
+            pin: cursorPin,
+            contentsVersion: manifest.contentsVersion,
+            layoutVersion: manifest.layoutVersion,
             query: state.query,
             ...(state.from !== undefined ? { from: state.from } : {}),
             skip: slice.pagesSearched,
@@ -170,8 +222,9 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 /**
  * Parse the unversioned form's flat query params. Same field vocabulary
  * as the token, except `q` is plain text (the query string already
- * carries arbitrary text safely) and `epoch` is optional — provide it to
- * get the same stale-version rejection the token form has.
+ * carries arbitrary text safely) and the pins (`contentsVersion`,
+ * `layoutVersion`) are optional — provide them to get the same stale-version
+ * rejection the token form has.
  */
 function searchStateFromParams(params: unknown): SearchGetState {
   const p = (params ?? {}) as Record<string, unknown>;
@@ -220,7 +273,10 @@ function searchStateFromParams(params: unknown): SearchGetState {
   const pages = int('limitPages', 1);
   const matches = int('limitMatches', 1);
   return {
-    ...(str('epoch') !== undefined ? { epoch: str('epoch') } : {}),
+    ...(int('contentsVersion', 1) !== undefined
+      ? { contentsVersion: int('contentsVersion', 1) }
+      : {}),
+    ...(int('layoutVersion', 1) !== undefined ? { layoutVersion: int('layoutVersion', 1) } : {}),
     query,
     ...(int('from', 1) !== undefined ? { from: int('from', 1) } : {}),
     skip: int('skip', 0) ?? 0,

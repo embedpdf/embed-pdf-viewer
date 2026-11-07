@@ -1,8 +1,9 @@
 /**
  * The parity gate: the widget painter (`@embedpdf/core-form`) draws what the
  * engine's appearance generator writes. For a matrix of widgets (family,
- * font, size, fitted size, alignment, lines, comb, password, border style
- * and width, colours, check style, turn), the engine writes the appearance;
+ * a signature field's box among them, font, size, fitted size, alignment,
+ * lines, comb, password, border style and width, colours, check style,
+ * turn), the engine writes the appearance;
  * the test reads its content stream back as what it paints and compares it
  * with the painter's drawing, item by item, within 0.01 pt.
  *
@@ -183,7 +184,7 @@ const textCase = (
   name: `text: ${name}`,
   draft: (page) =>
     ({
-      family: 'text',
+      kind: 'text',
       name: named(name),
       ...field,
       widgets: [{ page, box: box(size.width, size.height), ...LOOK, ...widget }],
@@ -287,12 +288,35 @@ const CASES: Case[] = [
       { width: 100, height: 30 },
     ),
   ),
+  // A signature field: its box, in every border, with no colours, and turned.
+  ...[...BORDERS, { color: undefined, interiorColor: undefined }].map(
+    (look): Case => ({
+      name: `signature: ${JSON.stringify(look)}`,
+      draft: (page) =>
+        ({
+          kind: 'signature',
+          name: named('signature'),
+          widgets: [{ page, box: box(140, 50), ...LOOK, ...look }],
+        }) as FormFieldDraft,
+    }),
+  ),
+  ...ROTATIONS.slice(1).map(
+    (rotation): Case => ({
+      name: `signature: turned ${rotation}`,
+      draft: (page) =>
+        ({
+          kind: 'signature',
+          name: named('turned_signature'),
+          widgets: [{ page, box: box(140, 50), ...LOOK, rotation }],
+        }) as FormFieldDraft,
+    }),
+  ),
   ...ROTATIONS.slice(1).flatMap((rotation) => [
     {
       name: `checkbox: turned ${rotation}`,
       draft: (page: PageRef) =>
         ({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: named('turned_check'),
           widgets: [{ page, box: box(30, 18), ...LOOK, rotation }],
         }) as FormFieldDraft,
@@ -302,7 +326,7 @@ const CASES: Case[] = [
       name: `combo: turned ${rotation}`,
       draft: (page: PageRef) =>
         ({
-          family: 'combobox',
+          kind: 'combobox',
           name: named('turned_combo'),
           options: [{ label: 'Alpha', value: 'a' }],
           widgets: [
@@ -315,7 +339,7 @@ const CASES: Case[] = [
       name: `button: turned ${rotation}`,
       draft: (page: PageRef) =>
         ({
-          family: 'pushbutton',
+          kind: 'pushbutton',
           name: named('turned_button'),
           widgets: [
             {
@@ -337,7 +361,7 @@ const CASES: Case[] = [
       name: `combo: ${fontSize} ${JSON.stringify(border)}`,
       draft: (page: PageRef) =>
         ({
-          family: 'combobox',
+          kind: 'combobox',
           name: named('combo'),
           options: [
             { label: 'Alpha', value: 'a' },
@@ -354,7 +378,7 @@ const CASES: Case[] = [
     name: 'combo: narrow, no button glyph',
     draft: (page) =>
       ({
-        family: 'combobox',
+        kind: 'combobox',
         name: named('narrow'),
         options: [{ label: 'X', value: 'x' }],
         widgets: [{ page, box: box(18, 6), ...LOOK, fontFamily: 'helvetica', fontSize: 4 }],
@@ -366,7 +390,7 @@ const CASES: Case[] = [
       name: `list: ${fontSize} ${selected.join(',')}`,
       draft: (page: PageRef) =>
         ({
-          family: 'listbox',
+          kind: 'listbox',
           name: named('list'),
           multiSelect: true,
           options: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((value) => ({
@@ -384,7 +408,7 @@ const CASES: Case[] = [
       name: `button: ${fontSize} ${caption}`,
       draft: (page: PageRef) =>
         ({
-          family: 'pushbutton',
+          kind: 'pushbutton',
           name: named('button'),
           widgets: [
             { page, box: box(110, 28), ...LOOK, fontFamily: 'helvetica-bold', fontSize, caption },
@@ -400,7 +424,7 @@ const CASES: Case[] = [
           name: `checkbox: ${checkStyle} ${checked} ${border.strokeWidth}`,
           draft: (page: PageRef) =>
             ({
-              family: 'checkbox',
+              kind: 'checkbox',
               name: named('check'),
               widgets: [
                 {
@@ -421,7 +445,7 @@ const CASES: Case[] = [
       name: `radio: ${checkStyle} ${checked}`,
       draft: (page: PageRef) =>
         ({
-          family: 'radio',
+          kind: 'radio',
           name: named('radio'),
           widgets: [
             {

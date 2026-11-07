@@ -21,7 +21,7 @@ const row = (kind: string, payload: Record<string, unknown>): StreamRow => ({
   id: 7,
   kind,
   sub: 'alice',
-  payload: { ...payload, meta: { cacheDelta, changed: ['secret'] } },
+  payload: { ...payload, meta: { cacheDelta, changedRefs: ['secret'] } },
 });
 const withheld = (kind: string): StreamRow => ({
   id: 7,
@@ -80,7 +80,9 @@ describe('visibleRow', () => {
   });
 
   it('sends what neither capability guards to everyone', () => {
-    const rotate = row('pages.rotate', { layout: { pages: [] } });
+    const rotate = row('change', {
+      items: [{ type: 'pages.rotate', pages: [], rotation: 90, layout: { pages: [] } }],
+    });
     expect(visibleRow(rotate, { annotations: false, forms: false })).toBe(rotate);
   });
 });

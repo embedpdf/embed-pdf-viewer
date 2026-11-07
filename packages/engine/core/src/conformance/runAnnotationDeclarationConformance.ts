@@ -1,3 +1,4 @@
+import { UUID_V7 } from './names';
 import { annotationReadDriftOf } from './annotationReadDrift';
 import { creatables, iconRect, PNG_1X1 } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
@@ -44,15 +45,15 @@ export interface AnnotationDeclarationConformanceOptions {
  */
 export function runAnnotationDeclarationConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationDeclarationConformanceOptions,
+  options: AnnotationDeclarationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation declaration conformance: ${opts.label}`, () => {
+  describe(`annotation declaration conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -61,8 +62,8 @@ export function runAnnotationDeclarationConformance(
 
     test('every read matches its kind declaration', async () => {
       const reads: unknown[] = [];
-      for (const fixture of opts.documents) {
-        const doc = await openFixture(engine, opts, fixture);
+      for (const fixture of options.documents) {
+        const doc = await openFixture(engine, options, fixture);
         try {
           reads.push(...(await doc.annotations.list()).annotations);
         } finally {
@@ -70,7 +71,7 @@ export function runAnnotationDeclarationConformance(
         }
       }
 
-      const doc = await openFixture(engine, opts, opts.authoring);
+      const doc = await openFixture(engine, options, options.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0];
         expect(first !== undefined).toBe(true);
@@ -93,7 +94,7 @@ export function runAnnotationDeclarationConformance(
     const onAuthoringPage = async (
       run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const doc = await openFixture(engine, opts, opts.authoring);
+      const doc = await openFixture(engine, options, options.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0]!;
         await run(doc.page(first), doc);
@@ -205,6 +206,17 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.update(created.ref, { nm: 'renamed-square' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      });
+    });
+
+    test('a create left without a name gets a fresh one; nm: null names none', async () => {
+      await onAuthoringPage(async (page) => {
+        const square = creatables().find(({ data }) => data.subtype === 'square')!.data;
+        const { nm: _name, ...unnamed } = square as typeof square & { nm?: string | null };
+        const { annotation: named } = await page.annotations.create(unnamed);
+        expect(named.nm).toMatch(UUID_V7);
+        const { annotation: none } = await page.annotations.create({ ...unnamed, nm: null });
+        expect(none.nm).toBe(null);
       });
     });
 
@@ -432,21 +444,21 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
-    test('a line without a caption flag reads captionEnabled: null', async () => {
+    test('a line without a caption flag reads captionEnabled: false, its default', async () => {
       await onAuthoringPage(async (page) => {
         const { annotation } = await page.annotations.create({
           subtype: 'line',
           linePoints: { start: { x: 40, y: 480 }, end: { x: 140, y: 480 } },
         } as never);
-        expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(null);
+        expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(false);
         const { annotation: flagged } = await page.annotations.update(annotation.ref, {
           captionEnabled: true,
         });
         expect(flagged.subtype === 'line' && flagged.captionEnabled).toBe(true);
         const { annotation: cleared } = await page.annotations.update(annotation.ref, {
-          captionEnabled: null,
+          captionEnabled: false,
         });
-        expect(cleared.subtype === 'line' && cleared.captionEnabled).toBe(null);
+        expect(cleared.subtype === 'line' && cleared.captionEnabled).toBe(false);
       });
     });
 
@@ -463,8 +475,8 @@ export function runAnnotationDeclarationConformance(
     });
 
     test('an annotation born inline exports by its baseIndex name', async () => {
-      for (const fixture of opts.documents) {
-        const doc = await openFixture(engine, opts, fixture);
+      for (const fixture of options.documents) {
+        const doc = await openFixture(engine, options, fixture);
         try {
           const inline = (await doc.annotations.list()).annotations.find(
             (annotation) => annotation.ref.kind === 'baseIndex',
@@ -481,7 +493,7 @@ export function runAnnotationDeclarationConformance(
     });
 
     test('a link read back can be sent back; its read-only target is kept', async () => {
-      const doc = await openFixture(engine, opts, opts.readOnlyLink);
+      const doc = await openFixture(engine, options, options.readOnlyLink);
       try {
         const link = (await doc.annotations.list()).annotations.find(
           (annotation) =>
@@ -552,7 +564,7 @@ export function runAnnotationDeclarationConformance(
 
         // A reply takes the replies under it, and its popup; the note stays.
         const replyDelete = await page.annotations.delete(reply.ref);
-        expect(replyDelete.meta.changed.length).toBe(3);
+        expect(replyDelete.meta.changedRefs.length).toBe(3);
         expect(await find(reply.ref)).toBe(undefined);
         expect(await find(nested.ref)).toBe(undefined);
         expect(await find(replyPopup.ref)).toBe(undefined);
@@ -564,9 +576,9 @@ export function runAnnotationDeclarationConformance(
         });
         try {
           const { meta } = await page.annotations.delete(note.ref);
-          expect(meta.changed.length).toBe(3);
-          expect(meta.changed[0]).toMatchObject({ kind: 'objectNumber' });
-          expect(deleted).toEqual([meta.changed]);
+          expect(meta.changedRefs.length).toBe(3);
+          expect(meta.changedRefs[0]).toMatchObject({ kind: 'objectNumber' });
+          expect(deleted).toEqual([meta.changedRefs]);
         } finally {
           stop();
         }
@@ -663,7 +675,7 @@ export function runAnnotationDeclarationConformance(
           resources: attachment.resources,
         });
         const fileOf = (dto: { subtype: string }) =>
-          (dto as { file?: { name: string; size?: number; checksum?: string } | null }).file;
+          (dto as { file?: { name: string; sizeBytes?: number; md5?: string } | null }).file;
         const original = fileOf(created)!;
 
         // The value replaces all of the metadata: leaving the description out removes it.
@@ -675,8 +687,8 @@ export function runAnnotationDeclarationConformance(
           name: 'renamed.txt',
           mimeType: 'text/plain',
           description: null,
-          size: original.size,
-          checksum: original.checksum,
+          sizeBytes: original.sizeBytes,
+          md5: original.md5,
           createdAt: (original as { createdAt?: string }).createdAt,
           modifiedAt: (original as { modifiedAt?: string }).modifiedAt,
         });
@@ -690,7 +702,7 @@ export function runAnnotationDeclarationConformance(
         expect(fileOf(replaced.annotation)).toMatchObject({
           name: 'renamed.txt',
           mimeType: 'text/plain',
-          size: bytes.byteLength,
+          sizeBytes: bytes.byteLength,
         });
         const read = await page.annotations.downloadResource(created.ref, 'file');
         expect(new TextDecoder().decode(read)).toBe('replaced bytes');

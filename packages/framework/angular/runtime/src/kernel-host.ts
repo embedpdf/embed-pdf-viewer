@@ -47,7 +47,7 @@ import type {
   SettingsDeclaration,
   ViewerSettings,
 } from '@embedpdf/core';
-import { browserClock } from '@embedpdf/web';
+import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
 import { Observable } from 'rxjs';
 import type { EmbedPdfConfig, EmbedPdfKernelConfig, EpdfViewerStatus } from './config';
 import { onServerError } from './errors';
@@ -141,7 +141,7 @@ export class EpdfKernelHost {
   /** A kernel given says it itself: someone else starts it. */
   readonly status: Signal<EpdfViewerStatus> = this.given
     ? this.read(
-        (kernel) => statusOfKernel(kernel.status()),
+        (kernel) => statusOfKernel(kernel.getStatus()),
         () => 'starting',
       )
     : this.statusState.asReadonly();
@@ -358,6 +358,9 @@ export class EpdfKernelHost {
         plugins: [...this.plugins],
         settings: registeredViewerSettings(config),
         clock: browserClock(),
+        printer: browserPrinter(),
+        measurer: browserTextMeasurer(),
+        fetch: config.fetch,
       });
     } catch (error) {
       if (owned) void engine.destroy();

@@ -1,4 +1,5 @@
 import type { NamedPageEntry } from './NamedPage';
+import type { PageLabelSection } from './PageLabelSection';
 import type { PageLayout } from './PageLayout';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
@@ -17,6 +18,12 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 export interface PageListSnapshot<C extends Coordinates = PageCoordinates> {
   pageCount: number;
   pages: PageLayout<C>[];
+  /**
+   * The page label sections (`/PageLabels`), in page order: each page's
+   * `label` is read from them. Empty when the document has none, and then no
+   * page has a label.
+   */
+  labels: PageLabelSection[];
   /**
    * The catalog's `/Names /Pages` and `/Names /Templates` registrations, in
    * tree order — see {@link NamedPageEntry}. Empty when there are none.

@@ -13,7 +13,12 @@
 
 <Toolbar bar={rail} orientation="vertical" aria-label="Tools" style="height: 100%">
   {#snippet command(cmd, _variant, run)}
-    <button onclick={run} disabled={!cmd.enabled} aria-pressed={cmd.active} title={cmd.label}>
+    <button
+      onclick={run}
+      disabled={!cmd.enabled}
+      aria-pressed={cmd.pressable ? cmd.active : undefined}
+      title={cmd.label}
+    >
       <Icon name={cmd.icon} />
     </button>
   {/snippet}

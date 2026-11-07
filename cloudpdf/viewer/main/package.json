@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "The open-source EmbedPDF viewer with the CloudPDF engine as its default: <embedpdf-viewer>, init() and every framework wrapper's names, pages rendered on CloudPDF SaaS or your own @cloudpdf/server, the local engine loaded only when stamps need it. dist/cloudpdf.js is the same door for a script tag.",
   "type": "module",
@@ -47,6 +47,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@cloudpdf/engine": "workspace:*",
+    "@cloudpdf/plugin-protected-display": "workspace:*",
+    "@cloudpdf/web": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/viewer": "workspace:*"
   },

@@ -13,7 +13,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Every field of the selection's state, as it changes.
 @Component({
@@ -64,7 +64,7 @@ export class SelectionStatus {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -93,10 +93,10 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something selected on load: the title on the cover.
+    // Something selected on load: "Documents", the first word on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 10, count: 52 });
+      if (cover) this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 }

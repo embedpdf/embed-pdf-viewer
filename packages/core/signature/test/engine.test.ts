@@ -88,7 +88,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
         trust: { anchors: async () => [signer.certificate] },
       });
       expect(verdict.summary).toBe('valid');
-      expect(verdict.cms?.signingTime).toBeInstanceOf(Date);
+      expect(verdict.cms?.signingTime).toMatch(/^\d{4}-\d{2}-\d{2}T/);
       // A fill after the certification: bytes stay intact, the verdict is honest about the later revision.
       await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'filled' });
       const [after] = await validateSignatures(doc, {

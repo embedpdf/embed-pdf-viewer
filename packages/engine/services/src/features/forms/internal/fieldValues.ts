@@ -1,7 +1,7 @@
 import type { FormValueEntry } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { withWideStringArray } from './wideStringArray';
+import { withWideStringArray } from '../../../runtime/memory/wideStringArray';
 import { withI32Array } from '../../../runtime/memory/scratch';
 
 /** `EPDF_FORM_VALUE_*`: how the fork's value writers take a value. */

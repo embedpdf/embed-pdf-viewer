@@ -11,5 +11,5 @@ export interface TokensRevokeRequest {
     tenantId: string;
     jti: string;
     reason?: string;
-    expiresAtSeconds?: number;
+    expiresAt?: string;
 }

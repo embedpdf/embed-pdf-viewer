@@ -1,0 +1,151 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --accent: #3858e9;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The title to add or rename with, and what to do with the picked item */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.field {
+  width: 160px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+
+.field:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible,
+.chevron:focus-visible,
+.row-title:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The tree: each level indented, a parent with a chevron that folds it */
+.tree {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+.row[aria-selected='true'] {
+  background: var(--tint);
+}
+
+.chevron {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+/* Drawn rather than typed, so it's the same size in every font: a right-pointing chevron */
+.chevron::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateX(-1px) rotate(-45deg);
+}
+
+.chevron:disabled {
+  visibility: hidden;
+}
+
+.chevron[data-expanded] {
+  transform: rotate(90deg);
+}
+
+.row-title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.empty {
+  margin: 0;
+  padding: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

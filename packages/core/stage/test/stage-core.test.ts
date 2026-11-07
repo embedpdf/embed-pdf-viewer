@@ -4,8 +4,8 @@ import * as S from '../src';
 const vp = { width: 1000, height: 700 };
 const GAP = 16;
 
-/** Build a PageGeom from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
-const pg = (width: number, height: number, rotation?: S.PageRotation): S.PageGeom => ({
+/** Build a PageGeometry from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
+const pg = (width: number, height: number, rotation?: S.Rotation): S.PageGeometry => ({
   size: { width, height },
   ...(rotation !== undefined ? { rotation } : {}),
 });
@@ -556,11 +556,11 @@ describe('direction: rtl (a layout property, not a navigation one)', () => {
 });
 
 describe('pageFrame: reserved chrome space around each PAGE', () => {
-  const pageGeom = pg(600, 800);
+  const pageGeometry = pg(600, 800);
   const frame = { top: 10, right: 8, bottom: 20, left: 6 };
 
   it('linear vertical: pages sit inside their slots; bands reserved between pages', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'none'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'none'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -575,7 +575,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('SPREADS: each page keeps its OWN flanks — left/right chrome works (the fix)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -587,7 +587,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('RTL spread: slots mirror but margins stay PHYSICAL (left room stays mL)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -742,5 +742,70 @@ describe('userUnit folds into layout size and per-page contentScale', () => {
     // 72pt × 2 (userUnit) × 4/3 (96dpi) = 192 world units — two inches
     expect(box.width).toBeCloseTo(192, 6);
     expect(box.contentScale).toBeCloseTo((96 / 72) * 2, 6);
+  });
+});
+
+describe('padding per side', () => {
+  // Room for a toolbar floating over the bottom edge.
+  const padding = { top: 24, right: 24, bottom: 72, left: 24 };
+
+  it('is every side for a number, and itself for sides', () => {
+    expect(S.paddingSidesOf(8)).toEqual({ top: 8, right: 8, bottom: 8, left: 8 });
+    expect(S.paddingSidesOf(padding)).toBe(padding);
+  });
+
+  it('fits the page inside each side', () => {
+    const box = { width: 600, height: 800 };
+    expect(S.resolveZoom({ mode: S.ZoomMode.FitPage }, box, vp, padding)).toBeCloseTo(
+      Math.min((1000 - 48) / 600, (700 - 24 - 72) / 800),
+      6,
+    );
+    expect(S.resolveZoom({ mode: S.ZoomMode.FitWidth }, box, vp, padding)).toBeCloseTo(
+      (1000 - 48) / 600,
+      6,
+    );
+  });
+
+  it('travels from the top side to the bottom side, and rests a fitting page between them', () => {
+    const bounds = { x: 0, y: 0, width: 800, height: 5000 };
+    const constraint = { bounded: true, padding } as const;
+    const top = S.clampCamera({ x: 0, y: -99999, zoom: 1 }, bounds, vp, constraint);
+    expect(top.y).toBeCloseTo(-24, 6);
+    const bottom = S.clampCamera({ x: 0, y: 99999, zoom: 1 }, bounds, vp, constraint);
+    expect(bottom.y).toBeCloseTo(5000 - vp.height + 72, 6);
+    expect(S.travelRange(0, 5000, vp.height, 1, 24, 72)).toEqual({
+      near: -24,
+      far: 5000 - vp.height + 72,
+      fits: false,
+    });
+
+    // A page that fits rests in the middle of the room the sides leave.
+    const page = { x: 0, y: 0, width: 800, height: 500 };
+    const rest = S.clampCamera({ x: 0, y: 0, zoom: 1 }, page, vp, constraint);
+    const roomAbove = -rest.y;
+    const roomBelow = vp.height - (500 - rest.y);
+    expect(roomAbove).toBeCloseTo(24 + (700 - 24 - 72 - 500) / 2, 6);
+    expect(roomBelow).toBeCloseTo(72 + (700 - 24 - 72 - 500) / 2, 6);
+  });
+
+  it('places, reveals and scrolls with each side', () => {
+    const subject = { x: 0, y: 1000, width: 800, height: 400 };
+    const end = S.placeCamera(subject, vp, 1, padding, { x: 'start', y: 'end' });
+    expect(end.y + vp.height).toBeCloseTo(1400 + 72, 6);
+    const center = S.placeCamera(subject, vp, 1, padding, { x: 'center', y: 'center' });
+    // The subject's middle at the middle of the padded viewport.
+    expect(1200 - center.y).toBeCloseTo(24 + (700 - 24 - 72) / 2, 6);
+
+    const below = S.revealCamera({ x: 0, y: 0, zoom: 1 }, subject, vp, padding);
+    expect(below.y).toBeCloseTo(1400 - (700 - 72), 6);
+
+    const bounds = { x: 0, y: 0, width: 800, height: 5000 };
+    const metrics = S.scrollMetrics({ x: 0, y: -24, zoom: 1 }, bounds, vp, padding);
+    expect(metrics.scrollTop).toBeCloseTo(0, 6);
+    expect(metrics.scrollHeight).toBeCloseTo(5000 + 24 + 72, 6);
+    const moved = S.cameraFromScroll({ x: 0, y: -24, zoom: 1 }, bounds, vp, padding, {
+      top: 1e9,
+    });
+    expect(moved.y).toBeCloseTo(5000 + 72 - vp.height, 6);
   });
 });

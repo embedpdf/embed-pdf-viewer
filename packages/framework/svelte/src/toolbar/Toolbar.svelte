@@ -163,17 +163,32 @@
   /**
    * The sections run along the toolbar. The center one carries auto margins: it centers in the
    * space the other two leave, and gives way before anything overlaps. The toolbar itself has no
-   * gap, so what the fit says fits, fits. Sections never grow or shrink: fitting is the solver's
-   * job, not flexbox's.
+   * gap, so what the fit says fits, fits. Sections never shrink, and grow only to hold an item
+   * that grows (a custom item with `grow`): that section takes the space left, and each drawn
+   * section after another keeps the gap the fit counted (`section.spacing`).
    */
-  const sectionStyle = (name: LiveSection['name']) =>
+  const sectionStyle = (section: LiveSection) =>
     `display: flex; flex-direction: ${vertical ? 'column' : 'row'}; align-items: center; ` +
-    `gap: ${gap}px; flex: 0 0 auto;` +
-    (name !== 'center'
-      ? ''
-      : vertical
+    `gap: ${gap}px; flex: ${section.grows ? '1 0 auto' : '0 0 auto'};` +
+    (section.spacing === 'balance'
+      ? vertical
         ? ' margin-top: auto; margin-bottom: auto;'
-        : ' margin-left: auto; margin-right: auto;');
+        : ' margin-left: auto; margin-right: auto;'
+      : section.spacing === 'gap'
+        ? vertical
+          ? ` margin-top: ${gap}px;`
+          : ` margin-inline-start: ${gap}px;`
+        : '');
+
+  /**
+   * The element around an item adds no box, so the item lays out as the section's child; around
+   * an item that grows, it's a box that grows into the space the toolbar has left.
+   */
+  const itemStyle = (item: ToolbarPart) =>
+    item.kind === 'custom' && item.grow
+      ? `display: flex; flex-direction: ${vertical ? 'column' : 'row'}; align-items: center; ` +
+        'flex: 1 0 auto'
+      : 'display: contents';
 
   /** The default separator: a 1px line across the toolbar, flat in a vertical one. */
   const separatorStyle = $derived(
@@ -223,6 +238,7 @@
       <NativeSlotSocket
         name={item.name}
         {orientation}
+        grow={item.grow}
         onLength={(length) => report(item.measureKey, length)}
       >
         {#if item.terminal}
@@ -260,7 +276,7 @@
   style={rootStyle}
 >
   {#each layout.sections as section (section.name)}
-    <div style={sectionStyle(section.name)}>
+    <div style={sectionStyle(section)}>
       {#each section.groups as group, index (group.id)}
         {#if index > 0}
           {#if separator}
@@ -270,8 +286,7 @@
           {/if}
         {/if}
         {#each group.parts as item (item.key)}
-          <!-- The element around an item adds no box: the item lays out as the section's child. -->
-          <span {...TOOLBAR_ITEM} style="display: contents">{@render part(item, 'live')}</span>
+          <span {...TOOLBAR_ITEM} style={itemStyle(item)}>{@render part(item, 'live')}</span>
         {/each}
       {/each}
       {#if section.name === 'end' && layout.hasOverflow}

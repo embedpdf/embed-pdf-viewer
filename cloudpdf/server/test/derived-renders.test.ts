@@ -19,22 +19,21 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { ENGINE } from './_helpers/pins';
+
+/** The stub worker's server fonts: it registers none. */
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'derived-renders-secret';
 
 /** Canonical lattice tokens: alphabetical and codec-exact. */
-const THUMB_TOKEN =
-  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
-const W640_TOKEN =
-  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=640';
+const THUMB_TOKEN = `background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320`;
+const W640_TOKEN = `background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=640`;
 /** Off-lattice: a width outside the ladder (the old viewer default). */
-const OFFLATTICE_TOKEN =
-  'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=720';
+const OFFLATTICE_TOKEN = `annotationVersion=1,background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=720`;
 /** Rect-target region render: the tile policy's jurisdiction — exempt from
  *  full-page enforcement and compute-only until tile support is advertised. */
-const RECT_TOKEN =
-  'background=white,contentVersion=1,format=webp,target.kind=rect,target.rect.height=100,target.rect.width=100,target.rect.x=0,target.rect.y=0,viewport.kind=width,viewport.width=64';
+const RECT_TOKEN = `background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,target.kind=rect,target.rect.height=100,target.rect.width=100,target.rect.x=0,target.rect.y=0,viewport.kind=width,viewport.width=64`;
 
 interface Fixture {
   bundle: AppBundle;
@@ -203,7 +202,7 @@ describe('derived renders', () => {
       appearancesUrl(
         fx.baseUrl,
         docId,
-        'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+        `annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=3`,
       ),
       { headers },
     );
@@ -221,7 +220,7 @@ describe('derived renders', () => {
         appearancesUrl(
           strict.baseUrl,
           strictDoc,
-          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+          `annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=3`,
         ),
         { headers: strictHeaders },
       );
@@ -236,7 +235,7 @@ describe('derived renders', () => {
         appearancesUrl(
           strict.baseUrl,
           strictDoc,
-          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=2',
+          `annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=2`,
         ),
         { headers: strictHeaders },
       );
@@ -247,7 +246,7 @@ describe('derived renders', () => {
         appearancesUrl(
           strict.baseUrl,
           strictDoc,
-          'annotationVersion=1,format=webp,viewport.kind=width,viewport.width=1224',
+          `annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=width,viewport.width=1224`,
         ),
         { headers: strictHeaders },
       );
@@ -277,7 +276,7 @@ describe('derived renders', () => {
       const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
       const blown = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=4`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=4`,
         { headers },
       );
       expect(blown.status).toBe(400);
@@ -285,7 +284,7 @@ describe('derived renders', () => {
       expect(body.error.message).toContain('budget');
 
       const fits = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=1`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=1`,
         { headers },
       );
       expect(fits.status).toBe(200);
@@ -352,7 +351,7 @@ describe('derived renders', () => {
     });
     expect(tile.status).toBe(404);
     const body = (await tile.json()) as { error: { state: string } };
-    expect(body.error.state).toBe('locked');
+    expect(body.error.details.state).toBe('locked');
   });
 
   test('dedup: same bytes twice → warm is an instant hit on the shared base tier', async () => {
@@ -396,8 +395,7 @@ describe('derived renders', () => {
     // Layer view at the base epoch. What the picture draws is its path: the
     // picture of everything pins every page counter, and its token says
     // nothing else of what it draws.
-    const token =
-      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320,widgetVersion=1';
+    const token = `annotationVersion=1,background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320,widgetVersion=1`;
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/all/pages/obj:1/data@${token}`,
       { headers },
@@ -560,7 +558,7 @@ async function adminUpload(
     method: 'POST',
     headers,
     body: JSON.stringify({
-      contentLength: bytes.byteLength,
+      sizeBytes: bytes.byteLength,
       contentSha256: sha256,
       ...(opts?.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
     }),

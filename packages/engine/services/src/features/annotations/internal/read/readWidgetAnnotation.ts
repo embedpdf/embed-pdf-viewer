@@ -5,17 +5,13 @@ import type {
   PdfCoordinates,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import {
-  colorOf,
-  freeTextFontForFace,
-  pdfQuarterTurnBox,
-  quarterTurnOf,
-} from '@embedpdf/engine-core/runtime';
+import { colorOf, pdfQuarterTurnBox, quarterTurnOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../../runtime/memory/strings';
 import { readI32 } from '../../../../runtime/memory/structs';
+import { readAppearanceFit } from '../appearanceFit';
 import { widgetBorderStyleFromCode } from '../shapeBorderStyle';
 import { textAlignmentFromCode } from '../textAlignment';
 import type { AnnotationReadContext } from './annotationReadContext';
@@ -25,6 +21,7 @@ import {
   readDefaultAppearanceFace,
   readTextAlignment,
 } from './annotationReadPrimitives';
+import { boxFontName } from './boxFontName';
 import { readBorderFields } from './readStyle';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
@@ -94,12 +91,7 @@ export function readWidget(
     // A widget draws `underline` too, which no other annotation does.
     borderStyle: widgetBorderStyleFromCode(readBorderStyle(fn, mem, annotPtr).styleCode),
     dashArray: border.dashArray,
-    fontFamily: face
-      ? freeTextFontForFace(
-          face,
-          fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
-        )
-      : null,
+    fontFamily: face ? boxFontName(fn, mem, annotPtr, face, fonts) : null,
     fontSize: da ? da.fontSize : null,
     fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
@@ -112,6 +104,9 @@ export function readWidget(
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,
-    fieldFamily: 'unknown',
+    fieldKind: 'unknown',
+    // A mark drawn in records how it fits; the join adds a signature, and
+    // keeps it only for a signature field's widget.
+    hasMark: readAppearanceFit(fn, mem, annotPtr) !== null,
   };
 }

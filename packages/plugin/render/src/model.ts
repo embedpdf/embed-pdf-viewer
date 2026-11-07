@@ -1,9 +1,10 @@
 /**
- * The render ledger: per-page raster versions. Every function below is a
- * pure transition or projection; the controller applies the transitions with
- * `ctx.state.update`.
+ * The render ledger: per-page raster versions, and the snapshot tool's box.
+ * Every function below is a pure transition or projection; the controller
+ * applies the transitions with `ctx.state.update`.
  */
-import type { PageObjectNumber, PageRenderLayers } from '@embedpdf/core';
+import type { PageObjectNumber, PageRef, PageRenderLayers } from '@embedpdf/core';
+import type { Rotation, Point } from '@embedpdf/core-geometry';
 import type { InvalidateScope } from './contract';
 
 /**
@@ -21,13 +22,38 @@ export interface RenderState {
   readonly annotationEpochs: Readonly<Record<PageObjectNumber, number>>;
   /** Form field versions, bumped by form facts: a fill, a widget's move or look, a signing. */
   readonly fieldEpochs: Readonly<Record<PageObjectNumber, number>>;
+  /** The snapshot tool's box, while it is dragged or held. */
+  readonly snapshot: SnapshotBox | null;
+}
+
+/**
+ * The snapshot tool's box: two corners on the page the press was on, in page
+ * space. Dragged until the release; held from then on, as the snapshot.
+ */
+export interface SnapshotBox {
+  readonly page: PageRef;
+  /** Where the press was. */
+  readonly from: Point;
+  /** Where the pointer is, kept on the page. */
+  readonly to: Point;
+  /** View px per page unit at the press, which tells a box from a click. */
+  readonly scale: number;
+  /** The page's turn on screen at the press: the picture turns with it. */
+  readonly rotation: Rotation;
+  /** Released: the box is the snapshot. */
+  readonly held: boolean;
 }
 
 export const initialRenderState = (): RenderState => ({
   contentEpochs: {},
   annotationEpochs: {},
   fieldEpochs: {},
+  snapshot: null,
 });
+
+export function setSnapshotBox(state: RenderState, snapshot: SnapshotBox | null): RenderState {
+  return state.snapshot === snapshot ? state : { ...state, snapshot };
+}
 
 const bump = (
   epochs: Readonly<Record<PageObjectNumber, number>>,

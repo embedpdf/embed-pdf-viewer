@@ -11,7 +11,7 @@ const CURSOR_TOKEN = 'selection-text';
 
 export interface TextSelectHandlerOptions {
   /** Viewport px the pointer must move before a drag-select begins, read when the drag would start. */
-  dragThreshold?: () => number;
+  dragThresholdPx?: () => number;
 }
 
 /**
@@ -33,7 +33,7 @@ export function createTextSelectHandler(
   feedback?: PlatformFeedback,
   options: TextSelectHandlerOptions = {},
 ): InteractionHandler {
-  const dragThreshold = options.dragThreshold ?? (() => SELECTION_DEFAULTS.dragThreshold);
+  const dragThreshold = options.dragThresholdPx ?? (() => SELECTION_DEFAULTS.dragThresholdPx);
   // Per-gesture drag-threshold state (one active gesture at a time — the hub owner).
   let anchor: {
     page: PageRef;
@@ -47,7 +47,7 @@ export function createTextSelectHandler(
     id: 'text-select',
     priority: 60,
     enabledFor: (tool) => tool.enables.has('text-select'),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       anchor = null;
       dragging = false;
       if (!sample.page) return false; // over a gap — let a lower handler (e.g. scroll) try
@@ -81,7 +81,7 @@ export function createTextSelectHandler(
       anchor = { page, point, viewportX: sample.viewport.x, viewportY: sample.viewport.y };
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       if (!sample.page || !anchor) return;
       if (!dragging) {
         const travelled = Math.hypot(
@@ -96,12 +96,12 @@ export function createTextSelectHandler(
       }
       selection.extendTo(sample.page.ref, sample.page.point);
     },
-    onUp: () => {
+    onPointerUp: () => {
       anchor = null;
       dragging = false;
       selection.endGesture();
     },
-    onCancel: () => {
+    onPointerCancel: () => {
       // Aborted (second finger → pinch, or a system cancel): drop the
       // in-flight selection instead of committing a sliver of it. endGesture()
       // after clear() settles the gesture with nothing to commit.

@@ -12,7 +12,7 @@ import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
 import { EpdfRender, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 interface Thumbnail {
   page: PageRef;
@@ -25,7 +25,7 @@ interface Thumbnail {
   // No Stage: these pictures are plain images, rendered on demand.
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withRender(),
     ),
   ],

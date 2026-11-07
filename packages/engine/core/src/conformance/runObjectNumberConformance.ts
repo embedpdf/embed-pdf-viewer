@@ -44,19 +44,19 @@ const box = (x: number): PageBox => ({ x, y: 120, width: 40, height: 30 });
  *   twice is `taken`. A refused call changes nothing.
  * - Writes made without waiting apply in the order they were made: a page
  *   named at birth takes an annotation at once.
- * - Every event of a write carries its `opId` as `origin.tx`.
+ * - Every event of a write carries its `opId` as `origin.transaction`.
  */
 export function runObjectNumberConformance(
   runner: ConformanceTestRunner,
-  opts: ObjectNumberConformanceOptions,
+  options: ObjectNumberConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`object number conformance: ${opts.label}`, () => {
+  describe(`object number conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -66,7 +66,7 @@ export function runObjectNumberConformance(
     const withDocument = async (
       body: (doc: DocumentHandle, pages: readonly PageRef[]) => Promise<void>,
     ) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { pages } = await doc.pages.list();
         await body(
@@ -222,7 +222,7 @@ export function runObjectNumberConformance(
         const [field, left, right, widget, split] = await take(doc, 5);
         const created = await doc.forms.create(
           {
-            family: 'text',
+            kind: 'text',
             name: 'billing.name',
             widgets: [
               { page: second!, rect: box(20) },
@@ -266,7 +266,7 @@ export function runObjectNumberConformance(
           opId: 'op-insert',
         });
         const [create, update, insert] = events.map((event) =>
-          event.type === 'stream.desynced' ? null : event.origin.tx,
+          event.type === 'stream.desynced' ? null : event.origin.transaction,
         );
         expect(events).toHaveLength(3);
         expect(create).toEqual({ id: 'op-create', index: 0, count: 1 });

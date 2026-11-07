@@ -12,11 +12,11 @@ import { computed, ref, watch } from 'vue';
 import { shallowEqual } from '@embedpdf/core';
 import { NO_FRAME } from '@embedpdf/core-geometry';
 import type { PageFrame } from '@embedpdf/core-geometry';
-import { createScrollHandler } from '@embedpdf/plugin-stage';
+import { createScrollHandler, createZoomDragHandler } from '@embedpdf/plugin-stage';
 import type { VisiblePage } from '@embedpdf/plugin-stage';
 import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-import { createStageSurface, stageViewProjector } from '@embedpdf/web';
+import { createStageSurface, stageViewProjector, ZOOM_BOX_DASH, zoomBoxPaint } from '@embedpdf/web';
 import type { ViewProjector } from '@embedpdf/web';
 import AnchoredScope from '../anchored/AnchoredScope.vue';
 import type { ProjectorBinding, ShownPages } from '../anchored/projector';
@@ -25,6 +25,7 @@ import {
   useOptionalCapability,
   useOptionalSelector,
 } from '../runtime/capabilities';
+import { useViewerSettings } from '../runtime/documents';
 import { useDocumentId, useKernelValue } from '../runtime/kernel';
 import type { PageContextValue } from '../runtime/page';
 import { asHost } from './composables';
@@ -106,8 +107,8 @@ const input = useOptionalSelector(
   shallowEqual,
 );
 // Routing pointer input to the interaction hub also registers this view's
-// pan-scroll handler with it, scoped to the view, so two Stages on one document
-// never pan each other. Without the hub the Stage pans by itself.
+// pan-scroll and zoom-box handlers with it, scoped to the view, so two Stages on
+// one document never pan or zoom each other. Without the hub the Stage pans by itself.
 const routesToHub = computed(() => input.value.interaction && interaction.value !== null);
 // The hub's cursor (text, grab, …), shown on the view while it routes there.
 const hubCursor = useKernelValue(() => interaction.value?.getCursor() ?? 'default');
@@ -138,13 +139,31 @@ watch(
             source: lens.getLensId(),
           })
         : null;
+    const offZoomDrag =
+      routed && hub
+        ? hub.registerHandler(createZoomDragHandler(lens, hub), { source: lens.getLensId() })
+        : null;
     onCleanup(() => {
+      offZoomDrag?.();
       offScroll?.();
       detachSurface();
     });
   },
   { immediate: true, flush: 'post' },
 );
+
+// ── the zoom tool's box ────────────────────────────────────────────────────
+
+// In viewport px, while the zoom tool's drag is a box; its colors follow the accent.
+const zoomBox = useOptionalSelector(hostToken, (lens) => lens.getZoomBox(), null);
+const FOLLOW_ACCENT = { fill: null, stroke: null };
+const zoomBoxColors = useOptionalSelector(
+  hostToken,
+  (lens) => lens.getSettings().zoomBox,
+  FOLLOW_ACCENT,
+);
+const accent = useViewerSettings((settings) => settings.accent);
+const zoomBoxStyle = computed(() => zoomBoxPaint(zoomBoxColors.value, accent.value));
 
 // ── v-model:tool ───────────────────────────────────────────────────────────
 
@@ -254,6 +273,27 @@ const shownPages = computed((previous?: ShownPages): ShownPages => {
         <slot name="page-chrome" :page="page" />
       </template>
     </PageSurface>
+    <svg
+      v-if="zoomBox"
+      aria-hidden="true"
+      :width="zoomBox.width"
+      :height="zoomBox.height"
+      :style="{
+        position: 'absolute',
+        left: `${zoomBox.x}px`,
+        top: `${zoomBox.y}px`,
+        overflow: 'visible',
+        pointerEvents: 'none',
+      }"
+    >
+      <rect
+        :width="zoomBox.width"
+        :height="zoomBox.height"
+        stroke-width="1"
+        :stroke-dasharray="ZOOM_BOX_DASH"
+        :style="zoomBoxStyle"
+      />
+    </svg>
     <!-- Anchored UI mounts here: its absolute coordinates are the view's. -->
     <AnchoredScope
       v-if="projectorBinding && $slots.overlay"

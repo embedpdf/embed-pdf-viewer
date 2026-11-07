@@ -22,7 +22,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPl
 const PLACEMENTS = ['top', 'bottom', 'left', 'right'] as const;
 type Placement = (typeof PLACEMENTS)[number];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // What's in the menu is yours: here, copy and clear.
 function SelectionActions() {
@@ -48,13 +48,13 @@ function SelectionActions() {
   );
 }
 
-// Something selected on load, so the menu shows: the title on the cover.
+// Something selected on load, so the menu shows: "Documents", the first word on the cover.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   return null;
@@ -64,7 +64,7 @@ export default function App() {
   const [placement, setPlacement] = useState<Placement>('top');
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectTitle />
         <SelectionClipboard />

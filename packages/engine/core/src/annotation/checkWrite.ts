@@ -62,29 +62,31 @@ export function assertAnnotationDraft(
 
 /**
  * A prepared update's data (`pdfPrepareAnnotationPatch`) checked against the
- * kind of `current`. A `readBack()` value still in it is a change, as
- * preparation drops one sent back as it reads, so one a write can't make is
- * refused; the rest is checked against the kind's update schema.
+ * kind it leaves the annotation: its own, or the sibling the patch names. A
+ * `readBack()` value still in it is a change, as preparation drops one sent
+ * back as it reads, so one a write can't make is refused; the rest is checked
+ * against the kind's update schema.
  */
 export function assertAnnotationPatch(
   current: Annotation<PdfCoordinates>,
   prepared: AnnotationPatch<PdfCoordinates>,
 ): void {
-  if (current.subtype === 'unsupported') return;
+  const subtype = prepared.subtype ?? current.subtype;
+  if (subtype === 'unsupported') return;
   const values = prepared as Record<string, unknown>;
-  for (const [name, write] of Object.entries(KIND_BY_SUBTYPE[current.subtype].readBackWrites)) {
+  for (const [name, write] of Object.entries(KIND_BY_SUBTYPE[subtype].readBackWrites)) {
     const value = values[name];
     if (value === undefined || write?.safeParse(value).success) continue;
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       write
-        ? `${current.subtype} update field '${name}': this value can be read but not written; send it back unchanged or replace it`
-        : `${current.subtype} update field '${name}': the engine works this out; send it back unchanged or leave it out`,
+        ? `${subtype} update field '${name}': this value can be read but not written; send it back unchanged or replace it`
+        : `${subtype} update field '${name}': the engine works this out; send it back unchanged or leave it out`,
       { details: { field: name } },
     );
   }
-  const parsed = fileAnnotationPatchSchemaOf(current.subtype).safeParse(prepared);
-  if (!parsed.success) throw invalidWrite(parsed.error, `${current.subtype} update`);
+  const parsed = fileAnnotationPatchSchemaOf(subtype).safeParse(prepared);
+  if (!parsed.success) throw invalidWrite(parsed.error, `${subtype} update`);
 }
 
 /**

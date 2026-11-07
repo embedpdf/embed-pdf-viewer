@@ -18,10 +18,12 @@ export type {
   PlacedButton,
   PlacedComponent,
   PlacedComponents,
+  PlacedIcon,
   PlacedMenu,
   PlacedMenuItem,
 } from './ui/placed-components';
 export type { PanelResizeEvent, ViewerFont } from './config-context';
+export type { LanguageStrings, StringsLoader } from './locales';
 export type {
   PluginSettings,
   SignatureFont,
@@ -47,6 +49,7 @@ export type {
   Viewer,
   ViewerLifetime,
   ViewerPlugins,
+  WatchOptions,
 } from './handle';
 export type { Feature, ReadOnlyExceptions } from './features';
 export type {
@@ -95,6 +98,8 @@ export { InteractionToken } from '@embedpdf/react/interaction';
 export { I18nToken } from '@embedpdf/react/i18n';
 export { ShellToken } from '@embedpdf/react/shell';
 export { MetadataToken } from '@embedpdf/react/metadata';
+export { OutlineToken } from '@embedpdf/react/outline';
+export { AttachmentToken } from '@embedpdf/react/attachment';
 export { RenderToken } from '@embedpdf/react/render';
 export { LinkToken } from '@embedpdf/react/link';
 export { PageEditToken } from '@embedpdf/react/page-edit';
@@ -142,4 +147,4 @@ export type {
   ViewerSize,
 } from '@embedpdf/core-ui';
 // A command as the `commands` config takes it: the headless one, with the viewer's words.
-export type { CommandContext, CommandDef } from './config/viewer-commands';
+export type { CommandContext, CommandDefinition } from './config/viewer-commands';

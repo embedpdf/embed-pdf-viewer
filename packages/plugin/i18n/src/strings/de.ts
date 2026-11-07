@@ -22,9 +22,12 @@ export const de: EmbedpdfStrings = {
     selection: { copy: 'Kopieren' },
     annotation: { delete: 'Löschen' },
     document: { download: 'Herunterladen', print: 'Drucken' },
+    snapshot: { copy: 'Kopieren', save: 'Bild speichern', clear: 'Schnappschuss verwerfen' },
     tool: {
       pointer: 'Auswählen',
       pan: 'Verschieben',
+      zoom: 'Bereich vergrößern',
+      snapshot: 'Schnappschuss',
       highlight: 'Hervorheben',
       underline: 'Unterstreichen',
       strikeout: 'Durchstreichen',
@@ -59,4 +62,5 @@ export const de: EmbedpdfStrings = {
       'form-signature': 'Unterschriftsfeld',
     },
   },
+  outline: { untitled: 'Unbenannt' },
 };

@@ -115,10 +115,27 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
   });
 
   it('stream.desynced repaints the content of every page', () => {
-    expect(changeOf({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 })).toEqual({
+    expect(
+      changeOf({
+        type: 'stream.desynced',
+        reason: 'backlog-overflow',
+        at: new Date(0).toISOString(),
+      }),
+    ).toEqual({
       pages: PAGE_OBJECT_NUMBERS,
       scope: 'content',
     });
+  });
+
+  it('fonts.changed with no write behind it repaints the content of every page', () => {
+    // The engine's fonts changed: a page's missing glyphs may now draw from another fallback.
+    expect(changeOf({ type: 'fonts.changed', origin: { kind: 'local' } })).toEqual({
+      pages: PAGE_OBJECT_NUMBERS,
+      scope: 'content',
+    });
+    // A write's: the write's own events repaint what it changed.
+    const transaction = { id: 'op-1', index: 1, count: 2 };
+    expect(changeOf({ type: 'fonts.changed', origin: { kind: 'local', transaction } })).toBeNull();
   });
 
   it.each([

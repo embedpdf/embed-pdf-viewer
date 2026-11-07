@@ -23,15 +23,21 @@ import {
   snapToDevice,
 } from '@embedpdf/core-geometry';
 import type { Point } from '@embedpdf/core-geometry';
-import { memo, toPageRef, type PluginContext, type PageRef } from '@embedpdf/core';
+import {
+  memo,
+  toPageRef,
+  type PageDestination,
+  type PluginContext,
+  type PageRef,
+} from '@embedpdf/core';
 
 import type { Viewpoint, VisiblePage } from '../contract';
 import type { StageHostCapability } from '../host-contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import type { StageServices } from '../services';
 
 export function createPageReads(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
 ) {
   const {
@@ -44,6 +50,7 @@ export function createPageReads(
     cacheKey,
     stayBounds,
     cursorItem,
+    currentPages,
     currentAnchor,
   } = scene;
   const state = () => ctx.state.get();
@@ -74,7 +81,7 @@ export function createPageReads(
     const ratio = dpr();
     // The footprint's top-left, camera-resolved. Device-snapped at rest, which
     // keeps a rotated page on the device grid; while the zoom moves it places
-    // fractionally (see `StageState.cameraResting`).
+    // fractionally (see `StageModel.cameraResting`).
     const rawX = (box.x - current.x) * current.zoom;
     const rawY = (box.y - current.y) * current.zoom;
     const resting = state().cameraResting;
@@ -186,7 +193,7 @@ export function createPageReads(
   const visiblePages = (): VisiblePage[] =>
     state().placed ? placedVisiblePages() : noVisiblePages;
 
-  const getPageFrame = (page: PageRef | number): VisiblePage | null => {
+  const getPageBox = (page: PageRef | number): VisiblePage | null => {
     if (!state().placed) return null;
     const index = ctx.getPage(page)?.index ?? -1;
     if (index < 0) return null;
@@ -199,7 +206,7 @@ export function createPageReads(
   };
 
   const pageToWorld = (page: PageRef | number, point: Point): Point | null => {
-    const frame = getPageFrame(page);
+    const frame = getPageBox(page);
     if (!frame) return null;
     // Place the page point into the page's display box through the same
     // quarter-turn matrix the layout and renderer use (`rotateScaleMatrix`),
@@ -234,8 +241,8 @@ export function createPageReads(
       getScrollMetrics: scrollMetricsNow,
       listVisiblePages: visiblePages,
       isPageVisible: (page) => visiblePageOf(page) !== null,
-      getCurrentPageIndex: () => state().cursor,
-      getCurrentPage: () => ctx.document()?.pages[state().cursor]?.ref ?? null,
+      getCurrentPageIndex: () => state().pageIndex,
+      getCurrentPage: () => ctx.document()?.pages[state().pageIndex]?.ref ?? null,
       getPageCount: () => ctx.document()?.pageCount ?? 0,
       listCurrentItemPages: () => {
         const item = cursorItem();
@@ -244,7 +251,13 @@ export function createPageReads(
           ? item.pageIndexes.map((index) => pages[index]).filter((page) => page !== undefined)
           : [];
       },
-      getPageFrame,
+      listCurrentPages: () => {
+        const pages = ctx.document()?.pages ?? [];
+        return currentPages()
+          .map((index) => pages[index])
+          .filter((page) => page !== undefined);
+      },
+      getPageBox,
       getPageAt: (point) => {
         // Find the visible page whose device-snapped display box contains the
         // point, then invert that page's transform: the same `viewToPage`
@@ -281,7 +294,7 @@ export function createPageReads(
       },
       pageToWorld,
       pageRectToViewport: (page, rect) => {
-        const frame = getPageFrame(page);
+        const frame = getPageBox(page);
         if (!frame) return null;
         const content = displaySize({ width: frame.width, height: frame.height }, frame.rotation);
         const matrix = rotateScaleMatrix(
@@ -313,6 +326,36 @@ export function createPageReads(
         return 'mode' in zoom ? zoom.mode : 'custom';
       },
       getViewpoint: (): Viewpoint => ({ anchor: currentAnchor(), zoom: state().zoom }),
+      getCurrentDestination: (): PageDestination | null => {
+        // Where `goToDestination` puts a destination's point: the padding in from the viewport's
+        // top-left. The page read is the first one reaching past that point; the one above it
+        // may still show in the padding.
+        const { left: insetX, top: insetY } = padding();
+        const current = camera();
+        const first = visiblePages()
+          .filter((page) => {
+            const corner = toScreen(current, { x: page.x + page.width, y: page.y + page.height });
+            return corner.x > insetX && corner.y > insetY;
+          })
+          .sort((left, right) => left.pageIndex - right.pageIndex)[0];
+        const size = first && ctx.getPage(first.ref)?.size;
+        if (!first || !size) return null;
+        // That point on the page's plane, then the nearest point of the page: a quarter-turn
+        // keeps the page's edges on the axes, so clamping each axis is exact.
+        const corner = first.transform.viewToPage({
+          x: insetX - first.screenX,
+          y: insetY - first.screenY,
+        });
+        const clamp = (value: number, max: number) =>
+          Math.round(Math.min(Math.max(value, 0), max) * 100) / 100;
+        return {
+          kind: 'xyz',
+          page: first.ref,
+          x: clamp(corner.x, size.width),
+          y: clamp(corner.y, size.height),
+          zoom: null,
+        };
+      },
     } satisfies Partial<StageHostCapability>,
   };
 }

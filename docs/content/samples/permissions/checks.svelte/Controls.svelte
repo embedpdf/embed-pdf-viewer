@@ -21,7 +21,9 @@
     if (canSearch) void search.search({ text });
   });
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   });
 
   async function copy() {
@@ -30,7 +32,7 @@
   }
 
   async function download() {
-    saveFile(await documents.download(), 'ebook.pdf');
+    saveFile(await documents.download(), 'welcome.pdf');
   }
 </script>
 

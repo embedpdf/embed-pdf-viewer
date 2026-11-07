@@ -133,12 +133,13 @@ export function importAnnotations(ctx: ChangeContext, op: AnnotationImportOp): D
       authorizeCreate: (draft) => {
         authorizeUnprotected(ctx.authority, annotationWriteCapability(draft.subtype));
         // A restoring import writes attribution that isn't the caller's,
-        // under the rights checked above; a copy is the caller's own create.
+        // under the rights checked above; a copy is the caller's own create,
+        // and an item in no group goes in the caller's (see `attributionOf`).
         if (!rights) {
           authorizeAnnotationCreate(
             ctx.authority,
             draft.subtype,
-            (draft as { groupId?: string | null }).groupId,
+            (draft as { groupId?: string | null }).groupId ?? undefined,
           );
         }
       },
@@ -485,7 +486,7 @@ function authorizeReorder(
   }
 }
 
-/** A reorder's item: the family's new order on the page, and the rows that moved. */
+/** A reorder's item: the kind's new order on the page, and the rows that moved. */
 function reorderItem(
   ctx: ChangeContext,
   family: AnnotationFamily,
@@ -530,7 +531,7 @@ export function writeUpdate(
   const before = readAnnotation(ctx, ref);
   const written =
     before.subtype === 'widget'
-      ? fitWidgetToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
+      ? fitWidgetToFamily(before.fieldKind, patch as WidgetPatch<PdfCoordinates>)
       : patch;
   const linked = linkedTo(before, written).map((other) => ({
     objectNumber: objectNumberOf(ctx, other),
@@ -621,7 +622,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
       {
         kind: 'annotation.restore',
         page: ref.page,
-        members: result.meta.changed,
+        members: result.meta.changedRefs,
         capture,
         unlinked: captureAfter(ctx.runtime, ctx.session, pending),
         ...(rights ? { rights } : {}),
@@ -633,7 +634,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
 /**
  * The value fallback of an update: the fields it changed, their old values,
  * and the values it left. Fields the patch named whose value stayed are not
- * changes.
+ * changes; a `subtype` it changed to a sibling kind is one.
  */
 function valuesChanged(
   before: Annotation<PdfCoordinates>,
@@ -642,9 +643,7 @@ function valuesChanged(
 ): RevertFallback {
   const was = before as unknown as Record<string, unknown>;
   const is = after as unknown as Record<string, unknown>;
-  const keys = Object.keys(patch).filter(
-    (key) => key !== 'subtype' && !valuesEqual(was[key], is[key]),
-  );
+  const keys = Object.keys(patch).filter((key) => !valuesEqual(was[key], is[key]));
   return {
     kind: 'annotation',
     restore: Object.fromEntries(

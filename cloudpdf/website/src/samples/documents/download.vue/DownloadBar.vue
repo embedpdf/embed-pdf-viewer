@@ -23,7 +23,7 @@ Promise.all([
   .catch(() => {}); // cancelled: the example went away
 
 async function download() {
-  saveFile(await documents.download(undefined, { mode: mode.value }), 'ebook.pdf');
+  saveFile(await documents.download(undefined, { mode: mode.value }), 'welcome.pdf');
 }
 </script>
 

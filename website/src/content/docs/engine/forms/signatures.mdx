@@ -70,17 +70,17 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 
 `sign()` and `prepare()` take these options (`sign()` also takes the `key`):
 
-| Option         | What it is                                                                        | Default                                       |
-| :------------- | :-------------------------------------------------------------------------------- | :-------------------------------------------- |
-| `field`        | The signature field to sign. It must not be signed yet.                           |                                               |
-| `kind`         | `'signature'`, or `'timestamp'` for a [document timestamp](#document-timestamps). | `'signature'`                                 |
-| `signer`       | `{ name, reason, location, contactInfo, signedAt }`, written into the signature.  | none; `signedAt` now                          |
-| `appearance`   | `{ pdf }`: a one-page PDF, drawn into the field's box.                            | none                                          |
-| `certify`      | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.       | not certified                                 |
-| `lock`         | Fields this signature [locks](#lock-fields).                                      | none                                          |
-| `digest`       | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
-| `subFilter`    | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                               | `'ETSI.CAdES.detached'`                       |
-| `contentsSize` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`                                        |
+| Option              | What it is                                                                        | Default                                       |
+| :------------------ | :-------------------------------------------------------------------------------- | :-------------------------------------------- |
+| `field`             | The signature field to sign. It must not be signed yet.                           |                                               |
+| `kind`              | `'signature'`, or `'timestamp'` for a [document timestamp](#document-timestamps). | `'signature'`                                 |
+| `signer`            | `{ name, reason, location, contactInfo, signedAt }`, written into the signature.  | none; `signedAt` now                          |
+| `appearance`        | `{ pdf }`: a one-page PDF, drawn into the field's box.                            | none                                          |
+| `certify`           | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.       | not certified                                 |
+| `lock`              | Fields this signature [locks](#lock-fields).                                      | none                                          |
+| `digest`            | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
+| `subFilter`         | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                               | `'ETSI.CAdES.detached'`                       |
+| `contentsSizeBytes` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`                                        |
 
 The field needs a widget to carry an `appearance`; without one, the call fails with
 `SignatureRefused`. A PDF with more than one page fails with `InvalidArg`, as for a
@@ -123,7 +123,7 @@ Between the two steps:
   for; a different one fails with `SigningVersionMismatch`, and you prepare again.
 
 `complete()` checks that `cms` is one signature that fits the space `prepare()` reserved
-(`contentsSize`); if not, it fails with `SignatureRefused`. It doesn't check the cryptography:
+(`contentsSizeBytes`); if not, it fails with `SignatureRefused`. It doesn't check the cryptography:
 `sign()` does that before it calls `complete()`, and `validateSignatures()` does it afterwards.
 Calling `complete()` again with the same `cms` returns the same result, with
 `status: 'already-completed'`; a different `cms` fails with `SignatureRefused`.
@@ -186,12 +186,12 @@ yourself.
 
 ## Signature fields and their look
 
-A signature field is a form field of family `'signature'`. Create one like any field (see
+A signature field is a form field of kind `'signature'`. Create one like any field (see
 [Creating form fields](/docs/engine/forms/authoring)):
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'signature',
+  kind: 'signature',
   name: 'approver',
   widgets: [{ page: page.ref, rect: { x: 300, y: 682, width: 200, height: 60 } }],
 });
@@ -204,6 +204,9 @@ that has no key, use `setSignatureAppearance()`. The field stays unsigned:
 await doc.forms.setSignatureAppearance(field.ref, { pdf: artworkPdf });
 ```
 
+The mark takes the place of the field's box: from then on its widgets read `hasMark: true`, and
+their style can't change (see [Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
+
 Once a field is signed, its look is part of what the signature seals, so
 `setSignatureAppearance()` fails with `ProtectedDocument`. To sign with artwork, pass `appearance` to
 `sign()` or `prepare()`.
@@ -212,10 +215,12 @@ Once a field is signed, its look is part of what the signature seals, so
 
 ## On the cloud
 
-- **Signing makes a new version.** A completed signature becomes a new version of the document on
-  the server, and everyone who opens the document from then on gets the signed file.
-- **Copies from before can't sign.** Someone who had the document open, and changed it, before the
-  signature completed can keep editing their copy, but `prepare()` fails with `StaleBase`.
+- **Signing makes a new version of the layer.** A completed signature becomes a new version of the
+  layer it was made in, and everyone who opens that layer from then on gets the signed file. The
+  document itself and every other layer stay as they were, so a new layer starts from the uploaded
+  file.
+- **Every layer can sign,** over its own version. Signing again in the same layer signs over the
+  layer's previous signature.
 - **Signed bytes never change.** `getContents()`, `getDigest()` and `downloadRevision()` read a
   version, and a version is never changed, so the server lets browsers and CDNs cache them.
 

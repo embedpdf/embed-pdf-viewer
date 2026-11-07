@@ -7,7 +7,12 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { resolveResourceIdForPath, wirePaths } from '@embedpdf/engine-core/wire';
 import { CloudObjectNumberPool } from '../src/document/CloudObjectNumberPool';
-import { CloudWrites, type ChangeSender, type SentChange } from '../src/document/CloudWrites';
+import {
+  CloudWrites,
+  type ChangeSender,
+  type SentChange,
+  type WriteGate,
+} from '../src/document/CloudWrites';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
@@ -21,7 +26,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 function newPool(): CloudObjectNumberPool {
   return new CloudObjectNumberPool({
-    reserve: async () => ({ objectNumbers: [], expiresIn: 900 }),
+    reserve: async () => ({ objectNumbers: [], expiresInSeconds: 900 }),
   });
 }
 
@@ -90,7 +95,11 @@ describe('the write line', () => {
 
   test('the numbers a write names are spent when it commits, and the caller’s when it fails', async () => {
     const pool = newPool();
-    pool.opened({ session: 'new', expiresIn: 900, objectNumbers: [{ first: 10, count: 3 }] });
+    pool.opened({
+      session: 'new',
+      expiresInSeconds: 900,
+      objectNumbers: [{ first: 10, count: 3 }],
+    });
     const writes = new CloudWrites(pool);
     const [spent, kept] = [pool.take()!, pool.take()!];
     await writes.run('ok', signal(), (line) => line.send(async () => 'ok'), [spent]);
@@ -104,7 +113,7 @@ describe('the write line', () => {
     ).rejects.toThrow('down');
     const lost: number[] = [];
     pool.onLost((event) => lost.push(...event.numbers));
-    pool.sync({ held: [{ first: 12, count: 1 }], expiresIn: 900 });
+    pool.sync({ held: [{ first: 12, count: 1 }], expiresInSeconds: 900 });
     // Off the server's list: the spent one isn't reported, the kept one is.
     expect(lost).toEqual([kept]);
   });
@@ -223,7 +232,11 @@ describe('changes in the line', () => {
 
   test('a request that fails fails every change in it, and their numbers stay the callers’', async () => {
     const pool = newPool();
-    pool.opened({ session: 'new', expiresIn: 900, objectNumbers: [{ first: 10, count: 2 }] });
+    pool.opened({
+      session: 'new',
+      expiresInSeconds: 900,
+      objectNumbers: [{ first: 10, count: 2 }],
+    });
     const writes = new CloudWrites(pool, async () => {
       throw new EngineError(EngineErrorCode.Network, 'down');
     });
@@ -235,7 +248,7 @@ describe('changes in the line', () => {
     expect(results.map((result) => result.status)).toEqual(['rejected', 'rejected']);
     const lost: number[] = [];
     pool.onLost((event) => lost.push(...event.numbers));
-    pool.sync({ held: [], expiresIn: 900 });
+    pool.sync({ held: [], expiresInSeconds: 900 });
     // Neither was spent: both are reported lost when the server forgets them.
     expect(lost.sort()).toEqual([a, b]);
   });
@@ -271,7 +284,7 @@ describe('the transport', () => {
     await http.postJson('/v1/docs/d1/layers/default/access', {}, parse, signal(), {
       session: true,
     });
-    await http.postJson('/v1/docs/d1/layers/default/pages/rotate', {}, parse, signal(), {
+    await http.postJson('/v1/docs/d1/layers/default/changes', {}, parse, signal(), {
       write: { opId: 'op-1' },
     });
     await http.stream('/v1/docs/d1/layers/default/events', {}, signal());
@@ -353,5 +366,78 @@ describe('the transport', () => {
       'https://cdn.test',
       'https://api.test',
     ]);
+  });
+});
+
+describe('the gate', () => {
+  /** A gate that's closed until `open()`, and closes again when the server refuses a write for it. */
+  function closedGate(): WriteGate & { open: () => void } {
+    let opened: Promise<void> | null = null;
+    let open = (): void => {};
+    const close = (): void => {
+      opened = new Promise<void>((resolve) => (open = resolve));
+    };
+    close();
+    return {
+      open: () => {
+        opened = null;
+        open();
+      },
+      passed: () => opened ?? Promise.resolve(),
+      refused: (error) => {
+        if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) return false;
+        close();
+        return true;
+      },
+    };
+  }
+
+  test('the line waits at the gate, and a write refused for it goes again under its opId', async () => {
+    const gate = closedGate();
+    const writes = new CloudWrites(newPool(), undefined, gate);
+    const sent: string[] = [];
+    let refuseOnce = true;
+    const first = writes.run('a', signal(), (line) =>
+      line.send(async (options) => {
+        sent.push(options.write!.opId!);
+        if (refuseOnce) {
+          refuseOnce = false;
+          throw new EngineError(EngineErrorCode.VisitorIdentityRequired, 'answer first');
+        }
+        return 'a';
+      }),
+    );
+    const second = writes.run('b', signal(), (line) =>
+      line.send(async (options) => {
+        sent.push(options.write!.opId!);
+        return 'b';
+      }),
+    );
+    await tick();
+    expect(sent).toEqual([]);
+    gate.open();
+    await tick();
+    // Refused for the gate: it closed again, and the line waits.
+    expect(sent).toEqual(['a']);
+    gate.open();
+    expect(await Promise.all([first, second])).toEqual(['a', 'b']);
+    expect(sent).toEqual(['a', 'a', 'b']);
+  });
+
+  test('a write the gate turns away fails, and the next one goes', async () => {
+    let turnAway = true;
+    const writes = new CloudWrites(newPool(), undefined, {
+      passed: async () => {
+        if (turnAway) {
+          turnAway = false;
+          throw new EngineError(EngineErrorCode.VisitorIdentityRequired, 'nobody to ask');
+        }
+      },
+      refused: () => false,
+    });
+    const refused = writes.run('a', signal(), (line) => line.send(async () => 'a'));
+    const next = writes.run('b', signal(), (line) => line.send(async () => 'b'));
+    await expect(refused).rejects.toMatchObject({ code: EngineErrorCode.VisitorIdentityRequired });
+    expect(await next).toBe('b');
   });
 });

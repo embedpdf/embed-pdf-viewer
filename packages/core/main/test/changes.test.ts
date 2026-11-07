@@ -79,13 +79,16 @@ function predictNotes(notes: Notes, op: PredictedOp): Notes {
   }
 }
 
-const origin = (kind: 'local' | 'remote', tx?: { id: string; index: number; count: number }) => ({
+const origin = (
+  kind: 'local' | 'remote',
+  transaction?: { id: string; index: number; count: number },
+) => ({
   kind,
   sessionId: kind === 'local' ? 'me' : 'them',
-  sub: null,
-  ts: 0,
-  serverId: null,
-  ...(tx ? { tx } : {}),
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+  ...(transaction ? { transaction } : {}),
 });
 
 /** A note's new text, as the engine publishes it. */
@@ -202,7 +205,7 @@ describe('a staged change', () => {
       { ops: [write(2, 'dos')] },
     ]);
     expect(calls[0]!.opId).toBe(first.opId);
-    expect(ctx.changes.pending()).toHaveLength(2);
+    expect(ctx.changes.listPending()).toHaveLength(2);
   });
 
   it('replays over a truth that moves: another session, then my own answer', async () => {
@@ -258,7 +261,7 @@ describe('when a change leaves the view', () => {
     ctx.changes.stage({ label: { key: 'note.edit' }, ops: [write(1, 'uno')] });
     answer(0, (opId) => [updated(1, 'uno', own(opId))]);
     await tick();
-    expect(ctx.changes.pending()).toEqual([]);
+    expect(ctx.changes.listPending()).toEqual([]);
     expect(notes.view()).toEqual({ 1: 'uno', 2: 'two' });
   });
 
@@ -274,7 +277,7 @@ describe('when a change leaves the view', () => {
     ctx.emitDocumentEvent(updated(2, 'dos', own(mine.opId, 1, 2)));
     // Another session changes a note the change wrote: the view shows theirs.
     ctx.emitDocumentEvent(updated(1, 'theirs', origin('remote')));
-    expect(ctx.changes.pending()).toEqual([mine]);
+    expect(ctx.changes.listPending()).toEqual([mine]);
     expect(notes.view()).toEqual({ 1: 'theirs', 2: 'dos' });
 
     calls[0]!.answer.resolve(resultOf(mine.opId));
@@ -292,7 +295,7 @@ describe('when a change leaves the view', () => {
     answer(0, (opId) => [updated(1, 'uno', own(opId))]);
     await tick();
     // Answered, but the mirror doesn't hold it yet: the view keeps it.
-    expect(ctx.changes.pending()).toEqual([]);
+    expect(ctx.changes.listPending()).toEqual([]);
     expect(notes.get()).toEqual({ 1: 'one', 2: 'two' });
     expect(notes.view()).toEqual({ 1: 'uno', 2: 'two' });
 
@@ -359,7 +362,7 @@ describe('when a change leaves the view', () => {
     });
     expect(calls[1]!.abort).toHaveBeenCalled();
     expect(calls[2]!.abort).not.toHaveBeenCalled();
-    expect(ctx.changes.pending()).toEqual([other]);
+    expect(ctx.changes.listPending()).toEqual([other]);
     expect(notes.view()).toEqual({ 1: 'one', 2: 'dos' });
     expect(settled.mock.calls.map(([event]) => event.status)).toEqual(['refused', 'refused']);
   });
@@ -424,7 +427,7 @@ describe('a held change', () => {
     const { ctx, calls } = await loaded();
     const typing = ctx.changes.hold({ key: 'note.type' }, { merge: 'note:1' });
     typing.set([write(1, 'uno')]);
-    expect(ctx.changes.pending().map((change) => change.merge)).toEqual(['note:1']);
+    expect(ctx.changes.listPending().map((change) => change.merge)).toEqual(['note:1']);
     ctx.changes.sendHolds();
     expect(calls.map((call) => call.change)).toEqual([{ ops: [write(1, 'uno')] }]);
     expect(typing.open).toBe(false);
@@ -454,7 +457,7 @@ describe('a group', () => {
     });
     expect(value).toBe('done');
     expect(calls.map((call) => call.change)).toEqual([{ ops: [write(1, 'uno'), write(2, 'dos')] }]);
-    const [change] = ctx.changes.pending();
+    const [change] = ctx.changes.listPending();
     expect(change!.label).toEqual({ key: 'notes.edit', count: 2 });
     expect(change!.undo).toEqual([write(2, 'two'), write(1, 'one')]);
     expect(notes.view()).toEqual({ 1: 'uno', 2: 'dos' });

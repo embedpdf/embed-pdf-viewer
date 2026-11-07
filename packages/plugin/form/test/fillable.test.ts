@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -16,15 +16,15 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import { FORM_DEFAULTS, type FormConfig } from '../src/contract';
 import { createFormController } from '../src/controller';
-import { initialFormState } from '../src/model';
+import { initialFormModel } from '../src/model';
 
 const PAGE = toPageRef(1);
 const FIELD = { kind: 'objectNumber' as const, objectNumber: 5 };
 
-const textField: FormFieldDTO = {
+const textField: FormField = {
   ref: FIELD,
   name: 'name',
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -69,7 +69,7 @@ async function loaded(config?: FormConfig) {
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
   const ctx = createTestContext({
     id: 'form',
-    state: initialFormState(),
+    state: initialFormModel(),
     settings: { defaults: FORM_DEFAULTS, registered: config },
     pages: [{ ref: PAGE }],
     capabilities: [

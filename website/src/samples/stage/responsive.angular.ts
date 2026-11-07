@@ -5,9 +5,9 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -15,7 +15,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       // Facing pages with a roomy margin, and one rule for a narrow Stage: a thin
       // margin and one page at a time. The rule has a name, so the UI can read it too.
       withStage({
@@ -35,6 +35,7 @@ const ebook = async (): Promise<OpenInput> => {
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <!-- One breakpoint drives both the layout and this toolbar. -->
       @let compact = stage.activeRules().includes('compact');
+      @let padding = stage.settings().padding;
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Stage width">
           <button type="button" [attr.aria-pressed]="!narrow()" (click)="narrow.set(false)">
@@ -48,7 +49,7 @@ const ebook = async (): Promise<OpenInput> => {
           compact <strong>{{ compact ? 'on' : 'off' }}</strong>
         </output>
         <output class="badge">
-          padding <strong>{{ stage.settings().padding }}</strong> · spread
+          padding <strong>{{ typeof padding === 'number' ? padding : 'by side' }}</strong> · spread
           <strong>{{ stage.settings().spread }}</strong>
         </output>
         <div class="pager">

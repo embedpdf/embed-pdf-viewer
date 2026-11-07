@@ -4,5 +4,5 @@
  * Layout: contract.ts · model.ts · controller.ts · state.ts · metadata.plugin.ts.
  */
 export { metadataPlugin } from './metadata.plugin';
-export { metadataState } from './state';
+export { metadataState, type MetadataState } from './state';
 export * from './contract';

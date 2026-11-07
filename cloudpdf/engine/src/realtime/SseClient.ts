@@ -12,7 +12,7 @@ export interface SseClientOptions {
   http: HttpClient;
   path: string;
   /** Resume cursor for the first connect (manifest `auditHead` /
-   *  `lastServerId`); `null` subscribes "from now". */
+   *  `lastServerSequence`); `null` subscribes "from now". */
   initialCursor: number | null;
   /** One parsed audit row, in id order. The cursor has already advanced. */
   onRow(row: AuditEventRow): void;
@@ -50,8 +50,8 @@ export class SseClient {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private retryDelayMs = 500;
 
-  constructor(private readonly opts: SseClientOptions) {
-    this.cursor = opts.initialCursor;
+  constructor(private readonly options: SseClientOptions) {
+    this.cursor = options.initialCursor;
   }
 
   open(): void {
@@ -73,24 +73,24 @@ export class SseClient {
     const startedAt = Date.now();
     this.abort = new AbortController();
     try {
-      const res = await this.opts.http.stream(
-        this.opts.path,
+      const res = await this.options.http.stream(
+        this.options.path,
         this.cursor !== null ? { 'Last-Event-ID': String(this.cursor) } : {},
         this.abort.signal,
       );
       if (res.status === 401 || res.status === 403) {
         this.closed = true;
-        this.opts.onAuthLost();
+        this.options.onAuthLost();
         return;
       }
       if (!res.ok || !res.body) {
         throw new EngineError(EngineErrorCode.Network, `events stream HTTP ${res.status}`);
       }
-      this.opts.onConnected?.(true);
+      this.options.onConnected?.(true);
       try {
         await this.consume(res.body);
       } finally {
-        this.opts.onConnected?.(false);
+        this.options.onConnected?.(false);
       }
       // Stream ended (server close / auth-expiring / network): reconnect.
       if (Date.now() - startedAt >= 30_000) this.retryDelayMs = 500;
@@ -134,7 +134,7 @@ export class SseClient {
     if (id !== null && Number.isFinite(id)) this.cursor = id;
     if (event === 'mutation') {
       try {
-        this.opts.onRow(JSON.parse(data.join('\n')) as AuditEventRow);
+        this.options.onRow(JSON.parse(data.join('\n')) as AuditEventRow);
       } catch {
         // A malformed row advances the cursor and is skipped; the audit log
         // remains the source of truth for anyone who refetches.
@@ -142,16 +142,16 @@ export class SseClient {
     } else if (event === 'session') {
       const parsed = safeJson(data.join('\n'));
       const status = EditSessionStatusSchema.safeParse(parsed);
-      if (status.success) this.opts.onSession?.(status.data);
+      if (status.success) this.options.onSession?.(status.data);
     } else if (event === 'full-refresh') {
-      this.opts.onFullRefresh();
+      this.options.onFullRefresh();
     } else if (event === 'auth-revoked') {
       // Terminal: the credential is dead by decree, not by clock — never
       // retry against it (a reconnect would just 401; this saves the trip
       // and surfaces the loss immediately).
       this.closed = true;
       this.abort?.abort();
-      this.opts.onAuthLost();
+      this.options.onAuthLost();
     }
     // 'auth-expiring' needs no handling: the server ends the stream right
     // after, and the reconnect path fetches a fresh token.

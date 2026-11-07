@@ -19,7 +19,7 @@ import './handles.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function CopyButton() {
   const selection = useSelection();
@@ -36,13 +36,13 @@ function CopyButton() {
   );
 }
 
-// A word selected on load, as a long-press selects one: "Viewers", on the cover.
+// A word selected on load, as a long-press selects one: "Documents", on the cover.
 function SelectWord() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 14, count: 7 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   return null;
@@ -50,7 +50,7 @@ function SelectWord() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectWord />
         <Stage

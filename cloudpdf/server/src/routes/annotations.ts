@@ -17,8 +17,9 @@ import {
   type AnnotationPosition,
   type AnnotationRef,
   type CollabTarget,
+  type DocumentManifest,
   type DocumentProtection,
-  type PdfBits,
+  type PdfPermissionFlags,
   type WorkerJobId,
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
@@ -40,6 +41,7 @@ import {
   AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -47,6 +49,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
@@ -121,11 +124,7 @@ export async function registerAnnotationRoutes(
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(
-        decodeAnnotationToken,
-        token,
-        'annotationVersion token',
-      ),
+      requested: parseTokenOrInvalidArg(decodeAnnotationToken, token, 'annotationVersion token'),
     });
   });
 
@@ -171,19 +170,19 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return readAnnotations({
         documentService,
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(
-          decodeAnnotationToken,
-          token,
-          'annotationVersion token',
-        ),
+        requested: parseTokenOrInvalidArg(decodeAnnotationToken, token, 'annotationVersion token'),
       });
     },
   );
@@ -197,8 +196,12 @@ export async function registerAnnotationRoutes(
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return readAnnotations({
         documentService,
         reply,
@@ -226,7 +229,7 @@ export async function registerAnnotationRoutes(
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
-      requestedVersion: parseTokenOrInvalidArg(
+      requested: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
         token,
         'annotationsVersion token',
@@ -241,14 +244,24 @@ export async function registerAnnotationRoutes(
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-annotations-all',
+      permissionFlags,
+    );
     return readAnnotationsAll({
       documentService,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
-      requestedVersion: parseTokenOrInvalidArg(
+      requested: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
         token,
         'annotationsVersion token',
@@ -296,8 +309,18 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-annotations-export',
+        permissionFlags,
+      );
       return exportAnnotations({
         documentService,
         limits: bundleLimits,
@@ -321,10 +344,22 @@ export async function registerAnnotationRoutes(
     async (req, reply) => {
       const { docId, layerName } = req.params as { docId: string; layerName: string };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
-      const request = parseOrInvalidArg<AnnotationsExportToken>(
-        AnnotationsExportRequestSchema as unknown as SchemaLike<AnnotationsExportToken>,
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-annotations-export',
+        permissionFlags,
+      );
+      const request = parseOrInvalidArg<Omit<AnnotationsExportToken, 'pin'>>(
+        AnnotationsExportRequestSchema as unknown as SchemaLike<
+          Omit<AnnotationsExportToken, 'pin'>
+        >,
         req.body,
         'request body',
       );
@@ -346,8 +381,18 @@ export async function registerAnnotationRoutes(
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-annotations-all',
+      permissionFlags,
+    );
     return readAnnotationsAll({
       documentService,
       reply,
@@ -373,8 +418,12 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return renderAppearanceBatch({
         family: 'annotations',
         documentService,
@@ -405,8 +454,12 @@ export async function registerAnnotationRoutes(
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return renderAppearanceBatch({
         family: 'annotations',
         documentService,
@@ -428,7 +481,11 @@ export async function registerAnnotationRoutes(
   app.post('/v1/docs/:docId/layers/:layerName/annotations/import', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const limits = bundleLimits;
     const { body, resources } = await readBundleImportRequest(req, limits, {
@@ -441,13 +498,20 @@ export async function registerAnnotationRoutes(
     if (attribution === 'restore') {
       // Restoring writes attribution that isn't the caller's, groups
       // included, so it takes the capabilities instead of per-group checks.
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        permissionFlags,
+        protection,
+      );
       ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.annotate.import',
-        pdfBits,
+        permissionFlags,
         protection,
       );
     } else {
@@ -473,7 +537,7 @@ export async function registerAnnotationRoutes(
           layerName,
           'create',
           target,
-          pdfBits,
+          permissionFlags,
           protection,
         );
       }
@@ -508,7 +572,11 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       // The draft, and beside its fields the files it names by role.
@@ -534,7 +602,7 @@ export async function registerAnnotationRoutes(
         layerName,
         'create',
         target,
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const actor = actorFromJwt(ctx.jwt, groupId);
@@ -567,11 +635,15 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       // The worker checks each annotation it moves inside the write: a
       // reorder takes `doc.annotate.modify`. Widgets have their own order.
-      const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+      const ctx = requireLayerAnnotationWrite(req, docId, layerName, permissionFlags, protection);
       const { refs, position } = parseOrInvalidArg<{
         refs: AnnotationRef[];
         position: AnnotationPosition;
@@ -607,17 +679,28 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.pages.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        permissionFlags,
+        protection,
+      );
       const raw = (req.body ?? {}) as { refs?: unknown; usage?: unknown };
       const body = parseOrInvalidArg<AnnotationFlattenInput>(
         AnnotationFlattenInputSchema as unknown as SchemaLike<AnnotationFlattenInput>,
@@ -647,8 +730,12 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
       const body = parseOrInvalidArg<AnnotationAppearanceExportInput>(
         AnnotationAppearanceExportInputSchema as unknown as SchemaLike<AnnotationAppearanceExportInput>,
         req.body,
@@ -673,18 +760,27 @@ export async function registerAnnotationRoutes(
   // An annotation's `appearance` resource: its drawing, as a one-page PDF. A
   // read that egresses content, gated by `doc.download` like the export above.
   app.get(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/appearance',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
       const bytes = await documentService.readAnnotationAppearance(
         ctx,
         docId,
@@ -700,17 +796,26 @@ export async function registerAnnotationRoutes(
   );
 
   app.patch(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
@@ -720,7 +825,7 @@ export async function registerAnnotationRoutes(
       setNoStore(reply);
       return updateAnnotation(
         req,
-        pdfBits,
+        permissionFlags,
         protection,
         {
           docId,
@@ -735,23 +840,32 @@ export async function registerAnnotationRoutes(
   );
 
   app.delete(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
 
       setNoStore(reply);
       return deleteAnnotation(
         req,
-        pdfBits,
+        permissionFlags,
         protection,
         { docId, layerName, ref: refFromKey(annotKey, pageObjectNumber) },
         abortSignalOf(reply),
@@ -761,12 +875,13 @@ export async function registerAnnotationRoutes(
 
   /**
    * Update an annotation. The patch has to fit some kind here; the worker
-   * checks it against its target's kind, and the caller's authority against
-   * the target's owner, inside the write.
+   * checks it against the kind it leaves the target (its own, or a sibling
+   * its `subtype` names), and the caller's authority against the target's
+   * owner, inside the write.
    */
   async function updateAnnotation(
     req: FastifyRequest,
-    pdfBits: PdfBits,
+    permissionFlags: PdfPermissionFlags,
     protection: DocumentProtection | null,
     input: {
       docId: string;
@@ -778,7 +893,7 @@ export async function registerAnnotationRoutes(
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const { docId, layerName, ref, resources } = input;
-    const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+    const ctx = requireLayerAnnotationWrite(req, docId, layerName, permissionFlags, protection);
     const patch = parseOrInvalidArg<AnnotationPatch>(
       AnnotationPatchSchema as unknown as SchemaLike<AnnotationPatch>,
       input.patch,
@@ -805,12 +920,18 @@ export async function registerAnnotationRoutes(
    */
   async function deleteAnnotation(
     req: FastifyRequest,
-    pdfBits: PdfBits,
+    permissionFlags: PdfPermissionFlags,
     protection: DocumentProtection | null,
     input: { docId: string; layerName: string; ref: AnnotationRef },
     signal: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
-    const ctx = requireLayerAnnotationWrite(req, input.docId, input.layerName, pdfBits, protection);
+    const ctx = requireLayerAnnotationWrite(
+      req,
+      input.docId,
+      input.layerName,
+      permissionFlags,
+      protection,
+    );
     return layerService.deleteAnnotation(ctx, { ...input, authority: ctx.authority }, signal);
   }
 }
@@ -918,105 +1039,79 @@ function actorFromJwt(
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { annotationVersion: number; pin: TokenPin };
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.annotationVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.annotationVersion}) for page ${
-        input.pageObjectNumber
-      }`,
-    );
-  }
-
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
-  // the full path today — no dispatched subtype reader uses the pagePtr —
-  // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
-  // reader ever lands, the local-vs-cloud conformance parity diff fails and
-  // forces this choice back onto the table (safe-by-conformance).
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.list' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      pages: [toPageRef(input.pageObjectNumber)],
-    });
   const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'annotations.list') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${
-        input.scope.kind === 'layer' ? 'layer ' : ''
-      }annotations.list payload: ${result.tag}`,
-    );
-  }
-
-  if (input.requestedVersion !== undefined) {
-    // Re-validate the pin after the worker read. The pre-check ran before
-    // parking behind any in-flight write; if that write (or any remote
-    // commit) landed while we read, the snapshot in hand belongs to a
-    // newer version and must not go out under this pin — the response
-    // carries `immutable`, so one slip poisons the CDN for every future
-    // reader. Refusing costs the client one manifest refetch.
-    const fresh = await resolvePageForRead(input);
-    if (input.requestedVersion !== fresh.cache.annotationVersion) {
-      setNoStore(input.reply);
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requested !== undefined &&
+      input.requested.annotationVersion !== page.cache.annotationVersion
+    ) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `${input.scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
-          input.requestedVersion
-        } no longer current (current=${fresh.cache.annotationVersion}) for page ${
+        `${scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
+          input.requested.annotationVersion
+        } no longer current (current=${page.cache.annotationVersion}) for page ${
           input.pageObjectNumber
         }`,
       );
     }
-  }
+  };
+  const read = async () => {
+    if (scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+    }
+    // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
+    // the full path today — no dispatched subtype reader uses the pagePtr —
+    // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
+    // reader ever lands, the local-vs-cloud conformance parity diff fails and
+    // forces this choice back onto the table (safe-by-conformance).
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.list' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: scope.docId,
+        ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+        pages: [toPageRef(input.pageObjectNumber)],
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
+    );
+    if (result.tag !== 'annotations.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.list payload: ${result.tag}`,
+      );
+    }
+    return result.list;
+  };
+  const list = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+    assertCurrent,
+    read,
+    token: input.requested && { kind: 'annotations', pin: input.requested.pin },
+  });
 
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-  return result.list;
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  return list;
 }
 
 /**
- * Whole-document bulk read: One `annotations.list` worker job per
- * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
- * reads double-check the manifest pin before serving a CDN-immutable body.
- * The public current-version read retries once if a mutation races the
- * sweep, then returns a retryable conflict rather than mixing a snapshot
- * with the wrong audit cursor. The response stamps the pre-check
- * manifest's `auditHead`, so replaying events with `serverId > auditHead`
- * over this body is exact.
- */
-/**
- * One export job at the token's pins, checked before and after the job so an
- * immutable body never belongs to another version: a stale pin is a 404 the
- * client answers by refreshing its manifest. The response is the bundle
+ * One export job, read at the token's pins (see `readAtPins`): a stale pin
+ * is a 404 the client answers by refreshing its manifest. The response is the bundle
  * without its bytes as the `body` part, then one `resource:<id>` part per
  * resource.
  */
@@ -1026,7 +1121,8 @@ async function exportAnnotations(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  token: AnnotationsExportToken;
+  /** A POST carries its pins in its body, without an engine value or shape. */
+  token: Omit<AnnotationsExportToken, 'pin'> & { pin?: TokenPin };
   /** A GET at its token is immutable; a POST is answered uncached. */
   cache?: 'immutable' | 'no-store';
 }) {
@@ -1040,7 +1136,6 @@ async function exportAnnotations(input: {
     const annotationsVersion = manifest.annotationsVersion ?? 1;
     const layoutVersion = manifest.layoutVersion ?? 1;
     if (token.annotationsVersion !== annotationsVersion || token.layoutVersion !== layoutVersion) {
-      setNoStore(input.reply);
       throw new EngineError(
         EngineErrorCode.NotFound,
         `annotation export at annotationsVersion ${token.annotationsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${annotationsVersion}, ${layoutVersion})`,
@@ -1048,62 +1143,66 @@ async function exportAnnotations(input: {
     }
   };
 
-  await assertCurrent();
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.export' as const,
-      effect: 'snapshot' as const,
-      jobId,
-      docId: scope.docId,
-      ...(layerName !== undefined ? { layerName } : {}),
-      selection: token.selection,
-      limits: input.limits,
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    layerName,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'annotations.export') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected annotations.export payload: ${result.tag}`,
+  const read = async () => {
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.export' as const,
+        effect: 'snapshot' as const,
+        jobId,
+        docId: scope.docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+        selection: token.selection,
+        limits: input.limits,
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      layerName,
+      build,
+      input.signal,
     );
-  }
-  await assertCurrent();
-  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
+    if (result.tag !== 'annotations.export') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.export payload: ${result.tag}`,
+      );
+    }
+    return result.bundle;
+  };
+  const bundle = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName,
+    assertCurrent,
+    read,
+    token: { kind: 'annotationsExport', pin: token.pin },
+  });
+  return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }
 
+/**
+ * Whole-document bulk read: one `annotations.list` worker job (the raw
+ * docPtr sweep, no per-page loads). A version-addressed read is read at its
+ * pin (see `readAtPins`). The current-version read retries once if a
+ * mutation races the sweep, then returns a retryable conflict rather than
+ * mixing a snapshot with the wrong audit cursor. The response stamps the
+ * pre-check manifest's `auditHead`, so replaying events with
+ * `serverId > auditHead` over this body is exact.
+ */
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  requestedVersion?: number;
+  requested?: { annotationsVersion: number; pin: TokenPin };
 }) {
   const scope = input.scope;
   const getManifest = () =>
     scope.kind === 'layer'
       ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
       : input.documentService.getManifest(scope.ctx, scope.docId);
-
-  const maxAttempts = input.requestedVersion === undefined ? 2 : 1;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const manifest = await getManifest();
-    const current = manifest.annotationsVersion ?? 1;
-    if (input.requestedVersion !== undefined && input.requestedVersion !== current) {
-      setNoStore(input.reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-          input.requestedVersion
-        } no longer current (current=${current})`,
-      );
-    }
-    const pinnedVersion = input.requestedVersion ?? current;
-
+  const read = async () => {
     if (scope.kind === 'layer') {
       await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
     }
@@ -1130,31 +1229,47 @@ async function readAnnotationsAll(input: {
         }`,
       );
     }
+    return result.list;
+  };
 
-    // Re-validate the pin after the worker read (see readAnnotations).
-    const fresh = await getManifest();
-    const freshCurrent = fresh.annotationsVersion ?? 1;
-    if (pinnedVersion !== freshCurrent) {
-      setNoStore(input.reply);
-      if (input.requestedVersion !== undefined) {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-            input.requestedVersion
-          } no longer current (current=${freshCurrent})`,
-        );
-      }
-      if (attempt + 1 < maxAttempts) continue;
-      throw new EngineError(
-        EngineErrorCode.LayerVersionConflict,
-        `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,
-      );
-    }
-
-    input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-    return { ...result.list, auditHead: manifest.auditHead };
+  const { requested } = input;
+  if (requested !== undefined) {
+    let auditHead: DocumentManifest['auditHead'] | undefined;
+    let checked = false;
+    const list = await readAtPins({
+      documentService: input.documentService,
+      reply: input.reply,
+      docId: scope.docId,
+      layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+      assertCurrent: async () => {
+        const manifest = await getManifest();
+        const current = manifest.annotationsVersion ?? 1;
+        if (requested.annotationsVersion !== current) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${requested.annotationsVersion} no longer current (current=${current})`,
+          );
+        }
+        if (!checked) auditHead = manifest.auditHead;
+        checked = true;
+      },
+      read,
+      token: { kind: 'annotationsAll', pin: requested.pin },
+    });
+    setImmutableCache(input.reply);
+    return { ...list, auditHead };
   }
 
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const manifest = await getManifest();
+    const current = manifest.annotationsVersion ?? 1;
+    const list = await read();
+    const fresh = await getManifest();
+    if ((fresh.annotationsVersion ?? 1) !== current) continue;
+    setNoStore(input.reply);
+    return { ...list, auditHead: manifest.auditHead };
+  }
+  setNoStore(input.reply);
   throw new EngineError(
     EngineErrorCode.LayerVersionConflict,
     `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,

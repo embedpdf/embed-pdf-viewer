@@ -28,9 +28,9 @@ const plugins = [
   annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A pen, 24 × 24, in a color: its tip is the bottom-left corner.
@@ -41,10 +41,10 @@ const penIcon = (color: string) =>
 
 // The pen cursor follows the pen's color.
 function InkCursor() {
-  const { color = '#000000' } = useAnnotationDefaults('ink');
+  const { color } = useAnnotationDefaults('ink');
   useToolCursor({
     toolId: 'ink',
-    cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } },
+    cursors: { crosshair: { svg: penIcon(color ?? '#000000'), hotspot: { x: 2, y: 22 } } },
   });
   return null;
 }
@@ -102,7 +102,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InkCursor />
         <Toolbar />

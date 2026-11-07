@@ -11,6 +11,7 @@ export * from './shared';
 export { AbortablePromise } from './promise/AbortablePromise';
 export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
+export { devWarn, isDev, resetDevWarnings } from './dev';
 
 export type { Engine, EngineFactory } from './engine/Engine';
 export { isLocalEngine } from './engine/LocalEngine';
@@ -21,8 +22,12 @@ export { isLocalPage } from './engine/LocalPageHandle';
 export type { LocalPageHandle } from './engine/LocalPageHandle';
 export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
-export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
-export type { DocumentHandle } from './engine/DocumentHandle';
+export type {
+  DocumentFontsService,
+  FontEmbeddingPolicy,
+  LocalDocumentFontsService,
+} from './engine/DocumentFontsService';
+export type { DocumentHandle, DocumentGrant } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,
@@ -35,9 +40,7 @@ export { subscribeToType } from './events/DocumentEventStream';
 export { EventHub, SessionEventPublisher } from './events/EventHub';
 export { changeEvents } from './events/changeEvents';
 export {
-  advisoryFromPdfBits,
   permissionInfoFromProbe,
-  permissionInfoWithAdvisory,
   securityStateFromHead,
   securityStateFromProbe,
 } from './engine/document-security-state';
@@ -53,7 +56,6 @@ export type {
   DocumentSecurityState,
   DocumentUnlockInput,
   DocumentUnlockResult,
-  PdfPermissionAdvisory,
   PdfPermissionInfo,
 } from './engine/DocumentSecurityService';
 export {
@@ -70,6 +72,10 @@ export type { JobTarget, Place, Placed, RankedJob, ViewSets } from './scheduling
 export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { MetadataService } from './engine/MetadataService';
+export type { DocumentOutlineService, OutlineCreateOptions } from './engine/DocumentOutlineService';
+export { attachmentVerbs, type AttachmentWriteVerb } from './engine/attachmentVerbs';
+export { outlineVerbs } from './engine/outlineVerbs';
+export { pageVerbs, type PageStructureVerb } from './engine/pageVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
@@ -102,7 +108,7 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
+export type { PageRenderService, RawPageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';
@@ -126,6 +132,7 @@ export type {
   MetadataReadCustomWorkerRequest,
   MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
+  OutlineReadWorkerRequest,
   AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
   AnnotationsRenderAppearancesEncodedWorkerRequest,
@@ -161,16 +168,11 @@ export type {
   SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
-  PagesReorderWorkerRequest,
-  PagesRotateWorkerRequest,
-  PagesDeleteWorkerRequest,
   AnnotationsFlattenWorkerRequest,
   AnnotationsExportAppearanceWorkerRequest,
   PagesSetNameWorkerRequest,
   PagesRemoveNameWorkerRequest,
   PagesExtractWorkerRequest,
-  PagesInsertWorkerRequest,
-  PagesInsertBlankWorkerRequest,
   PagesFlattenWorkerRequest,
   RedactionApplyWorkerRequest,
   PieceInfoReadWorkerRequest,
@@ -205,7 +207,12 @@ export type {
   FontsClearFallbacksWorkerRequest,
   FontsClearWorkerRequest,
   FontsAuthorizeEditingWorkerRequest,
+  FontsListWorkerRequest,
+  FontsProgramWorkerRequest,
   DocumentSetFontSettingsWorkerRequest,
+  DocumentFontsListWorkerRequest,
+  DocumentFontsResolveWorkerRequest,
+  DocumentFontsProgramWorkerRequest,
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,
@@ -213,8 +220,6 @@ export type {
   ShutdownWorkerRequest,
   AttachmentsListWorkerRequest,
   AttachmentsReadFileWorkerRequest,
-  AttachmentsCreateWorkerRequest,
-  AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
   AnnotationsExportWorkerRequest,
@@ -222,4 +227,28 @@ export type {
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,
+  WritePayloadFacts,
 } from './wire/worker-protocol';
+export {
+  canChooseProgram,
+  documentFontNameOf,
+  documentFontsOf,
+  documentProgramForName,
+  downloadableProgram,
+  FALLBACK_TIERS,
+  fontListOf,
+  fontResolutionOf,
+  listedProgram,
+  restrictionsOfProgram,
+  standardFontOfBaseFont,
+  TEXT_WRITING_CAPABILITIES,
+  type BuiltInPrograms,
+  type DocumentFace,
+  type DocumentFaceFacts,
+  type DocumentFontFacts,
+  type EngineFontFacts,
+  type FallbackTier,
+  type FontListFacts,
+  type FontProgramFacts,
+  type ResolvedRunFacts,
+} from './fonts/fontList';

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: a comments sidebar</title>
+<link rel="stylesheet" href="../shared/document.css">
+</head>
+<body class="fernquill">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Proposal</span>
+  </div>
+
+  <div class="with-note">
+    <h1 class="title">A comments sidebar for the portal's viewer</h1>
+    <p class="meta">Ada Lovelace · 14 October 2026 · Reviewer: Dana Smith <span class="status">In review</span></p>
+    <div class="note-slot" data-pdf="note-title"></div>
+  </div>
+
+  <h2>Problem</h2>
+  <p>Notes in a PDF are hard to follow. Each one is a small icon on the page with its replies hidden behind it, so a reviewer opens them one by one to read a conversation.</p>
+  <p>Teams that review contracts and reports tell us the same thing: they move the discussion to email, and the PDF stops being the place where decisions are made.</p>
+
+  <h2>Proposal</h2>
+  <p>Add a sidebar that lists every comment thread in reading order. A click on a thread scrolls to its mark on the page; replies and review states show in the sidebar, under the comment they answer.</p>
+  <p>The sidebar replaces the old floating popups entirely, which keeps one place to read and write comments.</p>
+
+  <h2>Phases</h2>
+  <table data-pdf="phases">
+    <thead>
+      <tr><th>Phase</th><th>Work</th><th class="number">Weeks</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>The thread list, and scrolling to a thread's mark</td><td class="number">2</td></tr>
+      <tr><td>2</td><td>Replies and review states</td><td class="number">2</td></tr>
+      <tr><td>3</td><td>Filters and search</td><td class="number">1</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer"><span>Proposal · Comments sidebar</span><span>1 of 2</span></div>
+</section>
+
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Proposal</span>
+  </div>
+
+  <h2>Open questions</h2>
+  <div class="with-note">
+    <p>How the sidebar looks on a phone. A sheet that slides up from the bottom is the likely answer, but it needs a mock-up before we decide.</p>
+    <div class="note-slot" data-pdf="note-phone"></div>
+  </div>
+  <p>Whether resolved threads stay in the list. Acrobat hides them behind a filter, and we lean towards the same.</p>
+
+  <h2>Timeline</h2>
+  <p>A design review on 21 October, then two sprints of work. The sidebar ships in 3.2.</p>
+
+  <div class="page-footer"><span>Proposal · Comments sidebar</span><span>2 of 2</span></div>
+</section>
+</body>
+</html>

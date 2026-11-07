@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { interpolate, translate, type TranslationSources } from '../src/translate';
+import { interpolate } from '../src/contract';
+import { translate, type TranslationSources } from '../src/translate';
 import { en, es } from './fixtures';
 
 const stateWith = (overrides: Partial<TranslationSources> = {}): TranslationSources => ({

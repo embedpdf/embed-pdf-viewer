@@ -13,14 +13,14 @@ export type EventHook<T> = (
 
 /**
  * The plugin-private pair behind one capability event. Expose `.on` on the
- * capability; keep `emit`/`dispose` inside the plugin. Because the capability
+ * capability; keep `emit`/`destroy` inside the plugin. Because the capability
  * member is the bare function type, the emitting half is unreachable through
  * the public contract by construction.
  */
 export interface EventHookSource<T> {
   readonly on: EventHook<T>;
   emit(event: T): void;
-  dispose(): void;
+  destroy(): void;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface EventHookSource<T> {
  * (listeners added or removed during an emit don't affect that emit); a
  * throwing listener is isolated — reported through `onListenerError`, never
  * allowed to break the emitting operation or its sibling listeners. After
- * `dispose()`, `on` returns an inert unsubscribe (teardown races never throw).
+ * `destroy()`, `on` returns an inert unsubscribe (teardown races never throw).
  * No value cache, no replay, no equality — state belongs to the store.
  */
 export function createEventHook<T = void>(
@@ -60,7 +60,7 @@ export function createEventHook<T = void>(
         }
       }
     },
-    dispose() {
+    destroy() {
       listeners = null;
     },
   };

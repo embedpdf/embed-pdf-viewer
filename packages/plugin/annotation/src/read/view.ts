@@ -19,6 +19,7 @@ import { memo, type Mirror } from '@embedpdf/core';
 import {
   type AnnotationView,
   drawnAfter,
+  drawsLive,
   fromDTO,
   type Id,
   type Model,
@@ -150,8 +151,8 @@ export function createView(
         ...fromDTO(shown),
         unconfirmed: true,
         source: confirmedOnce.has(annotationKey(shown.ref)) ? 'baked' : 'vector',
-        pictureVersion: lender.pictureVersion(shown.ref),
-        authority: lender.authority(shown),
+        pictureVersion: lender.getPictureVersion(shown.ref),
+        authority: lender.getAuthority(shown),
         ...painterOf(shown, lender),
       };
     } else {
@@ -160,8 +161,8 @@ export function createView(
       const base: ModelAnnotation = {
         ...fromDTO(truth),
         source: sourceOfConfirmed(truth, false),
-        pictureVersion: lender.pictureVersion(truth.ref),
-        authority: lender.authority(truth),
+        pictureVersion: lender.getPictureVersion(truth.ref),
+        authority: lender.getAuthority(truth),
         ...painterOf(shown, lender),
       };
       const patch = { ...annotationPatchBetween(truth, shown), subtype: truth.subtype };
@@ -169,8 +170,10 @@ export function createView(
         shown === truth
           ? base
           : { ...base, annotation: shown, ...drawnAfter(base, patch as AnnotationPatch) };
-      // A new look the lender made itself (a setting, a value): drawn live until its picture is there.
-      if (lender.pending(shown.ref)) record = { ...record, source: 'vector' };
+      // A new look the lender made itself (a setting, a value): drawn live until its picture is
+      // there, by a record with a live drawing; one without keeps its picture.
+      if (lender.isPending(shown.ref) && drawsLive(record))
+        record = { ...record, source: 'vector' };
     }
     lent.set(shown, { truth, record });
     return record;

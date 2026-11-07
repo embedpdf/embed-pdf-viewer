@@ -5,5 +5,8 @@ export default {
   saving: 'Saving & downloading',
   pages: 'Organizing pages',
   metadata: 'Metadata',
+  fonts: 'Fonts',
+  outline: 'Outline',
+  attachments: 'Attachments',
   actions: 'Actions & scripts',
 };

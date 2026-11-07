@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/angular",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "Angular adapter for EmbedPDF: provideEmbedPdf() with one feature per plugin, one service per plugin with signals and RxJS streams, and standalone components (<epdf-stage>, layers). One secondary entry point per feature.",
   "sideEffects": false,
@@ -35,6 +35,10 @@
       "types": "./dist/annotation/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-annotation.mjs"
     },
+    "./attachment": {
+      "types": "./dist/attachment/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-attachment.mjs"
+    },
     "./interaction": {
       "types": "./dist/interaction/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-interaction.mjs"
@@ -67,9 +71,17 @@
       "types": "./dist/page-edit/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-page-edit.mjs"
     },
+    "./fonts": {
+      "types": "./dist/fonts/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-fonts.mjs"
+    },
     "./metadata": {
       "types": "./dist/metadata/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-metadata.mjs"
+    },
+    "./outline": {
+      "types": "./dist/outline/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-outline.mjs"
     },
     "./history": {
       "types": "./dist/history/index.d.ts",
@@ -133,11 +145,14 @@
     "@embedpdf/web": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",

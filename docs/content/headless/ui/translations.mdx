@@ -17,7 +17,8 @@ them while the app runs. Register it with the user's language:
 `negotiateLocale` picks the best language you have for what the browser asks, such as `nl` for a
 browser set to `nl-BE`, within the script it's written in: `zh-TW` doesn't get `zh-CN`, since
 Taiwan writes Traditional Chinese and `zh-CN` is Simplified. A language in `loaders` is loaded the first time someone switches to it, so
-your bundle carries only the one you start with.
+your bundle carries only the one you start with. A fallback language in `loaders` loads at the
+start, and a language shows once it and the fallback language are in.
 
 ## Strings
 
@@ -109,7 +110,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `locale`    | The current language's code                                                                         | `getLocale()`        |
 | `direction` | `'ltr'` or `'rtl'`, how the current language reads                                                  | `getDirection()`     |
 | `locales`   | Every language you can switch to, loaded or not, each with `code`, `name`, `direction` and `loaded`. A language in `loaders` shows its code as its `name` until it's loaded. | `listLocales()` |
-| `loading`   | The code of the language being loaded, or `null`                                                    | `getLoadingLocale()` |
+| `loading`   | The code of the language on its way, or `null`: it shows once it and the fallback language have loaded | `getLoadingLocale()` |
 
 ## Settings
 
@@ -120,9 +121,9 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting          | What it does                                               | Default          |
 | :--------------- | :--------------------------------------------------------- | :--------------- |
 | `locale`         | The language to start with                                 | `fallbackLocale` |
-| `fallbackLocale` | The language to use for strings another language misses    | `'en'`           |
+| `fallbackLocale` | The language to use for strings another language misses; one in `loaders` loads at the start | `'en'` |
 | `locales`        | Languages loaded from the start                            | none             |
-| `loaders`        | Languages loaded when someone switches to them             | none             |
+| `loaders`        | Languages loaded when someone switches to them, and the fallback language at the start | none |
 
 ## Events
 
@@ -132,7 +133,7 @@ Set them when you register the plugin, and change them while the app runs with
 | :------------------- | :--------------------------------------- | :-------------------------- |
 | `onLocaleChanged`    | The language changed                     | `locale`, `previousLocale`  |
 | `onLocaleLoadFailed` | A language couldn't be loaded            | `locale`, `error`           |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 ## Good to know
 
@@ -145,4 +146,10 @@ viewer can be translated too.
 
 When a language in `loaders` can't be loaded, for example because the user is offline, the viewer
 stays in the language it had, and <Fw only={['react', 'vue', 'svelte']}>`onLocaleLoadFailed`</Fw><Fw only="angular">`localeLoadFailed$`</Fw> tells you why. Call `setLocale()` again to
-try once more.
+try once more. When the fallback language can't be loaded, languages show without it.
+
+### A language in `locales` and `loaders`
+
+Give a language in both, and it shows the strings from `locales` until its loader has run; the
+loader's language then replaces them. That keeps a language on screen at the start while more of
+its strings load.

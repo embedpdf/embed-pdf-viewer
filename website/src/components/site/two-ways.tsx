@@ -37,7 +37,8 @@ function Check({ color }: { color: string }) {
   );
 }
 
-function StackChip({
+/** A docs link chip with a framework icon (also the framework landing pages' card links). */
+export function StackChip({
   icon,
   label,
   href,
@@ -68,7 +69,12 @@ function StackChip({
   );
 }
 
-function IntegrationCard({
+/**
+ * One of the two integration options: badge, illustration, title, bullets
+ * and docs chips. Shared with the framework landing pages, so the choice
+ * looks the same wherever a visitor meets it.
+ */
+export function IntegrationCard({
   tone,
   badgeIcon,
   badgeLabel,

@@ -1,3 +1,4 @@
+import { EVERY_PERMISSION } from './fixtureScope';
 import type {
   ConformanceTestRunner,
   ConformanceFixture,
@@ -13,7 +14,6 @@ import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { AnnotationListSchema } from '../wire/schemas';
-import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Expected per-fixture annotation knowledge. The harness asserts against
@@ -58,15 +58,15 @@ export interface AnnotationConformanceOptions extends Omit<ConformanceOptions, '
 
 export function runAnnotationReadConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationConformanceOptions,
+  options: AnnotationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation read conformance: ${opts.label}`, () => {
+  describe(`annotation read conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -74,7 +74,7 @@ export function runAnnotationReadConformance(
     });
 
     test('list() returns every page, and each annotation names its page', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.annotations.list();
         expect(AnnotationListSchema.safeParse(list).success).toBe(true);
@@ -84,56 +84,56 @@ export function runAnnotationReadConformance(
         if (list.auditHead !== undefined) {
           expect(Number.isInteger(list.auditHead) && list.auditHead >= 0).toBe(true);
         }
-        const target = list.pages.find((p) => p.objectNumber === opts.fixture.pageObjectNumber);
+        const target = list.pages.find((p) => p.objectNumber === options.fixture.pageObjectNumber);
         expect(target !== undefined).toBe(true);
         const onTarget = list.annotations.filter(
-          (a) => a.page.objectNumber === opts.fixture.pageObjectNumber,
+          (a) => a.page.objectNumber === options.fixture.pageObjectNumber,
         );
-        expect(onTarget.length).toBe(opts.fixture.expectedAnnotationCount);
+        expect(onTarget.length).toBe(options.fixture.expectedAnnotationCount);
       } finally {
         await doc.close();
       }
     });
 
     test('list({ pages }) on the test page returns the expected counts and DTO shape', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const snap = await doc.annotations.list({
-          pages: [toPageRef(opts.fixture.pageObjectNumber)],
+          pages: [toPageRef(options.fixture.pageObjectNumber)],
         });
         expect(AnnotationListSchema.safeParse(snap).success).toBe(true);
-        expect(snap.pages.map((p) => p.objectNumber)).toEqual([opts.fixture.pageObjectNumber]);
-        expect(snap.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
+        expect(snap.pages.map((p) => p.objectNumber)).toEqual([options.fixture.pageObjectNumber]);
+        expect(snap.annotations.length).toBe(options.fixture.expectedAnnotationCount);
         const highlights = snap.annotations.filter((a) => a.subtype === 'highlight');
-        expect(highlights.length >= opts.fixture.minHighlightCount).toBe(true);
+        expect(highlights.length >= options.fixture.minHighlightCount).toBe(true);
         const unsupported = snap.annotations.filter((a) => a.subtype === 'unsupported');
-        expect(unsupported.length >= opts.fixture.minUnsupportedCount).toBe(true);
+        expect(unsupported.length >= options.fixture.minUnsupportedCount).toBe(true);
         const circles = snap.annotations.filter((a) => a.subtype === 'circle');
-        expect(circles.length >= (opts.fixture.minCircleCount ?? 0)).toBe(true);
+        expect(circles.length >= (options.fixture.minCircleCount ?? 0)).toBe(true);
         const squares = snap.annotations.filter((a) => a.subtype === 'square');
-        expect(squares.length >= (opts.fixture.minSquareCount ?? 0)).toBe(true);
+        expect(squares.length >= (options.fixture.minSquareCount ?? 0)).toBe(true);
         const polygons = snap.annotations.filter((a) => a.subtype === 'polygon');
-        expect(polygons.length >= (opts.fixture.minPolygonCount ?? 0)).toBe(true);
+        expect(polygons.length >= (options.fixture.minPolygonCount ?? 0)).toBe(true);
         const polylines = snap.annotations.filter((a) => a.subtype === 'polyline');
-        expect(polylines.length >= (opts.fixture.minPolylineCount ?? 0)).toBe(true);
+        expect(polylines.length >= (options.fixture.minPolylineCount ?? 0)).toBe(true);
         const lines = snap.annotations.filter((a) => a.subtype === 'line');
-        expect(lines.length >= (opts.fixture.minLineCount ?? 0)).toBe(true);
+        expect(lines.length >= (options.fixture.minLineCount ?? 0)).toBe(true);
         const inks = snap.annotations.filter((a) => a.subtype === 'ink');
-        expect(inks.length >= (opts.fixture.minInkCount ?? 0)).toBe(true);
+        expect(inks.length >= (options.fixture.minInkCount ?? 0)).toBe(true);
         const freeTexts = snap.annotations.filter((a) => a.subtype === 'free-text');
-        expect(freeTexts.length >= (opts.fixture.minFreeTextCount ?? 0)).toBe(true);
+        expect(freeTexts.length >= (options.fixture.minFreeTextCount ?? 0)).toBe(true);
         const carets = snap.annotations.filter((a) => a.subtype === 'caret');
-        expect(carets.length >= (opts.fixture.minCaretCount ?? 0)).toBe(true);
+        expect(carets.length >= (options.fixture.minCaretCount ?? 0)).toBe(true);
       } finally {
         await doc.close();
       }
     });
 
     test('shape/vertex/line annotations expose their family fields', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const snap = await doc.annotations.list({
-          pages: [toPageRef(opts.fixture.pageObjectNumber)],
+          pages: [toPageRef(options.fixture.pageObjectNumber)],
         });
         for (const a of snap.annotations) {
           // Ink carries the geometry styling (/C, /CA, /BS) but not /IC, plus
@@ -207,12 +207,12 @@ export function runAnnotationReadConformance(
     });
 
     test('page.annotations.list() is the document list of that page', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
-        const ref = toPageRef(opts.fixture.pageObjectNumber);
+        const ref = toPageRef(options.fixture.pageObjectNumber);
         const onPage = await doc.page(ref).annotations.list();
         expect(AnnotationListSchema.safeParse(onPage).success).toBe(true);
-        expect(onPage.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
+        expect(onPage.annotations.length).toBe(options.fixture.expectedAnnotationCount);
         expect(onPage).toEqual(await doc.annotations.list({ pages: [ref] }));
       } finally {
         await doc.close();
@@ -220,10 +220,10 @@ export function runAnnotationReadConformance(
     });
 
     test('every annotation DTO satisfies AnnotationSchema (discriminated union)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const snap = await doc.annotations.list({
-          pages: [toPageRef(opts.fixture.pageObjectNumber)],
+          pages: [toPageRef(options.fixture.pageObjectNumber)],
         });
         for (const a of snap.annotations) {
           const result = AnnotationSchema.safeParse(a);
@@ -234,32 +234,31 @@ export function runAnnotationReadConformance(
       }
     });
 
-    test('AnnotationSchema rejects an annotation with a foreign subtype', () => {
-      const bogus: unknown = {
-        subtype: 'pretend-not-real',
-        ref: {
-          kind: 'objectNumber',
-          page: { kind: 'objectNumber', objectNumber: 1 },
-          objectNumber: 1,
-        },
-        pageObjectNumber: 1,
-        nm: null,
-        flags: emptyFlags(),
-        rect: { left: 0, top: 0, right: 0, bottom: 0 },
-        contents: null,
-        author: null,
-        createdAt: null,
-        modifiedAt: null,
-      };
-      const result = AnnotationSchema.safeParse(bogus);
-      expect(result.success).toBe(false);
+    test('AnnotationSchema reads a subtype it does not know as unsupported, and a malformed one it knows fails', async () => {
+      const doc = await openFixture(engine, options);
+      try {
+        const snap = await doc.annotations.list({
+          pages: [toPageRef(options.fixture.pageObjectNumber)],
+        });
+        for (const annotation of snap.annotations) {
+          const newer = { ...annotation, subtype: 'from-a-newer-server' };
+          expect(AnnotationSchema.parse(newer)).toMatchObject({
+            subtype: 'unsupported',
+            ref: annotation.ref,
+            rect: annotation.rect,
+          });
+          expect(AnnotationSchema.safeParse({ ...annotation, rect: 'wide' }).success).toBe(false);
+        }
+      } finally {
+        await doc.close();
+      }
     });
 
-    if (opts.fixture.expectsInlineAnnotation) {
+    if (options.fixture.expectsInlineAnnotation) {
       test('an annotation born inline is named by its baseIndex: its position in the file', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
-          const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+          const page = doc.page(toPageRef(options.fixture.pageObjectNumber));
           const { annotations } = await page.annotations.list();
           const inline = annotations.find((a) => a.ref.kind === 'baseIndex');
           expect(inline !== undefined).toBe(true);
@@ -274,15 +273,15 @@ export function runAnnotationReadConformance(
       });
 
       test('a baseIndex that names no inline annotation is NotFound', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
-          const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+          const page = doc.page(toPageRef(options.fixture.pageObjectNumber));
           const { annotations } = await page.annotations.list();
           const missing = await page.annotations
             .update(
               {
                 kind: 'baseIndex',
-                page: toPageRef(opts.fixture.pageObjectNumber),
+                page: toPageRef(options.fixture.pageObjectNumber),
                 baseIndex: annotations.length + 10,
               },
               { contents: 'nobody' },
@@ -299,9 +298,9 @@ export function runAnnotationReadConformance(
     }
 
     test('abort() on listRaw rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
-        const p = doc.annotations.list({ pages: [toPageRef(opts.fixture.pageObjectNumber)] });
+        const p = doc.annotations.list({ pages: [toPageRef(options.fixture.pageObjectNumber)] });
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
@@ -310,7 +309,7 @@ export function runAnnotationReadConformance(
     });
 
     test('listRaw on an unknown pageObjectNumber throws NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         let caught: unknown;
         try {
@@ -333,21 +332,6 @@ async function openFixture(engine: Engine, opts: AnnotationConformanceOptions) {
     return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
-}
-
-function emptyFlags() {
-  return {
-    invisible: false,
-    hidden: false,
-    print: false,
-    noZoom: false,
-    noRotate: false,
-    noView: false,
-    readOnly: false,
-    locked: false,
-    toggleNoView: false,
-    lockedContents: false,
-  };
 }
 
 // Re-export for convenience: tests can hand a literal snapshot.

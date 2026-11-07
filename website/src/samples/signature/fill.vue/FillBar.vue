@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
+import { ref, watch } from 'vue';
 import { useStage } from '@embedpdf/vue/stage';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import { useStamp } from '@embedpdf/vue/stamp';
@@ -13,8 +12,6 @@ const stamp = useStamp();
 const stage = useStage();
 const signature = useSignature();
 const status = useFormState((state) => state.status);
-const pages = usePageList();
-const lastPage = computed(() => pages.value.at(-1)?.ref);
 const assetId = ref<string | null>(null);
 const drawn = ref(false);
 
@@ -27,20 +24,17 @@ useSignatureEvent(
   () => (drawn.value = false),
 );
 
-// On load: a signature field on the last page, a typed signature, drawn into the field.
+// On load: Ada's typed signature, ready to draw in, and the signature field in view.
 let done = false;
 watch(
-  [status, lastPage],
-  ([current, page]) => {
-    if (current !== 'ready' || !page || done) return;
+  status,
+  (current) => {
+    if (current !== 'ready' || done) return;
     done = true;
     void (async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the agreement's signature field into view.
+      const [widget] = form.getWidgets(APPROVAL);
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,
@@ -49,7 +43,6 @@ watch(
         mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
       });
       assetId.value = asset.id;
-      await signature.fillField(APPROVAL, { assetId: asset.id });
     })();
   },
   { immediate: true },

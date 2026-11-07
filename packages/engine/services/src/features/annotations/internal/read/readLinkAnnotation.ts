@@ -1,7 +1,6 @@
 import type {
   AnnotationBase,
   LinkAnnotation,
-  PdfActionTree,
   PdfDestination,
   PdfLinkTarget,
   PdfCoordinates,
@@ -9,6 +8,7 @@ import type {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationReadContext } from './annotationReadContext';
+import { linkTargetFromActionTree } from '../../../destinations/linkTarget';
 import { readDestination } from '../../../destinations/readDestination';
 
 /**
@@ -36,40 +36,6 @@ export function readLink(
   ctx: AnnotationReadContext,
 ): LinkAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, base, ctx) };
-}
-
-/**
- * Project the navigation view from a payload-carrying activate tree. Pure —
- * shared with any consumer that wants the root-level navigation reading of a
- * tree (the link plugin's no-actions-plugin fallback uses the same law).
- */
-export function linkTargetFromActionTree(
-  tree: PdfActionTree<PdfDestination>,
-): PdfLinkTarget<PdfDestination> | null {
-  // The law, enforced at the projection too: never execute — not even
-  // navigate the root of — a tree marked incomplete.
-  if (tree.incomplete) return { kind: 'unsupported' };
-  const root = tree.root;
-  if (!root) return { kind: 'unsupported' };
-  switch (root.type) {
-    case 'goto':
-      return { kind: 'goto', destination: root.destination };
-    case 'uri':
-      return { kind: 'uri', uri: root.uri };
-    // Reported, never followed/executed (and never writable — see the DTO).
-    case 'goto-remote':
-      return { kind: 'goto-remote', file: root.filePath };
-    case 'launch':
-      return { kind: 'launch', path: root.filePath };
-    case 'javascript':
-      // No script payload here by design: the text rides the action tree —
-      // the scripting plane's single home.
-      return { kind: 'javascript' };
-    case 'named':
-      return { kind: 'named', name: root.name };
-    default:
-      return { kind: 'unsupported' };
-  }
 }
 
 function readLinkTarget(

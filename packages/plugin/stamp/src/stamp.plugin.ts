@@ -4,7 +4,7 @@ import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 
 import { STAMP_DEFAULTS, StampToken, type StampConfig } from './contract';
 import { createStampController } from './controller';
-import { initialStampState } from './model';
+import { initialStampModel } from './model';
 
 /**
  * Stamp libraries and assets. Workspace-scoped: libraries outlive any one
@@ -17,9 +17,9 @@ export const stampPlugin = (config?: StampConfig) =>
     token: StampToken,
     scope: 'workspace',
     optional: [AnnotationToken, ActionsToken],
-    state: initialStampState,
+    state: initialStampModel,
     // An engine is one value: a change replaces it, never merges into it.
-    settings: { defaults: STAMP_DEFAULTS, registered: config, whole: ['assetEngine'] },
+    settings: { defaults: STAMP_DEFAULTS, registered: config, whole: ['assetEngine', 'fonts'] },
     create: createStampController,
     // Inside a document's scope, a placing call that leaves out the document is for that one.
     inScope: (stamp, documentId) => {

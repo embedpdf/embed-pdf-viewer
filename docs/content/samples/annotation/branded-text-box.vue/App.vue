@@ -3,23 +3,30 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddTextBox from './AddTextBox.vue';
 import BrandedTextBox from './BrandedTextBox.vue';
 import FormatButtons from './FormatButtons.vue';
+import SelectTextBox from './SelectTextBox.vue';
 
 import '../branded-text-box.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source notice]
+const notice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/notice.pdf');
+  return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -29,14 +36,15 @@ const RENDERERS: AnnotationRenderer[] = [
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: notice }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddTextBox />
+      <SelectTextBox />
       <FormatButtons />
       <Stage class="stage">
         <template #page>
           <RenderLayer />
+          <SelectionLayer />
           <AnnotationLayer :renderers="RENDERERS" />
         </template>
       </Stage>

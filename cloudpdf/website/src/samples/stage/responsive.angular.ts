@@ -5,14 +5,14 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       // Facing pages with a roomy margin, and one rule for a narrow Stage: a thin
       // margin and one page at a time. The rule has a name, so the UI can read it too.
       withStage({
@@ -32,6 +32,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <!-- One breakpoint drives both the layout and this toolbar. -->
       @let compact = stage.activeRules().includes('compact');
+      @let padding = stage.settings().padding;
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Stage width">
           <button type="button" [attr.aria-pressed]="!narrow()" (click)="narrow.set(false)">
@@ -45,7 +46,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
           compact <strong>{{ compact ? 'on' : 'off' }}</strong>
         </output>
         <output class="badge">
-          padding <strong>{{ stage.settings().padding }}</strong> · spread
+          padding <strong>{{ typeof padding === 'number' ? padding : 'by side' }}</strong> · spread
           <strong>{{ stage.settings().spread }}</strong>
         </output>
         <div class="pager">

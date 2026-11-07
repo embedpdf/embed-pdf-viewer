@@ -22,7 +22,7 @@ export interface CloudObjectNumberPoolOptions {
   reserve(
     count: number,
     signal: AbortSignal,
-  ): Promise<{ objectNumbers: ObjectNumberRange[]; expiresIn: number }>;
+  ): Promise<{ objectNumbers: ObjectNumberRange[]; expiresInSeconds: number }>;
   now?: () => number;
 }
 
@@ -72,8 +72,8 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
   /** The newest version a `versioned` call named. */
   private version: string | null = null;
 
-  constructor(private readonly opts: CloudObjectNumberPoolOptions) {
-    this.now = opts.now ?? Date.now;
+  constructor(private readonly options: CloudObjectNumberPoolOptions) {
+    this.now = options.now ?? Date.now;
   }
 
   get held(): number {
@@ -93,8 +93,8 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
       const turn = this.reserving.then(async () => {
         while (this.held < count) {
           const wanted = Math.min(count - this.held, MAX_RESERVATION);
-          const reserved = await this.opts.reserve(wanted, signal);
-          this.receive(reserved.objectNumbers, reserved.expiresIn);
+          const reserved = await this.options.reserve(wanted, signal);
+          this.receive(reserved.objectNumbers, reserved.expiresInSeconds);
         }
       });
       this.reserving = turn.catch(() => undefined);
@@ -128,19 +128,19 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
    */
   opened(edit: EditSessionAccess): void {
     if (edit.session === 'new') this.lose(this.unspent(), 'reclaimed');
-    this.receive(edit.objectNumbers, edit.expiresIn);
+    this.receive(edit.objectNumbers, edit.expiresInSeconds);
   }
 
   /**
    * Numbers handed to the session: by `/access`, a write's top-up or the
-   * bulk reservation; `expiresIn` (seconds) when the answer told it. Numbers
+   * bulk reservation; `expiresInSeconds` when the answer told it. Numbers
    * held from before an expiry the server can't vouch for any more are
    * dropped: only a `session` event says which survived.
    */
-  receive(ranges: readonly ObjectNumberRange[], expiresIn?: number): void {
-    if (expiresIn !== undefined) {
+  receive(ranges: readonly ObjectNumberRange[], expiresInSeconds?: number): void {
+    if (expiresInSeconds !== undefined) {
       if (!this.usable()) this.lose(this.available.splice(0), 'reclaimed');
-      this.expiresIn(expiresIn);
+      this.expiresIn(expiresInSeconds);
     }
     this.add(objectNumbersIn(ranges));
   }
@@ -151,7 +151,7 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
    * write in flight names it, is lost.
    */
   sync(status: EditSessionStatus): void {
-    this.expiresIn(status.expiresIn);
+    this.expiresIn(status.expiresInSeconds);
     const held = new Set(objectNumbersIn(status.held));
     const lost = this.unspent().filter((n) => !held.has(n));
     for (const n of lost) this.taken.delete(n);

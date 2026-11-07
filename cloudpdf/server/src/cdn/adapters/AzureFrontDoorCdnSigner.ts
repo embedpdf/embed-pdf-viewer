@@ -40,6 +40,7 @@ import type { CdnSigner, PurgeInput, PurgeReceipt, SignInput } from '../CdnSigne
 import { base64url } from '../util/base64url';
 import { buildBaseUrlOverrides } from '../util/baseUrlOverrides';
 import { hmacSha256 } from '../util/hmac';
+import { isoTimeOfSeconds } from '../../time';
 
 export interface AzureFrontDoorCdnSignerOptions {
   endpoint: string;
@@ -71,7 +72,7 @@ export class AzureFrontDoorCdnSigner implements CdnSigner {
     });
     return {
       adapter: 'azure-fd',
-      expiresAt: input.expiresAt,
+      expiresAt: isoTimeOfSeconds(input.expiresAt),
       cache: { scope: 'edge-shared', immutableVersionedReads: true },
       baseUrlOverrides: buildBaseUrlOverrides(this.cdnOrigin, input.coverage),
       authHeader: null,

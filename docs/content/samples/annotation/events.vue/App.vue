@@ -3,22 +3,28 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
 import ActivityLog from './ActivityLog.vue';
-import AddRectangle from './AddRectangle.vue';
 import Toolbar from './Toolbar.vue';
 
 import '../events.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source report]
+const report = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/report.pdf');
+  return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
@@ -28,16 +34,16 @@ const ebook = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: ebook }]"
+    :initial-documents="[{ source: report }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddRectangle />
       <Toolbar />
       <div class="viewer">
         <Stage class="stage">
           <template #page>
             <RenderLayer />
+            <SelectionLayer />
             <AnnotationLayer />
           </template>
         </Stage>

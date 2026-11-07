@@ -4,16 +4,19 @@
  * One ResizeObserver on the root measures the viewer (its width, and from it
  * the size), a media query says whether the main pointer is a finger, and the
  * language gives the direction: together the env, and the `layout` function
- * runs again whenever it changes. The direction is the root's `dir`, so the
+ * runs again whenever it changes. The config's `size` and `touch`, when they
+ * name one, take the place of the measured size and the media query. The
+ * direction is the root's `dir`, so the
  * viewer reads its own language's way whatever the page around it does. A
  * finger as the main pointer marks the root `data-touch` (every button and
  * menu row is then 44 px tall, styles.css), and the root keeps clear of the
  * notch and the home bar on the edges of the screen it reaches. Under
  * the root, the bars leave out the tab of a mode whose bars show nothing and
  * the button of a menu that shows nothing; an open mode whose tab goes falls
- * back to View; a bar with a new mode gets its `mode:<mode>` command, and each
- * panel its `panel:<id>`, with a command of yours of the same id merged over
- * it; and each problem with the layout is logged once. The root takes focus on
+ * back to View; a bar with a new mode gets its `mode:<mode>` command, each
+ * panel its `panel:<id>` and the root Full Screen (`view:fullscreen`), with a
+ * command of yours of the same id merged over it; and each problem with the
+ * layout is logged once. The root takes focus on
  * a press anywhere in the viewer that lands on nothing focusable (the pages),
  * so the viewer's keys reach it from there.
  */
@@ -41,6 +44,7 @@ import {
   type LayoutData,
   type LayoutEnv,
   type MenuSection,
+  type ViewerSize,
 } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
 import { useI18nState } from '@embedpdf/react/i18n';
@@ -53,6 +57,7 @@ import {
 import { ShellToken } from '@embedpdf/react/shell';
 import { observeWidth } from '@embedpdf/web';
 import { defaultLayout } from './config/chrome';
+import { fullscreenCommandOf } from './config/fullscreen';
 import {
   modeCommandsFor,
   modeSpecsOf,
@@ -65,11 +70,13 @@ import {
   DEFAULT_ENV,
   ResolvedLayoutProvider,
   stripOf,
+  useEnvOptions,
   useLayoutOption,
   useViewerCommands,
   type ResolvedLayout,
 } from './config-context';
 import { useScreenEdges } from './ui/compact';
+import { fullscreenTargetOf, useFullscreen } from './ui/fullscreen';
 import { safeAreaPaddingOf } from './ui/screen-edges';
 import { FOCUS_ROOT_ATTRIBUTE } from './ui/viewer-layer';
 
@@ -88,30 +95,63 @@ function useEqualValue<T>(value: T, isEqual: (left: T, right: T) => boolean): T 
   return last.current;
 }
 
+const SIZES: readonly unknown[] = ['compact', 'medium', 'expanded'] satisfies ViewerSize[];
+
+/** What the env takes from the config: a size and a touch it says, or `null` for what's measured. */
+interface EnvChoice {
+  readonly size: ViewerSize | null;
+  readonly touch: boolean | null;
+  /** What in the options isn't one of their values, which then measure. */
+  readonly problems: readonly string[];
+}
+
+/** The config's `size` and `touch` read: `'auto'` (or nothing) measures, as anything else does. */
+export function envChoiceOf(size: unknown, touch: unknown): EnvChoice {
+  const problems: string[] = [];
+  const auto = (value: unknown) => value === undefined || value === 'auto';
+  if (!auto(size) && !SIZES.includes(size))
+    problems.push(
+      `size: ${JSON.stringify(size)} is not auto, compact, medium or expanded; the viewer measures its width`,
+    );
+  if (!auto(touch) && typeof touch !== 'boolean')
+    problems.push(
+      `touch: ${JSON.stringify(touch)} is not auto, true or false; the viewer asks the browser`,
+    );
+  return {
+    size: SIZES.includes(size) ? (size as ViewerSize) : null,
+    touch: typeof touch === 'boolean' ? touch : null,
+    problems,
+  };
+}
+
 /**
  * The env of the element `root` points at: measured before the first paint, then on every
- * change. `null` for the first render, before there is anything to measure.
+ * change, with what `choice` says in place of what's measured. `null` for the first render,
+ * before there is anything to measure.
  */
-function useMeasuredEnv(root: RefObject<HTMLElement | null>): LayoutEnv | null {
+function useMeasuredEnv(root: RefObject<HTMLElement | null>, choice: EnvChoice): LayoutEnv | null {
   const dir = useI18nState((state) => state.direction);
   const [width, setWidth] = useState<number | null>(null);
-  const [touch, setTouch] = useState(isCoarsePointer);
+  const [coarse, setCoarse] = useState(isCoarsePointer);
   useLayoutEffect(() => {
     const element = root.current;
     return element
       ? observeWidth(element, (measured) => setWidth(Math.round(measured)))
       : undefined;
   }, [root]);
+  const asks = choice.touch === null;
   useEffect(() => {
-    if (typeof matchMedia !== 'function') return undefined;
+    if (!asks || typeof matchMedia !== 'function') return undefined;
     const query = matchMedia(COARSE_POINTER);
-    const update = () => setTouch(query.matches);
+    const update = () => setCoarse(query.matches);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
-  }, []);
+  }, [asks]);
+  const size = choice.size;
+  const touch = choice.touch ?? coarse;
   return useMemo(
-    () => (width === null ? null : { size: sizeOf(width), width, touch, dir }),
-    [width, touch, dir],
+    () => (width === null ? null : { size: size ?? sizeOf(width), width, touch, dir }),
+    [width, size, touch, dir],
   );
 }
 
@@ -131,7 +171,13 @@ export function LayoutRoot({
 }) {
   const ownRoot = useRef<HTMLDivElement>(null);
   const root = rootRef ?? ownRoot;
-  const measured = useMeasuredEnv(root);
+  // Read once, as the config is.
+  const options = useEnvOptions();
+  const [choice] = useState(() => envChoiceOf(options.size, options.touch));
+  useEffect(() => {
+    for (const problem of choice.problems) console.warn(`[embedpdf] ${problem}`);
+  }, [choice]);
+  const measured = useMeasuredEnv(root, choice);
   // The first render, before the root is measured, lays out as a wide viewer; the measured
   // env replaces it before the browser paints.
   const env = measured ?? DEFAULT_ENV;
@@ -165,6 +211,7 @@ export function LayoutRoot({
     const strips = {
       selection: stable('strip:selection', stripOf(data, 'selection', bar)),
       annotation: stable('strip:annotation', stripOf(data, 'annotation', bar)),
+      snapshot: stable('strip:snapshot', stripOf(data, 'snapshot', bar)),
     };
     const menus = new Map<string, readonly MenuSection[]>();
     for (const id of Object.keys(data.menus ?? {}))
@@ -197,6 +244,7 @@ export function LayoutRoot({
   useLayoutWarnings(measured === null ? null : layout);
 
   const edges = useScreenEdges(root);
+  useFullscreenCommand(root, edges.top && edges.right && edges.bottom && edges.left);
   return (
     <div
       ref={root}
@@ -250,6 +298,24 @@ function usePanelCommands(panels: LayoutData['panels']): void {
       ? commands.registerCommands(definitions, { replace: true })
       : undefined;
   }, [commands, panels, yours]);
+}
+
+/**
+ * Registers Full Screen for the viewer's box, with a command of yours of the same id merged over
+ * it, and again as the box starts or stops filling the screen. `coversWindow` says the root
+ * covers the window already.
+ */
+function useFullscreenCommand(root: RefObject<HTMLElement | null>, coversWindow: boolean): void {
+  const commands = useCommands();
+  const yours = useViewerCommands();
+  const fullscreen = useFullscreen(root);
+  // Before paint, like a panel's button.
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) return undefined;
+    const command = fullscreenCommandOf(fullscreenTargetOf(element), fullscreen, coversWindow);
+    return commands.registerCommands([yours.over(command)], { replace: true });
+  }, [commands, yours, root, fullscreen, coversWindow]);
 }
 
 /** Back to View when the open mode has no tab: its bars show nothing, or the layout lost it. */

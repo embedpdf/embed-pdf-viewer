@@ -4,27 +4,19 @@ import {
   effect,
   inject,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
-import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
+import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-// How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
+const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 @Component({
   selector: 'demo-root',
@@ -38,7 +30,7 @@ const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontS
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: forms }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -110,33 +102,23 @@ export class App {
   protected readonly form = inject(EpdfForm);
   private readonly annotation = inject(EpdfAnnotation);
   private readonly interaction = inject(EpdfInteraction);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
-  private added = false;
+  private started = false;
 
   constructor() {
-    // The ebook has no form: add two fields to its last page, and select the first in design mode.
+    // On load: design mode, with the name field selected.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
-      const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.added) return;
-      this.added = true;
-      untracked(() => void this.designForm(page, stage));
+      if (this.form.status() !== 'ready' || this.started) return;
+      this.started = true;
+      untracked(() => {
+        this.interaction.activateTool('form-edit');
+        const widget = this.form.get(toFieldRef('name'))?.widgets[0]?.ref;
+        if (widget) this.annotation.selection.select([widget]);
+      });
     });
   }
 
-  protected rename(field: FormFieldDTO, value: string) {
+  protected rename(field: FormField, value: string) {
     const name = value.trim();
     if (name && name !== field.name) void this.form.update(field.ref, { name });
-  }
-
-  private async designForm(page: PageRef, stage: EpdfStage) {
-    const at = (y: number) => ({ page, rect: { x: 72, y, width: 240, height: 24 }, ...look });
-    const { field } = await this.form.create({ family: 'text', name: 'name', widgets: [at(540)] });
-    await this.form.create({ family: 'text', name: 'email', widgets: [at(576)] });
-    stage.goToPage(page);
-    this.interaction.activateTool('form-edit');
-    const widget = field.widgets[0]?.ref;
-    if (widget) this.annotation.selection.set([widget]);
   }
 }

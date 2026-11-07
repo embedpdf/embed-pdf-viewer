@@ -1,16 +1,24 @@
 import {
+  type AnnotationProperty,
   isEditableByHand,
-  kindOf,
   linkOf,
   type Model,
   type ModelAnnotation,
   richDocOf,
-  sharedProperties,
+  richTextLength,
+  selectionProperties,
   textOf,
 } from '@embedpdf/core-annotation';
 
 import type { AnnotationProperties } from '../contract';
-import { RANGE_KEYS, rangeProps, type TextSelection } from '../rich-text';
+import {
+  caretProps,
+  RANGE_KEYS,
+  rangeProps,
+  type EditorSelection,
+  type TextProps,
+  type TextSelection,
+} from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { propertyValue, propertyValues, type PropertySources } from './property-values';
 
@@ -24,12 +32,26 @@ export function createPropertyReads(
   ctx: Pick<AnnotationContext, 'state'>,
   { store, fonts }: Pick<AnnotationServices, 'store' | 'fonts'>,
 ) {
-  /** The editor's text range inside the annotation being edited, or null
-   *  (no editor selection, a bare caret, or a selection left behind by a
-   *  previous edit). The one condition that routes the range properties to runs. */
-  const activeTextRange = (model: Model): TextSelection | null => {
+  /** The editor's selection inside the annotation being edited, or null (no
+   *  editor selection, or one left behind by a previous edit). */
+  const editorSelection = (model: Model): EditorSelection | null => {
     const ts = ctx.state.get().textSelection;
-    return ts && model.editing === ts.id && ts.end > ts.start && model.byId[ts.id] ? ts : null;
+    return ts && model.editing === ts.id && model.byId[ts.id] ? ts : null;
+  };
+
+  /** The editor's text range inside the annotation being edited, or null
+   *  (no editor selection, or a bare caret). The one condition that routes
+   *  the range properties to runs. */
+  const activeTextRange = (model: Model): TextSelection | null => {
+    const ts = editorSelection(model);
+    return ts && ts.end > ts.start ? ts : null;
+  };
+
+  /** The editor's caret inside the annotation being edited, or null. The
+   *  range properties there are the text typed next. */
+  const activeCaret = (model: Model): EditorSelection | null => {
+    const ts = editorSelection(model);
+    return ts && ts.end === ts.start ? ts : null;
   };
 
   /** What a panel reads of one member: its fields, its text as shown, and its link. */
@@ -45,45 +67,69 @@ export function createPropertyReads(
     };
   };
 
-  let cache: { model: Model; range: TextSelection | null; v: AnnotationProperties } | null = null;
+  /**
+   * What a free text's range properties read: the text the next change
+   * styles. The editor's range, the text typed next at its caret, else all of
+   * the box's text. `null` for any other kind.
+   */
+  const textPropsOf = (model: Model, record: ModelAnnotation): TextProps | null => {
+    if (record.annotation.subtype !== 'free-text') return null;
+    const doc = richDocOf(record.annotation, fonts);
+    const ts = editorSelection(model);
+    if (ts?.id !== record.id) return rangeProps(doc, { start: 0, end: richTextLength(doc) }, fonts);
+    if (ts.end > ts.start) return rangeProps(doc, ts, fonts);
+    return caretProps(doc, ts.start, ts.typing, fonts);
+  };
+
+  let cache: {
+    model: Model;
+    selection: EditorSelection | null;
+    v: AnnotationProperties;
+  } | null = null;
   const selectionPropertiesOf = (): AnnotationProperties => {
     const model = store.model();
-    const range = activeTextRange(model);
-    if (cache && cache.model === model && cache.range === range) return cache.v;
+    const selection = editorSelection(model);
+    if (cache && cache.model === model && cache.selection === selection) return cache.v;
     const members = model.selected
       .map((id) => model.byId[id])
       .filter(
         (record): record is ModelAnnotation =>
           !!record && isEditableByHand(model, record.annotation),
       );
-    const properties = sharedProperties(members.map((record) => kindOf(record.annotation)));
+    const properties = selectionProperties(
+      model,
+      members.map((record) => record.annotation),
+    );
     const sources = members.map((record) => sourcesOf(model, record));
+    // A free text's range properties are its text's: what the next change
+    // styles reads back, resolved against the body, the same values
+    // `selection.update` would restyle.
+    const texts = members.map((record) => textPropsOf(model, record));
+    const valueOf = (spec: AnnotationProperty, index: number): unknown => {
+      const text = texts[index];
+      return text && RANGE_KEYS.includes(spec.key)
+        ? text.values[spec.key]
+        : propertyValue(spec, sources[index]!);
+    };
     const values = sources.length ? propertyValues(properties, sources[0]!) : {};
     const mixed: string[] = [];
     for (const spec of properties) {
-      const first = JSON.stringify(propertyValue(spec, sources[0]!));
-      if (sources.some((source) => JSON.stringify(propertyValue(spec, source)) !== first))
+      const ofText = RANGE_KEYS.includes(spec.key);
+      if (ofText && texts[0]) values[spec.key] = texts[0].values[spec.key];
+      const first = JSON.stringify(valueOf(spec, 0));
+      if (
+        sources.some((_, index) => JSON.stringify(valueOf(spec, index)) !== first) ||
+        (ofText && texts.some((text) => text?.mixed.includes(spec.key)))
+      ) {
         mixed.push(spec.key);
-    }
-    // While the editor holds a range in the (sole) selected free text, the
-    // range properties report the runs it covers, resolved against the body:
-    // the same values `selection.update` would restyle.
-    if (range && members.length === 1 && members[0]!.id === range.id) {
-      const rp = rangeProps(richDocOf(members[0]!.annotation, fonts), range, fonts);
-      for (const spec of properties) {
-        if (!RANGE_KEYS.includes(spec.key)) continue;
-        values[spec.key] = rp.values[spec.key];
-        const index = mixed.indexOf(spec.key);
-        if (index >= 0) mixed.splice(index, 1);
-        if (rp.mixed.includes(spec.key)) mixed.push(spec.key);
       }
     }
     const result: AnnotationProperties = { properties, values, mixed };
-    cache = { model, range, v: result };
+    cache = { model, selection, v: result };
     return result;
   };
 
-  return { activeTextRange, selectionPropertiesOf };
+  return { activeTextRange, activeCaret, selectionPropertiesOf };
 }
 
 export type PropertyReads = ReturnType<typeof createPropertyReads>;

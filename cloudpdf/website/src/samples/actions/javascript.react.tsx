@@ -21,19 +21,18 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // A JavaScript action, as a PDF carries it behind a button or a link.
 const script = (code: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const GREETING = "app.alert('Hello, ' + identity.name + ' from ' + identity.corporation + '!');";
@@ -99,7 +98,7 @@ function ScriptConsole() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ScriptConsole />
       </DocumentGate>

@@ -33,6 +33,7 @@ A note's `subtype` is `'text'`.
 | :--------- | :--------------------------------------------------------------------------------------- | :------- |
 | `rect`     | The icon's box, which the icon fills. Required; see [The note icon](#the-note-icon).     |          |
 | `contents` | The comment.                                                                             | none     |
+| `richText` | The comment with formatting; see [Formatted comments](#formatted-comments).              | none     |
 | `icon`     | `'note'`, `'comment'`, `'key'`, `'help'`, `'insert'`, `'paragraph'` or `'new-paragraph'` | `'note'` |
 | `color`    | The icon's color, `'#rrggbb'`.                                                           | yellow   |
 | `open`     | Whether PDF apps show its comment window open; see [Popups](#popups).                    | `false`  |
@@ -67,6 +68,41 @@ A reply is on the same page as the annotation it answers; a `to` on another page
 
 To take a reply out of its thread, set `reply: null`. It stays in the document as an annotation
 of its own.
+
+## Formatted comments
+
+A comment can have bold, italic, underlined or colored words, as PDF apps let you type them in a
+note. Give the comment as `richText` instead of `contents`: paragraphs of runs, each run a piece
+of text with the styles it changes. This works on any annotation's comment, not only a note's.
+
+```ts
+await page.annotations.create({
+  subtype: 'text',
+  rect: { x: 500, y: 72, width: 20, height: 20 },
+  richText: {
+    paragraphs: [
+      { runs: [{ text: 'Is this total ' }, { text: 'right', style: { weight: 700 } }, { text: '?' }] },
+      { runs: [{ text: 'It looks low.', style: { italic: true } }] },
+    ],
+  },
+});
+```
+
+The annotation reads back with `contents: 'Is this total right?\nIt looks low.'`, the same text
+without the formatting, so code that only reads `contents` still gets the comment. A plain comment
+reads `richText: null`.
+
+To change a formatted comment:
+
+- Send new `richText` to replace it.
+- Send `contents` alone to replace it with plain text. The comment stays formatted text, but the
+  bold and italic words go, since plain text can't say which they were.
+- Send `richText: null` to keep the text and drop the formatting.
+
+A run's styles and the comment's `body` (how its text looks by default) are the same as a free
+text's; see [Free text](/docs/engine/annotations/free-text#rich-text). A comment draws nothing on
+the page, so its font and size are a hint: PDF apps show comments in their own font, and most
+only show bold, italic, underline, strikethrough and color.
 
 ## Read a thread
 
@@ -175,7 +211,7 @@ await page.annotations.update(popup.ref, { open: false });
 ```
 
 A note and its popup hold one `open`: set it on either, and both change (the update's
-`meta.changed` names both). A popup made without `open` takes its note's. Other annotations
+`meta.changedRefs` names both). A popup made without `open` takes its note's. Other annotations
 have no `open` of their own; their popup's is the only one.
 
 You don't need a popup to have a note. Add one when the document should say where the comment
@@ -190,7 +226,7 @@ showing a reply without its note.
 
 ```ts
 const { meta } = await page.annotations.delete(note.ref);
-// meta.changed names everything that went, the note first
+// meta.changedRefs names everything that went, the note first
 ```
 
 It's all or nothing: when the user may not delete one of them (someone else's reply, for a user who
@@ -225,5 +261,6 @@ Each `icon` draws its own symbol, and a name the engine doesn't know draws `'not
 
 For readers who know PDF: `reply` is `/IRT` with `/RT`, a popup is linked by the parent's
 `/Popup` and the popup's `/Parent`, `open` is `/Open` on the note and on its popup, and states are `/State` and `/StateModel`
-on a text annotation, as ISO 32000 describes them. So threads, states and popups made here show
+on a text annotation, as ISO 32000 describes them. A formatted comment is `/RC`, written as
+Acrobat writes a note's, with its plain text in `/Contents`. So threads, states and popups made here show
 up in other PDF apps, and theirs show up here.

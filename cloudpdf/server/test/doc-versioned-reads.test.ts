@@ -18,10 +18,14 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { ENGINE } from './_helpers/pins';
+
+/** The stub worker's server fonts: it registers none. */
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-versioned-secret';
-const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+// No CDN in this fixture: only the caller's browser may keep versioned reads.
+const IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 const NO_STORE = 'private, no-store';
 
 interface Fixture {
@@ -82,8 +86,8 @@ function tenantAdminToken(tenantId: string): string {
   return signDevToken(SECRET, { sub: 'admin-1', tenant_id: tenantId, scope: ['*'] });
 }
 
-function tenantReadToken(tenantId: string): string {
-  return signDevToken(SECRET, { sub: 'user-1', tenant_id: tenantId, scope: ['docs.read'] });
+function tenantToken(tenantId: string, scope: string[]): string {
+  return signDevToken(SECRET, { sub: 'user-1', tenant_id: tenantId, scope });
 }
 
 async function seedDocument(
@@ -148,25 +152,13 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(NO_STORE);
   });
 
-  test('/manifest@dN sets public, immutable', async () => {
+  test('/manifest@dN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-m';
     const docId = 'doccch002';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
-  });
-
-  test('/text@cN sets public, immutable', async () => {
-    const tenantId = 'tenant-cache-t';
-    const docId = 'doccch003';
-    await seedDocument(fx, tenantId, docId);
-
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -175,13 +167,28 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
   });
 
-  test('/annotations@aN sets public, immutable', async () => {
+  test('/text@cN sets private, immutable', async () => {
+    const tenantId = 'tenant-cache-t';
+    const docId = 'doccch003';
+    await seedDocument(fx, tenantId, docId);
+
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
+  });
+
+  test('/annotations@aN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-a';
     const docId = 'doccch004';
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -206,7 +213,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 4 });
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:2/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:2/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -227,7 +234,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=999`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=999,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -242,7 +249,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:999/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:999/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -256,7 +263,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${tenantAdminToken(tenantId)}` },
       },
@@ -264,18 +271,20 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     expect(res.status).toBe(200);
   });
 
-  test('tenant token with docs.read scope (Model B) reads doc text', async () => {
+  test('a tenant token reads doc text with doc.text.copy, never with docs.read alone', async () => {
     const tenantId = 'tenant-tdocsread';
     const docId = 'doctxx005';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
-      {
-        headers: { Authorization: `Bearer ${tenantReadToken(tenantId)}` },
-      },
-    );
-    expect(res.status).toBe(200);
+    const read = (scope: string[]) =>
+      fetch(
+        `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
+        {
+          headers: { Authorization: `Bearer ${tenantToken(tenantId, scope)}` },
+        },
+      );
+    expect((await read(['doc.text.copy'])).status).toBe(200);
+    expect((await read(['docs.read'])).status).toBe(403);
   });
 
   test('cross-tenant doc token is rejected with 403', async () => {
@@ -288,7 +297,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     // in tenantB — server treats this as a foreign doc and 403s.
     const foreign = docToken(tenantA, docB);
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docB}/text/pages/obj:1/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docB}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${foreign}` },
       },
@@ -305,7 +314,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     // explicitly lacks doc.text.copy, so /text rejects.
     const tok = docToken(tenantId, docId, { scope: ['doc.open', 'doc.render'] });
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${tok}` },
       },
@@ -317,7 +326,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     const tenantId = 'tenant-annotatedperm';
     const docId = 'doctxx009';
     await seedDocument(fx, tenantId, docId);
-    const options = 'background=white,format=webp,viewport.kind=width,viewport.width=320';
+    const options = `background=white,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320`;
     const fetchAs = (scope: string[], path: string) =>
       fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
@@ -358,13 +367,68 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     }
   });
 
+  test("each print picture takes its family's rights and its tier's, at both tiers", async () => {
+    const tenantId = 'tenant-printperm';
+    const docId = 'doctxx010';
+    await seedDocument(fx, tenantId, docId);
+    const fetchAs = (scope: string[], path: string) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
+      });
+    const families = [
+      { path: 'pages', pins: 'contentVersion=1', reads: [] },
+      {
+        path: 'annotations/pages',
+        pins: 'annotationVersion=1,contentVersion=1',
+        reads: ['doc.annotate.read'],
+      },
+      { path: 'fields/pages', pins: 'contentVersion=1,widgetVersion=1', reads: ['doc.forms.read'] },
+      {
+        path: 'all/pages',
+        pins: 'annotationVersion=1,contentVersion=1,widgetVersion=1',
+        reads: ['doc.annotate.read', 'doc.forms.read'],
+      },
+    ];
+    const tiers = [
+      { tier: 'print', rights: ['doc.print'] },
+      { tier: 'print-high', rights: ['doc.print', 'doc.print.high'] },
+    ];
+
+    for (const { tier, rights } of tiers) {
+      for (const family of families) {
+        // A print picture's token is its pins and its format, nothing else.
+        const token = [...family.pins.split(','), `engine=${ENGINE.render},format=png,shape=1`]
+          .sort()
+          .join(',');
+        for (const path of [
+          `/render/${tier}/${family.path}/obj:1/data@${token}`,
+          `/layers/default/render/${tier}/${family.path}/obj:1/data@${token}`,
+        ]) {
+          const scope = ['doc.open', 'doc.render', ...family.reads, ...rights];
+          const res = await fetchAs(scope, path);
+          expect(res.status).toBe(200);
+          expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
+          for (const missing of new Set([...family.reads, ...rights])) {
+            const short = scope.filter((s) => s !== missing);
+            expect((await fetchAs(short, path)).status).toBe(403);
+          }
+        }
+      }
+    }
+
+    // What sizes a screen picture has no place in a print picture's token.
+    const everything = ['doc.open', 'doc.render', 'doc.print'];
+    const sized = `contentVersion=1,engine=${ENGINE.render},format=png,shape=1,viewport.kind=width,viewport.width=320`;
+    expect((await fetchAs(everything, `/render/print/pages/obj:1/data@${sized}`)).status).toBe(400);
+  });
+
   test('missing Authorization header returns 401', async () => {
     const tenantId = 'tenant-tunauth';
     const docId = 'doctxx008';
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
     );
     expect(res.status).toBe(401);
   });
@@ -385,7 +449,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/annotations@aN', () =>
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -405,7 +469,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/annotations@aN', () =>
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=999`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items@annotationVersion=999,engine=${ENGINE.annotations},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -420,7 +484,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/annotations@aN', () =>
     await seedDocument(fx, tenantId, docId);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:999/items@annotationVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:999/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
       },
@@ -443,9 +507,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const docId = 'docmpp001';
     await seedDocument(fx, tenantId, docId, { pageCount: 5 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       docVersion: number;
@@ -491,9 +558,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
     const token = docToken(tenantId, docId);
 
-    const first = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const first = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(first.status).toBe(200);
 
     await fx.db
@@ -503,9 +573,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       .where('page_object_number', '=', 1)
       .execute();
 
-    const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const second = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(second.status).toBe(200);
     const body = (await second.json()) as {
       pages: Array<{
@@ -524,9 +597,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
-    const base = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const base = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(base.status).toBe(200);
 
     const now = Date.now();
@@ -567,7 +643,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       .execute();
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=4`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=4,engine=${ENGINE.manifest},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, { layerName })}` },
       },
@@ -593,9 +669,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const docId = 'doclayerempty';
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/bob/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId, { layerName: 'bob' })}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/bob/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { layerName: 'bob' })}` },
+      },
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       pages: Array<{ page: { objectNumber: number }; cache: { annotationVersion: number } }>;
@@ -619,9 +698,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
     const token = docToken(tenantId, docId, { layerName });
 
-    const base = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const base = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(base.status).toBe(200);
 
     const now = Date.now();
@@ -662,7 +744,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       .execute();
 
     const text = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=4`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=4,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${token}` },
       },
@@ -675,14 +757,14 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     expect(typeof textBody.text).toBe('string');
 
     const annotations = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items@annotationVersion=6`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items@annotationVersion=6,engine=${ENGINE.annotations},shape=1`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(annotations.status).toBe(200);
     expect(annotations.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
 
     const stale = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items@annotationVersion=5`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items@annotationVersion=5,engine=${ENGINE.annotations},shape=1`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(stale.status).toBe(404);
@@ -697,9 +779,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
     const token = docToken(tenantId, docId, { layerName });
 
-    const base = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const base = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(base.status).toBe(200);
 
     const artifact = new Uint8Array([42, 7, 3, 1]);
@@ -746,7 +831,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       .execute();
 
     const text = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=3`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=3,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${token}` },
       },
@@ -764,9 +849,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const token = docToken(tenantId, docId, { layerName });
 
-    const base = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const base = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(base.status).toBe(200);
 
     const now = Date.now();
@@ -798,7 +886,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       .execute();
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=2`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/text/pages/obj:1/data@contentVersion=2,engine=${ENGINE.text},shape=1`,
       {
         headers: { Authorization: `Bearer ${token}` },
       },
@@ -812,9 +900,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const docId = 'doclayerguard';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/bob/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId, { layerName: 'alice' })}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/bob/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { layerName: 'alice' })}` },
+      },
+    );
     expect(res.status).toBe(403);
   });
 
@@ -854,9 +945,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const token = docToken(tenantId, docId, { layerName });
 
-    const base = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const base = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(base.status).toBe(200);
 
     const now = Date.now();
@@ -947,9 +1041,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const docId = 'docfuture';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=999`, {
-      headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/manifest@docVersion=999,engine=${ENGINE.manifest},shape=1`,
+      {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId)}` },
+      },
+    );
     expect(res.status).toBe(404);
     expect(res.headers.get('cache-control')).toBe(NO_STORE);
   });

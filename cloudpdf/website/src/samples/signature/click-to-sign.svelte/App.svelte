@@ -23,13 +23,13 @@ import { localEngine } from '@embedpdf/engine';
     annotationPlugin(),
     formPlugin(),
     stampPlugin({ assetEngine }),
-    signaturePlugin({ key: () => signer }),
+    signaturePlugin({ signingKey: () => signer }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: agreement }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

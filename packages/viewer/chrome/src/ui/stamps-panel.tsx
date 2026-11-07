@@ -28,6 +28,7 @@ import {
 } from '@embedpdf/react/stamp';
 import { useSurface } from '@embedpdf/react/shell';
 import { useI18nState, useT } from '@embedpdf/react/i18n';
+import { saveFile } from '@embedpdf/web';
 import { useStampSettings } from '../config-context';
 import {
   DEFAULT_LIBRARY_ID,
@@ -36,6 +37,7 @@ import {
 } from '../config/default-stamps';
 import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
+import { TooltipButton, WithTooltip } from './tooltip';
 
 const ALL = 'all';
 
@@ -119,14 +121,7 @@ export function StampsPanel() {
    *  or another viewer. */
   const exportPdf = async (libraryId: string, name: string) => {
     const bytes = await stamp.exportLibrary(libraryId).catch(() => null);
-    if (!bytes) return;
-    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${name || 'stamps'}.pdf`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    if (bytes) saveFile(bytes, `${name || 'stamps'}.pdf`, 'application/pdf');
   };
 
   // A removed library falls back to "All"; the picker never names a ghost.
@@ -169,23 +164,21 @@ export function StampsPanel() {
           )}
           {selected && (
             <>
-              <button
-                type="button"
+              <TooltipButton
+                label={t('demo.stampsExportLibrary')}
                 onClick={() => exportPdf(selected.id, selected.name)}
-                title={t('demo.stampsExportLibrary')}
                 className="text-fg-muted hover:text-fg grid h-7 w-7 shrink-0 place-items-center rounded"
               >
                 <Icon name="download" size={14} />
-              </button>
+              </TooltipButton>
               {!isDefault(selected.id) && (
-                <button
-                  type="button"
+                <TooltipButton
+                  label={t('demo.stampsRemoveLibrary')}
                   onClick={() => void stamp.deleteLibrary(selected.id)}
-                  title={t('demo.stampsRemoveLibrary')}
                   className="text-fg-muted hover:text-fg grid h-7 w-7 shrink-0 place-items-center rounded"
                 >
                   <Icon name="trash" size={14} />
-                </button>
+                </TooltipButton>
               )}
             </>
           )}
@@ -213,14 +206,13 @@ export function StampsPanel() {
                   onArm={() => arm(asset)}
                 />
                 {!isDefault(asset.libraryId) && (
-                  <button
-                    type="button"
+                  <TooltipButton
+                    label={t('demo.stampsRemoveStamp')}
                     onClick={() => void stamp.deleteAsset(asset.id)}
-                    title={t('demo.stampsRemoveStamp')}
                     className="bg-surface border-border text-fg-muted hover:text-fg absolute end-1 top-1 grid h-5 w-5 place-items-center rounded-full border opacity-0 shadow-sm focus:opacity-100 group-hover:opacity-100"
                   >
                     <Icon name="x" size={12} />
-                  </button>
+                  </TooltipButton>
                 )}
               </li>
             ))}
@@ -239,16 +231,21 @@ export function StampsPanel() {
       )}
 
       <div className="border-border-subtle shrink-0 border-t p-3">
-        <button
-          type="button"
-          disabled={busy != null}
-          onClick={() => fileRef.current?.click()}
-          title={t('demo.stampsImportHint')}
-          className="border-border text-fg hover:bg-hover flex w-full items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm disabled:opacity-40"
-        >
-          <Icon name="rubberStampPlus" size={16} />
-          {busy === 'importing' ? t('demo.stampsImporting') : t('demo.stampsImport')}
-        </button>
+        {/* Its words are its name; the tooltip says more. */}
+        <WithTooltip content={{ label: t('demo.stampsImportHint') }}>
+          {(tooltip) => (
+            <button
+              {...tooltip}
+              type="button"
+              disabled={busy != null}
+              onClick={() => fileRef.current?.click()}
+              className="border-border text-fg hover:bg-hover flex w-full items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm disabled:opacity-40"
+            >
+              <Icon name="rubberStampPlus" size={16} />
+              {busy === 'importing' ? t('demo.stampsImporting') : t('demo.stampsImport')}
+            </button>
+          )}
+        </WithTooltip>
         <input
           ref={fileRef}
           type="file"
@@ -268,7 +265,7 @@ export function StampsPanel() {
 /** One grid cell: the plugin's cached preview through the object-URL hook
  *  (the DOM resource's lifetime belongs to the framework layer, not the
  *  store). Image only — the artwork is the label; the label is the
- *  tooltip for the curious. */
+ *  tooltip for the curious, and the button's name. */
 function StampAssetCell({
   asset,
   armed,
@@ -280,10 +277,9 @@ function StampAssetCell({
 }) {
   const url = useStampAssetPreviewUrl(asset.id);
   return (
-    <button
-      type="button"
+    <TooltipButton
+      label={asset.label}
       onClick={onArm}
-      title={asset.label}
       aria-pressed={armed}
       className={`flex aspect-square w-full items-center justify-center rounded-md border p-2 ${
         armed
@@ -296,6 +292,6 @@ function StampAssetCell({
       ) : (
         <span className="text-fg truncate text-sm">{asset.label}</span>
       )}
-    </button>
+    </TooltipButton>
   );
 }

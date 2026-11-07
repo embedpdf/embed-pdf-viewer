@@ -9,7 +9,7 @@ import {
   type ObjectReferrer,
   type PdfCoordinates,
   type RevisionStructure,
-  type SignatureDTO,
+  type Signature,
 } from '../../src/shared';
 
 describe("parsePdfValue: the fork's shallow serialisation", () => {
@@ -98,8 +98,8 @@ function change(
 function signature(
   index: number,
   fieldObjectNumber: number,
-  extra: Partial<SignatureDTO> = {},
-): SignatureDTO {
+  extra: Partial<Signature> = {},
+): Signature {
   return {
     index,
     field: { kind: 'objectNumber', objectNumber: fieldObjectNumber },
@@ -110,7 +110,7 @@ function signature(
     filter: 'Adobe.PPKLite',
     subFilter: 'ETSI.CAdES.detached',
     byteRange: [0, 100, 200, 100],
-    contentsSize: 8,
+    contentsSizeBytes: 8,
     coverage: 'whole-revision',
     revisionIndex: 1,
     signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
@@ -131,8 +131,8 @@ function structure(overrides: Partial<RevisionStructure> = {}): RevisionStructur
     pagesRoot: 2,
     pages: [3],
     fields: [
-      { objectNumber: 20, name: 'name', family: 'text', widgets: [21] },
-      { objectNumber: 30, name: 'sig0', family: 'signature', widgets: [30] },
+      { objectNumber: 20, name: 'name', kind: 'text', widgets: [21] },
+      { objectNumber: 30, name: 'sig0', kind: 'signature', widgets: [30] },
     ],
     signatures: [signature(0, 30)],
     ...overrides,
@@ -550,9 +550,9 @@ describe('evaluateStep: the edge-claim law', () => {
   test('a second signature with a FieldMDP lock is permitted; touching the locked field afterwards is not', () => {
     const before = structure({
       fields: [
-        { objectNumber: 20, name: 'name', family: 'text', widgets: [21] },
-        { objectNumber: 30, name: 'sig0', family: 'signature', widgets: [30] },
-        { objectNumber: 60, name: 'sig1', family: 'signature', widgets: [60] },
+        { objectNumber: 20, name: 'name', kind: 'text', widgets: [21] },
+        { objectNumber: 30, name: 'sig0', kind: 'signature', widgets: [30] },
+        { objectNumber: 60, name: 'sig1', kind: 'signature', widgets: [60] },
       ],
       signatures: [
         signature(0, 30),
@@ -630,7 +630,7 @@ describe('evaluateStep: the edge-claim law', () => {
     const before = structure({
       fields: [
         ...structure().fields,
-        { objectNumber: 60, name: 'sig1', family: 'signature', widgets: [60] },
+        { objectNumber: 60, name: 'sig1', kind: 'signature', widgets: [60] },
       ],
       signatures: [
         signature(0, 30),
@@ -718,7 +718,7 @@ describe('evaluateStep: the edge-claim law', () => {
     const before = structure({
       fields: [
         ...structure().fields,
-        { objectNumber: 60, name: 'sig1', family: 'signature', widgets: [60] },
+        { objectNumber: 60, name: 'sig1', kind: 'signature', widgets: [60] },
       ],
       signatures: [
         signature(0, 30),
@@ -956,9 +956,9 @@ describe('evaluateStep: hardening', () => {
   test('a field added and signed in one step is permitted; its /V and indirect /Lock are claimed', () => {
     const after = structure({
       fields: [
-        { objectNumber: 20, name: 'name', family: 'text', widgets: [21] },
-        { objectNumber: 30, name: 'sig0', family: 'signature', widgets: [30] },
-        { objectNumber: 60, name: 'sig1', family: 'signature', widgets: [60] },
+        { objectNumber: 20, name: 'name', kind: 'text', widgets: [21] },
+        { objectNumber: 30, name: 'sig0', kind: 'signature', widgets: [30] },
+        { objectNumber: 60, name: 'sig1', kind: 'signature', widgets: [60] },
       ],
       signatures: [
         signature(0, 30, { docMdp: 2, catalogCertification: true }),
@@ -1014,8 +1014,8 @@ describe('evaluateStep: hardening', () => {
   test('a lock landing on a terminal without its own /Ff is judged against the effective flags', () => {
     const before = structure({
       fields: [
-        { objectNumber: 20, name: 'name', family: 'text', widgets: [21], flags: 4096 },
-        { objectNumber: 30, name: 'sig0', family: 'signature', widgets: [30] },
+        { objectNumber: 20, name: 'name', kind: 'text', widgets: [21], flags: 4096 },
+        { objectNumber: 30, name: 'sig0', kind: 'signature', widgets: [30] },
       ],
       signatures: [],
     });
@@ -1097,7 +1097,7 @@ describe('evaluateStep: appearance regeneration', () => {
     const two = structure({
       fields: [
         ...structure().fields,
-        { objectNumber: 40, name: 'other', family: 'text', widgets: [40] },
+        { objectNumber: 40, name: 'other', kind: 'text', widgets: [40] },
       ],
       signatures: certifiedFill.signatures,
     });

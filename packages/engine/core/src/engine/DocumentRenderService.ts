@@ -84,9 +84,12 @@ export interface DocumentRenderService {
 export function snapFullPageViewport(
   policy: EngineRenderPolicy,
   viewport: PageRenderViewport,
-  opts?: { pageWidth?: number },
+  options?: { pageWidth?: number },
 ): PageRenderViewport {
   if (policy.kind === 'continuous') return viewport;
+  // A print picture has its own size, for its paper, and a thumbnail its
+  // own, both off the lattice.
+  if (viewport.kind === 'dpi' || viewport.kind === 'thumbnail') return viewport;
   if (policy.fullPage.widths.length === 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'render policy has an empty width ladder');
   }
@@ -96,7 +99,7 @@ export function snapFullPageViewport(
   if (viewport.kind === 'width') {
     requested = viewport.width;
   } else {
-    const pageWidth = opts?.pageWidth;
+    const pageWidth = options?.pageWidth;
     if (pageWidth === undefined || pageWidth <= 0) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,

@@ -1,11 +1,13 @@
 import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
+import { createPageView, layoutFromEvent, NO_PENDING_PAGES, type PageView } from './page-view';
 import { timerClock, type HostClock } from './clock';
+import type { HostTextMeasurer } from './measurer';
 import { createStore } from './store';
 import {
   createPluginContext,
   markConnected,
-  readWrapped,
+  runWrapped,
   sliceKey,
   type ContextServices,
   type SessionRef,
@@ -13,8 +15,9 @@ import {
 import type { SliceLease } from './store';
 import { cancellable } from './cancellable';
 import { createEventHook } from './event-hook';
-import { PluginError, toPluginError, toPluginErrorInfo } from './errors';
+import { PluginError, toPluginError, toPluginErrorInfo, type PluginErrorCode } from './errors';
 import { findPage } from './page-of';
+import { isPdf } from './pdf-header';
 import { permissionDenied, sessionAllows } from './permissions';
 import { settle } from './settle';
 import {
@@ -48,39 +51,41 @@ import {
   type DocumentActiveChangedEvent,
   type DocumentPagesChangedEvent,
   type DocumentUnsavedChangesChangedEvent,
+  type HostFetch,
+  type HostPrinter,
+  type PageInfo,
   type PendingMeta,
   type Permission,
+  type PreparedPrint,
+  type PrintOptions,
+  type PrintQuality,
+  type PrintSheet,
+  type StagedPrint,
   type PluginScope,
   type Unsubscribe,
   type UnlockOptions,
   type UrlSource,
+  type RetryOptions,
+  type GrantOpenRequest,
 } from './types';
 import { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, type ViewerSettings } from './viewer-settings';
 import {
   CONTINUOUS_RENDER_POLICY,
   isLocalDocument,
   pageRefsEqual,
+  grantOpenRequestOf,
+  visitorIdentityRequestOf,
+  type OpenInputGrant,
+  type VisitorAnswers,
+  type VisitorIdentityRequest,
   type DocumentEvent,
   type EngineRenderPolicy,
   type PageLayout,
+  type PageRef,
+  type PrintDpi,
 } from '@embedpdf/engine-core/runtime';
 
 const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
-
-/** The new page registry a document mutation carries, or null for events that
- *  don't change page structure (annotations, metadata). The snapshot is the
- *  same shape `pages.list()` returns, so callers swap it in directly. */
-function layoutFromEvent(event: DocumentEvent) {
-  switch (event.type) {
-    case 'pages.reordered':
-    case 'pages.rotated':
-    case 'pages.deleted':
-    case 'pages.inserted':
-      return event.layout;
-    default:
-      return null;
-  }
-}
 
 /** Kernel lifecycle. Monotonic: created → starting → started, then destroying →
  *  destroyed; `failed` is a terminal branch off starting. */
@@ -103,7 +108,7 @@ export interface Kernel extends SettingsApi<ViewerSettings> {
   /**
    * Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc.
    * For a workspace token, a `documentId` gives the capability as seen from that document's
-   * scope (`PluginDef.inScope`; the documents capability too): the same object on every call
+   * scope (`PluginDefinition.inScope`; the documents capability too): the same object on every call
    * while the document is open.
    */
   capability<T>(token: CapabilityToken<T>, documentId?: string): T;
@@ -129,7 +134,7 @@ export interface Kernel extends SettingsApi<ViewerSettings> {
   settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>>;
   subscribe(listener: () => void): Unsubscribe;
   getState(): GlobalState;
-  status(): KernelStatus;
+  getStatus(): KernelStatus;
   /** Idempotent: a second call joins the first. Throws after destroy(). */
   start(): Promise<void>;
   /**
@@ -162,6 +167,8 @@ const readyInfo = (meta: DocumentMeta): DocumentInfo =>
     status: 'ready',
     pageCount: meta.pageCount,
     hasUnsavedChanges: meta.hasUnsavedChanges,
+    ...(meta.identityRequest ? { identityRequest: meta.identityRequest } : {}),
+    ...(meta.openRequest ? { openRequest: meta.openRequest } : {}),
   });
 const pendingInfo = (meta: PendingMeta): DocumentInfo =>
   Object.freeze({
@@ -174,7 +181,38 @@ const pendingInfo = (meta: PendingMeta): DocumentInfo =>
     ...(meta.status === 'error' && meta.error !== undefined
       ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
       : {}),
+    ...(meta.openRequest ? { openRequest: meta.openRequest } : {}),
   });
+
+/**
+ * What an open from a grant (`grant`) that failed with `error` waits for: the grant's
+ * passphrase, or the visitor's answers. `share` says whether a passphrase was tried.
+ */
+function openRequestOf(error: unknown, grant: OpenInputGrant | null): GrantOpenRequest | undefined {
+  if (!grant) return undefined;
+  return grantOpenRequestOf(error, grant.passphrase !== undefined) ?? undefined;
+}
+
+/**
+ * What `retry()` opens: the failed document's source, or, with the passphrase the visitor gave
+ * (`RetryOptions`), the grant it opened with that passphrase.
+ */
+function retrySourceOf(
+  source: OpenSource,
+  grant: OpenInputGrant | null,
+  options: RetryOptions | undefined,
+): OpenSource {
+  const { passphrase, visitorIdentity } = options ?? {};
+  if (passphrase === undefined && visitorIdentity === undefined) return source;
+  if (!grant) {
+    throw new PluginError(
+      'invalid-input',
+      'documents',
+      'only a document from a grant takes its passphrase or answers',
+    );
+  }
+  return passphrase !== undefined ? { ...grant, passphrase } : grant;
+}
 
 /** Whether an event is a change to the document, one a download would carry. */
 const changesDocument = (event: DocumentEvent): boolean =>
@@ -183,37 +221,66 @@ const changesDocument = (event: DocumentEvent): boolean =>
   event.type !== 'signatures.prepared' &&
   event.type !== 'signatures.cancelled';
 
-/** The part of `fetch` a `{ kind: 'url' }` source needs. */
-type FetchFile = (
-  url: string,
-  init: { readonly signal: AbortSignal },
-) => Promise<{
-  readonly ok: boolean;
-  readonly status: number;
-  arrayBuffer(): Promise<ArrayBuffer>;
-}>;
+/** What a download's HTTP status says: the file isn't there, the user may not have it, or neither. */
+const downloadErrorCode = (status: number): PluginErrorCode =>
+  status === 404
+    ? 'not-found'
+    : status === 401 || status === 403
+      ? 'permission-denied'
+      : 'operation-failed';
 
-/** Download a URL source's file; its tab shows the failure when the server says no. */
-async function fetchUrlSource(source: UrlSource, signal: AbortSignal): Promise<OpenInput> {
-  const fetchFile = (globalThis as { fetch?: FetchFile }).fetch;
+/**
+ * Download a URL source's file with the host's `fetch`, or the global one; its tab shows why
+ * when the server says no, or answers with something that isn't a PDF.
+ */
+async function fetchUrlSource(
+  source: UrlSource,
+  signal: AbortSignal,
+  hostFetch: HostFetch | undefined,
+): Promise<OpenInput> {
+  // Called as a plain function: the browser's own `fetch` refuses any other `this`.
+  const fetchFile = hostFetch ?? (globalThis as { fetch?: HostFetch }).fetch;
   if (!fetchFile) {
     throw new PluginError('unsupported', 'documents', `can't download ${source.url}: no fetch()`);
   }
   const response = await fetchFile(source.url, { signal });
   if (!response.ok) {
     throw new PluginError(
-      response.status === 404 ? 'not-found' : 'operation-failed',
+      downloadErrorCode(response.status),
       'documents',
       `couldn't download ${source.url} (HTTP ${response.status})`,
     );
   }
-  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  // Said here, where it's known: the engine says only that it couldn't open the file. A sign-in
+  // page a server answers with instead is the usual one.
+  if (!isPdf(bytes)) {
+    throw new PluginError('invalid-input', 'documents', `${source.url} isn't a PDF`);
+  }
+  return { kind: 'bytes', ...(source.id !== undefined ? { id: source.id } : {}), bytes };
 }
 
 const isUrlSource = (source: OpenInput | UrlSource): source is UrlSource => source.kind === 'url';
 
 const noLayer = () =>
   new PluginError('unsupported', 'documents', 'only the local engine gives a layer to download');
+
+/** How a print comes out at each tier, one object each, so readers can compare them with `Object.is`. */
+const PRINT_STANDARD: PrintQuality = Object.freeze({ kind: 'images', dpi: 150 });
+const PRINT_HIGH: Extract<PrintQuality, { kind: 'images' }> = Object.freeze({
+  kind: 'images',
+  dpi: 300,
+});
+const PRINT_PDF: PrintQuality = Object.freeze({ kind: 'pdf' });
+
+/** One print being staged: the document, its pages, what prints beside them, the job's name. */
+interface PrintJob {
+  readonly handle: DocumentHandle;
+  readonly pages: readonly PageInfo[];
+  readonly layers: { readonly includeAnnotations: boolean; readonly includeFormFields: boolean };
+  readonly name: string;
+  readonly options: PrintOptions;
+}
 
 /**
  * The documents capability as seen from inside one document's scope: every call whose document
@@ -228,6 +295,9 @@ const documentsInScope = (
   download: (id = documentId, options) => documents.download(id, options),
   downloadLayer: (id = documentId, options) => documents.downloadLayer(id, options),
   canDownload: (id = documentId) => documents.canDownload(id),
+  preparePrint: (id = documentId, options) => documents.preparePrint(id, options),
+  print: (id = documentId, options) => documents.print(id, options),
+  getPrintQuality: (id = documentId) => documents.getPrintQuality(id),
   canPrint: (id = documentId) => documents.canPrint(id),
   listPages: (id = documentId) => documents.listPages(id),
   getPage: (page, id = documentId) => documents.getPage(page, id),
@@ -257,6 +327,8 @@ interface DocumentSession extends SessionRef {
   name?: string;
   /** What `open()` was called with, so a failed tab can `retry()`. */
   source: OpenSource | null;
+  /** The grant the source opened (`{ kind: 'grant' }`), once a function source gave it. */
+  grantInput: OpenInputGrant | null;
   openOptions: OpenDocumentOptions | undefined;
   phase: 'opening' | 'locked' | 'bringup' | 'ready' | 'error' | 'closing';
   /** In-flight open/unlock — close() cancels, then joins this before disposing,
@@ -273,12 +345,17 @@ interface DocumentSession extends SessionRef {
    * store holds its notifications while a document's plugins are built.)
    */
   building: Set<AnyPlugin>;
-  /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
+  /** Workspace capabilities as seen from this document's scope (`PluginDefinition.inScope`), by token. */
   views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;
   /** How many changes the document has had since it opened: a download that read them all clears `hasUnsavedChanges`. */
   changeCount: number;
+  /**
+   * How many changes the document has had since it opened, on any engine and from any session:
+   * a prepared print that saw fewer is prepared again before it prints.
+   */
+  changesSeen: number;
   close(): Promise<void>;
 }
 
@@ -317,6 +394,22 @@ export function createKernel(config: {
    * timers and no frames.
    */
   clock?: HostClock;
+  /**
+   * The host's print dialog: where `documents.print()` sends the pages. A browser passes
+   * `browserPrinter()` from `@embedpdf/web`. Without one, nothing prints (`canPrint()` is false).
+   */
+  printer?: HostPrinter;
+  /**
+   * The host's text measuring: what plugins' `ctx.measurer` measures with. A browser passes
+   * `browserTextMeasurer()` from `@embedpdf/web`. Without one, `ctx.measurer` is `null`.
+   */
+  measurer?: HostTextMeasurer;
+  /**
+   * How a `{ kind: 'url' }` source downloads: `fetch`'s own shape, called with the URL and the
+   * document's cancel `signal`, and again on `retry()`. Yours adds headers or cookies. Default:
+   * the global `fetch`.
+   */
+  fetch?: HostFetch;
 }): Kernel {
   const { engine, plugins } = config;
   const report = config.report ?? ((error: unknown) => console.error('[kernel]', error));
@@ -358,7 +451,7 @@ export function createKernel(config: {
       pagesChanged,
       unsavedChangesChanged,
     ])
-      hook.dispose();
+      hook.destroy();
   });
   /** Every core write goes through here so an active-tab change is observed exactly once. */
   const setCore = (patch: Partial<CoreState>): void => {
@@ -433,11 +526,21 @@ export function createKernel(config: {
 
   function createSession(id: string, name: string | undefined): DocumentSession {
     const cancel = new AbortController();
+    // What the queue stages shows in the page list before anything else hears of it.
+    const changes = createDocumentChanges({
+      handle: () => session.handle,
+      notify: () => {
+        refreshPages(session);
+        store.notify();
+      },
+      report,
+    });
     const session: DocumentSession = {
       id,
       instanceId: `${id}#${++instanceCounter}`,
       name,
       source: null,
+      grantInput: null,
       openOptions: undefined,
       phase: 'opening',
       handle: null,
@@ -454,12 +557,11 @@ export function createKernel(config: {
       leases: new Map(),
       settleFlushes: new Set(),
       downloadWraps: [],
-      changes: createDocumentChanges({
-        handle: () => session.handle,
-        notify: () => store.notify(),
-        report,
-      }),
+      printWraps: [],
+      changes,
+      pageView: createPageView({ changes, report }),
       changeCount: 0,
+      changesSeen: 0,
       close: () => closeSession(session),
     };
     // A download waits for every change: open holds are sent, and the answers awaited.
@@ -521,7 +623,7 @@ export function createKernel(config: {
       await session.operation?.catch((error) => {
         if (!isCancelled(error) && !isAbortLike(error)) report(error);
       });
-      await session.scope.dispose();
+      await session.scope.destroy();
       if (sessions.get(session.id) === session) sessions.delete(session.id);
       session.views.clear();
       closed.emit({ documentId: session.id });
@@ -565,10 +667,17 @@ export function createKernel(config: {
 
   function publishError(session: DocumentSession, error: unknown): void {
     const core = store.getCore();
+    const openRequest = openRequestOf(error, session.grantInput);
     setCore({
       pending: {
         ...core.pending,
-        [session.id]: { id: session.id, name: session.name, status: 'error', error },
+        [session.id]: {
+          id: session.id,
+          name: session.name,
+          status: 'error',
+          error,
+          ...(openRequest ? { openRequest } : {}),
+        },
       },
     });
     openFailed.emit({
@@ -595,11 +704,133 @@ export function createKernel(config: {
    *  back by disposing the session scope; nothing after this can fail. */
   function commitReady(session: DocumentSession): void {
     session.phase = 'ready';
-    const meta = session.stagedMeta!;
+    session.pageView.refresh();
+    const meta = pageMetaOf(session.stagedMeta!, session.pageView.current());
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
+    // A grant that asks before the first change: a change waiting for the answers shows
+    // on the document until the visitor gives them or declines.
+    // A passphrase or questions the grant got after it opened show the same way, until given.
+    const grant = session.handle?.grant;
+    if (grant) {
+      session.scope.defer(
+        grant.onIdentityRequested((request) => setIdentityRequest(session, request)),
+      );
+      session.scope.defer(grant.onOpenRequested((request) => setOpenRequest(session, request)));
+    }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
+  }
+
+  /** `meta` with the pages a page view shows: its revision moves when the pages do. */
+  function pageMetaOf(meta: DocumentMeta, view: PageView): DocumentMeta {
+    const { pages, labels, pending } = view;
+    if (meta.pages === pages && meta.pageLabels === labels && meta.pendingPages === pending) {
+      return meta;
+    }
+    return {
+      ...meta,
+      pageCount: pages.length,
+      pages,
+      pageLabels: labels,
+      pendingPages: pending,
+      pagesSequence: meta.pages === pages ? meta.pagesSequence : meta.pagesSequence + 1,
+    };
+  }
+
+  /**
+   * Show the document's pages as its page view has them now: after each of
+   * the engine's events, and each time a change is staged or answered.
+   * `onPagesChanged` tells when the pages moved, not when only which of them
+   * the engine has did.
+   */
+  function refreshPages(session: DocumentSession): void {
+    const view = session.pageView.refresh();
+    if (!view) return;
+    const now = store.getCore();
+    const existing = now.documents[session.id];
+    if (!existing) return; // not published yet (commitReady publishes the view), or closed
+    const updated = pageMetaOf(existing, view);
+    if (updated === existing) return;
+    setCore({ documents: { ...now.documents, [session.id]: updated } });
+    if (updated.pages === existing.pages) return;
+    pagesChanged.emit({
+      documentId: session.id,
+      pagesSequence: updated.pagesSequence,
+      pages: updated.pages,
+    });
+  }
+
+  /** Show, or stop showing, that the grant asks before the document goes on. */
+  function setOpenRequest(session: DocumentSession, request: GrantOpenRequest | null): void {
+    const core = store.getCore();
+    const published = core.documents[session.id];
+    if (!published || (published.openRequest ?? null) === request) return;
+    const { openRequest: _shown, ...rest } = published;
+    setCore({
+      documents: {
+        ...core.documents,
+        [session.id]: request ? { ...rest, openRequest: request } : rest,
+      },
+    });
+  }
+
+  /** Give a ready document's grant what it asks (`openRequest`): it goes on as the same visitor. */
+  async function resumeGrant(session: DocumentSession, options: RetryOptions | undefined) {
+    const grant = session.handle!.grant!;
+    const { passphrase, visitorIdentity } = options ?? {};
+    try {
+      await grant.resume({
+        ...(passphrase !== undefined ? { passphrase } : {}),
+        ...(visitorIdentity !== undefined ? { visitorIdentity } : {}),
+      });
+    } catch (error) {
+      // Still asked: the request shows what's wrong or missing.
+      setOpenRequest(session, grant.openRequest);
+      throw toPluginError('documents', error);
+    }
+    setOpenRequest(session, grant.openRequest);
+    return { document: getDocument(session.id)! };
+  }
+
+  /** Show, or stop showing, that a change waits for the visitor's answers. */
+  function setIdentityRequest(
+    session: DocumentSession,
+    request: VisitorIdentityRequest | null,
+  ): void {
+    const core = store.getCore();
+    const published = core.documents[session.id];
+    if (!published || (published.identityRequest ?? null) === request) return;
+    const { identityRequest: _shown, ...rest } = published;
+    setCore({
+      documents: {
+        ...core.documents,
+        [session.id]: request ? { ...rest, identityRequest: request } : rest,
+      },
+    });
+  }
+
+  async function identify(id: string, answers: VisitorAnswers): Promise<void> {
+    const session = readySession(id, 'identify');
+    const grant = session.handle!.grant;
+    if (!grant) {
+      throw new PluginError('invalid-input', 'documents', `${id} isn't from a grant`);
+    }
+    try {
+      await grant.identify(answers);
+    } catch (error) {
+      // Still asked: the request shows what's missing or can't be taken.
+      const request = visitorIdentityRequestOf(error);
+      if (request) setIdentityRequest(session, request);
+      throw toPluginError('documents', error);
+    }
+    setIdentityRequest(session, grant.identityRequest);
+  }
+
+  function declineIdentity(id: string): void {
+    const session = readySession(id, 'decline');
+    session.handle!.grant?.decline();
+    setIdentityRequest(session, null);
   }
 
   /**
@@ -681,9 +912,239 @@ export function createKernel(config: {
         readAt = session.changeCount;
         return cancellable('documents', signal, read(handle));
       };
-      const bytes = await readWrapped(session.downloadWraps, readFile);
+      const bytes = await runWrapped(session.downloadWraps, readFile);
       if (readAt === session.changeCount) setUnsavedChanges(session, false);
       return bytes;
+    } catch (error) {
+      throw toPluginError('documents', error);
+    }
+  }
+
+  // ── printing ─────────────────────────────────────────────────────────────
+
+  const printer = config.printer ?? null;
+
+  const canPrintOn = (documentId: string | undefined): boolean =>
+    printer !== null && allowsOn(documentId, 'doc.print');
+
+  /**
+   * How a print comes out: the PDF copy with `doc.print.high`, a right to keep the copy (every
+   * print dialog can save it as a file) and a printer that prints a PDF; else pictures, at the
+   * resolution `doc.print.high` or `doc.print` allows.
+   */
+  const printQualityOf = (documentId: string | undefined): PrintQuality | null => {
+    if (!canPrintOn(documentId)) return null;
+    if (!allowsOn(documentId, 'doc.print.high')) return PRINT_STANDARD;
+    const mayKeepCopy =
+      allowsOn(documentId, 'doc.download') || allowsOn(documentId, 'doc.download.flattened');
+    return mayKeepCopy && printer?.stagePdf ? PRINT_PDF : PRINT_HIGH;
+  };
+
+  /** The pages a print asks for, in its order: every page when it names none. */
+  function printPagesOf(
+    session: DocumentSession,
+    pages: readonly PageRef[] | undefined,
+  ): readonly PageInfo[] {
+    const all = metaOf(session.id)?.pages ?? EMPTY_PAGES;
+    if (pages === undefined) return all;
+    if (pages.length === 0) {
+      throw new PluginError('invalid-input', 'documents', 'a print needs at least one page');
+    }
+    const found = pages.map((ref) => {
+      const page = findPage(all, ref);
+      if (!page) {
+        throw new PluginError(
+          'not-found',
+          'documents',
+          `page ${ref.objectNumber} is not in this document`,
+        );
+      }
+      return page;
+    });
+    if (new Set(found).size !== found.length) {
+      throw new PluginError('invalid-input', 'documents', 'a print names a page twice');
+    }
+    return found;
+  }
+
+  /**
+   * What prints beside the page content: the annotations as the options ask, by default when
+   * the user may read them; the form fields whenever the user may read the form.
+   */
+  const printLayersOf = (documentId: string, options: PrintOptions) => ({
+    includeAnnotations: options.includeAnnotations ?? allowsOn(documentId, 'doc.annotate.read'),
+    includeFormFields: allowsOn(documentId, 'doc.forms.read'),
+  });
+
+  /**
+   * Make the pages as they print and hand them to the printer, once the document settled: the
+   * PDF copy, or a picture of each page. The pages are looked up again each time, so one deleted
+   * meanwhile refuses `not-found`. Returns the staged print, how it came out, and the change it
+   * saw last, so a print can tell it went stale.
+   */
+  async function stagePrint(
+    session: DocumentSession,
+    activePrinter: HostPrinter,
+    quality: PrintQuality,
+    options: PrintOptions,
+  ): Promise<{ staged: StagedPrint; quality: PrintQuality; changesSeen: number }> {
+    const { signal } = options;
+    await settle(session.settleFlushes, [signal, session.signal], report);
+    const handle = documentHandle(session.id);
+    if (!handle) throw new PluginError('not-ready', 'documents', 'no open document to print');
+    const changesSeen = session.changesSeen;
+    const job: PrintJob = {
+      handle,
+      pages: printPagesOf(session, options.pages),
+      layers: printLayersOf(session.id, options),
+      name: session.name ?? 'document',
+      options,
+    };
+    options.onProgress?.({ pagesRendered: 0, pageCount: job.pages.length });
+    if (quality.kind === 'images') {
+      return { staged: await stagePictures(job, activePrinter, quality.dpi), quality, changesSeen };
+    }
+    try {
+      return { staged: await stagePdfCopy(job, activePrinter), quality, changesSeen };
+    } catch (error) {
+      // A printer can turn the PDF copy down (a browser that reports a PDF viewer it doesn't
+      // show): the same pages print as pictures.
+      if (signal?.aborted) throw error;
+      const staged = await stagePictures(job, activePrinter, PRINT_HIGH.dpi);
+      return { staged, quality: PRINT_HIGH, changesSeen };
+    }
+  }
+
+  /** The PDF copy of the pages as they print, staged with the printer. */
+  async function stagePdfCopy(job: PrintJob, activePrinter: HostPrinter): Promise<StagedPrint> {
+    const { handle, pages, layers, name, options } = job;
+    const { signal } = options;
+    if (!activePrinter.stagePdf) {
+      throw new PluginError('unsupported', 'documents', 'this printer prints no PDF');
+    }
+    const pdf = await cancellable(
+      'documents',
+      signal,
+      handle.pages.extract(
+        pages.map((page) => page.ref),
+        { flatten: { usage: 'print' }, ...layers },
+      ),
+    );
+    const staged = await activePrinter.stagePdf(pdf, { name, ...(signal ? { signal } : {}) });
+    options.onProgress?.({ pagesRendered: pages.length, pageCount: pages.length });
+    return staged;
+  }
+
+  /** A picture of each page, drawn by the print rules at `dpi`, staged with the printer. */
+  async function stagePictures(
+    job: PrintJob,
+    activePrinter: HostPrinter,
+    dpi: PrintDpi,
+  ): Promise<StagedPrint> {
+    const { handle, pages, layers, name, options } = job;
+    const { signal } = options;
+    const sheets: PrintSheet[] = [];
+    for (const page of pages) {
+      const image = await cancellable(
+        'documents',
+        signal,
+        handle.page(page.ref).render.image({
+          usage: 'print',
+          viewport: { kind: 'dpi', dpi },
+          format: 'png',
+          ...layers,
+        }),
+      );
+      const blob = await cancellable('documents', signal, image.blob());
+      sheets.push({ image: blob, widthPt: page.size.width, heightPt: page.size.height });
+      options.onProgress?.({ pagesRendered: sheets.length, pageCount: pages.length });
+    }
+    return activePrinter.stage(sheets, { name, ...(signal ? { signal } : {}) });
+  }
+
+  /**
+   * Get a print ready. Refused before anything runs without `doc.print` or a printer, or for
+   * pages the document doesn't have. Its `print()` runs inside every `aroundPrint` wrap (the
+   * document's own print actions), and prepares again first when the document changed since:
+   * a will-print action that fills in a date is on the paper. When the printer turns the PDF
+   * copy down, preparing or printing, the same pages print as pictures, and `quality` says so.
+   */
+  async function preparePrint(
+    documentId: string | undefined,
+    options: PrintOptions = {},
+  ): Promise<PreparedPrint> {
+    const session = readySession(documentId, 'preparePrint');
+    if (!allowsOn(session.id, 'doc.print')) {
+      throw permissionDenied('documents', 'doc.print', 'documents.preparePrint');
+    }
+    const quality = printQualityOf(session.id);
+    if (!printer || !quality) {
+      throw new PluginError(
+        'unsupported',
+        'documents',
+        'no printer: pass one to createKernel({ printer }), such as browserPrinter() from @embedpdf/web',
+      );
+    }
+    const pageCount = printPagesOf(session, options.pages).length;
+    try {
+      let {
+        staged,
+        changesSeen,
+        quality: printed,
+      } = await stagePrint(session, printer, quality, options);
+      let disposed = false;
+      const destroy = () => {
+        if (disposed) return;
+        disposed = true;
+        staged.destroy();
+      };
+      session.scope.defer(destroy);
+      /** Stage the print again, as `as`, in place of what was staged. */
+      const restage = async (as: PrintQuality, signal: AbortSignal | undefined) => {
+        const fresh = await stagePrint(session, printer, as, {
+          ...(options.pages ? { pages: options.pages } : {}),
+          ...(options.includeAnnotations !== undefined
+            ? { includeAnnotations: options.includeAnnotations }
+            : {}),
+          ...(signal ? { signal } : {}),
+        });
+        staged.destroy();
+        ({ staged, changesSeen, quality: printed } = fresh);
+      };
+      return {
+        get quality() {
+          return printed;
+        },
+        pageCount,
+        needsTap: printer.needsTap === true,
+        async print(printOptions) {
+          if (disposed) {
+            throw new PluginError('invalid-input', 'documents', 'this print was disposed');
+          }
+          const signal = printOptions?.signal;
+          const run = async () => {
+            if (session.changesSeen !== changesSeen) await restage(quality, signal);
+            if (signal?.aborted) {
+              throw new PluginError('operation-cancelled', 'documents', 'print cancelled', {
+                cause: signal.reason,
+              });
+            }
+            try {
+              await staged.print();
+            } catch (error) {
+              if (printed.kind !== 'pdf') throw error;
+              await restage(PRINT_HIGH, signal);
+              await staged.print();
+            }
+          };
+          try {
+            await runWrapped(session.printWraps, run);
+          } catch (error) {
+            throw toPluginError('documents', error);
+          }
+        },
+        destroy,
+      };
     } catch (error) {
       throw toPluginError('documents', error);
     }
@@ -802,7 +1263,7 @@ export function createKernel(config: {
     store.notify,
     report,
   );
-  workspaceScope.defer(() => viewerSettings.dispose());
+  workspaceScope.defer(() => viewerSettings.destroy());
 
   // A plugin's settings belong to the plugin as the app registered it, not to one document.
   // Each registration's store is built here, before any plugin is created, so the settings
@@ -817,7 +1278,7 @@ export function createKernel(config: {
   }
   // Destroy ends the listeners; the values stay readable, so a reader unmounting late never throws.
   workspaceScope.defer(() => {
-    for (const settings of settingsStores.values()) settings.dispose();
+    for (const settings of settingsStores.values()) settings.destroy();
   });
 
   function settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>> {
@@ -837,6 +1298,7 @@ export function createKernel(config: {
     workspaceLeases,
     report,
     clock: config.clock ?? timerClock,
+    measurer: config.measurer ?? null,
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,
@@ -856,7 +1318,11 @@ export function createKernel(config: {
    *  document was never `ready`. */
   async function bringUp(
     session: DocumentSession,
-    snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
+    snapshot: {
+      pageCount: number;
+      pages: DocumentMeta['pages'];
+      labels: DocumentMeta['pageLabels'];
+    },
   ): Promise<void> {
     session.phase = 'bringup';
     // The render policy is a document fact (Pattern A, like the page
@@ -872,13 +1338,17 @@ export function createKernel(config: {
       /* unreachable policy = continuous */
     }
     checkpoint(session);
+    session.pageView.setEnginePages(snapshot);
+    session.pageView.refresh();
     session.stagedMeta = {
       id: session.id,
       instanceId: session.instanceId,
       name: session.name,
       pageCount: snapshot.pageCount,
-      pages: snapshot.pages,
-      revision: 0,
+      pages: session.pageView.current().pages,
+      pageLabels: session.pageView.current().labels,
+      pendingPages: NO_PENDING_PAGES,
+      pagesSequence: 0,
       renderPolicy,
       hasUnsavedChanges: false,
     };
@@ -886,37 +1356,27 @@ export function createKernel(config: {
     // Changes are unsaved only where they live in this tab until a download (the local
     // engine); the cloud engine stores each one as it's made.
     const tracksChanges = isLocalDocument(session.handle!);
-    // Document mutation events (rotate/move/delete) replace the page
-    // registry in place — the snapshot they carry is byte-identical to
-    // pages.list(), so this is a direct swap, no merge. Own mutations and
-    // remote (collaborator) mutations arrive identically; the handler is
+    // Page mutation events (rotate, move, delete, insert, restore) carry the
+    // engine's pages, the same list pages.list() returns, so they replace the
+    // engine's pages whole; the page view replays the pending changes on top.
+    // Own and remote (collaborator) mutations arrive alike: the handler is
     // origin-agnostic, as the event model intends.
     // The kernel listens first and last, so a change's events land as one store update.
     const bursts = createBurstGate(store);
     session.scope.defer(bursts.close);
     const unsubscribeEvents = session.handle!.events.subscribe((event) => {
       bursts.first(event);
-      if (tracksChanges && changesDocument(event)) {
-        session.changeCount += 1;
-        setUnsavedChanges(session, true);
+      if (changesDocument(event)) {
+        session.changesSeen += 1;
+        if (tracksChanges) {
+          session.changeCount += 1;
+          setUnsavedChanges(session, true);
+        }
       }
       const layout = layoutFromEvent(event);
-      if (!layout) return;
-      const now = store.getCore();
-      const existing = now.documents[session.id];
-      if (!existing) return; // pre-commit or closed — registry not published
-      const updated: DocumentMeta = {
-        ...existing,
-        pageCount: layout.pageCount,
-        pages: layout.pages,
-        revision: existing.revision + 1,
-      };
-      setCore({ documents: { ...now.documents, [session.id]: updated } });
-      pagesChanged.emit({
-        documentId: session.id,
-        revision: updated.revision,
-        pages: updated.pages,
-      });
+      if (layout) session.pageView.setEnginePages(layout);
+      session.pageView.fold(event);
+      refreshPages(session);
     });
     session.scope.defer(unsubscribeEvents);
 
@@ -1038,9 +1498,10 @@ export function createKernel(config: {
         checkpoint(session);
         // A URL is downloaded here, under the loading tab; closing the tab stops the download.
         const source = isUrlSource(given)
-          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal))
+          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal, config.fetch))
           : given;
         checkpoint(session);
+        session.grantInput = source.kind === 'grant' ? source : null;
         const sourceId = idOfInput(source);
         if (sourceId) rekeySession(session, sourceId);
 
@@ -1079,7 +1540,7 @@ export function createKernel(config: {
         // 3. Real failure: Rollback (scope releases exactly what was acquired,
         //    however far we got), then park the tab as `error` — closable, and
         //    reopenable after close. The document was never `ready`.
-        await session.scope.dispose();
+        await session.scope.destroy();
         session.phase = 'error';
         publishError(session, error);
         throw error;
@@ -1125,7 +1586,7 @@ export function createKernel(config: {
         if (session.phase === 'closing' || isAbortLike(error)) {
           throw new CancelledError(`closed while opening: ${session.id}`);
         }
-        await session.scope.dispose();
+        await session.scope.destroy();
         session.phase = 'error';
         publishError(session, error);
         throw error;
@@ -1181,6 +1642,9 @@ export function createKernel(config: {
     canOpenFiles: () => engine.canOpenFiles,
     retry: async (id, options) => {
       const session = sessions.get(id);
+      if (session?.phase === 'ready' && session.handle?.grant?.openRequest) {
+        return resumeGrant(session, options);
+      }
       if (!session || session.phase !== 'error' || session.source === null) {
         throw new PluginError(
           'invalid-input',
@@ -1191,10 +1655,28 @@ export function createKernel(config: {
       // In its own tab, which keeps its id and place; the active document stays the active one.
       // The failed session holds nothing (its scope was released when it failed), so the new
       // one takes its id without closing it: the tab never closes.
-      const { source, openOptions } = session;
+      const { source, grantInput, openOptions } = session;
+      const given = retrySourceOf(source, grantInput, options);
+      // The visitor's answers join who the page said the user is: the document's own, else the
+      // viewer's.
+      const identity =
+        options?.visitorIdentity !== undefined
+          ? { ...engineOptionsOf(openOptions).identity, ...options.visitorIdentity }
+          : undefined;
       sessions.delete(id);
-      return openDocument(source, { ...openOptions, activate: false, signal: options?.signal }, id);
+      return openDocument(
+        given,
+        {
+          ...openOptions,
+          ...(identity !== undefined ? { identity } : {}),
+          activate: false,
+          signal: options?.signal,
+        },
+        id,
+      );
     },
+    identify,
+    declineIdentity,
     rename: (id, name) => {
       const core = store.getCore();
       if (core.documents[id]) {
@@ -1298,15 +1780,26 @@ export function createKernel(config: {
         // Refused before anything runs: the cloud engine keeps layers itself.
         (handle) => (isLocalDocument(handle) ? null : noLayer()),
       ),
+    // Printing it: the pages drawn by the print rules, on the host's printer (preparePrint above).
+    preparePrint: (id, options) => preparePrint(id, options),
+    async print(id, options = {}) {
+      const prepared = await preparePrint(id, options);
+      try {
+        await prepared.print(options.signal ? { signal: options.signal } : undefined);
+      } finally {
+        prepared.destroy();
+      }
+    },
+    getPrintQuality: (id) => printQualityOf(id),
     // The verbs that need them live here, so their checks do too (permissions.md).
     canDownload: (id) => allowsOn(id, 'doc.download'),
-    canPrint: (id) => allowsOn(id, 'doc.print'),
+    canPrint: (id) => canPrintOn(id),
     // The page registry, addressed by PageRef (durable) or display index.
     listPages: (id) => metaOf(id)?.pages ?? EMPTY_PAGES,
     getPage: (page, id) => findPage(metaOf(id)?.pages ?? EMPTY_PAGES, page),
     getPageIndex: (ref, id) =>
       metaOf(id)?.pages.findIndex((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? -1,
-    getRevision: (id) => metaOf(id)?.revision ?? -1,
+    getRevision: (id) => metaOf(id)?.pagesSequence ?? -1,
     onOpened: opened.on,
     onOpenFailed: openFailed.on,
     onLocked: locked.on,
@@ -1350,7 +1843,7 @@ export function createKernel(config: {
     settingsOf,
     subscribe: store.subscribe,
     getState: store.getState,
-    status: () => status,
+    getStatus: () => status,
     start: () => {
       if (status === 'destroying' || status === 'destroyed' || status === 'failed') {
         return Promise.reject(new Error(`[kernel] start() on a ${status} kernel`));
@@ -1367,7 +1860,7 @@ export function createKernel(config: {
           // Startup failure unwinds everything construction + start registered;
           // the kernel is terminally failed (destroy() remains legal, and idle).
           status = 'failed';
-          await workspaceScope.dispose();
+          await workspaceScope.destroy();
           workspaceCapabilities.clear();
           throw error;
         }
@@ -1385,7 +1878,7 @@ export function createKernel(config: {
         // session mid-close is already unpublished but still needs joining.
         await Promise.allSettled([...sessions.values()].map((session) => session.close()));
         sessions.clear();
-        await workspaceScope.dispose();
+        await workspaceScope.destroy();
         workspaceCapabilities.clear();
         store.destroy();
         status = 'destroyed';

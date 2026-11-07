@@ -10,14 +10,14 @@
   const hasSelection = useSelectionState((state) => state.hasSelection);
   const currentPage = useStageState((state) => state.currentPageIndex);
   const ready = useAnnotationState((state) => state.status === 'ready');
-  let text = $state('EmbedPDF');
+  let text = $state('John Warnock');
 
-  // On load: every "EmbedPDF" in the document.
+  // On load: every "John Warnock" in the document.
   let started = false;
   $effect(() => {
     if (!ready.current || started) return;
     started = true;
-    untrack(() => void redaction.markMatches({ text: 'EmbedPDF' }));
+    untrack(() => void redaction.markMatches({ text: 'John Warnock' }));
   });
 
   function markEveryMatch(event: SubmitEvent) {

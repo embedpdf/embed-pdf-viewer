@@ -1,12 +1,12 @@
 import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CommandContext, CommandDef, CommandFamily } from '../src/contract';
+import type { CommandContext, CommandDefinition, CommandFamily } from '../src/contract';
 import { createStandardCommands } from '../src/standard';
 
 /** A command context over stand-in capabilities, for the document `doc`. */
@@ -15,6 +15,7 @@ function contextWith(capabilities: Map<CapabilityToken<unknown>, unknown>): Comm
     (capabilities.get(token as CapabilityToken<unknown>) as T | undefined) ?? null;
   return {
     documentId: 'doc',
+    appState: undefined,
     tryGet,
     get: <T>(token: CapabilityToken<T>): T => {
       const capability = tryGet(token);
@@ -26,14 +27,14 @@ function contextWith(capabilities: Map<CapabilityToken<unknown>, unknown>): Comm
 
 const platform = () => ({
   copySelection: vi.fn(async () => 'text'),
+  copyImage: vi.fn(async () => {}),
   saveFile: vi.fn(),
-  print: vi.fn(),
 });
 
 function standard(platformImpl = platform()) {
   const items = createStandardCommands(platformImpl);
   const command = (id: string) =>
-    items.find((item): item is CommandDef => 'id' in item && item.id === id)!;
+    items.find((item): item is CommandDefinition => 'id' in item && item.id === id)!;
   const family = items.find((item): item is CommandFamily => 'prefix' in item)!;
   return { items, command, family, platform: platformImpl };
 }
@@ -41,7 +42,7 @@ function standard(platformImpl = platform()) {
 describe('standard commands', () => {
   it('has the commands the commands page lists, with their shortcuts', () => {
     const { items } = standard();
-    const defined = items.filter((item): item is CommandDef => 'id' in item);
+    const defined = items.filter((item): item is CommandDefinition => 'id' in item);
     expect(Object.fromEntries(defined.map((item) => [item.id, item.shortcut ?? null]))).toEqual({
       'zoom:in': ['Mod+=', 'Mod+NumpadAdd'],
       'zoom:out': ['Mod+-', 'Mod+NumpadSubtract'],
@@ -55,8 +56,13 @@ describe('standard commands', () => {
       'view:rotate-counterclockwise': null,
       'tool:pointer': 'V',
       'tool:pan': 'H',
+      'tool:zoom': 'Z',
+      'tool:snapshot': null,
       'selection:copy': 'Mod+C',
       'annotation:delete': ['Delete', 'Backspace'],
+      'snapshot:copy': 'Mod+C',
+      'snapshot:save': null,
+      'snapshot:clear': 'Escape',
       'document:download': 'Mod+S',
       'document:print': 'Mod+P',
     });
@@ -75,6 +81,14 @@ describe('standard commands', () => {
     command('page:previous').run?.(context);
     expect(stage.previousPage).toHaveBeenCalled();
     expect(command('zoom:in').enabled?.(contextWith(new Map()))).toBe(false);
+  });
+
+  it('zooms only while the zoom is inside its limits', () => {
+    const { command } = standard();
+    const stage = { canZoomIn: () => false, canZoomOut: () => true };
+    const context = contextWith(new Map([[StageToken, stage]]));
+    expect(command('zoom:in').enabled?.(context)).toBe(false);
+    expect(command('zoom:out').enabled?.(context)).toBe(true);
   });
 
   it('has a tool command for every tool the document has', () => {
@@ -126,7 +140,7 @@ describe('standard commands', () => {
     const { command } = standard();
     const refs = [{ id: 1 }, { id: 2 }];
     const annotation = {
-      selection: { list: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
+      selection: { getSelected: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
       canDelete: (ref: { id: number }) => ref.id === 1,
       isEditable: (_ref: { id: number }) => true,
     };
@@ -160,18 +174,61 @@ describe('standard commands', () => {
     expect(command('document:print').enabled?.({ ...context, documentId: null })).toBe(false);
     await command('document:download').run?.(context);
     expect(documents.download).toHaveBeenCalledWith('doc', { signal: undefined });
-    expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf');
+    expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf', 'application/pdf');
   });
 
-  it("prints through the document's print actions when the actions plugin is there", async () => {
+  it('switches to the snapshot tool only when the user may take snapshots', () => {
+    const { command } = standard();
+    const render = { canSnapshot: () => false, getSnapshot: () => null };
+    const context = contextWith(new Map([[RenderToken, render]]));
+    expect(command('tool:snapshot').allowed?.(context)).toBe(false);
+    expect(command('tool:snapshot').notAllowedKey).toBe('commands.notAllowed.doc-content-copy');
+    render.canSnapshot = () => true;
+    expect(command('tool:snapshot').allowed?.(context)).toBe(true);
+    expect(command('tool:snapshot').labelKey).toBe('commands.tool.snapshot');
+  });
+
+  it('copies, saves and clears the snapshot, while there is one', async () => {
     const { command, platform } = standard();
-    const actions = {
-      runDocumentVerb: vi.fn(async (_verb: string, operation: () => unknown) => operation()),
+    const blob = new Blob(['png'], { type: 'image/png' });
+    const image = Promise.resolve({ blob: async () => blob });
+    const snapshot = { page: { objectNumber: 22 }, rect: {}, image };
+    const render = {
+      getSnapshot: vi.fn((): typeof snapshot | null => null),
+      clearSnapshot: vi.fn(),
     };
-    await command('document:print').run?.(contextWith(new Map([[ActionsToken, actions]])));
-    expect(actions.runDocumentVerb).toHaveBeenCalledWith('print', expect.any(Function));
-    expect(platform.print).toHaveBeenCalledTimes(1);
-    await command('document:print').run?.(contextWith(new Map()));
-    expect(platform.print).toHaveBeenCalledTimes(2);
+    const documents = {
+      get: () => ({ name: 'Report.pdf' }),
+      listPages: () => [{ ref: { objectNumber: 11 } }, { ref: { objectNumber: 22 } }],
+    };
+    const context = contextWith(
+      new Map<CapabilityToken<unknown>, unknown>([
+        [RenderToken, render],
+        [DocumentsToken, documents],
+      ]),
+    );
+    for (const id of ['snapshot:copy', 'snapshot:save', 'snapshot:clear']) {
+      expect(command(id).enabled?.(context)).toBe(false);
+    }
+    render.getSnapshot.mockReturnValue(snapshot);
+    for (const id of ['snapshot:copy', 'snapshot:save', 'snapshot:clear']) {
+      expect(command(id).enabled?.(context)).toBe(true);
+    }
+    // The copy starts in the press: the picture goes to the clipboard as it comes.
+    void command('snapshot:copy').run?.(context);
+    expect(platform.copyImage).toHaveBeenCalledWith(image);
+    await command('snapshot:save').run?.(context);
+    expect(platform.saveFile).toHaveBeenCalledWith(blob, 'Report p2.png', 'image/png');
+    await command('snapshot:clear').run?.(context);
+    expect(render.clearSnapshot).toHaveBeenCalled();
+  });
+
+  it('prints the document in scope through the kernel', async () => {
+    const { command } = standard();
+    const documents = { print: vi.fn(async () => {}), canPrint: () => true };
+    const context = contextWith(new Map([[DocumentsToken, documents]]));
+    expect(command('document:print').allowed?.(context)).toBe(true);
+    await command('document:print').run?.(context);
+    expect(documents.print).toHaveBeenCalledWith('doc', { signal: undefined });
   });
 });

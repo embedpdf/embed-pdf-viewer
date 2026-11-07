@@ -39,18 +39,18 @@ interface PageBox {
  */
 export function runPageSpaceConformance(
   runner: ConformanceTestRunner,
-  opts: PageSpaceConformanceOptions,
+  options: PageSpaceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
   const fixtures = PAGE_SPACE_FIXTURES.filter(
-    (fixture) => !opts.only || opts.only.includes(fixture.name),
+    (fixture) => !options.only || options.only.includes(fixture.name),
   );
 
-  describe(`page space conformance: ${opts.label}`, () => {
+  describe(`page space conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -63,7 +63,7 @@ export function runPageSpaceConformance(
         let layouts: PageLayout[];
 
         beforeAll(async () => {
-          doc = await opts.open(engine, fixture);
+          doc = await options.open(engine, fixture);
           layouts = (await doc.pages.list()).pages;
         });
 
@@ -208,7 +208,7 @@ export function runPageSpaceConformance(
               height: 20,
             };
             const { field, widgets } = await doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: `placed_${layout.ref.objectNumber}`,
               widgets: [{ page: layout.ref, rect: spot }],
             });

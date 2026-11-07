@@ -2,6 +2,7 @@ import type { AnnotationBase, LineAnnotation, PdfCoordinates } from '@embedpdf/e
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { lineIntentFromName } from '../measurementIntent';
+import { readCommentRichText } from '../richTextWire';
 import { readIntent } from './annotationReadPrimitives';
 import { readLine as readLinePoints, readLineEndings } from './annotationReadPrimitives';
 import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
@@ -25,11 +26,11 @@ export function readLine(
   const leader = readLineLeader(fn, mem, annotPtr);
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     ...readAnnotationMeasure(fn, mem, annotPtr),
     intent: lineIntentFromName(intent),
-    // An absent `/Cap` reads `null`, as on polygons and polylines; `/CP`
-    // reads its ISO default.
-    captionEnabled: fn.FPDFAnnot_HasKey(annotPtr, 'Cap') ? (caption?.enabled ?? false) : null,
+    // An absent `/Cap` and `/CP` read their ISO defaults.
+    captionEnabled: caption?.enabled ?? false,
     captionPosition: caption?.position ?? 'inline',
     captionOffset: caption?.offset ?? null,
     leader: leader ?? null,

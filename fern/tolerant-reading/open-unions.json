@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Annotation",
+    "tag": "subtype",
+    "catchAll": "unsupported",
+    "fill": [
+      { "field": "rawSubtypeCode", "is": "integer", "otherwise": 0 },
+      { "field": "rawSubtypeName", "is": "string", "otherwise": null }
+    ],
+    "fixtureKind": "sound"
+  },
+  {
+    "name": "FormField",
+    "tag": "kind",
+    "catchAll": "unknown",
+    "fill": [{ "field": "rawValue", "is": "string", "otherwise": "" }],
+    "fixtureKind": "barcode"
+  },
+  {
+    "name": "FormValueEntry",
+    "tag": "kind",
+    "catchAll": "unsupported",
+    "fill": [],
+    "fixtureKind": "rich-text"
+  },
+  {
+    "name": "PdfMeasurement",
+    "tag": "subtype",
+    "catchAll": "unknown",
+    "fill": [],
+    "fixtureKind": "volumetric"
+  },
+  {
+    "name": "PdfLinkTarget",
+    "tag": "kind",
+    "catchAll": "unsupported",
+    "fill": [],
+    "fixtureKind": "goto-3d"
+  },
+  {
+    "name": "PdfActionNode",
+    "tag": "type",
+    "catchAll": "unknown",
+    "fill": [],
+    "fixtureKind": "set-presentation"
+  }
+]

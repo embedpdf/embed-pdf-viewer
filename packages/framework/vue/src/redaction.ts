@@ -22,7 +22,6 @@ import type {
 } from '@embedpdf/plugin-redaction';
 import { useCapability, useCapabilityEvent, useOptionalSelector } from './runtime/capabilities';
 import { settingsComposable, stateComposable } from './state';
-import type { StateComposable } from './state';
 
 /**
  * The redaction API (marking, the pending marks, applying them) of the
@@ -46,13 +45,8 @@ export function useRedactionEvent<Event>(
  * applied, and the last apply's result (the page's State table, declared once
  * in `redactionState`). With a selector, one ref that updates only when the
  * value it picks changes.
- *
- * Typed through the declaration, so the published types name it from
- * `@embedpdf/plugin-redaction`, a dependency of this package, and not from the
- * engine package `lastResult`'s type comes from, which isn't one.
  */
-export const useRedactionState: StateComposable<ReturnType<typeof redactionState.read>> =
-  stateComposable(redactionState);
+export const useRedactionState = stateComposable(redactionState);
 
 /** The redaction settings (`overlay`), with or without a document, as refs. Takes a selector. */
 export const useRedactionSettings = settingsComposable(RedactionToken);

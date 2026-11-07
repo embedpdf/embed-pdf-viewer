@@ -1,6 +1,7 @@
 import type {
   PageHandle,
   PageLayerRights,
+  PagePictureRights,
   PageLayout,
   PageRef,
   SessionEventPublisher,
@@ -9,9 +10,9 @@ import type {
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';
 import { CloudPageFormsService } from './CloudPageFormsService';
+import { CloudPageMeasureService } from './CloudPageMeasureService';
 import { CloudPageRenderService } from './CloudPageRenderService';
 import { CloudPageTextService } from './CloudPageTextService';
-import { CloudPageMeasureService } from './CloudPageMeasureService';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -39,6 +40,7 @@ export class CloudPageHandle implements PageHandle {
     writes: CloudWrites,
     layout: (signal: AbortSignal) => Promise<PageLayout>,
     layerRights: () => PageLayerRights | null,
+    pictureRights: () => PagePictureRights | null,
   ) {
     this.measure = new CloudPageMeasureService(
       http,
@@ -71,6 +73,7 @@ export class CloudPageHandle implements PageHandle {
       manifest,
       layout,
       layerRights,
+      pictureRights,
     );
   }
 }

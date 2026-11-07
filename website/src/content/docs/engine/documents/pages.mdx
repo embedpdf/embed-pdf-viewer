@@ -1,6 +1,6 @@
 ---
 title: Pages
-description: List a document's pages, then rotate, reorder, delete, insert, extract and flatten them.
+description: List a document's pages, then rotate, reorder, delete, insert, copy, extract and flatten them.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -33,11 +33,11 @@ for (const page of pages) {
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `index`      | Position in the document, from 0. Changes when pages move.                                                                                                                |
 | `ref`        | The page's address. Stays the same when pages move; pass it to every page call.                                                                                           |
-| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.                                                                                       |
+| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none. See [Page labels](#page-labels).                                                      |
 | `size`       | `{ width, height }` of the visible area (the crop box) in points, before rotation.                                                                                        |
 | `rotation`   | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                                                                               |
 | `userUnit`   | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                                                                             |
-| `tabOrder`   | The order its annotations and form fields take keyboard focus in: `'rows'`, `'columns'`, `'structure'`, `'annotations'` or `'widgets'`; `null` when the page doesn't say. |
+| `tabOrder`   | The order its annotations and form fields take keyboard focus in: `'rows'`, `'columns'`, `'structure'`, `'annotations'` or `'widgets'`; `null` when the page doesn't say. See [Keyboard order](#keyboard-order). |
 | `boxes`      | The page's five boxes: `media`, `crop`, `bleed`, `trim` and `art`. See below.                                                                                             |
 | `pdfCropBox` | Where the page sits in the PDF file's own numbers, for tools that use those. See below.                                                                                   |
 
@@ -84,6 +84,68 @@ const { size, rotation } = pages[0];
 const turned = rotation === 90 || rotation === 270;
 const shown = turned ? { width: size.height, height: size.width } : size;
 ```
+
+## Page labels
+
+A PDF can number its pages its own way: the front matter `i`, `ii`, `iii`, the body from `1`,
+an appendix `A-1`, `A-2`. Each page's `label` is its label, and `labels` in the page list holds
+the numbering as sections, in page order:
+
+```ts
+const { labels } = await doc.pages.list();
+// [
+//   { firstPage: 0, style: 'lowerRoman', firstNumber: 1, prefix: '' },
+//   { firstPage: 3, style: 'decimal', firstNumber: 1, prefix: '' },
+//   { firstPage: 20, style: 'decimal', firstNumber: 1, prefix: 'A-' },
+// ]
+```
+
+| Field         | What it is                                                                                                      |
+| :------------ | :-------------------------------------------------------------------------------------------------------------- |
+| `firstPage`   | The index of the section's first page. A section runs up to the next one's first page.                          |
+| `style`       | `'decimal'`, `'upperRoman'`, `'lowerRoman'`, `'upperLetters'` or `'lowerLetters'`; `null` for no number at all. |
+| `firstNumber` | The number of its first page.                                                                                   |
+| `prefix`      | What every label of the section starts with; `''` for none.                                                     |
+
+The first section always starts at page 0. A file without labels has no sections, and every
+page's `label` is `null`.
+
+When pages move, come or go, the sections follow the pages, so a label stays where it belongs:
+
+- A section stays with the page it starts at, and a page takes the numbering of the section it
+  lands in. A page inserted between the front matter and the body is numbered as front matter.
+- When a section's first page is deleted, the section starts on its next page, which becomes
+  `1`. A section with no pages left goes.
+- Pages put before every page join the first section.
+- A move is a delete followed by an insert.
+
+An undo puts the labels back as they were.
+
+## Keyboard order
+
+Each page says in what order its annotations and form fields take keyboard focus: its `tabOrder`.
+`tabOrderOf()` puts annotations in that order, page by page, as Tab visits them:
+
+```ts
+import { tabOrderOf } from '@embedpdf/engine';
+
+const { pages } = await doc.pages.list();
+const { widgets } = await doc.forms.list();
+const order = tabOrderOf(widgets, pages); // every field box, in the order Tab visits them
+```
+
+| `tabOrder`              | The order on the page                                                                        |
+| :---------------------- | :------------------------------------------------------------------------------------------- |
+| `'rows'`                | Top to bottom, each row left to right                                                        |
+| `'columns'`             | Left to right, each column top to bottom                                                     |
+| `'structure'`           | As the document's tags read: by each annotation's `structurePosition`. Those that aren't tagged come after them, in the order the page lists them. |
+| `'annotations'`, `null` | The order the page lists them                                                                |
+| `'widgets'`             | The form fields first, then the other annotations, each in the order the page lists them     |
+
+Most tagged PDFs, from Acrobat, Word or a browser's print, say `'structure'`: their order is the
+reading order their author tagged. `structurePosition` is where an annotation sits in those tags,
+from the root down, the index of each step among its parent's kids; compared index by index, two
+positions give the reading order.
 
 ## Refs, not positions
 
@@ -137,13 +199,15 @@ one the document doesn't have fails with `NotFound`.
 await doc.pages.delete([page.ref]);
 ```
 
-A page's annotations go with it. A document keeps at least one page: deleting every page fails
-with `InvalidArg`.
+A page's annotations go with it. A form field with a widget on it stays in the form, with its
+value, and that widget shows on no page. Outline items that go to it stay, and their target reads
+`unsupported` from then on (see [Outline](/docs/engine/documents/outline#pages-that-are-gone)). A
+document keeps at least one page: deleting every page fails with `InvalidArg`.
 
 ## Insert another PDF
 
 `insert(bytes, position?)` copies every page of another PDF into this one, with their
-annotations. Without a position, the pages go at the end:
+annotations and form fields. Without a position, the pages go at the end:
 
 ```ts
 const response = await fetch('/appendix.pdf');
@@ -152,6 +216,27 @@ const { insertedPages } = await doc.pages.insert(await response.arrayBuffer());
 
 `insertedPages` holds the refs of the new pages, in order. To merge several files, insert them one
 after the other.
+
+### Form fields
+
+The pages bring the form fields of their widgets into the document's form, with their values, so
+they fill in here and in other PDF apps alike.
+
+A top-level field whose name the document already uses is kept apart: it comes in as `name_2`, or
+the next number that's free, and the fields under it keep their place. Insert a filled-in form
+twice and you get `email` and `email_2`, `address.city` and `address_2.city`, each with its own
+value. Joined, two fields of one name would be one field with one value, and the second file's
+answers would be lost.
+
+```ts
+await doc.pages.insert(firstCopy);
+await doc.pages.insert(secondCopy);
+const { fields } = await doc.forms.list();
+fields.map((field) => field.name); // ['email', 'address.city', 'email_2', 'address_2.city']
+```
+
+A script in the inserted PDF that looks up a renamed field by its name finds the document's field
+of that name.
 
 ## Insert blank pages
 
@@ -166,6 +251,21 @@ await doc.pages.insertBlank({ size: letter, count: 2 }, { after: pages[0].ref })
 
 A4 is `{ width: 595, height: 842 }`. `count` is 1 by default and at most 100 per call.
 
+## Copy pages
+
+`copy(refs, position?)` copies pages of the document, in the order you pass them, to `position`.
+Without a position, the copies go at the end:
+
+```ts
+const { insertedPages } = await doc.pages.copy([page.ref], { after: page.ref }); // duplicate a page
+```
+
+A copy looks like its page and brings the page's annotations. Its form fields come as fields of
+their own, with their values: a name the document already uses gets the first free `name_2`, as an
+[insert's](#form-fields) do, so filling in the copy leaves the original alone. Name a page twice to
+copy it twice. Unlike `extract()` then `insert()`, the pages never leave the document, so `copy()`
+needs only `doc.pages.assemble`.
+
 ## Extract pages to a new PDF
 
 `extract(refs)` returns a new PDF with copies of those pages, in the order you pass them. The
@@ -174,6 +274,10 @@ document itself doesn't change.
 ```ts
 const bytes = await doc.pages.extract([pages[0].ref, pages[1].ref]);
 ```
+
+The copy has the form fields of those pages' widgets, with their values. A field with widgets on
+other pages too keeps only the ones on the pages you copy, and a field with no widget on them
+stays behind.
 
 That makes splitting a document a loop, one file per page:
 
@@ -191,6 +295,27 @@ const bytes = await source.pages.extract([ref]);
 await target.pages.insert(bytes, 'start');
 ```
 
+### A copy as the pages print
+
+With `flatten`, the copy is the pages as they look: the annotations and form fields painted into
+the pages, and nothing left to click, fill in or edit. It takes the same options as
+[`flatten()`](#flatten-a-pages-annotations), so `{ usage: 'print' }` makes a copy for paper: only
+what prints is on it, and layers are in their print state. The document itself doesn't change.
+
+```ts
+const printable = await doc.pages.extract(refs, { flatten: { usage: 'print' } });
+```
+
+`includeAnnotations` and `includeFormFields` choose what's painted in. Each defaults to what the
+caller may read, as in a [page picture](/docs/engine/documents/rendering), and they only go with
+`flatten`:
+
+```ts
+await doc.pages.extract(refs, { flatten: { usage: 'print' }, includeAnnotations: false });
+```
+
+The copy keeps the document's title, so a print queue or a saved file has a name.
+
 ## Flatten a page's annotations
 
 Flattening draws a page's annotations into the page itself and removes them, so they can't be
@@ -203,12 +328,15 @@ const { results } = await doc.pages.flatten([page.ref]);
 
 Each page's `status` is `'applied'`, or `'unchanged'` when it had nothing to flatten. Flattening is
 all or nothing: when a page fails, or the call is cancelled, no page changes and the call rejects
-with the error. Hidden annotations, popups and annotations without an appearance stay as they are.
+with the error. Flattening paints what the page shows: an annotation without a stored appearance is
+painted as the engine draws it. Hidden annotations and popups stay as they are, and so do the few
+annotations the engine draws only from a stored appearance, such as a stamp without one.
 Flattening can't be undone, and it ends undo for every change made before it; see
 [Changes & undo](/docs/engine/documents/changes#what-cant-be-undone).
 
-By default the page is flattened as it's shown on screen. Pass `{ usage: 'print' }` to flatten it
-as it prints, which leaves out annotations that don't print:
+By default the page is flattened as it's shown on screen, which leaves out annotations shown only
+when printed. Pass `{ usage: 'print' }` to flatten it as it prints, which leaves out annotations that
+don't print:
 
 ```ts
 await doc.pages.flatten([page.ref], { usage: 'print' });
@@ -222,12 +350,13 @@ To flatten only some annotations, see
 
 ## Permissions
 
-| Call                                                             | Needs                                        |
-| :--------------------------------------------------------------- | :------------------------------------------- |
-| `list()`                                                         | `doc.open`                                   |
-| `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
-| `extract()`                                                      | `doc.download`: the pages leave the document |
-| `flatten()`                                                      | `doc.pages.modify` and `doc.annotate.modify` |
+| Call                                                                       | Needs                                        |
+| :------------------------------------------------------------------------- | :------------------------------------------- |
+| `list()`                                                                   | `doc.open`                                   |
+| `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `copy()` | `doc.pages.assemble`                         |
+| `extract()`                                                                | `doc.download`: the pages leave the document |
+| `extract()` with `flatten`                                                 | `doc.download` or `doc.download.flattened`   |
+| `flatten()`                                                                | `doc.pages.modify` and `doc.annotate.modify` |
 
 See [Permissions](/docs/engine/concepts/permissions).
 
@@ -235,8 +364,8 @@ See [Permissions](/docs/engine/concepts/permissions).
 
 ### What a change returns
 
-`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `setName()` and `removeName()`
-return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
+`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `copy()`, `setName()` and
+`removeName()` return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
 you hold without asking again:
 
 ```ts
@@ -245,13 +374,42 @@ showThumbnails(layout.pages);
 ```
 
 Other code that shows pages can listen for `pages.reordered`, `pages.rotated`, `pages.deleted`,
-`pages.inserted` and `pages.flattened` instead. See [Events](/docs/engine/concepts/events).
+`pages.inserted`, `pages.restored` and `pages.flattened` instead. See
+[Events](/docs/engine/concepts/events).
+
+### Undo
+
+`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` and `copy()` are changes: each
+returns its `opId` in `meta`, and `doc.apply({ undoOf: opId })` undoes it. An undo of a delete
+brings the same pages back, under the same refs, with their annotations and names, and fires
+`pages.restored`. To make several page edits one step, apply them as one change. See
+[Changes & undo](/docs/engine/documents/changes).
+
+```ts
+const { meta } = await doc.pages.delete([ref]);
+await doc.apply({ undoOf: meta.opId }); // the page is back where it was
+```
+
+An undo of an insert or a copy deletes the pages it brought and the form fields that came with
+them; a redo brings both back.
 
 ### Inserting
 
 A password-protected PDF can't be inserted: `insert()` fails with `DocPasswordRequired`. Open it,
 unlock it, and `extract()` its pages instead. Pages you insert get new refs; the pages already in
 the document keep theirs.
+
+To know the new refs before the engine answers, name the pages yourself with numbers from
+[`doc.objectNumbers`](/docs/engine/concepts/identity), one per new page: `insertBlank()`,
+`insert()` and `copy()` all take them as `objectNumbers`. A count other than the number of new
+pages, or a number the session doesn't hold, is refused.
+
+```ts
+await doc.objectNumbers.reserve(1);
+const number = doc.objectNumbers.take()!;
+const copy = doc.pages.copy([page.ref], 'end', { objectNumbers: [number] });
+const ref = toPageRef(number); // known now, the same ref the answer names
+```
 
 <Engine local>
 

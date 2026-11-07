@@ -176,12 +176,12 @@ describe('annotation import on the cloud engine', () => {
       eventsB.forEach((event, index) => {
         if (event.type !== 'annotations.created') return;
         expect(event.origin.kind).toBe('remote');
-        expect(event.origin.tx).toEqual({ id: 'remote-import', index, count: 3 });
+        expect(event.origin.transaction).toEqual({ id: 'remote-import', index, count: 3 });
         expect(event.annotation).toEqual(result.annotations[index]);
       });
       // A published its own, once, with the same transaction.
-      expect(eventsA.map((event) => event.origin.tx)).toEqual(
-        eventsB.map((event) => event.origin.tx),
+      expect(eventsA.map((event) => event.origin.transaction)).toEqual(
+        eventsB.map((event) => event.origin.transaction),
       );
       await new Promise((r) => setTimeout(r, 400));
       expect(eventsA).toHaveLength(3);

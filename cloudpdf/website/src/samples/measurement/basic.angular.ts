@@ -15,7 +15,7 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfMeasurement, withMeasurement } from '@embedpdf/angular/measurement';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -49,7 +49,7 @@ export class MeasureToolbar {
   protected readonly interaction = inject(EpdfInteraction);
   private readonly measurement = inject(EpdfMeasurement);
   protected readonly tools = TOOLS;
-  private readonly scale = this.measurement.scaleOf(0); // the cover's scale
+  private readonly scale = this.measurement.scaleOf(0); // the floor plan's scale
   protected readonly ratio = computed(() => {
     const measure = this.scale().measure;
     return measure?.subtype === 'rectilinear' ? measure.ratio : '…';
@@ -57,7 +57,7 @@ export class MeasureToolbar {
   private started = false;
 
   constructor() {
-    // On load: the cover at 1:100, its width measured along the top, and the distance tool on.
+    // On load: the floor plan at 1:100, the building's width measured, and the distance tool on.
     effect(() => {
       if (!this.scale().ready || this.started) return;
       this.started = true;
@@ -68,8 +68,8 @@ export class MeasureToolbar {
             kind: 'distance',
             page: 0,
             points: [
-              { x: 30, y: 28 },
-              { x: 582, y: 28 },
+              { x: 62, y: 150 },
+              { x: 550, y: 150 },
             ],
           }),
         )
@@ -90,7 +90,7 @@ export class MeasureToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

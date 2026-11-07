@@ -24,7 +24,7 @@
   });
 
   async function download() {
-    saveFile(await documents.download(undefined, { mode }), 'ebook.pdf');
+    saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
   }
 </script>
 

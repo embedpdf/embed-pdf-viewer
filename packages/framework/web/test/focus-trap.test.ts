@@ -23,6 +23,9 @@ function page() {
   return byId;
 }
 
+/** Focus that lands outside comes back a microtask later. */
+const settled = () => Promise.resolve();
+
 const tab = (shiftKey = false) => {
   const event = new KeyboardEvent('keydown', {
     key: 'Tab',
@@ -55,12 +58,23 @@ describe('attachFocusTrap', () => {
     expect(tab().defaultPrevented).toBe(false);
   });
 
-  it('brings focus that lands outside back to the control that had it', () => {
+  it('brings focus that lands outside back to the control that had it', async () => {
     const byId = page();
     attachFocusTrap(byId('dialog'));
     byId('save').focus();
     byId('behind').focus();
+    await settled();
     expect(document.activeElement).toBe(byId('save'));
+  });
+
+  it('leaves focus where code moved it as the trap is released', async () => {
+    const byId = page();
+    const release = attachFocusTrap(byId('dialog'));
+    // One click closes the dialog and puts the cursor somewhere else.
+    byId('behind').focus();
+    release();
+    await settled();
+    expect(document.activeElement).toBe(byId('behind'));
   });
 
   it('holds focus on the container when nothing in it takes Tab', () => {
@@ -80,7 +94,7 @@ describe('attachFocusTrap', () => {
     expect(document.activeElement).toBe(byId('name'));
   });
 
-  it('lets only the trap started last act, until it is released', () => {
+  it('lets only the trap started last act, until it is released', async () => {
     const byId = page();
     const outer = byId('dialog');
     const inner = document.createElement('div');
@@ -90,22 +104,25 @@ describe('attachFocusTrap', () => {
     const releaseInner = attachFocusTrap(inner);
     expect(document.activeElement).toBe(byId('inner'));
     byId('behind').focus();
+    await settled();
     expect(document.activeElement).toBe(byId('inner'));
 
     releaseInner();
     expect(document.activeElement).toBe(byId('name'));
     byId('behind').focus();
+    await settled();
     expect(document.activeElement).toBe(byId('name'));
     releaseOuter();
     expect(document.activeElement).toBe(byId('opener'));
   });
 
-  it('leaves focus on a control inside that has it already, and comes back to it', () => {
+  it('leaves focus on a control inside that has it already, and comes back to it', async () => {
     const byId = page();
     byId('save').focus();
     attachFocusTrap(byId('dialog'));
     expect(document.activeElement).toBe(byId('save'));
     byId('behind').focus();
+    await settled();
     expect(document.activeElement).toBe(byId('save'));
   });
 

@@ -27,6 +27,7 @@ import {
 import { PagePtrPool } from './pages/PagePtrPool';
 import type { PageRecord } from './pages/PageRecord';
 import type { PageResidency } from './pages/PageResidency';
+import { readUtf16String } from '../runtime/memory/strings';
 
 /**
  * Owns the lifecycle of a single open PDFium document and the
@@ -412,6 +413,27 @@ export class DocumentSession {
     this.editsSeqCounter++;
   }
 
+  /** Forget the characters earlier appearances drew with no font: a write starts. */
+  clearMissingCharacters(): void {
+    if (this.docPtr) this.runtime.fn.EPDFDoc_ClearMissingCharacters(this.docPtr);
+  }
+
+  /** The characters (graphemes) appearances drew with no font since the last clear. */
+  missingCharacters(): string[] {
+    if (!this.docPtr) return [];
+    const { fn, mem } = this.runtime;
+    const docPtr = this.docPtr;
+    const characters: string[] = [];
+    const count = fn.EPDFDoc_CountMissingCharacters(docPtr);
+    for (let index = 0; index < count; index++) {
+      const character = readUtf16String(mem, (buf, cap) =>
+        fn.EPDFDoc_GetMissingCharacter(docPtr, index, buf, cap),
+      );
+      if (character) characters.push(character);
+    }
+    return characters;
+  }
+
   // ── transactions ──────────────────────────────────────────────────────────
 
   /** Whether a layer transaction is open (see {@link beginTransaction}). */
@@ -584,7 +606,7 @@ export class DocumentSession {
    * Nothing else creates objects at held numbers, so a held number is free
    * otherwise; the fork checks that again as it creates.
    */
-  useObjectNumber(objectNumber: number): void {
+  claimObjectNumber(objectNumber: number): void {
     if (!Number.isInteger(objectNumber) || objectNumber < 1) {
       throw new EngineError(EngineErrorCode.InvalidArg, `${objectNumber} is not an object number`, {
         details: { field: 'objectNumber' },
@@ -645,7 +667,7 @@ export class DocumentSession {
   /**
    * Park a disposer to run when this session closes. Used by operations
    * whose native side leaves the session document referencing another
-   * resource — e.g. `pages.insert`: `FPDF_ImportPagesByIndex` does not
+   * resource — e.g. `pages.insert`: `EPDFDoc_ImportPages` does not
    * fully detach imported objects from their source document, so the
    * source doc + its byte buffer must stay alive until the destination
    * can no longer be saved (i.e. until this session closes).

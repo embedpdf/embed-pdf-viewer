@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "The full viewer, delivered: the <embedpdf-viewer> custom element + EmbedPDF.init(). One Preact-compiled artifact of @embedpdf/viewer-chrome with the local wasm engine wired in — the thing the CDN serves and every framework wrapper wraps. Ships DIST only (the preact aliasing happens in THIS package's build), so consumers never compile the chrome.",
   "type": "module",
@@ -24,6 +24,7 @@
       "types": "./dist/doors/snippet.d.ts",
       "default": "./dist/embedpdf.js"
     },
+    "./strings/en.json": "./dist/strings/en.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -41,6 +42,7 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/default-signature-fonts": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
@@ -48,7 +50,9 @@
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
@@ -56,6 +60,7 @@
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-measurement": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",

@@ -11,6 +11,7 @@
 import type {
   BarEdge,
   BarPlace,
+  FloatPlace,
   FloatPosition,
   LayoutBar,
   LayoutData,
@@ -23,11 +24,13 @@ import type {
 import {
   SECTION_NAMES,
   entriesOf,
+  hostOf,
   isGroupObject,
   isLayoutItem,
   itemIdOf,
   itemsOfEntry,
   itemsOfMenuSection,
+  panelOf,
   sectionsOfMenu,
 } from './layout';
 import type {
@@ -79,11 +82,6 @@ export function edgeOf(place: BarPlace | undefined): BarEdge | null {
   if (typeof place === 'object' && place !== null && 'edge' in place)
     return EDGES.includes(place.edge) ? place.edge : null;
   return null;
-}
-
-/** The bar a place rides along, or `null`. */
-export function hostOf(place: BarPlace | undefined): string | null {
-  return typeof place === 'object' && place !== null && 'with' in place ? place.with : null;
 }
 
 /** What a place follows when it is over a selection, or `null`. */
@@ -175,10 +173,36 @@ export function floatStackOf(data: LayoutData, position: FloatPosition): string[
   return withRiders(data, barsFloating(data, position));
 }
 
+/**
+ * Whether a floating bar's place says it hides while nothing moves: its own place's
+ * `hideWhenIdle`, or that of the floating bar it rides along; `undefined` when it says neither,
+ * or the bar doesn't float.
+ */
+export function hideWhenIdleOf(data: LayoutData, id: string): boolean | undefined {
+  const seen = new Set<string>();
+  for (let current: string | null = id; current !== null && !seen.has(current); ) {
+    seen.add(current);
+    const place = data.bars?.[current]?.place;
+    if (floatOf(place) !== null) {
+      const hide: unknown = (place as FloatPlace).hideWhenIdle;
+      return typeof hide === 'boolean' ? hide : undefined;
+    }
+    current = hostOf(place);
+  }
+  return undefined;
+}
+
 /** The bars over a selection of this kind, in the order they were added. */
 export function barsAt(data: LayoutData, target: SelectionTarget): string[] {
   return barsOf(data)
     .filter(([, bar]) => selectionOf(bar.place) === target)
+    .map(([id]) => id);
+}
+
+/** The bars at the top of a panel, in the order they were added. */
+export function barsInPanel(data: LayoutData, panel: string): string[] {
+  return barsOf(data)
+    .filter(([, bar]) => panelOf(bar.place) === panel)
     .map(([id]) => id);
 }
 
@@ -215,11 +239,13 @@ const toBarChild = (item: LayoutItem): BarChild => {
     if (item.command !== undefined) custom.terminal = item.command;
     if (item.variants !== undefined) custom.variants = item.variants;
     if (item.importance !== undefined) custom.importance = item.importance;
+    if (item.grow === true) custom.grow = true;
     return custom;
   }
   const command: { -readonly [Key in keyof BarItem]: BarItem[Key] } = { command: item.command };
   if (item.variants !== undefined) command.variants = item.variants;
   if (item.importance !== undefined) command.importance = item.importance;
+  if (item.emphasis === 'primary') command.emphasis = 'primary';
   return command;
 };
 

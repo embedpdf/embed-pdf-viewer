@@ -5,6 +5,10 @@ import { useStage, useStageSettings, useStageState } from '@embedpdf/vue/stage';
 const stage = useStage();
 const { padding, gap } = useStageSettings();
 const zoomLevel = useStageState((state) => state.zoomLevel);
+// A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+const paddingSize = computed(() =>
+  typeof padding.value === 'number' ? padding.value : padding.value.top,
+);
 // A number grows with the zoom; { px } stays the same on screen.
 const onScreen = computed(() => typeof gap.value !== 'number');
 const gapSize = computed(() => (typeof gap.value === 'number' ? gap.value : gap.value.px));
@@ -26,10 +30,10 @@ function setGap(event: Event) {
         type="range"
         :min="0"
         :max="64"
-        :value="padding"
+        :value="paddingSize"
         @input="stage.updateSettings({ padding: numberOf($event) })"
       />
-      <output class="value">{{ padding }}</output>
+      <output class="value">{{ paddingSize }}</output>
     </label>
     <label class="label">
       Gap

@@ -20,10 +20,10 @@ import {
 } from '@embedpdf/angular/selection';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -96,7 +96,7 @@ export class SelectedText {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -127,10 +127,12 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something selected on load: the title on the cover.
+    // Something selected on load: "Documents", the first word on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 10, count: 52 });
+      // [!doc-range welcome firstWord]
+      if (cover) this.selection.select({ page: cover, start: 28, count: 9 });
+      // [!/doc-range]
     });
   }
 }

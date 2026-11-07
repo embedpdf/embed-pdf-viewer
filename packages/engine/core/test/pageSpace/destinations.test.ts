@@ -31,10 +31,6 @@ describe('destinations in page space', () => {
       { kind: 'xyz', page: B, x: null, y: null, zoom: null },
     ],
     [
-      { kind: 'xyz', page: B },
-      { kind: 'xyz', page: B },
-    ],
-    [
       { kind: 'fitH', page: A, top: 700 },
       { kind: 'fitH', page: A, y: 92 },
     ],
@@ -85,10 +81,12 @@ describe('destinations in page space', () => {
     expect(pdfDestinationOf(pageDestinationOf(destination, box), box)).toEqual(destination);
   });
 
-  test('a null or absent axis is kept, never measured', () => {
-    const page = pageDestinationOf({ kind: 'xyz', page: A, top: 500 }, boxOf);
-    expect(page).toEqual({ kind: 'xyz', page: A, y: 292 });
-    expect('x' in page).toBe(false);
+  test('a null axis stays null, never measured', () => {
+    const page = pageDestinationOf(
+      { kind: 'xyz', page: A, left: null, top: 500, zoom: null },
+      boxOf,
+    );
+    expect(page).toEqual({ kind: 'xyz', page: A, x: null, y: 292, zoom: null });
   });
 });
 
@@ -108,7 +106,6 @@ describe('values that carry destinations', () => {
   test('every goto in an action tree converts, down its next chain', () => {
     const tree: PdfActionTree<PdfDestination> = {
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
       root: {
         subtype: 'GoTo',
@@ -119,7 +116,7 @@ describe('values that carry destinations', () => {
           {
             subtype: 'GoTo',
             type: 'goto',
-            destination: { kind: 'xyz', page: B, left: -250, top: 350 },
+            destination: { kind: 'xyz', page: B, left: -250, top: 350, zoom: null },
             next: [],
           },
         ],
@@ -128,7 +125,7 @@ describe('values that carry destinations', () => {
     const page = mapActionTree(tree, toPage);
     expect(page.root).toMatchObject({
       destination: { kind: 'fitH', page: A, y: 92 },
-      next: [{ type: 'uri' }, { destination: { kind: 'xyz', page: B, x: 50, y: 40 } }],
+      next: [{ type: 'uri' }, { destination: { kind: 'xyz', page: B, x: 50, y: 40, zoom: null } }],
     });
   });
 
@@ -136,12 +133,12 @@ describe('values that carry destinations', () => {
     const snapshot: DocumentActionsSnapshot<PdfDestination> = {
       nameTreeScripts: [],
       openAction: null,
-      openDestination: { kind: 'xyz', page: B, left: -250, top: 350 },
+      openDestination: { kind: 'xyz', page: B, left: -250, top: 350, zoom: null },
     };
     expect(mapDocumentActions(snapshot, toPage)).toEqual({
       nameTreeScripts: [],
       openAction: null,
-      openDestination: { kind: 'xyz', page: B, x: 50, y: 40 },
+      openDestination: { kind: 'xyz', page: B, x: 50, y: 40, zoom: null },
     });
   });
 });

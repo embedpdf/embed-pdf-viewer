@@ -10,8 +10,14 @@
  * follows.
  */
 export { EmbedPdfViewerElement, type DefaultEngineProvider, type DoorEngine } from './element';
-// The viewer's own components, for your page: `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`.
-export { EpdfButtonElement, EpdfMenuElement, EpdfMenuItemElement } from './components';
+// The viewer's own components, for your page: `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`,
+// `<epdf-icon>`.
+export {
+  EpdfButtonElement,
+  EpdfIconElement,
+  EpdfMenuElement,
+  EpdfMenuItemElement,
+} from './components';
 export { initViewer } from './init';
 export type {
   DocumentEntry,
@@ -88,12 +94,14 @@ export type {
   CommandsCapability,
   DocumentInfo,
   DocumentsCapability,
+  LanguageStrings,
   NotAllowedMode,
   PanelResizeEvent,
   PluginName,
   PluginSettings,
   ResolvedCommand,
   ScopedViewer,
+  StringsLoader,
   ToolbarItemContext,
   ToolbarItemEdge,
   Unsubscribe,
@@ -101,13 +109,14 @@ export type {
   ViewerFont,
   ViewerPlugins,
   ViewerPluginsConfig,
+  WatchOptions,
 } from '@embedpdf/viewer-chrome';
 export type {
   AddItemOptions,
   BarEdge,
   BarPlace,
   CommandContext,
-  CommandDef,
+  CommandDefinition,
   Feature,
   FloatPosition,
   IconDef,

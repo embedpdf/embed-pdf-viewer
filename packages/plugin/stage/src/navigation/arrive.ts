@@ -21,12 +21,12 @@ import type { GoToOptions } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, setCursor, type StageState } from '../model';
+import { patchSettings, setCursor, type StageModel } from '../model';
 import type { StageServices } from '../services';
 import { whenPlaced } from '../services/placement-latch';
 
 export function createArrival(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
   { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,
@@ -35,16 +35,17 @@ export function createArrival(
     camera,
     viewport,
     padding,
+    zoomLimits,
     paged,
     isFitAll,
-    grouping,
     itemIndexOfPage,
     buildScene,
     sceneRect,
     itemRect,
     pageRectOf,
-    cursorItem,
-    fits,
+    currentPages,
+    unitStartOf,
+    fitsAcross,
     alignPoint,
     fitBox,
     boundsFor,
@@ -75,7 +76,7 @@ export function createArrival(
       const current = buildScene();
       if (!current.itemCount) return;
       const item = current.items[current.itemOfPage(anchor.pageIndex)];
-      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding());
+      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding(), zoomLimits());
       // Resolved against the current viewport: a resize restores the anchor
       // to the new viewport's policy point (start/start keeps the top pinned).
       const at = alignPoint(align ?? state().anchorAlign, viewport());
@@ -90,7 +91,7 @@ export function createArrival(
    * when unbounded).
    */
   const reapply = (anchor: Anchor, align?: AlignmentValue) => {
-    if (isFitAll()) goToTarget(state().cursor, { behavior: 'instant' });
+    if (isFitAll()) goToTarget(state().pageIndex, { behavior: 'instant' });
     else applyAnchor(anchor, align);
   };
 
@@ -114,10 +115,10 @@ export function createArrival(
       const current = buildScene(); // paged: the (possibly new) slice; continuous: the full scene
       if (!current.itemCount) return null;
       const item = paged() ? current.items[0] : current.items[itemIndexOfPage(target)];
-      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding());
+      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding(), zoomLimits());
       const subject = isFitAll()
         ? sceneRect()
-        : fits(itemRect(item), zoom)
+        : fitsAcross(itemRect(item), zoom)
           ? itemRect(item)
           : pageRectOf(item, target);
       // The landing policy: a per-call override beats the setting, and 'keep'
@@ -162,19 +163,20 @@ export function createArrival(
     }
   };
 
-  /** Step by the navigation unit: the item when it fits the viewport, else the page. */
+  /**
+   * Step past the pages you're on (`currentPages`): forward to the page after
+   * them, back to the unit before them, so a step always reaches a page you
+   * weren't on. Nothing past either end.
+   */
   const step = (direction: 1 | -1, options?: GoToOptions) => {
-    const item = cursorItem();
-    if (!item) return;
-    const { grouping: groups } = grouping();
-    if (isFitAll() || fits(itemRect(item), camera().zoom)) {
-      const index = Math.max(
-        0,
-        Math.min(itemIndexOfPage(state().cursor) + direction, groups.length - 1),
-      );
-      goToTarget(groups[index][0], options);
+    const pages = currentPages();
+    if (!pages.length) return;
+    if (direction === 1) {
+      const next = Math.max(...pages) + 1;
+      if (next < pageCount()) goToTarget(next, options);
     } else {
-      goToTarget(state().cursor + direction, options);
+      const before = Math.min(...pages) - 1;
+      if (before >= 0) goToTarget(unitStartOf(before), options);
     }
   };
 
@@ -198,8 +200,14 @@ export function createArrival(
         whenPlaced(placement, options, (go) =>
           goToTarget(Math.max(0, (ctx.document()?.pageCount ?? 1) - 1), go),
         ),
-      canGoNext: () => state().cursor < pageCount() - 1,
-      canGoPrevious: () => state().cursor > 0,
+      canGoNext: () => {
+        const pages = currentPages();
+        return pages.length > 0 && Math.max(...pages) < pageCount() - 1;
+      },
+      canGoPrevious: () => {
+        const pages = currentPages();
+        return pages.length > 0 && Math.min(...pages) > 0;
+      },
       nextPage: (options) => whenPlaced(placement, options, (go) => step(1, go)),
       previousPage: (options) => whenPlaced(placement, options, (go) => step(-1, go)),
       resetView,

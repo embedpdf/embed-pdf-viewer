@@ -18,19 +18,18 @@ import {
 } from '@embedpdf/angular/actions';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // A JavaScript action, as a PDF carries it behind a button or a link.
 const script = (code: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const GREETING = "app.alert('Hello, ' + identity.name + ' from ' + identity.corporation + '!');";
@@ -109,7 +108,7 @@ export class ScriptConsole {
   providers: [
     ScriptOutput,
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: links }] },
       // JavaScript on, and two fields scripts often ask for about the user.
       withActions({
         javascript: { enabled: true, identity: { name: 'Dana Smith', corporation: 'Acme' } },

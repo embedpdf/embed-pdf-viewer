@@ -15,11 +15,11 @@ import type {
   StageViewportChangedEvent,
   StageZoomChangedEvent,
 } from '../contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { eqSetting } from '../responsive';
 import { pickSettings, SETTING_KEYS } from '../settings';
 
-export function createEvents(ctx: PluginContext<StageState>) {
+export function createEvents(ctx: PluginContext<StageModel>) {
   const pageChanged = ctx.events.source<StagePageChangedEvent>();
   const zoomChanged = ctx.events.source<StageZoomChangedEvent>();
   const cameraChanged = ctx.events.source<StageCameraChangedEvent>();
@@ -38,16 +38,16 @@ export function createEvents(ctx: PluginContext<StageState>) {
         });
       }
     }
-    if (previous.cursor !== next.cursor) {
+    if (previous.pageIndex !== next.pageIndex) {
       pageChanged.emit({
-        page: ctx.document()?.pages[next.cursor]?.ref ?? null,
-        pageIndex: next.cursor,
-        previousPageIndex: previous.cursor,
+        page: ctx.document()?.pages[next.pageIndex]?.ref ?? null,
+        pageIndex: next.pageIndex,
+        previousPageIndex: previous.pageIndex,
       });
     }
     if (previous.viewport !== next.viewport) viewportChanged.emit({ size: next.viewport });
-    const changed = SETTING_KEYS.filter((key) => !eqSetting(previous[key], next[key]));
-    if (changed.length) settingsChanged.emit({ settings: pickSettings(next), changed });
+    const changedKeys = SETTING_KEYS.filter((key) => !eqSetting(previous[key], next[key]));
+    if (changedKeys.length) settingsChanged.emit({ settings: pickSettings(next), changedKeys });
   });
 
   return { pageChanged, zoomChanged, cameraChanged, motionEnded, settingsChanged, viewportChanged };

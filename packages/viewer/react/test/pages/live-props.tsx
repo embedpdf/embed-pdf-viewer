@@ -1,5 +1,5 @@
 /**
- * The live props: `src`, `theme`, `locale`, `disable` and `readOnly` change on a running viewer
+ * The live props: `src`, `theme`, `locale`, `disable`, `readOnly` and `appState` change on a running viewer
  * without mounting a new one, a callback prop calls its latest function, and a changed prop of any
  * other key is ignored with one warning in development. `live-props.test.ts` drives it.
  */
@@ -16,6 +16,7 @@ export interface LiveProps {
   locale: string;
   disable: string[];
   readOnly: boolean;
+  appState: { approved: boolean };
 }
 
 export interface LivePropsRecord {
@@ -47,6 +48,7 @@ function App() {
     locale: 'en',
     disable: [],
     readOnly: false,
+    appState: { approved: false },
   });
   const [, setRenders] = useState(0);
   const [tag, setTag] = useState('first');
@@ -57,7 +59,14 @@ function App() {
     <PDFViewer
       {...props}
       // A new array on every render: read once, so its change is ignored, with a warning.
-      commands={[{ id: 'acme:hello', label: 'Hello', run: () => {} }]}
+      commands={[
+        { id: 'acme:hello', label: 'Hello', run: () => {} },
+        {
+          id: 'acme:approve',
+          label: 'Approve',
+          active: ({ appState }) => (appState as LiveProps['appState']).approved,
+        },
+      ]}
       style={{ height: '100vh', display: 'block' }}
       onReady={(viewer) => record.viewers.push(viewer)}
       // A new function on every render: the viewer calls the latest one.

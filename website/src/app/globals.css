@@ -83,6 +83,38 @@ html {
   }
 }
 
+/* ---- Sponsorship: the funding bar fills in, sponsor tiles drift ---- */
+@keyframes epFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes epFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.ep-fill {
+  transform-origin: left center;
+  animation: epFill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+.ep-float {
+  animation: epFloat 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep-fill,
+  .ep-float {
+    animation: none;
+  }
+}
+
 /* ---- Quick Start section: dark background + arched wave transitions ---- */
 .ep-qs-bg {
   background:

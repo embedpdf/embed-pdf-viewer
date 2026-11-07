@@ -2,6 +2,7 @@ import {
   annotationKey,
   CONTINUOUS_RENDER_POLICY,
   isPluginError,
+  PluginError,
   memo,
   resolvePageLayers,
   snapAppearanceScale,
@@ -21,18 +22,21 @@ import {
   type PageRenderViewport,
   type PluginErrorInfo,
 } from '@embedpdf/core';
-import type { Rect } from '@embedpdf/core-geometry';
+import { intersectRects, type Rect } from '@embedpdf/core-geometry';
 import { AppearanceStore, RecentPictures } from './appearance-store';
 import type {
   InvalidateOptions,
   InvalidateScope,
   PageLayerOptions,
   PageRender,
+  PictureStateChangedEvent,
   RenderFormat,
   RenderInvalidatedEvent,
   RenderPageOptions,
   RenderPagesOptions,
   RenderSettings,
+  PicturePainter,
+  RenderThumbnailOptions,
 } from './contract';
 import type {
   AppearancePicture,
@@ -53,11 +57,14 @@ import {
   type ResolvedRenderOptions,
   type TilePaintPlan,
 } from './paint-plan';
+import { createPictureReports, PICTURE_STATES } from './pictures';
 import { RasterStore } from './raster-store';
+import { createSnapshots } from './snapshot';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
 
 const RENDER_SCOPE: DocCapability = 'doc.render';
+const THUMBNAIL_SCOPE: DocCapability = 'doc.render.thumbnail';
 const FORMS_SCOPE: DocCapability = 'doc.forms.read';
 const ANNOTATIONS_SCOPE: DocCapability = 'doc.annotate.read';
 
@@ -115,8 +122,32 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();
+  const pictureStateChanged = ctx.events.source<PictureStateChangedEvent>();
+  const pictures = createPictureReports(ctx, pictureStateChanged.emit);
 
   const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
+  const canRenderThumbnail = (): boolean => ctx.allows(THUMBNAIL_SCOPE);
+
+  // ── another plugin painting the pictures ──
+  // Kept out of state (a painter is behaviour, not data); `notify` tells the
+  // page layers, which read it through the capability.
+  let picturePainter: PicturePainter | null = null;
+  const handOverPictures = <Host>(painter: PicturePainter<Host>): (() => void) => {
+    if (picturePainter) {
+      throw new PluginError('conflict', 'render', 'another plugin paints the pictures already');
+    }
+    const held = painter as PicturePainter;
+    picturePainter = held;
+    ctx.notify();
+    let givenBack = false;
+    return () => {
+      if (givenBack) return;
+      givenBack = true;
+      if (picturePainter !== held) return;
+      picturePainter = null;
+      ctx.notify();
+    };
+  };
 
   // ── what a picture draws ──
   // The engine's rule (`resolvePageLayers`): each option as given, and one
@@ -190,6 +221,26 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const allPageObjectNumbers = (): PageObjectNumber[] =>
     (ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber);
 
+  /**
+   * A page a change on its way makes (a blank insert, a copy, an undone
+   * delete) is in the page list before the engine has it. Until it lands
+   * nothing asks the engine for its pictures: a blank page shows its
+   * background, a page coming back the pictures still kept under its keys,
+   * and a copy the pictures of the page it copies.
+   */
+  const isPending = (page: PageRef): boolean =>
+    ctx.document()?.pendingPages.has(page.objectNumber) ?? false;
+  /** The page a pending copy copies; null for any other page. */
+  const copiedFrom = (page: PageRef): PageRef | null => {
+    const pending = ctx.document()?.pendingPages.get(page.objectNumber);
+    return pending?.kind === 'copy' ? pending.of : null;
+  };
+  /** Resolves once the engine has a pending page; rejects `not-found` when it went first. */
+  const whenHeld = async (page: PageRef, signal: AbortSignal | undefined): Promise<void> => {
+    await ctx.waitFor(() => !isPending(page), signal ? { signal } : undefined);
+    if (!ctx.getPage(page)) ctx.assertPageRef(page);
+  };
+
   // The one base-sizing path: renderSource, getSourceKey, conformViewport,
   // and (through the tile manager) engagement all go through baseAskWidth.
   const conformViewport = (page: PageRef, scale: number): PageRenderViewport => {
@@ -215,6 +266,16 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   ): string =>
     `${pageObjectNumber}|w${width}|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
     `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
+  // A thumbnail is one picture per page, whatever the screen asks: its key
+  // has no width.
+  const thumbnailKey = (
+    pageObjectNumber: PageObjectNumber,
+    layers: PageRenderLayers,
+    format: RenderFormat | undefined,
+    quality: number | undefined,
+  ): string =>
+    `${pageObjectNumber}|thumbnail|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
+    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
 
   // ── the raster store door (shared by both render doors and the tiles) ──
   function acquireRaster(
@@ -233,22 +294,28 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const result = store.acquire(
       key,
       (storeSignal) => {
-        const doc = ctx.doc.with({
-          priority: 'high',
-          ...(request.view !== undefined ? { view: request.view } : {}),
-        });
-        const task = doc.page(page).render.image({
-          viewport: request.viewport,
-          ...request.layers,
-          ...(request.format !== undefined ? { format: request.format } : {}),
-          ...(request.quality !== undefined ? { quality: request.quality } : {}),
-        });
-        if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
-        else
-          storeSignal.addEventListener('abort', () => task.abort(reasonOf(storeSignal)), {
-            once: true,
+        const draw = (drawn: PageRef): Promise<PageImageHandle> => {
+          const doc = ctx.doc.with({
+            priority: 'high',
+            ...(request.view !== undefined ? { view: request.view } : {}),
           });
-        return task; // AbortablePromise<PageImageHandle> is a Promise<PageImageHandle>
+          const task = doc.page(drawn).render.image({
+            viewport: request.viewport,
+            ...request.layers,
+            ...(request.format !== undefined ? { format: request.format } : {}),
+            ...(request.quality !== undefined ? { quality: request.quality } : {}),
+          });
+          if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
+          else
+            storeSignal.addEventListener('abort', () => task.abort(reasonOf(storeSignal)), {
+              once: true,
+            });
+          return task; // AbortablePromise<PageImageHandle> is a Promise<PageImageHandle>
+        };
+        const drawnWhenHeld = (drawn: PageRef) =>
+          isPending(drawn) ? whenHeld(drawn, storeSignal).then(() => draw(drawn)) : draw(drawn);
+        // A copy draws as the page it copies, which the engine may not have yet either.
+        return drawnWhenHeld(copiedFrom(page) ?? page);
       },
       signal,
     );
@@ -273,8 +340,9 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The host door: conformed to the render points. Async so refusals reject. */
   async function renderSource(
     page: PageRef,
-    { scale, view, signal, ...options }: RenderSourceOptions & { signal?: AbortSignal },
+    { scale, view, signal, thumbnail, ...options }: RenderSourceOptions & { signal?: AbortSignal },
   ): Promise<PageImageHandle> {
+    if (thumbnail) return thumbnailOf(page, { ...options, view, signal }, 'render.renderSource');
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderSource');
     const layers = pictureLayers(options, 'render.renderSource');
     const viewport = conformViewport(page, scale);
@@ -300,6 +368,50 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     );
   }
 
+  /**
+   * A picture of part of a page, or a turned one, for its caller alone: no
+   * layer asks for it, so it skips the store. The rect is cut at the page's
+   * edge, and the size is the caller's, as the engine takes it.
+   */
+  function renderPart(
+    page: PageRef,
+    pageSize: { width: number; height: number },
+    options: RenderPageOptions,
+    layers: PageRenderLayers,
+    format: RenderFormat | undefined,
+    quality: number | undefined,
+  ): Promise<PageImageHandle> {
+    const rect = options.rect && intersectRects(options.rect, { x: 0, y: 0, ...pageSize });
+    if (rect && !(rect.width > 0 && rect.height > 0)) {
+      throw new PluginError('invalid-input', 'render', 'the rect misses the page', {
+        details: { field: 'rect' },
+      });
+    }
+    const signal = options.signal;
+    const draw = (drawn: PageRef): Promise<PageImageHandle> => {
+      const task = ctx.doc
+        .with({ priority: 'high' })
+        .page(drawn)
+        .render.image({
+          ...(rect ? { target: { kind: 'rect' as const, rect } } : {}),
+          viewport:
+            options.width !== undefined
+              ? { kind: 'width', width: Math.max(1, Math.round(options.width)) }
+              : { kind: 'scale', scale: options.scale ?? 1 },
+          ...(options.rotation ? { rotation: options.rotation } : {}),
+          ...layers,
+          ...(format !== undefined ? { format } : {}),
+          ...(quality !== undefined ? { quality } : {}),
+        });
+      if (signal?.aborted) task.abort(reasonOf(signal));
+      else signal?.addEventListener('abort', () => task.abort(reasonOf(signal)), { once: true });
+      return task;
+    };
+    // A copy draws as the page it copies, which the engine may not have yet either.
+    const drawn = copiedFrom(page) ?? page;
+    return isPending(drawn) ? whenHeld(drawn, signal).then(() => draw(drawn)) : draw(drawn);
+  }
+
   /** The public door: the requested size, exactly. Async so refusals reject. */
   async function renderPage(
     pageArgument: PageRef | number,
@@ -307,11 +419,17 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   ): Promise<PageImageHandle> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderPage');
     const { ref: page, size } = ctx.pageOf(pageArgument);
-    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     const layers = pictureLayers(options, 'render.renderPage');
     const strategy = currentStrategy();
     const format = options.format ?? strategy.format;
     const quality = options.quality ?? strategy.quality;
+    if (options.rect !== undefined || options.rotation) {
+      return ctx.cancellable(
+        options.signal,
+        renderPart(page, size, options, layers, format, quality),
+      );
+    }
+    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     // Exact-size renders share the store with the conformed door: a width
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
@@ -330,6 +448,31 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         },
         options.signal,
       ),
+    );
+  }
+
+  /** A page's thumbnail, by either door: one picture per page and layers. */
+  async function thumbnailOf(
+    page: PageRef,
+    {
+      view,
+      signal,
+      format: askedFormat,
+      quality: askedQuality,
+      ...options
+    }: RenderThumbnailOptions & { view?: string | undefined },
+    operation: string,
+  ): Promise<PageImageHandle> {
+    ctx.assertAllowed(THUMBNAIL_SCOPE, operation);
+    const layers = pictureLayers(options, operation);
+    const strategy = currentStrategy();
+    const format = askedFormat ?? strategy.format;
+    const quality = askedQuality ?? strategy.quality;
+    return acquireRaster(
+      page,
+      thumbnailKey(page.objectNumber, layers, format, askedQuality),
+      { viewport: { kind: 'thumbnail' }, layers, format, quality, view },
+      signal,
     );
   }
 
@@ -386,6 +529,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       group,
       `${group}|s${scale}|${asked.join(',')}`,
       async (fetchSignal) => {
+        if (isPending(page)) await whenHeld(page, fetchSignal);
         // The look at rest only, in every state: a check box keeps both its
         // pictures, and the looks under the pointer and pressed aren't drawn.
         const pageHandle = ctx.doc.page(toPageRef(pageObjectNumber));
@@ -469,6 +613,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       // denied session's viewport would otherwise be refused once per tile.
       ctx.assertAllowed(RENDER_SCOPE, 'render.tile');
       const page = toPageRef(pageObjectNumber);
+      if (isPending(page)) await whenHeld(page, signal);
       const strategy = currentStrategy();
       const task = ctx.doc
         .with({ priority: 'high', view })
@@ -535,7 +680,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         pages.delete(page.objectNumber);
         tiles.releasePage(viewId, page.objectNumber);
       },
-      dispose: () => {
+      destroy: () => {
         const view = views.get(viewId);
         if (!view || view.refs === 0) return;
         view.refs -= 1;
@@ -566,13 +711,25 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     for (const page of shown) replanPage(page);
   });
 
+  const snapshots = createSnapshots(ctx, {
+    renderPage,
+    renderPolicy,
+    settings: () => settings.get().snapshot,
+  });
+
   const api: RenderHostCapability = {
     // ── public lens ──
     ...settings.api,
     canRender,
+    canRenderThumbnail,
+    handOverPictures,
+    getPicturePainter: () => picturePainter,
     renderPage,
-    renderThumbnail: (page, { maxWidth, ...options }) =>
-      renderPage(page, { width: maxWidth, ...options }),
+    renderThumbnail: async (pageArgument, options = {}) =>
+      ctx.cancellable(
+        options.signal,
+        thumbnailOf(ctx.pageOf(pageArgument).ref, options, 'render.renderThumbnail'),
+      ),
     renderPages,
     getRenderPolicy: renderPolicy,
     getRenderEpoch: (page, layers = {}) => {
@@ -581,10 +738,23 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     },
     invalidate,
     onInvalidated: invalidated.on,
+    getPictureState: (page, view) => {
+      const info = ctx.getPage(page);
+      return info ? pictures.stateIn(view, info.ref.objectNumber) : PICTURE_STATES.idle;
+    },
+    onPictureStateChanged: pictureStateChanged.on,
 
     // ── host lens ──
     renderSource,
-    getSourceKey: (page, { scale, view: _view, ...options }) => {
+    getSourceKey: (page, { scale, view: _view, thumbnail, ...options }) => {
+      if (thumbnail) {
+        return thumbnailKey(
+          page.objectNumber,
+          layersOf(options),
+          currentStrategy().format,
+          undefined,
+        );
+      }
       const viewport = conformViewport(page, scale);
       return rasterKey(
         page.objectNumber,
@@ -598,11 +768,15 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     getPaintSettings: paintSettings,
     getLayerRights: rights,
     createViewDemand,
+    reportPicture: pictures.open,
     renderAppearances,
-    keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
+    getKeptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
     getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,
+
+    // ── snapshots, both lenses ──
+    ...snapshots.api,
   };
 
   return {
@@ -615,6 +789,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         if (!change) return;
         publishInvalidation(change.pages, change.scope, 'origin' in event ? event.origin : null);
       });
+      snapshots.connect();
     },
   };
 }

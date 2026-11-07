@@ -101,12 +101,14 @@ describe('validateLayout', () => {
         loopA: { place: { with: 'loopB' } },
         loopB: { place: { with: 'loopA' } },
         selected: { place: { at: 'everything' as never } },
+        paneled: { place: { panel: 'coments' } },
         unknown: { place: { near: 'main' } as never },
       },
+      panels: { comments: { side: 'end' } },
     };
     expect(validateLayout(places, { commands })).toEqual([
       'bar "none" has no place',
-      'bar "sideways": "sideways" is not a place (an edge, { edge, before | after }, { float }, { with } or { at })',
+      'bar "sideways": "sideways" is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })',
       'bar "odd": "middle" is not an edge',
       'bar "lost" goes after "mian": no such bar (did you mean "main"?)',
       'bar "wrongEdge" goes before "rail", which is not on the top edge',
@@ -115,8 +117,61 @@ describe('validateLayout', () => {
       'bar "orphan" rides along "mian": no such bar (did you mean "main"?)',
       'bar "loopA" rides along a bar that rides along it',
       'bar "loopB" rides along a bar that rides along it',
-      'bar "selected": "everything" is not selection or annotation',
-      'bar "unknown": {"near":"main"} is not a place (an edge, { edge, before | after }, { float }, { with } or { at })',
+      'bar "selected": "everything" is not selection, annotation or snapshot',
+      'bar "paneled" goes in "coments": no such panel (did you mean "comments"?)',
+      'bar "unknown": {"near":"main"} is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })',
+    ]);
+  });
+
+  it('says nothing about the bars that rode along a removed bar: they went with it', () => {
+    const { review: _review, ...bars } = valid.bars!;
+    const layout = createLayout({ ...valid, bars }).removeBar('main');
+    expect(Object.keys(layout.toJSON().bars!)).toEqual(['pager', 'selection']);
+    expect(validateLayout(layout, { commands })).toEqual([]);
+  });
+
+  it('checks hideWhenIdle and grow: true or false, and grow on your own components only', () => {
+    const flags: LayoutData = {
+      bars: {
+        pager: { place: { float: 'bottom', hideWhenIdle: 'yes' as never } },
+        zoom: { place: { float: 'bottom-end', hideWhenIdle: false } },
+        main: {
+          place: 'top',
+          start: [
+            [
+              { custom: 'title', grow: true },
+              { custom: 'status', grow: 1 as never },
+              { command: 'tool:pan', grow: true } as never,
+            ],
+          ],
+        },
+      },
+    };
+    expect(validateLayout(flags, { commands })).toEqual([
+      'bar "pager": hideWhenIdle "yes" is not true or false',
+      'bar "main": "status" has grow 1, which is not true or false',
+      'bar "main": "tool:pan" has grow, which only your own components take',
+    ]);
+  });
+
+  it('checks emphasis: primary, on a command only', () => {
+    const emphasis: LayoutData = {
+      bars: {
+        main: {
+          place: 'top',
+          start: [
+            [
+              { command: 'tool:pan', emphasis: 'primary' },
+              { command: 'tool:pointer', emphasis: 'loud' as never },
+              { custom: 'title', emphasis: 'primary' } as never,
+            ],
+          ],
+        },
+      },
+    };
+    expect(validateLayout(emphasis, { commands })).toEqual([
+      'bar "main": "tool:pointer" has emphasis "loud", which is not primary',
+      'bar "main": "title" has emphasis, which only a command\'s button takes',
     ]);
   });
 
@@ -182,15 +237,22 @@ describe('validateLayout', () => {
     ]);
   });
 
-  it('checks a panel’s present per size, its width limits and resizable', () => {
+  it('checks a panel’s present per size, its width limits and its flags', () => {
     const wrong: LayoutData = {
       panels: {
         notes: {
           present: { compact: 'overlay', medum: 'dock', expanded: 'float' } as never,
           width: { initial: 300, min: 400, max: 320, widest: 9 } as never,
           resizable: 'no' as never,
+          open: 1 as never,
+          closable: 'never' as never,
         },
-        fine: { present: { compact: 'overlay' }, width: { initial: 320, min: 240, max: 480 } },
+        fine: {
+          present: { compact: 'overlay' },
+          width: { initial: 320, min: 240, max: 480 },
+          open: true,
+          closable: false,
+        },
       },
     };
     expect(validateLayout(wrong, { commands })).toEqual([
@@ -199,6 +261,8 @@ describe('validateLayout', () => {
       'panel "notes": width has "widest", not initial, min or max',
       'panel "notes": width.min 400 is wider than width.max 320',
       'panel "notes": resizable "no" is not true or false',
+      'panel "notes": open 1 is not true or false',
+      'panel "notes": closable "never" is not true or false',
     ]);
   });
 

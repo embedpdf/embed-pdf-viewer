@@ -4,7 +4,7 @@ import type {
   DocumentProtection,
   FormFieldRef,
   FormWidget,
-  SignatureDTO,
+  Signature,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import { formWidget } from '@embedpdf/engine-core/runtime';
@@ -128,7 +128,7 @@ export class SignatureReader {
   }
 
   /** One signature by field object number, from the current model. */
-  readSignatureByObjectNumber(fieldObjectNumber: number): SignatureDTO {
+  readSignatureByObjectNumber(fieldObjectNumber: number): Signature {
     const snapshot = this.readSnapshot();
     const found = snapshot.signatures.find(
       (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === fieldObjectNumber,
@@ -167,14 +167,14 @@ export class SignatureReader {
         }
         return toHex(mem.readBytes(out, 32));
       });
-      return { sha256, byteLength };
+      return { sha256, sizeBytes: byteLength };
     }
     const cached = this.session.cachedPlainSha256();
-    if (cached) return { sha256: cached, byteLength };
+    if (cached) return { sha256: cached, sizeBytes: byteLength };
     const digest = new Uint8Array(this.digestRange([0, byteLength, byteLength, 0], 'sha256'));
     const sha256 = toHex(digest);
     this.session.rememberPlainSha256(sha256);
-    return { sha256, byteLength };
+    return { sha256, sizeBytes: byteLength };
   }
 
   // -------------------------------------------------------------------------

@@ -54,12 +54,12 @@ Each link has an `id`, its `bounds` on the page, and a `target`: where it goes.
 `activate()` does what a click does:
 
 ```ts
-const { outcome } = link.activate(someLink);
+const { status } = link.activate(someLink);
 ```
 
-It returns what happened right away, so a website can still open in a new tab: `'revealed'` (the
-view went to a page), `'uri'` (a website opened), or `'dispatched'` (the actions plugin runs the
-link's action). A link it won't follow, such as one to another file, is `'reported'`.
+Its `status` says what happened right away, so a website can still open in a new tab: `'revealed'`
+(the view went to a page), `'uri'` (a website opened), or `'dispatched'` (the actions plugin runs
+the link's action). A link it won't follow, such as one to another file, is `'reported'`.
 
 <Example name="links/list" />
 
@@ -72,7 +72,7 @@ Everything `useLink()` gives you.
 | `listLinks(page)`                   | Every link on a page, once the page's links are read. [Read the links on a page](#read-the-links-on-a-page)                   |
 | `getLink(page, id)`                 | One link by its `id`, or `null`                                                                                               |
 | `getLinkAt(page, point)`            | The link at a point on the page, the smallest when links overlap, or `null`                                                   |
-| `listAllLinks()`                    | Every link in the document, reading each page's links as needed                                                               |
+| `readAllLinks()`                    | Every link in the document, reading each page's links as needed                                                               |
 | `ensureLoaded(page)`                | Reads a page's links if they aren't read yet. `<LinkLayer>` does this for every page it shows.                                |
 | `isLoaded(page)`, `getStatus(page)` | Whether a page's links are read, and in detail: `'idle'`, `'loading'`, `'ready'`, `'error'` or `'forbidden'`                  |
 | `activate(link)`                    | Follows a link, or a link's `target`, as a click does, and returns what happened. [Follow a link from code](#follow-a-link-from-code) |

@@ -66,6 +66,7 @@ const ALL_BASE_SCOPES: LayerScopes = {
   attachments: 'base',
   metadata: 'base',
   actions: 'base',
+  outline: 'base',
 };
 
 /**
@@ -129,6 +130,9 @@ export class LayerStateService {
         attachmentsVersion: row.attachmentsVersion,
         annotationsVersion: row.annotationsVersion,
         formsVersion: row.formsVersion,
+        outlineVersion: row.outlineVersion,
+        fontsVersion: row.fontsVersion,
+        contentsVersion: row.contentsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -197,6 +201,7 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
       | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
@@ -210,13 +215,14 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
-    // Law 9: a layer whose base is not the head (a sibling published a
-    // version since) is diverged for every plane — the head's layout,
-    // metadata and attachments are another version's. Its reads resolve
-    // at layer URLs over its own base until it is rebased.
+    // Law 9: a layer whose base is not the document's (the upload: its own
+    // signature made a version) is diverged for every plane: the shared
+    // layout, metadata and attachments are the upload's. Its reads resolve
+    // at layer URLs over its own base.
     if (head && layer.baseSha !== null && layer.baseSha !== head.sha256) {
       return {
         content: 'layer',
@@ -226,6 +232,7 @@ export class LayerStateService {
         attachments: 'layer',
         metadata: 'layer',
         actions: 'base',
+        outline: 'layer',
       };
     }
     const base = head ?? { ...INITIAL_BASE_POINTERS, sha256: layer.baseSha ?? '' };
@@ -251,6 +258,7 @@ export class LayerStateService {
       attachments: layer.attachmentsVersion === base.attachmentsVersion ? 'base' : 'layer',
       metadata: layer.metadataVersion === base.metadataVersion ? 'base' : 'layer',
       actions: 'base',
+      outline: layer.outlineVersion === base.outlineVersion ? 'base' : 'layer',
     };
   }
 
@@ -290,13 +298,16 @@ export class LayerStateService {
       attachmentsVersion: version.attachmentsVersion,
       annotationsVersion: version.annotationsVersion,
       formsVersion: version.formsVersion,
+      outlineVersion: version.outlineVersion,
+      fontsVersion: version.fontsVersion,
+      contentsVersion: version.contentsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
-      baseSha: head.baseSha,
+      baseSha256: head.baseSha256,
       layerVersion: 0,
       working: false,
-      baseByteLength: version.byteLength,
+      baseSizeBytes: version.byteLength,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),
     };
@@ -304,7 +315,7 @@ export class LayerStateService {
 
   buildLayerManifest(
     docId: string,
-    /** The layer's base version (behind the head after a sibling published). */
+    /** The layer's base version: the upload, or the version its last signature made. */
     base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
     /** What the base version's signatures forbid. */
     protection: DocumentProtection | null,
@@ -317,6 +328,9 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
+      | 'fontsVersion'
+      | 'contentsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -337,16 +351,19 @@ export class LayerStateService {
       attachmentsVersion: layer.attachmentsVersion,
       annotationsVersion: layer.annotationsVersion,
       formsVersion: layer.formsVersion,
+      outlineVersion: layer.outlineVersion,
+      fontsVersion: layer.fontsVersion,
+      contentsVersion: layer.contentsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
-      baseSha: base.sha256,
+      baseSha256: base.sha256,
       // The signing fences a client pins: the layer's write serial, and
       // whether an artifact (edits not yet sealed into a version) exists —
       // `currentVersion > 0` alone no longer says so after a publish.
       layerVersion: layer.currentVersion,
       working: layer.currentArtifactKey !== null,
-      baseByteLength: base.byteLength,
+      baseSizeBytes: base.byteLength,
       scopes,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),
@@ -366,6 +383,10 @@ export class LayerStateService {
      */
     annotationsVersion?: number;
     formsVersion?: number;
+    /** The font list's pin, when the write changed the fonts the list shows. */
+    fontsVersion?: number;
+    /** The contents pin, when the write moved a page's content or the page set. */
+    contentsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -375,6 +396,8 @@ export class LayerStateService {
         ? { annotationsVersion: input.annotationsVersion }
         : {}),
       ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
+      ...(input.fontsVersion !== undefined ? { fontsVersion: input.fontsVersion } : {}),
+      ...(input.contentsVersion !== undefined ? { contentsVersion: input.contentsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).
@@ -387,18 +410,15 @@ export class LayerStateService {
   }
 
   /**
-   * Law 9: a published version contains everything the signing layer's
-   * artifact carried — every page it touched, its page order, metadata,
-   * attachments, annotations — so the head's catalog becomes the layer's
-   * complete surviving page set: rows the layer has replace the base's,
-   * pages it inserted are added, pages it deleted (seeded on first write,
-   * removed by pages.delete) disappear; the signed page gets one more
-   * annotation bump for the signature widget. The layer's rows are then
-   * the base's again (it inherits every plane over the new version). A
-   * layer with no page rows was never page-written: the base's rows carry
-   * over unchanged but for the signed page.
+   * The signing layer's pages over the version its signature made. The
+   * version contains everything the layer's artifact carried (every page
+   * it touched, its page order, its annotations), so its page set is the
+   * layer's surviving rows, or the base's when it never wrote a page; the
+   * signed page gets one more widget bump for the signature. They become
+   * the layer's own rows: the document's (`document_pages`, the upload's)
+   * don't change.
    */
-  async promoteLayerToBase(
+  async signLayerPages(
     trx: Transaction<Schema>,
     input: { docId: string; layerId: string; signedPage: number | null; now: number },
   ): Promise<DurablePageRow[]> {
@@ -408,46 +428,32 @@ export class LayerStateService {
       .where('layer_id', '=', input.layerId)
       .orderBy('page_object_number', 'asc')
       .execute();
-    const baseRows = await trx
-      .selectFrom('document_pages')
-      .selectAll()
-      .where('doc_id', '=', input.docId)
-      .orderBy('page_object_number', 'asc')
-      .execute();
-    const source = layerRows.length > 0 ? layerRows : baseRows;
-    const promoted = source.map((row) => {
-      const signed =
+    const source =
+      layerRows.length > 0
+        ? layerRows
+        : await trx
+            .selectFrom('document_pages')
+            .selectAll()
+            .where('doc_id', '=', input.docId)
+            .orderBy('page_object_number', 'asc')
+            .execute();
+    const signed = source.map((row) => {
+      const isSigned =
         input.signedPage !== null && Number(row.page_object_number) === input.signedPage;
       return {
         pageObjectNumber: Number(row.page_object_number),
         contentVersion: Number(row.content_version),
         annotationVersion: Number(row.annotation_version),
-        widgetVersion: Number(row.widget_version) + (signed ? 1 : 0),
-        updatedAt: signed ? input.now : Number(row.updated_at),
+        widgetVersion: Number(row.widget_version) + (isSigned ? 1 : 0),
+        updatedAt: isSigned ? input.now : Number(row.updated_at),
       };
     });
-    await trx.deleteFrom('document_pages').where('doc_id', '=', input.docId).execute();
-    if (promoted.length > 0) {
-      await trx
-        .insertInto('document_pages')
-        .values(
-          promoted.map((page) => ({
-            doc_id: input.docId,
-            page_object_number: page.pageObjectNumber,
-            content_version: page.contentVersion,
-            annotation_version: page.annotationVersion,
-            widget_version: page.widgetVersion,
-            updated_at: page.updatedAt,
-          })),
-        )
-        .execute();
-    }
-    if (layerRows.length > 0) {
-      await trx.deleteFrom('layer_pages').where('layer_id', '=', input.layerId).execute();
+    await trx.deleteFrom('layer_pages').where('layer_id', '=', input.layerId).execute();
+    if (signed.length > 0) {
       await trx
         .insertInto('layer_pages')
         .values(
-          promoted.map((page) => ({
+          signed.map((page) => ({
             layer_id: input.layerId,
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
@@ -458,7 +464,7 @@ export class LayerStateService {
         )
         .execute();
     }
-    return promoted;
+    return signed;
   }
 
   get repos(): {

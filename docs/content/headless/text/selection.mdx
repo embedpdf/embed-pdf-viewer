@@ -11,9 +11,9 @@ above the page:
 
 <Example name="selection/basic" mode="open" />
 
-> **Try it:** the cover's title starts out selected from code. Drag over text, double-click a word,
-> or triple-click a line. A selection can run from one page onto the next. On a touch screen,
-> long-press a word and drag the handles.
+> **Try it:** "Documents", the first word on the cover, starts out selected from code. Drag over
+> text, double-click a word, or triple-click a line. A selection can run from one page onto the
+> next. On a touch screen, long-press a word and drag the handles.
 
 `interactionPlugin()` is the input system every tool shares: the Stage passes the pointer to it,
 the selection plugin handles it, and `<SelectionLayer>` draws the result. So you can restyle or
@@ -191,7 +191,7 @@ Set them when you register the plugin, and change them while the app runs with
 
 | Setting           | What it does                                                | Default                       | From CSS                              |
 | :---------------- | :---------------------------------------------------------- | :---------------------------- | :------------------------------------ |
-| `dragThreshold`   | How far, in pixels, the pointer moves before a drag selects | `4`                           | —                                     |
+| `dragThresholdPx`   | How far, in pixels, the pointer moves before a drag selects | `4`                           | —                                     |
 | `color`           | The color of selected text                                  | the viewer's accent at 35%    | `--epdf-text-selection`               |
 | `handles.color`   | The grips at its ends, on touch screens                     | the viewer's accent           | `--epdf-text-selection-handle`        |
 | `handles.shadow`  | Their shadow                                                | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
@@ -214,7 +214,7 @@ A CSS variable wins over the setting, for dark mode or a different look per view
 | `onChanged`   | The selection changed, while dragging too                   | `range`, `pages` |
 | `onCommitted` | A drag or a tap finished selecting                          | `range`          |
 | `onCleared`   | The selection was cleared                                   | —                |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 Use the change event for things that follow the selection as it grows, and the commit event for
 things that should happen once, such as creating a highlight.

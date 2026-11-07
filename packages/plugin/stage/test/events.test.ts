@@ -3,14 +3,14 @@ import { toPageRef, type HostClock } from '@embedpdf/core';
 import { createTestContext, manualClock } from '@embedpdf/core/testing';
 
 import { createStageController } from '../src/controller';
-import { initialStageState } from '../src/model';
+import { initialStageModel } from '../src/model';
 import type { StageConfig, StageHostCapability } from '../src/host-contract';
 
 function harness(config: StageConfig = {}, clock?: HostClock) {
   const ctx = createTestContext({
     id: 'stage',
     clock,
-    state: initialStageState({ viewUnitsPerPoint: 1, ...config }),
+    state: initialStageModel({ viewUnitsPerPoint: 1, ...config }),
     pages: Array.from({ length: 5 }, (_, index) => ({
       ref: toPageRef(index + 1),
       size: { width: 600, height: 800 },
@@ -30,7 +30,7 @@ function harness(config: StageConfig = {}, clock?: HostClock) {
     ),
   );
   stage.onViewportChanged((event) => log.push(`viewport:${event.size.width}x${event.size.height}`));
-  stage.onSettingsChanged((event) => log.push(`settings:${event.changed.join(',')}`));
+  stage.onSettingsChanged((event) => log.push(`settings:${event.changedKeys.join(',')}`));
   stage.onMotionEnded(() => log.push('motion-ended'));
   return { stage, log };
 }

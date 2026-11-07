@@ -13,13 +13,12 @@ import {
   type BundleLimits,
   type DocumentEventInit,
   type DocumentFormsService,
-  type DocumentManifest,
   type FormBundle,
   type FormExportSelection,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
@@ -70,7 +69,9 @@ import {
   FormWidgetsReorderResultSchema,
   FormCalculationsReorderResultSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
+import type { CloudManifest } from './CloudDocumentHandle';
 
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -118,9 +119,10 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       this.http.getJsonWithRefresh(
         async (s) => {
           const manifest = await this.manifest.get(s);
+          const pin = tokenPinOf('form', manifest.engine);
           return planesInherited(manifest, ['forms'])
-            ? wirePaths.docForm(this.docId, manifest.formsVersion)
-            : wirePaths.layerForm(this.docId, this.layerName, manifest.formsVersion);
+            ? wirePaths.docForm(this.docId, manifest.formsVersion, pin)
+            : wirePaths.layerForm(this.docId, this.layerName, manifest.formsVersion, pin);
         },
         (raw) => FormSnapshotSchema.parse(raw),
         async (s) => {
@@ -131,10 +133,10 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     );
   }
 
-  get(ref: FormFieldRef): AbortablePromise<FormFieldDTO> {
-    const rejected = this.rejectIfClosed<FormFieldDTO>();
+  get(ref: FormFieldRef): AbortablePromise<FormField> {
+    const rejected = this.rejectIfClosed<FormField>();
     if (rejected) return rejected;
-    return AbortablePromise.run<FormFieldDTO>((signal) =>
+    return AbortablePromise.run<FormField>((signal) =>
       this.http.getJson(
         wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
         (raw) => FormFieldDTOSchema.parse(raw),
@@ -641,11 +643,12 @@ export class CloudDocumentFormsService implements DocumentFormsService {
    * base leaf while the layer inherits both planes the bundle depends on —
    * or `null` when a URL can't carry it.
    */
-  private exportPathAt(manifest: DocumentManifest, selection: FormExportSelection): string | null {
+  private exportPathAt(manifest: CloudManifest, selection: FormExportSelection): string | null {
     const token = {
       formsVersion: manifest.formsVersion,
       layoutVersion: manifest.layoutVersion,
       selection,
+      pin: tokenPinOf('formExport', manifest.engine),
     };
     try {
       return planesInherited(manifest, ['forms', 'layout'])

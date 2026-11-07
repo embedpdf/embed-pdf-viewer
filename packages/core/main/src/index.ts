@@ -5,11 +5,13 @@ export * from './serial-queue';
 export * from './errors';
 export { timerClock } from './clock';
 export type { Cancel, HostClock, PluginClock } from './clock';
+export type { HostFontProgram, HostTextMeasurer } from './measurer';
 export { composeApi } from './compose';
 export type { LatestCancellation, LatestLane, LatestRun } from './lanes';
 export { createLatestLane } from './lanes';
 export { guardHandle } from './guarded-handle';
 export { memo, memoByKey } from './memo';
+export { isPdf } from './pdf-header';
 export { reload } from './mirror';
 export type { Mirror, MirrorChange, MirrorReload, MirrorSpec } from './mirror';
 export type { PageMirror, PageMirrorChange, PageMirrorSpec } from './page-mirror';
@@ -26,6 +28,7 @@ export type {
 export type {
   DeepPartial,
   NoSettings,
+  SettingLock,
   Settings,
   SettingsApi,
   SettingsChangedEvent,
@@ -64,6 +67,10 @@ export {
   annotationKey,
   // Local-only members (warmup, fonts) are reached through this check.
   isLocalEngine,
+  // What undoing a page edit shows: a change's `undo` (the page list predicts with these).
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationAppearanceImage,
@@ -77,17 +84,19 @@ export type {
   PageRenderOptions,
   PageRenderTarget,
   PageRenderViewport,
+  PrintDpi,
   PageImageHandle,
   PageImageOptions,
   PageImageObjectUrl,
   PdfRect,
+  RestoredPage,
   CallFacts,
   CallPriority,
   WorkingSetPage,
 } from '@embedpdf/engine-core/runtime';
 
 import type { NoSettings } from './settings';
-import type { CapabilityToken, PluginDef, PromiseMembers } from './types';
+import type { CapabilityToken, PluginDefinition, PromiseMembers } from './types';
 
 /**
  * Create a typed capability token. `name` is the token's identity (debugging,
@@ -127,6 +136,8 @@ export function definePlugin<
   State = void,
   Capability = unknown,
   Settings extends object = NoSettings,
->(definition: PluginDef<State, Capability, Settings>): PluginDef<State, Capability, Settings> {
+>(
+  definition: PluginDefinition<State, Capability, Settings>,
+): PluginDefinition<State, Capability, Settings> {
   return definition;
 }

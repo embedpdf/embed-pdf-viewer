@@ -4,6 +4,7 @@ import type { BaseClientOptions, BaseRequestOptions } from "../../../../../../Ba
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../../../BaseClient.js";
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../../../core/headers.js";
 import * as core from "../../../../../../core/index.js";
+import * as environments from "../../../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../../../errors/index.js";
 import * as CloudPDF from "../../../../../index.js";
@@ -19,7 +20,7 @@ export class MetadataClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<MetadataClient.Options>;
     protected _custom: CustomClient | undefined;
 
-    constructor(options: MetadataClient.Options) {
+    constructor(options: MetadataClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -44,26 +45,30 @@ export class MetadataClient {
     public get(
         request: CloudPDF.doc.GetMetadataRequest,
         requestOptions?: MetadataClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocMetadataGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocMetadataGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.GetMetadataRequest,
         requestOptions?: MetadataClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataGetResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.0",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/metadata`,
             ),
             method: "GET",
@@ -76,13 +81,16 @@ export class MetadataClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocMetadataGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocMetadataGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

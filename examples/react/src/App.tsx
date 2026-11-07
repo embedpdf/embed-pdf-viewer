@@ -23,6 +23,7 @@ import {
   useStageState,
   useStageSettings,
   useDocuments,
+  usePageList,
   useDocumentsState,
   useViewManager,
   useViewManagerState,
@@ -259,7 +260,7 @@ const plugins = [
   // document text search: budgeted engine slices, viewport-first scanning. Hit
   // navigation lands the match at the viewport's top-middle (y: 0.35 — the
   // browser find-bar feel); try y: 0.5 for dead center, y: 0.65 for bottom.
-  searchPlugin({ reveal: { anchor: { y: 0.35 }, behavior: 'smooth' } }),
+  searchPlugin({ reveal: { align: { y: 0.35 }, behavior: 'smooth' } }),
   // workspace plugin, engine-free: locale packs as store state. Alive from
   // createKernel() — the shell below translates while the engine still boots.
   // 'en' ships eagerly; 'es' is a lazy pack fetched on first switch. The
@@ -958,7 +959,7 @@ function FieldPanel() {
   const field = useFormState((state) => state.selectedField);
   if (!field) return null;
   const patch = (p: Record<string, unknown>) =>
-    void form.update(field.ref, { family: field.family, ...p } as FormFieldPatch);
+    void form.update(field.ref, { kind: field.kind, ...p } as FormFieldPatch);
   return (
     <div
       style={{
@@ -970,7 +971,7 @@ function FieldPanel() {
       }}
     >
       <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: '#999' }}>
-        Field · {field.family}
+        Field · {field.kind}
       </span>
       <SideField label="Name">
         <input
@@ -991,7 +992,7 @@ function FieldPanel() {
         />
         required
       </label>
-      {(field.family === 'combobox' || field.family === 'listbox') && (
+      {(field.kind === 'combobox' || field.kind === 'listbox') && (
         <SideField label="Options (one per line)">
           <textarea
             key={field.name}
@@ -1472,7 +1473,7 @@ function Toolbar() {
             min={0}
             max={200}
             step={4}
-            value={settings.padding}
+            value={typeof settings.padding === 'number' ? settings.padding : settings.padding.top}
             onChange={(e) => update({ padding: Math.max(0, Number(e.target.value) || 0) })}
             style={tbNum}
           />
@@ -1553,6 +1554,7 @@ function ThumbnailSidebar() {
   const currentPage = useStageState((state) => state.currentPageIndex);
   const editor = usePageEdit(); // PERSISTED page edits (document-scoped, shared by lenses)
   const canEdit = editor.canEdit();
+  const pages = usePageList(); // a move names its neighbour by ref
   const pageCount = useStageState((state) => state.pageCount, ThumbsStageToken); // gates move/delete edges
   const [menuPage, setMenuPage] = useState<number | null>(null); // which thumb's action menu is open
   const thumbs = useStage(ThumbsStageToken); // the SIDEBAR lens
@@ -1718,7 +1720,9 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.reorder([page.ref], { before: page.pageIndex - 1 }))
+                          act(e, () =>
+                            editor.reorder([page.ref], { before: pages[page.pageIndex - 1]!.ref }),
+                          )
                         }
                       >
                         ↑ Move page up
@@ -1728,7 +1732,9 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.reorder([page.ref], { after: page.pageIndex + 1 }))
+                          act(e, () =>
+                            editor.reorder([page.ref], { after: pages[page.pageIndex + 1]!.ref }),
+                          )
                         }
                       >
                         ↓ Move page down
@@ -1913,7 +1919,7 @@ function Pane({
         </button>
         {canRemove && (
           <button
-            onClick={() => v.removePane(view.id)}
+            onClick={() => v.deletePane(view.id)}
             title="close this pane (documents stay open)"
             style={{
               marginLeft: 'auto',

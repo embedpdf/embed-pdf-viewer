@@ -10,7 +10,7 @@ import type { IsoDateTime } from './IsoDateTime';
  *             takes the metadata as its `file` data and the bytes as its
  *             `file` resource.
  *   read   -> {@link AttachmentFileInfo}: the same metadata fields plus
- *             engine-derived facts (size, checksum, dates) and never
+ *             engine-derived facts (`sizeBytes`, `md5`, dates) and never
  *             the bytes — listings stay cheap; bytes leave the engine only
  *             through an explicit download call.
  *
@@ -65,9 +65,9 @@ export interface AttachmentFileInfo {
   /** Human-readable description — `/Desc` on the filespec. */
   description: string | null;
   /** `/Params /Size` — decoded size in bytes. */
-  size: number | null;
+  sizeBytes: number | null;
   /** `/Params /CheckSum` — MD5 of the decoded bytes, lowercase hex. */
-  checksum: string | null;
+  md5: string | null;
   /** `/Params /CreationDate`. */
   createdAt: IsoDateTime | null;
   /** `/Params /ModDate`. */
@@ -85,6 +85,14 @@ export interface AttachmentFileInfo {
  * values may collide while keys cannot. Address by `key`; display `name`.
  */
 export type AttachmentRef = { kind: 'key'; key: string };
+
+/**
+ * How much of a file the local engine decodes: a download of a larger file,
+ * from either home, is refused with `PayloadTooLarge`, before a small stream
+ * that inflates to gigabytes takes the tab down. A file's declared size
+ * can't be trusted. The cloud engine has its server's limit.
+ */
+export const ATTACHMENT_LIMITS = { decodedBytes: 256 * 1024 * 1024 } as const;
 
 /** The ref of an attachment whose name-tree key you already hold. */
 export function toAttachmentRef(key: string): AttachmentRef {

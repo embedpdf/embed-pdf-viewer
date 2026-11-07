@@ -19,14 +19,14 @@ const plugins = [
   searchPlugin(),
 ];
 
-const TITLE = { start: 10, count: 52 };
+const FIRST_WORD = { start: 28, count: 9 };
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
+// On load: the first word is selected and "PDF" is found, so every color below has something to paint.
 function ShowColors() {
   const selection = useSelection();
   const search = useSearch();
@@ -35,7 +35,7 @@ function ShowColors() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   }, [selection, cover]);
   return null;
 }
@@ -56,7 +56,7 @@ export default function App() {
           </button>
         </div>
       </div>
-      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
         <DocumentGate fallback={<p className="loading">Loading…</p>}>
           <ShowColors />
           <Stage className="stage">

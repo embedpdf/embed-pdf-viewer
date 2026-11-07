@@ -9,7 +9,7 @@ const viewer = shallowRef<Viewer | null>(null);
 
 <template>
   <button :disabled="!viewer" @click="viewer?.commands.execute('document:print')">Print</button>
-  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 80vh" @ready="viewer = $event">
+  <PDFViewer :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 80vh" @ready="viewer = $event">
     <ToolbarItem id="first-page"><FirstPage /></ToolbarItem>
   </PDFViewer>
 </template>

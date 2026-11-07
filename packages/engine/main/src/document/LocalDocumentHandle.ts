@@ -6,10 +6,15 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  attachmentVerbs,
+  outlineVerbs,
+  pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
+  type DocumentAttachmentsService,
   type DocumentActionsService,
   type DocumentEventStream,
+  type DocumentOutlineService,
   type ObjectNumberPool,
   type ObjectNumberRange,
   LOCAL_ENGINE_BRAND,
@@ -37,8 +42,9 @@ import { LocalDocumentActionsService } from './LocalDocumentActionsService';
 import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
 import { LocalDocumentChanges } from './LocalDocumentChanges';
-import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
+import { LocalDocumentFontsService, noticingFontChanges } from './LocalDocumentFontsService';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
+import { readLocalOutline } from './LocalDocumentOutlineService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
@@ -77,10 +83,11 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly annotations: DocumentAnnotationsService;
-  readonly attachments: LocalDocumentAttachmentsService;
+  readonly attachments: DocumentAttachmentsService;
   readonly actions: DocumentActionsService;
+  readonly outline: DocumentOutlineService;
   readonly forms: LocalDocumentFormsService;
-  readonly fonts: LocalDocumentFontSettings;
+  readonly fonts: LocalDocumentFontsService;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
@@ -114,20 +121,26 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
     /** The numbers the open handed out; absent for a locked open, which gets them on unlock. */
     objectNumbers?: ObjectNumberRange,
+    /** Told when the engine's fonts change: this document's joins while it is open. */
+    engineFontListeners?: Set<() => void>,
   ): LocalDocumentHandle {
     let closed = false;
     const isClosed = () => closed;
     const hub = new EventHub();
     const pool = new LocalObjectNumberPool(id, queue, hub, objectNumbers);
+    // A single instance, so every event is `kind: 'local'` — the same
+    // interface as cloud with the collaborative fields at rest.
+    const publisher = new SessionEventPublisher(hub, sessionId);
+    // The engine's fonts are in every open document's list.
+    const engineFontsChanged = () => publisher.publishFact({ type: 'fonts.changed' });
+    engineFontListeners?.add(engineFontsChanged);
     const doc: OpenDocument = {
       id,
       queue,
       imageEncoder,
       guard,
       renderPolicy,
-      // A single instance, so every event is `kind: 'local'` — the same
-      // interface as cloud with the collaborative fields at rest.
-      publisher: new SessionEventPublisher(hub, sessionId),
+      publisher,
       events: hub,
       security: new LocalDocumentSecurityService(
         initialSecurity,
@@ -142,6 +155,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       isClosed,
       close: () => {
         closed = true;
+        engineFontListeners?.delete(engineFontsChanged);
       },
       withFacts: new Map(),
     };
@@ -153,7 +167,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     private readonly facts: CallFacts,
   ) {
     const { id, guard, publisher } = doc;
-    const queue = doc.queue.withFacts(facts);
+    const queue = noticingFontChanges(doc.queue.withFacts(facts), publisher);
     const view = { isClosed: doc.isClosed };
     this.id = id;
     this.queue = queue;
@@ -165,12 +179,22 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
     this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
-    this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, publisher);
+    this.attachments = attachmentVerbs(
+      new LocalDocumentAttachmentsService(id, queue, view, guard),
+      (change, options) => this.apply(change, options),
+    );
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
+    this.outline = outlineVerbs(
+      () => readLocalOutline(id, queue, view, guard),
+      (change, options) => this.apply(change, options),
+    );
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
-    this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
+    this.fonts = new LocalDocumentFontsService(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
-    this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
+    this.pages = pageVerbs(
+      new LocalDocumentPagesService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);
     this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, publisher);
     this.changes = new LocalDocumentChanges(id, queue, view, guard, publisher);

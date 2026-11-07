@@ -6,6 +6,7 @@ import {
   filterBar,
   group,
   hasVisibleUnits,
+  item,
   normalizeBar,
   type BarSchema,
 } from '../src/schema';
@@ -82,6 +83,74 @@ describe('a custom item without a command', () => {
       'versions:versions',
     ]);
     expect(kept.sections[1]!.groups[0]!.units).toEqual([]);
+  });
+});
+
+describe("an item's importance", () => {
+  const unitsOf = (schema: BarSchema) =>
+    normalizeBar(schema).sections.flatMap((section) =>
+      section.groups.flatMap((each) => each.units.map((unit) => [unit.key, unit.importance])),
+    );
+
+  it("is its group's when it has none of its own, and 3 when neither does", () => {
+    expect(
+      unitsOf({
+        id: 'main',
+        sections: {
+          start: [
+            group(
+              'tools',
+              ['tool:pan', item('tool:pointer', { importance: 4 }), custom('zoom', 'menu:zoom')],
+              { importance: 2 },
+            ),
+            group('plain', ['acme:a']),
+          ],
+        },
+      }),
+    ).toEqual([
+      ['tools:tool:pan', 2],
+      ['tools:tool:pointer', 4],
+      ['tools:zoom', 2],
+      ['plain:acme:a', 3],
+    ]);
+  });
+
+  it("leaves a pinned item's neighbours at their group's own", () => {
+    expect(
+      unitsOf({
+        id: 'main',
+        sections: { start: [group('versions', [custom('versions'), 'acme:a'], { importance: 2 })] },
+      }),
+    ).toEqual([
+      ['versions:versions', 5],
+      ['versions:acme:a', 2],
+    ]);
+  });
+
+  it('sends a less important group to the "More" menu first, wherever it is', () => {
+    const normalized = normalizeBar({
+      id: 'main',
+      sections: {
+        start: [group('tools', ['tool:pan', 'tool:pointer'], { importance: 2 })],
+        end: [group('panels', ['panel:search', 'panel:comments'])],
+      },
+    });
+    // Room for two items and the "More" button: the end of the bar would go first at equal
+    // importance, but the tools are less important.
+    const fit = solve(normalized, metrics, 40 * 2 + 10 + 10 + 40);
+    expect(
+      [...fit.units].filter(([, unit]) => unit.kind === 'overflow').map(([key]) => key),
+    ).toEqual(['tools:tool:pan', 'tools:tool:pointer']);
+  });
+
+  it('keeps every item of a pinned group in the bar', () => {
+    const normalized = normalizeBar({
+      id: 'main',
+      sections: { start: [group('document', ['menu:document', 'menu:view'], { importance: 5 })] },
+    });
+    const fit = solve(normalized, metrics, 0);
+    expect(fit.hasOverflow).toBe(false);
+    expect(fit.units.get('document:menu:view')).toEqual({ kind: 'variant', variant: 'icon' });
   });
 });
 

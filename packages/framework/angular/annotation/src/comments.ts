@@ -17,7 +17,7 @@ import {
   type AnnotationRef,
   type CommentThread,
   type CommentThreadChangedEvent,
-  type CommentsApi,
+  type CommentsCapability,
 } from '@embedpdf/plugin-annotation';
 import { enrichCommentThreads } from '@embedpdf/web';
 import type { Observable } from 'rxjs';
@@ -53,60 +53,69 @@ export class EpdfComments extends EpdfPluginService<AnnotationCapability> {
   }
 
   /** Every thread, in reading order, read once. In a template, use `threads()`. */
-  readonly listThreads: CommentsApi['listThreads'] = this.binding.namespaceMethod(
+  readonly listThreads: CommentsCapability['listThreads'] = this.binding.namespaceMethod(
     'comments',
     'listThreads',
   );
   /** The thread a comment is in (its first comment, a reply or a review state), read once, or null. */
-  readonly getThread: CommentsApi['getThread'] = this.binding.namespaceMethod(
+  readonly getThread: CommentsCapability['getThread'] = this.binding.namespaceMethod(
     'comments',
     'getThread',
   );
   /** Reply to the thread's first comment, whichever comment you pass. Resolves `{ annotation }`. */
-  readonly reply: CommentsApi['reply'] = this.binding.namespaceMethod('comments', 'reply');
+  readonly reply: CommentsCapability['reply'] = this.binding.namespaceMethod('comments', 'reply');
   /** Change a comment's text. */
-  readonly setText: CommentsApi['setText'] = this.binding.namespaceMethod('comments', 'setText');
+  readonly setText: CommentsCapability['setText'] = this.binding.namespaceMethod(
+    'comments',
+    'setText',
+  );
   /** Set the user's review state on a thread, such as `'accepted'`. */
-  readonly setStatus: CommentsApi['setStatus'] = this.binding.namespaceMethod(
+  readonly setStatus: CommentsCapability['setStatus'] = this.binding.namespaceMethod(
     'comments',
     'setStatus',
   );
   /** Check a thread off for the user, or clear the check mark. */
-  readonly setMarked: CommentsApi['setMarked'] = this.binding.namespaceMethod(
+  readonly setMarked: CommentsCapability['setMarked'] = this.binding.namespaceMethod(
     'comments',
     'setMarked',
   );
   /** Delete a comment with its replies; the first comment of a thread deletes the thread. */
-  readonly delete: CommentsApi['delete'] = this.binding.namespaceMethod('comments', 'delete');
+  readonly delete: CommentsCapability['delete'] = this.binding.namespaceMethod(
+    'comments',
+    'delete',
+  );
   /** Delete a whole thread, all of it or none. Resolves `{ deleted, failed }`. */
-  readonly deleteThread: CommentsApi['deleteThread'] = this.binding.namespaceMethod(
+  readonly deleteThread: CommentsCapability['deleteThread'] = this.binding.namespaceMethod(
     'comments',
     'deleteThread',
   );
   /** Whether the user may reply to this thread. */
-  readonly canReply: CommentsApi['canReply'] = this.binding.namespaceMethod('comments', 'canReply');
+  readonly canReply: CommentsCapability['canReply'] = this.binding.namespaceMethod(
+    'comments',
+    'canReply',
+  );
   /** Whether the user may change this comment's text. */
-  readonly canSetText: CommentsApi['canSetText'] = this.binding.namespaceMethod(
+  readonly canSetText: CommentsCapability['canSetText'] = this.binding.namespaceMethod(
     'comments',
     'canSetText',
   );
   /** Whether the user may set a review state on this thread. */
-  readonly canSetStatus: CommentsApi['canSetStatus'] = this.binding.namespaceMethod(
+  readonly canSetStatus: CommentsCapability['canSetStatus'] = this.binding.namespaceMethod(
     'comments',
     'canSetStatus',
   );
   /** Whether the user may check this thread off. */
-  readonly canSetMarked: CommentsApi['canSetMarked'] = this.binding.namespaceMethod(
+  readonly canSetMarked: CommentsCapability['canSetMarked'] = this.binding.namespaceMethod(
     'comments',
     'canSetMarked',
   );
   /** Whether the user may delete this comment. */
-  readonly canDelete: CommentsApi['canDelete'] = this.binding.namespaceMethod(
+  readonly canDelete: CommentsCapability['canDelete'] = this.binding.namespaceMethod(
     'comments',
     'canDelete',
   );
   /** Whether the user may delete every comment in this thread. */
-  readonly canDeleteThread: CommentsApi['canDeleteThread'] = this.binding.namespaceMethod(
+  readonly canDeleteThread: CommentsCapability['canDeleteThread'] = this.binding.namespaceMethod(
     'comments',
     'canDeleteThread',
   );

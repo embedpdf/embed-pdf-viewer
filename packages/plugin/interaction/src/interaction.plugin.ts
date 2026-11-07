@@ -3,7 +3,7 @@ import { definePlugin } from '@embedpdf/core';
 import { INTERACTION_DEFAULTS, type InteractionConfig } from './contract';
 import { createInteractionController } from './controller';
 import { InteractionToken } from './host-contract';
-import { builtinTools, initialInteractionState } from './model';
+import { builtinTools, initialInteractionModel } from './model';
 
 /**
  * The interaction hub: document-scoped, depends on nothing. Feature plugins
@@ -15,7 +15,7 @@ export const interactionPlugin = (config?: InteractionConfig) =>
     id: 'interaction',
     token: InteractionToken,
     scope: 'document',
-    state: initialInteractionState,
+    state: initialInteractionModel,
     settings: { defaults: INTERACTION_DEFAULTS, registered: config },
     create: (ctx) => createInteractionController(ctx, builtinTools()),
   });

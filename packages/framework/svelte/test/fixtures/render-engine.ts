@@ -17,8 +17,8 @@ export function renderEngine(pageCount = 2) {
   const pages = Array.from({ length: pageCount }, (_, index) => pageAt(index));
   const handle = {
     id: 'doc',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount, pages }) },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
+    pages: { list: () => Promise.resolve({ pageCount, labels: [], pages }) },
     security: { allows: () => true, allowsAnnotation: () => true },
     render: { getPolicy: () => Promise.resolve({ kind: 'continuous' }) },
     page: (ref: PageRef) => ({

@@ -12,15 +12,14 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readAppearanceFit, writeAppearanceFit } from '../appearanceFit';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotOpacity } from './annotationWritePrimitives';
 import { drawingFor } from './stampDrawing';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
-import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './writeEmbedMetadata';
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 import { readAnnotationBox, type AnnotationBox } from '../read/readAnnotationTurn';
-import { KEY_APPEARANCE_FIT, readStampFit } from '../read/readStampAnnotation';
 
 /** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
 const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
@@ -91,7 +90,7 @@ export function applyStampDraft(
     box: draft.box,
     rotation: draft.rotation ?? null,
   });
-  if (draft.fit !== null) writeStampFit(fn, mem, annotPtr, fit);
+  if (draft.fit !== null) writeAppearanceFit(fn, mem, annotPtr, fit);
 }
 
 export function applyStampPatch(
@@ -111,9 +110,9 @@ export function applyStampPatch(
   }
   // The fit the drawing is (re-)fit with: the patch's, else the recorded one,
   // else `fill`, the way a PDF places any appearance in its /Rect.
-  const recordedFit = readStampFit(fn, mem, annotPtr) ?? 'fill';
+  const recordedFit = readAppearanceFit(fn, mem, annotPtr) ?? 'fill';
   const fit = patch.fit !== undefined ? (patch.fit ?? 'fill') : recordedFit;
-  if (patch.fit !== undefined) writeStampFit(fn, mem, annotPtr, patch.fit);
+  if (patch.fit !== undefined) writeAppearanceFit(fn, mem, annotPtr, patch.fit);
   const appearance = ctx?.resources?.appearance;
   if (appearance !== undefined) {
     // New bytes replace the drawing, so they only need the new value.
@@ -144,23 +143,6 @@ export function applyStampPatch(
 
 export function isStampSubtype(subtype: string): subtype is 'stamp' {
   return subtype === 'stamp';
-}
-
-/** Record how the drawing fills the box; `null` removes the record. */
-function writeStampFit(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  fit: StampFit | null,
-): void {
-  if (fit === null) {
-    fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_APPEARANCE_FIT);
-    return;
-  }
-  if (!fn.EPDFAnnot_HasEmbedMetadata(annotPtr)) {
-    fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, 'SchemaVersion', EMBD_METADATA_SCHEMA_VERSION);
-  }
-  writeEmbedMetadataString(fn, mem, annotPtr, KEY_APPEARANCE_FIT, fit);
 }
 
 /** Any non-empty name: standard ('Approved') or custom ('#LBGiYhk8V…') —

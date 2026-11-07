@@ -11,7 +11,7 @@ import {
   type PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import type { CommentsApi, ThreadDeleteResult } from '../contract';
+import type { CommentsCapability, ThreadDeleteResult } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
@@ -59,10 +59,10 @@ export function createComments(
 
   const announce = (
     root: AnnotationRef,
-    change: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
-  ) => events.threadChanged.emit({ rootRef: root, change });
+    type: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
+  ) => events.threadChanged.emit({ rootRef: root, type: type });
 
-  const comments: CommentsApi = {
+  const comments: CommentsCapability = {
     listThreads: () => threads.index().threads,
     getThread: (ref) => threads.index().byMember.get(annotationKey(ref)) ?? null,
     onThreadChanged: events.threadChanged.on,
@@ -170,7 +170,7 @@ export function createComments(
       const thread = threads.threadOf(ref);
       const members = threads.memberRefsOf(thread);
       // A courtesy preflight: all or nothing, as the engine decides it.
-      const blocked = members.filter((ref) => !authority.canDelete(ref));
+      const blocked = authority.blockersOf(root);
       if (blocked.length > 0) {
         announce(root, 'deleted');
         return {
@@ -199,7 +199,7 @@ export function createComments(
     canDelete: (ref) => authority.canDelete(ref),
     canDeleteThread: (ref) => {
       const thread = threads.index().byMember.get(annotationKey(ref)) ?? null;
-      return thread !== null && threads.memberRefsOf(thread).every(authority.canDelete);
+      return thread !== null && authority.canDelete(thread.root.ref);
     },
   };
 

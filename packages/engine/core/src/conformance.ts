@@ -71,6 +71,14 @@ export {
   type PageRenderConformanceOptions,
 } from './conformance/runPageRenderConformance';
 export {
+  PRINT_RULES_PDF,
+  PRINT_SCOPES,
+  runPrintCopyConformance,
+  runPrintRenderConformance,
+  type PrintCopyConformanceOptions,
+  type PrintRenderConformanceOptions,
+} from './conformance/runPrintRenderConformance';
+export {
   runPageSpaceConformance,
   type PageSpaceConformanceOptions,
 } from './conformance/runPageSpaceConformance';
@@ -79,6 +87,11 @@ export {
   runColorConformance,
   type ColorConformanceOptions,
 } from './conformance/runColorConformance';
+export {
+  NO_STROKE_FIXTURE_PDF,
+  runNoStrokeConformance,
+  type NoStrokeConformanceOptions,
+} from './conformance/runNoStrokeConformance';
 export {
   APPEARANCE_STATES_FIXTURE_PDF,
   runAppearanceStatesConformance,
@@ -100,6 +113,7 @@ export { runNamedPagesConformance } from './conformance/runNamedPagesConformance
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';
 export { runAnnotationAppearanceExportConformance } from './conformance/runAnnotationAppearanceExportConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
+export { BANDS_PDF } from './conformance/stampFixtures';
 export {
   BARE_PAGE_FIXTURE_PDF,
   runRedactionApplyConformance,
@@ -108,7 +122,13 @@ export {
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
+export { runPageFormFieldsConformance } from './conformance/runPageFormFieldsConformance';
+export type { PageFormFieldsConformanceOptions } from './conformance/runPageFormFieldsConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
+export {
+  runPageCopyConformance,
+  type PageCopyConformanceOptions,
+} from './conformance/runPageCopyConformance';
 export {
   OBJECT_NUMBER_FIXTURE_PDF,
   runObjectNumberConformance,
@@ -120,6 +140,12 @@ export {
   type ChangeConformanceOptions,
 } from './conformance/runChangeConformance';
 export { pdfOf } from './conformance/pdfOf';
+export {
+  BROKEN_OUTLINE_FIXTURE_PDF,
+  OUTLINE_FIXTURE_PDF,
+  runOutlineConformance,
+  type OutlineConformanceOptions,
+} from './conformance/runOutlineConformance';
 export {
   PERMISSION_TOKENS,
   runPermissionConformance,
@@ -196,9 +222,28 @@ export {
   type FormPredictionConformanceOptions,
 } from './conformance/runFormPredictionConformance';
 export {
+  PAGE_PREDICTION_FIXTURE_PDF,
+  runPagePredictionConformance,
+  type PagePredictionConformanceOptions,
+} from './conformance/runPagePredictionConformance';
+export {
   FIELD_GROUP_TOKENS,
   FIELD_GROUPS_PDF,
   runFieldGroupsConformance,
   type FieldGroupToken,
   type FieldGroupsConformanceOptions,
 } from './conformance/runFieldGroupsConformance';
+export { runMixedScriptConformance } from './conformance/runMixedScriptConformance';
+export {
+  runDocumentFontsConformance,
+  type DocumentFontsConformanceOptions,
+} from './conformance/runDocumentFontsConformance';
+export { drawnTextOf, type DrawnRun, type DrawnText } from './conformance/drawnText';
+export {
+  openUnionOf,
+  openUnionsIn,
+  readingProblems,
+  UNKNOWN_FIELD,
+  withUnknownFields,
+} from './conformance/tolerantReading';
+export type { OpenUnion } from './conformance/tolerantReading';

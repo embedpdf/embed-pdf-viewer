@@ -89,6 +89,9 @@ export function createActionsController(ctx: ActionsContext, config: ActionsConf
       // The document's save actions (/WS, /DS) run around every download of its file, so
       // what WillSave changes is in the bytes.
       ctx.aroundDownload((read) => documentEvents.api.runDocumentVerb('save', read));
+      // Its print actions (/WP, /DP) run around every print, so what WillPrint changes is on
+      // the paper: the kernel prepares a print again when the document changed.
+      ctx.aroundPrint((print) => documentEvents.api.runDocumentVerb('print', print));
     },
   };
 }

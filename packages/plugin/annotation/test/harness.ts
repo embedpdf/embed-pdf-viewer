@@ -21,6 +21,7 @@ import type {
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
@@ -33,7 +34,7 @@ import {
   type AnnotationSettings,
 } from '../src/contract';
 import { createAnnotationController } from '../src/controller';
-import { initialAnnotationState, type AnnotationState } from '../src/model';
+import { initialAnnotationModel, type AnnotationModel } from '../src/model';
 
 export const PAGE = toPageRef(1);
 
@@ -42,7 +43,13 @@ export const dataOf = (annotation: Annotation | null | undefined): Record<string
   (annotation ?? {}) as unknown as Record<string, unknown>;
 export const PAGE2 = toPageRef(2);
 
-const localOrigin = { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null };
+const localOrigin = {
+  kind: 'local',
+  sessionId: 'me',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 
 /** The mutation meta a write's event carries. */
 const metaOf = () => ({ affectedPages: [], cacheDelta: null, changed: [] });
@@ -68,6 +75,8 @@ export interface AnnotationHarnessOptions {
   readonly selection?: object;
   /** The settings the app registers (`annotationPlugin(config)`). */
   readonly config?: AnnotationConfig;
+  /** A fonts plugin to draw text boxes with (`FontsToken`). */
+  readonly fonts?: object;
 }
 
 const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -213,7 +222,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     events.forEach((event, index) =>
       ctx.emitDocumentEvent({
         ...event,
-        origin: { ...localOrigin, tx: { id: opId, index, count: events.length } },
+        origin: { ...localOrigin, transaction: { id: opId, index, count: events.length } },
       } as unknown as DocumentEvent),
     );
     return { items, meta: { ...metaOf(), opId, undoable: true } };
@@ -303,22 +312,23 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   // The real render plugin, on the same document: its appearance door fetches
   // the page's pictures from the engine (`renderAppearances`), shares and keeps them.
   const renderDefinition = renderPlugin();
-  const renderCtx = createTestContext({
+  const renderContext = createTestContext({
     id: 'render',
     state: (renderDefinition.state as () => unknown)(),
     settings: renderDefinition.settings,
     pages,
     doc,
   });
-  const render = renderDefinition.create(renderCtx as never) as { api: unknown };
-  const ctx = createTestContext<AnnotationState, AnnotationSettings>({
+  const render = renderDefinition.create(renderContext as never) as { api: unknown };
+  const ctx = createTestContext<AnnotationModel, AnnotationSettings>({
     id: 'annotation',
-    state: initialAnnotationState(),
+    state: initialAnnotationModel(),
     settings: { defaults: ANNOTATION_DEFAULTS, registered: options.config },
     capabilities: [
       [InteractionToken, interaction],
       [RenderHostToken, render.api],
       ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
+      ...(options.fonts ? [[FontsToken, options.fonts] as const] : []),
     ],
     pages,
     doc,
@@ -369,7 +379,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     },
     state: () => ctx.state.get(),
     /** This session's changes the engine hasn't answered, in staging order. */
-    pending: () => ctx.changes.pending(),
+    pending: () => ctx.changes.listPending(),
     /** The composed model: confirmed records, pending changes and the session. */
     model: () => instance.model(),
     /** Run a core message through the store's `commit` door, as a gesture does. */

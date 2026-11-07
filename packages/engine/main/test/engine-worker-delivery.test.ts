@@ -50,7 +50,13 @@ class FakeWorker {
   removeEventListener(type: string, listener: (event: unknown) => void): void {
     this.listeners.get(type)?.delete(listener);
   }
-  postMessage(message: { kind: string; wasmUrl?: string }): void {
+  postMessage(message: { kind: string; wasmUrl?: string; jobId?: unknown }): void {
+    if (message.jobId !== undefined) {
+      // A job (the boot registers the default fallback fonts): done.
+      const answer = { kind: 'resolve', jobId: message.jobId, result: { tag: message.kind } };
+      queueMicrotask(() => this.emit('message', { data: answer }));
+      return;
+    }
     if (message.kind !== 'init') return;
     this.init = message;
     queueMicrotask(() => {

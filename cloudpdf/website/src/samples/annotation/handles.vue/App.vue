@@ -7,26 +7,26 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
-import AddRectangle from './AddRectangle.vue';
 import ChromeControls from './ChromeControls.vue';
 import Handle from './Handle.vue';
 import RotationHandle from './RotationHandle.vue';
+import SelectSquare from './SelectSquare.vue';
 
 import '../handles.css';
 
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 const own = ref(false);
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddRectangle />
+      <SelectSquare />
       <ChromeControls v-model:own="own" />
       <Stage class="stage">
         <template #page>

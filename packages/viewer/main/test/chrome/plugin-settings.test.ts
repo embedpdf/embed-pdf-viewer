@@ -32,11 +32,11 @@ describe('readPluginsConfig', () => {
 
   it("takes the viewer's own stamp and signature settings out of the plugins'", () => {
     const assetEngine = () => Promise.reject(new Error('unused'));
-    const key = () => Promise.reject(new Error('unused'));
+    const signingKey = () => Promise.reject(new Error('unused'));
     const fonts = [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }];
     const read = readPluginsConfig({
       stamp: { standard: false, quick: ['standard:Approved'], assetEngine, previewWidth: 128 },
-      signature: { kinds: ['signature'], fonts, key, mode: 'ask' },
+      signature: { kinds: ['signature'], fonts, signingKey, mode: 'ask' },
     });
     expect(read.viewer).toEqual({
       stamp: { standard: false, quick: ['standard:Approved'] },
@@ -44,7 +44,7 @@ describe('readPluginsConfig', () => {
     });
     // What each plugin's factory gets: its own settings, and nothing of the viewer's.
     expect(read.settings.stamp).toEqual({ assetEngine, previewWidth: 128 });
-    expect(read.settings.signature).toEqual({ key, mode: 'ask' });
+    expect(read.settings.signature).toEqual({ signingKey, mode: 'ask' });
     expect(read.problems).toEqual([]);
   });
 
@@ -75,6 +75,23 @@ describe('readPluginsConfig', () => {
     expect(read.settings).toEqual({});
     expect(read.problems).toEqual([
       '"search" is the viewer\'s own search plugin: give it settings, or give your plugin a name of its own',
+    ]);
+  });
+
+  it("takes only the fallback language from the i18n plugin's settings", () => {
+    const read = readPluginsConfig({
+      i18n: {
+        fallbackLocale: 'sv',
+        locale: 'da',
+        locales: [],
+        loaders: {},
+      },
+    } as unknown as ViewerConfig['plugins']);
+    expect(read.settings.i18n).toEqual({ fallbackLocale: 'sv' });
+    expect(read.problems).toEqual([
+      "the i18n plugin's locale is the viewer's `locale`",
+      "the i18n plugin's locales are the viewer's `strings`: give your words there",
+      "the i18n plugin's loaders are the viewer's `strings`: give your words there",
     ]);
   });
 
@@ -175,4 +192,7 @@ export const pluginsConfigs: ViewerConfig[] = [
   { plugins: { link: { color: 'red' } } },
   // @ts-expect-error -- a value of the wrong type
   { plugins: { form: { fillable: 'text' } } },
+  { plugins: { i18n: { fallbackLocale: 'sv' } } },
+  // @ts-expect-error -- the languages are `strings`
+  { plugins: { i18n: { locales: [] } } },
 ];

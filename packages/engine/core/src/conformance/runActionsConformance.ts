@@ -39,14 +39,14 @@ export interface ActionsConformanceOptions {
 /** Action extraction parity. These tests assert data only; no script executes. */
 export function runActionsConformance(
   runner: ConformanceTestRunner,
-  opts: ActionsConformanceOptions,
+  options: ActionsConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
   let engine: Engine;
 
-  describe(`actions conformance: ${opts.label}`, () => {
+  describe(`actions conformance: ${options.label}`, () => {
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -54,7 +54,7 @@ export function runActionsConformance(
     });
 
     test('reads catalog additional actions and preserves /CO identity', async () => {
-      const doc = await open(engine, opts, opts.fixtures.document);
+      const doc = await open(engine, options, options.fixtures.document);
       try {
         expect(Boolean(doc.actions)).toBe(true);
         const snapshot = await doc.actions!.get();
@@ -74,7 +74,7 @@ export function runActionsConformance(
     });
 
     test('attaches page /AA to PageLayout', async () => {
-      const doc = await open(engine, opts, opts.fixtures.page);
+      const doc = await open(engine, options, options.fixtures.page);
       try {
         const pages = await doc.pages.list();
         expect(pages.pages[0].actions?.open?.root?.type).toBe('goto-embedded');
@@ -87,7 +87,7 @@ export function runActionsConformance(
     });
 
     test('attaches activation actions to AnnotationBase, including links', async () => {
-      const doc = await open(engine, opts, opts.fixtures.annotation);
+      const doc = await open(engine, options, options.fixtures.annotation);
       try {
         const firstPage = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(firstPage.ref).annotations.list();
@@ -114,9 +114,9 @@ export function runActionsConformance(
     });
 
     test('classifies a /S /JavaScript link target, script staying on base.actions', async () => {
-      const fixture = opts.fixtures.javascriptLink;
+      const fixture = options.fixtures.javascriptLink;
       if (!fixture) return; // fixture not provided for this engine flavour
-      const doc = await open(engine, opts, fixture);
+      const doc = await open(engine, options, fixture);
       try {
         const firstPage = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(firstPage.ref).annotations.list();
@@ -136,7 +136,7 @@ export function runActionsConformance(
     });
 
     test('keeps field actions separate from merged widget events', async () => {
-      const doc = await open(engine, opts, opts.fixtures.field);
+      const doc = await open(engine, options, options.fixtures.field);
       try {
         const form = await doc.forms.list();
         expect(form.fields).toHaveLength(1);
@@ -150,7 +150,7 @@ export function runActionsConformance(
     });
 
     test('carries interpreter payloads on every executable node', async () => {
-      const doc = await open(engine, opts, opts.fixtures.payloads);
+      const doc = await open(engine, options, options.fixtures.payloads);
       try {
         const page = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(page.ref).annotations.list();
@@ -231,7 +231,9 @@ export function runActionsConformance(
           payload: {
             url: 'https://uf.example.test/submit',
             fields: [{ kind: 'name', name: 'parent' }],
-            flags: { raw: 0, exclude: false, format: 'fdf', method: 'post' },
+            exclude: false,
+            format: 'fdf',
+            method: 'post',
           },
         });
         expect(rootOf('submit-compat-xfdf')).toMatchObject({
@@ -242,13 +244,10 @@ export function runActionsConformance(
               { kind: 'name', name: 'noexport' },
               { kind: 'name', name: 'plain' },
             ],
-            flags: {
-              raw: 35,
-              exclude: true,
-              includeNoValueFields: true,
-              format: 'xfdf',
-              method: 'post',
-            },
+            exclude: true,
+            includeNoValueFields: true,
+            format: 'xfdf',
+            method: 'post',
             charSet: 'utf-8',
           },
         });
@@ -257,7 +256,8 @@ export function runActionsConformance(
           payload: {
             url: 'https://example.test/pdf',
             fields: null,
-            flags: { raw: 264, format: 'pdf', method: 'get' },
+            format: 'pdf',
+            method: 'get',
           },
         });
 
@@ -289,7 +289,7 @@ export function runActionsConformance(
     });
 
     test('degrades unreadable payloads to unknown with payload-dropped', async () => {
-      const doc = await open(engine, opts, opts.fixtures.payloads);
+      const doc = await open(engine, options, options.fixtures.payloads);
       try {
         const page = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(page.ref).annotations.list();
@@ -317,7 +317,7 @@ export function runActionsConformance(
     });
 
     test('reads a destination-form /OpenAction as openDestination', async () => {
-      const doc = await open(engine, opts, opts.fixtures.openDestination);
+      const doc = await open(engine, options, options.fixtures.openDestination);
       try {
         expect(Boolean(doc.actions)).toBe(true);
         const snapshot = await doc.actions!.get();

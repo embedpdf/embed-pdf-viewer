@@ -22,7 +22,7 @@ export function createJudging(
   { store }: Pick<SignatureServices, 'store'>,
   { validate }: Pick<SignatureValidation, 'validate'>,
   signatures: Mirror<SignatureRecord>,
-  { getSignature, getVerdict }: Pick<SignatureReads, 'getSignature' | 'getVerdict'>,
+  { findSignature, getVerdict }: Pick<SignatureReads, 'findSignature' | 'getVerdict'>,
 ) {
   const { requireSignatures } = store;
 
@@ -30,17 +30,18 @@ export function createJudging(
     api: {
       refresh: verb(async (options?: OperationOptions) => {
         await ctx.cancellable(options?.signal, signatures.refresh());
-        return signatures.get().snapshot;
       }),
       validate: verb(validate),
-      validateField: verb(async (field: SignatureFieldAddress, options?: SignatureValidateOptions) => {
-        await validate(options);
-        const verdict = getVerdict(field);
-        if (!verdict) {
-          throw new PluginError('not-found', 'signature', 'no signed field at that address');
-        }
-        return verdict;
-      }),
+      validateField: verb(
+        async (field: SignatureFieldAddress, options?: SignatureValidateOptions) => {
+          await validate(options);
+          const verdict = getVerdict(field);
+          if (!verdict) {
+            throw new PluginError('not-found', 'signature', 'no signed field at that address');
+          }
+          return verdict;
+        },
+      ),
       analyzeChanges: verb(async (input: AnalyzeInput, options?: OperationOptions) =>
         ctx.cancellable(options?.signal, requireSignatures().analyze(input)),
       ),
@@ -55,7 +56,7 @@ export function createJudging(
           if ('revisionIndex' in target) {
             revisionIndex = target.revisionIndex;
           } else {
-            const signature = getSignature(target);
+            const signature = findSignature(target);
             if (!signature?.signed || signature.revisionIndex === null) {
               throw new PluginError('not-found', 'signature', 'no signed revision at that address');
             }

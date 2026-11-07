@@ -67,6 +67,37 @@ out, `true` draws it. A clean preview without the annotations:
 
 <Snippet name="viewing/render-without-annotations" />
 
+## Show that a page is loading
+
+The first picture of a page can take a moment: a heavy page, a slow connection, a server that's
+just starting. Until it's on screen, the page shows its background, which looks like a blank page.
+Put a layer of your own in each page, after the render layer, that shows an indicator while its
+page waits:
+
+<Snippet name="viewing/page-loading" />
+
+<Fw only={['react', 'vue', 'svelte']}>`usePictureState()`</Fw><Fw only="angular">`injectPictureState()`</Fw>
+reads the page it's in. `status` is `'loading'` until a picture of the page is on screen, then
+`'ready'`. `slow` turns on once the page has waited 400 milliseconds, so a page that shows quickly
+never flashes an indicator. Getting sharper isn't loading: tiles arriving as you zoom, and a page
+redrawing after a change, keep the old picture on screen, so the page stays `'ready'`.
+
+| `status`      | What it means                                                                         |
+| :------------ | :------------------------------------------------------------------------------------ |
+| `'idle'`      | The view doesn't show this page                                                       |
+| `'loading'`   | The page is in the view, and no picture of it is on screen yet                        |
+| `'ready'`     | A picture of it is on screen                                                          |
+| `'forbidden'` | The user may not see it: no [`doc.render`](#permissions)                              |
+| `'error'`     | It couldn't be drawn, for example after a network failure                             |
+
+Each view has its own: a page can be `'ready'` in the main view while its thumbnail still loads.
+Outside a page, `render.getPictureState(page, view)` reads the same, and `onPictureStateChanged`
+fires on every change. Change the wait with `slowAfterMs`; `0` turns `slow` on at once:
+
+```ts
+renderPlugin({ slowAfterMs: 200 });
+```
+
 ## Render a page yourself
 
 For your own preview, an export or a page picker, render any page on demand:
@@ -81,18 +112,41 @@ const { url, revoke } = await image.objectUrl();
 layers' cache. For many pages at once, use `renderPages`, which renders a few at a time:
 
 ```ts
-const thumbnail = await render.renderThumbnail(page.ref, { maxWidth: 200 });
-
 const { applied } = await render.renderPages(
   pages.map((page) => page.ref),
   { width: 300 },
 );
 ```
 
+For a page picker or a strip, `renderThumbnail` renders the page's
+[thumbnail](/docs/engine/documents/rendering#thumbnails): the whole page, 512 pixels on its long
+side. It needs only `doc.render.thumbnail`, so it works for users who may not render pages:
+
+```ts
+const thumbnail = await render.renderThumbnail(page.ref);
+```
+
+To render part of a page, give its `rect` in [page space](/docs/engine/concepts/coordinates): from
+the page's top-left, y down, in points. `width` and `scale` then size that part. `rotation` turns the
+picture clockwise:
+
+```ts
+const part = await render.renderPage(page.ref, {
+  rect: { x: 72, y: 72, width: 200, height: 100 },
+  scale: 2, // 400 × 200 pixels
+});
+```
+
+A part of a page, or a turned picture, is rendered for you alone: it doesn't go through the layers'
+cache. A `rect` that runs past the page's edge is cut at it, and one that misses the page fails with
+`invalid-input`.
+
 | Option               | What it is                                       | Default                                                           |
 | :------------------- | :----------------------------------------------- | :---------------------------------------------------------------- |
 | `width`              | The width of the image, in pixels                | —                                                                 |
 | `scale`              | Or a scale: `1` is the page's size in points     | `1`                                                               |
+| `rect`               | The part of the page to render, in page space    | the whole page                                                    |
+| `rotation`           | Turn the picture clockwise: `0`, `90`, `180` or `270` | `0`: the page as stored                                      |
 | `includeAnnotations` | Draw the annotations into the image              | when the user may read them                                       |
 | `includeFormFields`  | Draw the form fields into the image              | `false` without annotations; else when the user may read the form |
 | `format`             | `'png'`, `'webp'` or `'bmp'`                     | per engine                                                        |
@@ -102,6 +156,45 @@ const { applied } = await render.renderPages(
 Asking for annotations or form fields the user may not read fails with `permission-denied`.
 
 <Example name="render/render-page" />
+
+## Take a snapshot
+
+The `snapshot` tool takes part of a page as an image, to paste into a message or save as a file,
+like Acrobat's Snapshot. Put `<SnapshotLayer>` in each page, after your other layers, to draw the
+box, and switch to the tool:
+
+```ts
+interaction.activateTool('snapshot');
+```
+
+<Example name="render/snapshot" />
+
+> **Try it:** switch to Snapshot and drag a box over the page, then copy it and paste it into a
+> message, or save it. A click takes the whole page.
+
+- **Drag a box on a page.** It stays on the page where it started. A click takes the whole page.
+- **The box stays** when you let go: it is the snapshot until you take another or switch tools.
+  `Escape` and `render.clearSnapshot()` let it go.
+- **Its picture** is the box at 2 pixels per point (144 DPI) as PNG, turned as the page is shown,
+  with the annotations and form fields the user may read. `snapshot.scale` changes the size. A
+  picture over 16 million pixels, or over what your server allows, comes out smaller, to fit.
+- **A change on its way is in it.** The picture waits until the engine has every change made
+  before the snapshot, so a stamp you placed a moment ago is there.
+
+<Fw only={['react', 'vue', 'svelte']}>`useSnapshot()`</Fw><Fw only="angular">`getSnapshot()` on `inject(EpdfRender)`</Fw>
+reads it: `{ page, rect, image }`, where `rect` is the box in page space and `image` resolves to the
+picture, or `null` while there's none. Outside a component, `render.getSnapshot()` reads the same,
+and `onSnapshotChanged` fires when one is taken or let go. To copy it or save it, `copyImage` and
+`saveFile` from `/runtime` do the browser's part:
+
+<Snippet name="viewing/snapshot-actions" />
+
+Call `copyImage` in the click itself, not after an `await`: Safari lets a page write to the
+clipboard only while it handles a press or a key.
+
+The render plugin adds the tool when the [interaction plugin](../ui/tools) is registered. It needs
+[`doc.content.copy`](#permissions) as well as `doc.render`; `render.canSnapshot()` says whether the
+user may take one. Without it, the tool draws no box.
 
 ## When a page changes
 
@@ -122,6 +215,45 @@ whenever the page's pixels do.
 
 <Example name="render/redraws" />
 
+## Paint the pictures another way
+
+A plugin that shows the pages some other way, as protected video or on a canvas of its own, takes
+the pictures over from the render plugin:
+
+```ts
+const giveBack = render.handOverPictures({
+  paints: (view) => view === mainView, // the views it paints; the others keep the render plugin's
+  paint(host, page, report) {
+    // host: an empty box over the page's content, page: the page as the layers see it
+    const picture = drawInto(host, page);
+    picture.ready.then(
+      () => report.shown(), // its picture is on screen
+      (error) => report.failed(error), // it can't paint this page
+    );
+    return {
+      update: (page) => picture.follow(page.transform), // the zoom or the turn changed
+      destroy: () => picture.remove(),
+    };
+  },
+});
+```
+
+While it holds them, every `<RenderLayer>` in a view it paints lends it its box instead of drawing:
+no picture, no tiles, no renders for that view. Everything above stays as it is: selection, search
+highlights, links, annotations and form fields still sit on the page, in page space. A view it
+doesn't paint, such as a strip of thumbnails, keeps the render plugin's pictures.
+
+- **`page`** has the page's `ref`, `pageIndex`, `view`, `transform` (its size, zoom and turn on
+  screen) and `getViewDemand()` (the part of it on screen), the same in every framework.
+- **`report`** is how the page's [loading state](#show-that-a-page-is-loading) knows: the page is
+  `'loading'` until you call `report.shown()`, once its first picture is on screen.
+  `report.failed(error)` makes it `'error'`, or `'forbidden'` for a `permission-denied` error.
+  Later pictures of the same page don't report: the page keeps showing until they're there.
+- **One painter at a time.** A second one is refused (`conflict`) until the first is given back.
+- **Take them over in your plugin's `connect()`**, and the pages never show the render plugin's
+  picture first: every plugin connects before the document shows. The hand-over lasts until the
+  document closes, or until you call the function it returns.
+
 ## Methods
 
 Everything `useRender()` gives you.
@@ -129,12 +261,18 @@ Everything `useRender()` gives you.
 | Method                                     | What it does                                                                                                                                     |
 | :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `renderPage(page, options?)`               | Renders one page at exactly the size you ask for, sharing the layers' cache. Resolves an image; `image.objectUrl()` gives a URL for an `<img>`. [Render a page yourself](#render-a-page-yourself) |
-| `renderThumbnail(page, { maxWidth })`      | Renders a small picture of a page, `maxWidth` pixels wide                                                                                        |
+| `renderThumbnail(page, options?)`          | Renders the page's thumbnail: the whole page, 512 pixels on its long side. Takes `includeAnnotations` and `includeFormFields`. [Render a page yourself](#render-a-page-yourself) |
 | `renderPages(pages, options?)`             | Renders several pages, a few at a time. Resolves `{ applied, failed }`: each page with its image, in the order you gave, and the pages that failed with why. |
 | `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
 | `getRenderEpoch(page, layers?)`            | A number that changes whenever the page's pixels do, for a picture that draws what `layers` says (`includeAnnotations`, `includeFormFields`, as above). Key your own long-lived renders on it. |
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
+| `getPictureState(page, view)`              | Whether a picture of the page is on screen in a view: `{ status, slow }`. [Show that a page is loading](#show-that-a-page-is-loading) |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
+| `canRenderThumbnail()`                     | Whether thumbnails are allowed. [Permissions](#permissions)                                                                                      |
+| `canSnapshot()`                            | Whether the user may take a snapshot. [Permissions](#permissions)                                                                                |
+| `getSnapshot()`                            | The snapshot held now, `{ page, rect, image }`, or `null`. [Take a snapshot](#take-a-snapshot)                                                   |
+| `clearSnapshot()`                          | Lets the snapshot go. [Take a snapshot](#take-a-snapshot)                                                                                        |
+| `handOverPictures(painter)`, `getPicturePainter()` | Lets another plugin paint the pages' pictures until the function it returns is called, and which one does, or `null`. [Paint the pictures another way](#paint-the-pictures-another-way) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -155,12 +293,25 @@ Set them when you register the plugin, and change them while the app runs with
 | `tiles.prefetch.margin`       | How far around the view to load tiles, as a share of the view         | `0.5`            |
 | `tiles.prefetch.velocityBias` | Load further ahead in the direction you're scrolling                  | `true`           |
 | `tiles.settleMs`              | How long a zoom rests before tiles redraw                             | `150`            |
+| `slowAfterMs`                 | How long a page waits for its picture before it counts as `slow`      | `400`            |
 | `format`                      | `'png'`, `'webp'`, or `'bmp'` (fastest, local engine only)            | per engine       |
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
+| `snapshot.scale`              | A [snapshot](#take-a-snapshot)'s pixels per point                     | `2`              |
+| `snapshot.box.fill`           | Inside the box you drag with the snapshot tool                        | the viewer's `accent` at 8% |
+| `snapshot.box.stroke`         | Its dashed edge                                                       | the viewer's `accent` |
 
-`<RenderLayer>` takes three <Word of="props" />: `annotations` and `formFields`, unset by default
-(see [What the picture draws](#what-the-picture-draws)), and `tiles` (default `true`).
+`format` and `quality` read `null` while the engine chooses, and `updateSettings({ format: null })`
+gives the choice back. `snapshot.box` is one look: a change replaces it whole, so a color you leave
+out follows the accent again.
+
+`<RenderLayer>` takes four <Word of="props" />: `annotations` and `formFields`, unset by default
+(see [What the picture draws](#what-the-picture-draws)), `tiles` (default `true`), and `thumbnail`:
+in a strip of thumbnails, `<RenderLayer thumbnail />` draws each page's
+[thumbnail](/docs/engine/documents/rendering#thumbnails) instead, one small picture without tiles,
+which needs only `doc.render.thumbnail`. `<SnapshotLayer>` takes none. The box's colors also come
+from CSS: `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` win over the settings, as on
+[Theming](../ui/theming).
 
 ## Events
 
@@ -169,16 +320,33 @@ Set them when you register the plugin, and change them while the app runs with
 | Event           | Fires when                                  | Carries                      |
 | :-------------- | :------------------------------------------ | :--------------------------- |
 | `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onPictureStateChanged` | A page's picture came on screen, failed, went slow, or left its view | `page`, `view`, `status`, `slow` |
+| `onSnapshotChanged` | A snapshot was taken, or let go | `snapshot`: `{ page, rect, image }`, or `null` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 ## Permissions
 
 | Permission   | What it allows                            | Check                |
 | :----------- | :---------------------------------------- | :------------------- |
-| `doc.render` | Page images, thumbnails and page sections | `render.canRender()` |
+| `doc.render` | Page images and page sections, and thumbnails | `render.canRender()` |
+| `doc.render.thumbnail` | Thumbnails only (`<RenderLayer thumbnail />`, `renderThumbnail`) | `render.canRenderThumbnail()` |
+| `doc.content.copy` | [Snapshots](#take-a-snapshot), with `doc.render` | `render.canSnapshot()` |
 
-Without it, pages keep their size and place, so the Stage still scrolls and the other plugins still
-work, but nothing is painted.
+Without `doc.render`, pages keep their size and place, so the Stage still scrolls and the other
+plugins still work, but nothing is painted: each page's [state](#show-that-a-page-is-loading) is
+`'forbidden'`. A strip of thumbnails still draws with
+`doc.render.thumbnail`.
+
+`doc.content.copy` comes with copying text: a PDF that forbids copying forbids snapshots too, as in
+Acrobat. It's a rule the viewer keeps, not one that hides pixels: someone who may see the pages
+could still capture the screen.
+
+<Engine cloud>
+
+To keep pages from being captured at all, see
+[Screenshot protection](/docs/viewer/features/screenshot-protection).
+
+</Engine>
 
 ## Good to know
 

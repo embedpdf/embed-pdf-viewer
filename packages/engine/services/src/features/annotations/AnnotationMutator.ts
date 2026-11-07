@@ -20,6 +20,7 @@ import {
   type AnnotationReplyType,
   type AnnotationUpdateResult,
   type PageObjectNumber,
+  PDF_SUBTYPE_TO_CODE,
   PdfAnnotationSubtypeCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -32,7 +33,7 @@ import { blendModeFromCode } from './internal/blendMode';
 import { assertCaptionMetadataWritable } from './internal/mutations/captionMetadata';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import type { FontRegistrar } from '../fonts';
+import { fontWriteContext, type FontRegistrar } from '../fonts';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { openAnnotAtRaw, resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from './internal/mutations/annotationMutationMeta';
@@ -49,6 +50,7 @@ import { RawAnnotationReader } from './RawAnnotationReader';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
+import { assertMarkKeepsItsLook } from './internal/write/writeWidgetAnnotation';
 import {
   writeAnnotationRelationship,
   writeLinkedOpen,
@@ -97,14 +99,8 @@ export class AnnotationMutator {
   /** Build the per-write context handed to subtype writers: font resolver
    *  (FreeText `/DA`), the document pointer and binary resources (stamp). */
   private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
-    const fonts = this.fonts;
     return {
-      ...(fonts
-        ? {
-            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
-            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
-          }
-        : {}),
+      ...fontWriteContext(this.runtime, this.session, this.fonts),
       runtime: this.runtime,
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),
@@ -181,7 +177,7 @@ export class AnnotationMutator {
     try {
       throwIfAborted(signal);
 
-      const writeCtx = this.writeContext(resources);
+      const writeContext = this.writeContext(resources);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -214,10 +210,11 @@ export class AnnotationMutator {
       // exactly this.
       assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
       patch = pdfResolveAnnotationPatch(currentDto, patch, {
-        describeFont: writeCtx.describeRegisteredFont,
+        describeFont: writeContext.describeFont,
       });
+      assertMarkKeepsItsLook(currentDto, patch);
       assertAnnotationResources(currentDto.subtype, resources, 'update');
-      preflightPatch(patch, writeCtx);
+      preflightPatch(patch, writeContext);
 
       // Apply boundary: validation and cancellation are complete before the
       // first document write.
@@ -229,8 +226,16 @@ export class AnnotationMutator {
       const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
       if (impact !== 'inert') settleAnnotationTurn(fn, mem, annotPtr);
 
+      // A sibling kind (the resolver allows no other) is named first: its
+      // fields are then written as its own, and its appearance drawn below.
+      if (patch.subtype !== undefined && patch.subtype !== currentDto.subtype) {
+        if (!fn.EPDFAnnot_SetSubtype(annotPtr, PDF_SUBTYPE_TO_CODE[patch.subtype])) {
+          throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetSubtype returned false');
+        }
+      }
+
       // Apply caller-supplied subtype-specific writes.
-      applyPatch(fn, mem, annotPtr, patch, writeCtx);
+      applyPatch(fn, mem, annotPtr, patch, writeContext);
       // A derived plain label supersedes imported rich contents; retaining stale /RC
       // would show a different value in consumers that prefer rich text.
       if (
@@ -242,7 +247,7 @@ export class AnnotationMutator {
       }
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Only this
       // annotation is written; a popup relink and a shared `/Open` also write
-      // the other annotation, which `meta.changed` names after this one.
+      // the other annotation, which `meta.changedRefs` names after this one.
       let linkedParent: AnnotationRef | null = null;
       if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
         writeAnnotationRelationship(
@@ -318,12 +323,14 @@ export class AnnotationMutator {
       } else {
         const ok =
           currentDto.subtype === 'widget'
-            ? // Drawn as its field's family draws it; a widget in no field has none.
-              fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+            ? // Drawn as its field's family draws it: a signature field's and
+              // one in no field, their box. A mark in the widget stays: the
+              // file places it in the moved or resized box.
+              !currentDto.hasMark && fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
             : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
         appearance = ok
           ? { action: 'regenerated', changed: true }
-          : // No generator for this annotation (a widget in no field). The
+          : // Not drawn (a mark kept, a field type with no generator). The
             // dictionary still changed when the patch was appearance-relevant,
             // so `changed` stays true in that case — form-layer renderers may
             // paint differently even though no /AP was written.

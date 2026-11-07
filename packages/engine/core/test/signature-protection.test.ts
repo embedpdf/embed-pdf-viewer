@@ -9,9 +9,9 @@ import {
   PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
 } from '../src/signature/protection';
-import type { SignatureDTO } from '../src/signature/types';
+import type { Signature } from '../src/signature/types';
 
-const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
+const sig = (over: Partial<Signature>): Signature => ({
   index: 0,
   field: { kind: 'objectNumber', objectNumber: 10 },
   fieldName: 'sig',
@@ -21,7 +21,7 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   filter: 'Adobe.PPKLite',
   subFilter: 'ETSI.CAdES.detached',
   byteRange: [0, 10, 20, 5],
-  contentsSize: 8,
+  contentsSizeBytes: 8,
   coverage: 'whole-revision',
   revisionIndex: 1,
   signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
@@ -62,6 +62,7 @@ describe('deriveProtection: enforced vs judged', () => {
     expect(protectedCapabilities(p3).has('doc.annotate.import')).toBe(false);
     // A declaration refuses everything outside what it permits: structure too.
     expect(protectedCapabilities(p3).has('doc.pages.assemble')).toBe(true);
+    expect(protectedCapabilities(p3).has('doc.outline.modify')).toBe(true);
     expect(protectedCapabilities(p3).has('doc.forms.modify')).toBe(true);
     // Writing scripts into the form is designing it.
     expect(protectedCapabilities(p3).has('doc.forms.script')).toBe(true);

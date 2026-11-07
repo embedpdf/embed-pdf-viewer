@@ -29,15 +29,15 @@ import { EVERY_PERMISSION } from './fixtureScope';
  */
 export function runPageDeleteConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page delete conformance: ${opts.label}`, () => {
+  describe(`page delete conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -45,7 +45,7 @@ export function runPageDeleteConformance(
     });
 
     test('pages.delete() removes the page and returns the surviving layout', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
@@ -77,7 +77,7 @@ export function runPageDeleteConformance(
     });
 
     test('addressing a deleted page afterwards is a clean NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
@@ -97,7 +97,7 @@ export function runPageDeleteConformance(
     });
 
     test('an annotation born inline keeps its baseIndex name when another page is deleted', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const inline = (await doc.annotations.list()).annotations.find(
@@ -119,7 +119,7 @@ export function runPageDeleteConformance(
     });
 
     test('deleting EVERY page is rejected with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         let caught: unknown;
@@ -135,7 +135,7 @@ export function runPageDeleteConformance(
     });
 
     test('pages.delete() rejects duplicate PONs with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;
@@ -152,7 +152,7 @@ export function runPageDeleteConformance(
     });
 
     test('pages.delete() rejects unknown PON with NotFound or InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         let bogus = 0;
@@ -175,7 +175,7 @@ export function runPageDeleteConformance(
     });
 
     test('abort on pages.delete() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;

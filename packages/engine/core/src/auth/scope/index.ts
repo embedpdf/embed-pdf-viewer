@@ -14,19 +14,28 @@ export type {
   CollabFilter,
   DocCapability,
   FieldAction,
+  PluginPermission,
+  PluginPermissions,
   FieldFilter,
   Identity,
   ParsedCapability,
   ParsedCollab,
+  ParsedPluginPermission,
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './types';
 
-export { PDF_BITS, decodePdfBits } from './pdf-bits';
+export { PDF_BITS, permissionFlagsOf } from './permission-flags';
 
-export { parseScope, validateScopeArray } from './parser';
+export {
+  CORE_NAMESPACES,
+  isPluginId,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from './parser';
 
 export { InvalidScope, MissingIdentity, PermissionDenied } from './errors';
 
@@ -54,6 +63,7 @@ export {
   checkCapability,
   checkCollab,
   checkFieldAction,
+  checkPluginPermission,
   fieldRightsOf,
   type FieldGroupRight,
   type FieldRights,
@@ -61,6 +71,9 @@ export {
   expandedCapabilities,
   expandRawScope,
   filterMatches,
+  pluginPermissionsOf,
 } from './resolver';
+
+export { scopeNotCovered } from './coverage';
 
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './builders';

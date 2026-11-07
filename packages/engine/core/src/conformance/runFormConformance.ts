@@ -8,7 +8,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import { formEffectOps } from '../forms/effects';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 import { toFieldRef } from '../identity/FormFieldRef';
@@ -63,15 +63,15 @@ export interface FormConformanceOptions extends Omit<ConformanceOptions, 'fixtur
 
 export function runFormConformance(
   runner: ConformanceTestRunner,
-  opts: FormConformanceOptions,
+  options: FormConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`forms conformance: ${opts.label}`, () => {
+  describe(`forms conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -79,21 +79,21 @@ export function runFormConformance(
     });
 
     async function open(fixture: ConformanceFixture, idSuffix = ''): Promise<DocumentHandle> {
-      if (opts.openKind === 'bytes') {
+      if (options.openKind === 'bytes') {
         const bytes = await fixture.bytes();
         return engine.open({ kind: 'bytes', id: fixture.id + idSuffix, bytes }, EVERY_PERMISSION);
       }
       return engine.open({ kind: 'id', id: fixture.cloudId ?? fixture.id });
     }
 
-    function fieldByName(fields: FormFieldDTO[], name: string): FormFieldDTO {
+    function fieldByName(fields: FormField[], name: string): FormField {
       const field = fields.find((f) => f.name === name);
       expect(Boolean(field)).toBe(true);
       return field!;
     }
 
     test('lists the reconciled field tree with per-family DTOs', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const snapshot = await doc.forms.list();
         // Wire parity: the snapshot must survive its own schema.
@@ -101,7 +101,7 @@ export function runFormConformance(
         expect(snapshot.formKind).toBe('acroform');
 
         const text = fieldByName(snapshot.fields, 'maxlen_text');
-        if (text.family !== 'text') throw new Error('expected text family');
+        if (text.kind !== 'text') throw new Error('expected text family');
         expect(text.value).toBe('abc');
         expect(text.valueEntry).toEqual({ kind: 'scalar', value: 'abc' });
         expect(text.defaultValueEntry).toEqual({ kind: 'none' });
@@ -109,7 +109,7 @@ export function runFormConformance(
         expect(text.widgets.length).toBe(1);
 
         const radio = fieldByName(snapshot.fields, 'ntto_radio');
-        if (radio.family !== 'radio') throw new Error('expected radio family');
+        if (radio.kind !== 'radio') throw new Error('expected radio family');
         expect(radio.noToggleToOff).toBe(true);
         expect(radio.value).toBe('x');
         expect(radio.valueEntry).toEqual({ kind: 'scalar', value: 'x' });
@@ -118,17 +118,17 @@ export function runFormConformance(
         expect(radio.widgets.map((w) => w.checked)).toEqual([true, false]);
 
         const unison = fieldByName(snapshot.fields, 'unison_radio');
-        if (unison.family !== 'radio') throw new Error('expected radio family');
+        if (unison.kind !== 'radio') throw new Error('expected radio family');
         expect(unison.radiosInUnison).toBe(true);
 
         const check = fieldByName(snapshot.fields, 'opt_check');
-        if (check.family !== 'checkbox') throw new Error('expected checkbox family');
+        if (check.kind !== 'checkbox') throw new Error('expected checkbox family');
         expect(check.checked).toBe(false);
         expect(check.exportValue).toBe('Alpha');
 
         // Hierarchical fields surface under their fully qualified name.
         const nested = fieldByName(snapshot.fields, 'billing.name');
-        expect(nested.family).toBe('text');
+        expect(nested.kind).toBe('text');
         expect(snapshot.calculationOrder).toEqual([]);
       } finally {
         await doc.close();
@@ -136,15 +136,15 @@ export function runFormConformance(
     });
 
     test('writes text values and truncates to /MaxLen', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const result = await doc.forms.setValue(
           { kind: 'fqn', name: 'maxlen_text' },
           { value: 'abcde' },
         );
         FormSetValueResultSchema.parse(result);
-        expect(result.field.family).toBe('text');
-        if (result.field.family === 'text') expect(result.field.value).toBe('abcde');
+        expect(result.field.kind).toBe('text');
+        if (result.field.kind === 'text') expect(result.field.value).toBe('abcde');
         expect(result.meta.changedWidgets.length).toBe(1);
         // The meta names the field and the page its repainted widget is on.
         expect(result.meta.changedFields).toEqual([result.field.ref]);
@@ -154,24 +154,24 @@ export function runFormConformance(
           { kind: 'fqn', name: 'maxlen_text' },
           { value: 'abcdef' },
         );
-        if (truncated.field.family !== 'text') throw new Error('expected text family');
+        if (truncated.field.kind !== 'text') throw new Error('expected text family');
         expect(truncated.field.value).toBe('abcde');
         expect(truncated.meta.changedWidgets).toHaveLength(0);
 
         // Re-read through the (invalidated) snapshot: the write is visible.
         const after = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
-        if (after.family === 'text') expect(after.value).toBe('abcde');
+        if (after.kind === 'text') expect(after.value).toBe('abcde');
       } finally {
         await doc.close();
       }
     });
 
     test('toggles radio groups and honors NoToggleToOff', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const radioRef = { kind: 'fqn', name: 'ntto_radio' } as const;
         const result = await doc.forms.setValue(radioRef, { value: 'y' });
-        if (result.field.family !== 'radio') throw new Error('expected radio family');
+        if (result.field.kind !== 'radio') throw new Error('expected radio family');
         expect(result.field.value).toBe('y');
         expect(result.field.widgets.map((w) => w.checked)).toEqual([false, true]);
         expect(result.meta.changedWidgets.length).toBe(2); // x -> Off, y -> on
@@ -191,13 +191,13 @@ export function runFormConformance(
           code: EngineErrorCode.InvalidArg,
         });
         const byValue = await doc.forms.setValue(optCheck, { value: 'Alpha' });
-        if (byValue.field.family !== 'checkbox') throw new Error('expected checkbox family');
+        if (byValue.field.kind !== 'checkbox') throw new Error('expected checkbox family');
         expect(byValue.field.checked).toBe(true);
         const cleared = await doc.forms.setValue(optCheck, { checked: false });
-        if (cleared.field.family !== 'checkbox') throw new Error('expected checkbox family');
+        if (cleared.field.kind !== 'checkbox') throw new Error('expected checkbox family');
         expect(cleared.field.checked).toBe(false);
         const check = await doc.forms.setValue(optCheck, { checked: true });
-        if (check.field.family !== 'checkbox') throw new Error('expected checkbox family');
+        if (check.field.kind !== 'checkbox') throw new Error('expected checkbox family');
         expect(check.field.checked).toBe(true);
         expect(check.field.exportValue).toBe('Alpha');
       } finally {
@@ -206,26 +206,26 @@ export function runFormConformance(
     });
 
     test('rejects family/value mismatches without touching the field', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         // Compare against the current value, not the fixture seed: on
         // transports with durable server state (cloud), earlier tests'
         // legitimate writes persist. The invariant under test is that a
         // rejected write changes nothing.
         const before = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
-        if (before.family !== 'text') throw new Error('expected text family');
+        if (before.kind !== 'text') throw new Error('expected text family');
         await expect(
           doc.forms.setValue({ kind: 'fqn', name: 'maxlen_text' }, { checked: true }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         const field = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
-        if (field.family === 'text') expect(field.value).toBe(before.value);
+        if (field.kind === 'text') expect(field.value).toBe(before.value);
       } finally {
         await doc.close();
       }
     });
 
     test("a script run's effects are one change: all of it, or none of it", async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const events: Extract<DocumentEvent, { type: 'forms.valueSet' }>[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
@@ -251,7 +251,7 @@ export function runFormConformance(
           );
         expect(refusal === null).toBe(false);
         const untouched = await doc.forms.get(text);
-        if (untouched.family === 'text' && before.family === 'text') {
+        if (untouched.kind === 'text' && before.kind === 'text') {
           expect(untouched.value).toBe(before.value);
         }
         expect(events).toHaveLength(0);
@@ -265,10 +265,10 @@ export function runFormConformance(
         });
         expect(result.items.map((item) => item.type)).toEqual(['forms.setValue', 'forms.setValue']);
         const after = await doc.forms.get(text);
-        if (after.family !== 'text') throw new Error('expected text family');
+        if (after.kind !== 'text') throw new Error('expected text family');
         expect(after.value).toBe('xyz');
         // One burst: the change's events share its opId.
-        expect(new Set(events.map((event) => event.origin.tx?.id))).toEqual(
+        expect(new Set(events.map((event) => event.origin.transaction?.id))).toEqual(
           new Set([result.meta.opId]),
         );
         unsubscribe();
@@ -278,7 +278,7 @@ export function runFormConformance(
     });
 
     test('a value, reset or display that changes nothing has nothing to undo', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const text = { kind: 'fqn', name: 'maxlen_text' } as const;
         const fill = {
@@ -304,11 +304,11 @@ export function runFormConformance(
     });
 
     test('selects multi-select list box options by export value', async () => {
-      const doc = await open(opts.fixtures.choiceFields);
+      const doc = await open(options.fixtures.choiceFields);
       try {
         const multiRef = { kind: 'fqn', name: 'Listbox_MultiSelect' } as const;
         const result = await doc.forms.setValue(multiRef, { selectedValues: ['Cherry', 'Apple'] });
-        if (result.field.family !== 'listbox') throw new Error('expected listbox family');
+        if (result.field.kind !== 'listbox') throw new Error('expected listbox family');
         // Option order, not input order.
         expect(result.field.selectedValues).toEqual(['Apple', 'Cherry']);
         expect(result.field.valueEntry.kind).toBe('array');
@@ -326,7 +326,7 @@ export function runFormConformance(
     });
 
     test('reset restores /DV or clears the value, and reports only the fields it changed', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const radioRef = toFieldRef('ntto_radio');
         const textRef = toFieldRef('maxlen_text');
@@ -336,7 +336,7 @@ export function runFormConformance(
         FormResetResultSchema.parse(radio);
         expect(radio.fields.map((field) => field.name)).toEqual(['ntto_radio']);
         const [restored] = radio.fields;
-        if (restored?.family === 'radio') expect(restored.value).toBe('x');
+        if (restored?.kind === 'radio') expect(restored.value).toBe('x');
         expect(radio.meta.changedFields).toEqual([restored!.ref]);
 
         // maxlen_text has no /DV: reset clears. The radio is already at its
@@ -350,7 +350,7 @@ export function runFormConformance(
         unsubscribe();
         expect(both.fields.map((field) => field.name)).toEqual(['maxlen_text']);
         const [text] = both.fields;
-        if (text?.family === 'text') expect(text.value).toBe('');
+        if (text?.kind === 'text') expect(text.value).toBe('');
         expect(events.map((event) => event.type)).toEqual(['forms.valueSet']);
 
         // Nothing left to restore: no fields, no widgets.
@@ -368,7 +368,7 @@ export function runFormConformance(
     });
 
     test('reset without refs resets the whole form as one change', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         await doc.forms.setValue(toFieldRef('ntto_radio'), { value: 'y' });
         await doc.forms.setValue(toFieldRef('billing.name'), { value: 'Ada' });
@@ -383,20 +383,24 @@ export function runFormConformance(
         expect(names).toContain('billing.name');
         // One event per changed field, all in one transaction.
         expect(events.length).toBe(result.fields.length);
-        const txIds = new Set(events.map((event) => event.origin.tx?.id));
+        const txIds = new Set(events.map((event) => event.origin.transaction?.id));
         expect(txIds.size).toBe(1);
-        expect(events.map((event) => event.origin.tx?.index)).toEqual(events.map((_, i) => i));
-        expect(events.every((event) => event.origin.tx?.count === events.length)).toBe(true);
+        expect(events.map((event) => event.origin.transaction?.index)).toEqual(
+          events.map((_, i) => i),
+        );
+        expect(events.every((event) => event.origin.transaction?.count === events.length)).toBe(
+          true,
+        );
         const after = await doc.forms.list();
         const radio = after.fields.find((field) => field.name === 'ntto_radio');
-        if (radio?.family === 'radio') expect(radio.value).toBe('x');
+        if (radio?.kind === 'radio') expect(radio.value).toBe('x');
       } finally {
         await doc.close();
       }
     });
 
     test('emits form events on mutations', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
@@ -412,7 +416,7 @@ export function runFormConformance(
     });
 
     test('repair makes recovered fields durable and is idempotent', async () => {
-      const doc = await open(opts.fixtures.orphanWidgets);
+      const doc = await open(options.fixtures.orphanWidgets);
       try {
         const before = await doc.forms.list();
         expect(before.fields.length).toBe(3);
@@ -436,12 +440,12 @@ export function runFormConformance(
     });
 
     test('widgets live the full form loop', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const pageRef = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       const page = doc.page(pageRef);
       try {
         // 1. A field gets a widget where its placement says, styled with the house vocabulary.
-        const field = await doc.forms.create({ family: 'text', name: 'loop_field' });
+        const field = await doc.forms.create({ kind: 'text', name: 'loop_field' });
         expect(field.field.widgets).toEqual([]);
         const rect = { x: 20, y: 20, width: 180, height: 24 };
         const added = await doc.forms.addWidget(field.field.ref, {
@@ -464,7 +468,7 @@ export function runFormConformance(
         );
         if (!widgetRow) throw new Error('expected a widget row');
         expect(widgetRow.field).toEqual(field.field.ref);
-        expect(widgetRow.fieldFamily).toBe('text');
+        expect(widgetRow.fieldKind).toBe('text');
         expect(widgetRow.rect).toEqual(rect);
         expect(widgetRow.interiorColor).toEqual('#f6f8fa');
         expect(
@@ -502,14 +506,14 @@ export function runFormConformance(
     });
 
     test('deleteWidget takes a widget off its page, and out of its field', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const pageRef = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       const page = doc.page(pageRef);
       const events: DocumentEvent[] = [];
       const stop = doc.events.subscribe((event) => events.push(event));
       try {
         const created = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'delete_me',
           widgets: [
             { page: pageRef, rect: { x: 20, y: 300, width: 120, height: 20 } },
@@ -569,8 +573,8 @@ export function runFormConformance(
     });
 
     test('widgets and annotations each keep their own stacking order', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const pageRef = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       const page = doc.page(pageRef);
       const events: DocumentEvent[] = [];
       const stop = doc.events.subscribe((event) => events.push(event));
@@ -645,11 +649,11 @@ export function runFormConformance(
     });
 
     test('createField composes styled widgets atomically', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const pageObjectNumber = opts.fixtures.toggleFields.pageObjectNumber;
+      const doc = await open(options.fixtures.toggleFields);
+      const pageObjectNumber = options.fixtures.toggleFields.pageObjectNumber;
       try {
         const created = await doc.forms.create({
-          family: 'radio',
+          kind: 'radio',
           name: 'authored_radio',
           noToggleToOff: true,
           widgets: [
@@ -667,7 +671,7 @@ export function runFormConformance(
             },
           ],
         });
-        if (created.field.family !== 'radio') throw new Error('expected radio');
+        if (created.field.kind !== 'radio') throw new Error('expected radio');
         expect(created.field.noToggleToOff).toBe(true);
         expect(created.field.widgets.map((w) => w.exportValue)).toEqual(['yes', 'no']);
         // Each widget lands where it was placed, measured from the page's top-left,
@@ -689,7 +693,7 @@ export function runFormConformance(
           rect: { x: 100, y: 60, width: 20, height: 20 },
           exportValue: 'maybe',
         });
-        if (third.field.family !== 'radio') throw new Error('expected radio');
+        if (third.field.kind !== 'radio') throw new Error('expected radio');
         expect(third.field.widgets.map((w) => w.exportValue)).toEqual(['yes', 'no', 'maybe']);
         // A button needs an export value; a refused add creates nothing.
         const countBefore = (await doc.forms.list()).widgets.length;
@@ -705,20 +709,20 @@ export function runFormConformance(
 
         // The newborn group fills through the normal value path.
         const filled = await doc.forms.setValue(created.field.ref, { value: 'yes' });
-        if (filled.field.family !== 'radio') throw new Error('expected radio');
+        if (filled.field.kind !== 'radio') throw new Error('expected radio');
         expect(filled.field.value).toBe('yes');
 
-        // update: no family needed (the ref says it); rename + conflict validation.
+        // update: no kind needed (the ref says it); rename + conflict validation.
         await doc.forms.update(created.field.ref, { name: 'renamed_radio' });
         await expect(
           doc.forms.update(created.field.ref, { name: 'unison_radio' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
-        // A member another family has, or a family that isn't the field's, is refused.
+        // A member another kind has, or a kind that isn't the field's, is refused.
         await expect(
           doc.forms.update(created.field.ref, { multiline: true }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         await expect(
-          doc.forms.update(created.field.ref, { family: 'text', name: 'x' }),
+          doc.forms.update(created.field.ref, { kind: 'text', name: 'x' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
         // delete cascades: field gone and its widgets gone; meta names both.
@@ -738,11 +742,11 @@ export function runFormConformance(
     });
 
     test("a widget's colour change keeps its font and size", async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const page = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       try {
         const { field } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'styled',
           widgets: [
             {
@@ -778,17 +782,21 @@ export function runFormConformance(
           fontSize: 11,
           fontColor: '#cc0000',
         });
+        // A font can't be removed: `null` beside one is refused.
+        await expect(doc.forms.updateWidget(widget, { fontSize: null })).rejects.toMatchObject({
+          code: 'InvalidArg',
+        });
       } finally {
         await doc.close();
       }
     });
 
     test('a push button has a caption and an action, and holds no value', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const page = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       try {
         const { field } = await doc.forms.create({
-          family: 'pushbutton',
+          kind: 'pushbutton',
           name: 'clear',
           widgets: [
             {
@@ -800,7 +808,7 @@ export function runFormConformance(
             },
           ],
         });
-        expect(field.family).toBe('pushbutton');
+        expect(field.kind).toBe('pushbutton');
         const widget = field.widgets[0]!.ref!;
         const rowOf = async (ref: AnnotationRef) =>
           (await doc.forms.list()).widgets.find(
@@ -808,7 +816,7 @@ export function runFormConformance(
           )!;
         let row = await rowOf(widget);
         expect(row).toMatchObject({
-          fieldFamily: 'pushbutton',
+          fieldKind: 'pushbutton',
           caption: 'Clear form',
           interiorColor: '#f6f8fa',
           hasAppearance: true,
@@ -819,7 +827,7 @@ export function runFormConformance(
         await expect(doc.forms.setValue(field.ref, { value: 'x' })).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
-        // Its field takes the settings every field has, and no family's own.
+        // Its field takes the settings every field has, and no kind's own.
         await doc.forms.update(field.ref, { alternateName: 'Clears every field' });
         await expect(doc.forms.update(field.ref, { multiline: true })).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
@@ -852,9 +860,7 @@ export function runFormConformance(
 
         // Another widget has no caption: its row reads none, sent back it is
         // kept, and a caption is refused, on its placement too.
-        const checkbox = (await doc.forms.list()).widgets.find(
-          (w) => w.fieldFamily === 'checkbox',
-        )!;
+        const checkbox = (await doc.forms.list()).widgets.find((w) => w.fieldKind === 'checkbox')!;
         expect(checkbox.caption).toBeNull();
         await doc.forms.updateWidget(checkbox.ref, { ...checkbox });
         await expect(
@@ -862,7 +868,7 @@ export function runFormConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         await expect(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'captioned',
             widgets: [{ page, rect: { x: 20, y: 160, width: 120, height: 20 }, caption: 'x' }],
           }),
@@ -873,8 +879,8 @@ export function runFormConformance(
     });
 
     test('create is one change: a rejected draft creates nothing', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const page = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       const names = async () => (await doc.forms.list()).fields.map((field) => field.name);
       const widgetCount = async () =>
         (await doc.forms.list()).widgets.filter((w) => w.page.objectNumber === page.objectNumber)
@@ -887,7 +893,7 @@ export function runFormConformance(
         // Checked before anything is written.
         await expect(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'rejected_text',
             maxLength: -5,
             widgets: [placed],
@@ -895,7 +901,7 @@ export function runFormConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         await expect(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'rejected_text',
             widgets: [{ ...placed, page: toPageRef(999_999) }],
           }),
@@ -903,7 +909,7 @@ export function runFormConformance(
         // Refused after the field exists: the whole create is undone.
         await expect(
           doc.forms.create({
-            family: 'combobox',
+            kind: 'combobox',
             name: 'rejected_choice',
             options: [{ label: 'A', value: 'a' }],
             defaultValue: 'not-an-option',
@@ -916,7 +922,7 @@ export function runFormConformance(
 
         // The names are still free.
         const created = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'rejected_text',
           widgets: [placed],
         });
@@ -928,11 +934,11 @@ export function runFormConformance(
     });
 
     test('flags, list box defaults and signature fields are written like any other member', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const doc = await open(options.fixtures.toggleFields);
+      const page = toPageRef(options.fixtures.toggleFields.pageObjectNumber);
       try {
         const list = await doc.forms.create({
-          family: 'listbox',
+          kind: 'listbox',
           name: 'defaults_list',
           multiSelect: true,
           options: [
@@ -944,7 +950,7 @@ export function runFormConformance(
           required: true,
           widgets: [{ page, rect: { x: 20, y: 140, width: 100, height: 60 } }],
         });
-        if (list.field.family !== 'listbox') throw new Error('expected listbox');
+        if (list.field.kind !== 'listbox') throw new Error('expected listbox');
         expect(list.field.defaultValue).toEqual(['a', 'c']);
         expect(list.field).toMatchObject({ readOnly: false, required: true, noExport: false });
 
@@ -958,7 +964,7 @@ export function runFormConformance(
         await doc.forms.setValue(list.field.ref, { selectedValues: ['a'] });
         const reset = await doc.forms.reset(list.field.ref);
         const [restored] = reset.fields;
-        if (restored?.family !== 'listbox') throw new Error('expected listbox');
+        if (restored?.kind !== 'listbox') throw new Error('expected listbox');
         expect(restored.selectedValues).toEqual(['b']);
 
         // A flag left out keeps its value.
@@ -979,7 +985,7 @@ export function runFormConformance(
 
         // A signature field takes the settings every field shares.
         const signature = await doc.forms.create({
-          family: 'signature',
+          kind: 'signature',
           name: 'sign_here',
           widgets: [{ page, rect: { x: 20, y: 220, width: 150, height: 40 } }],
         });
@@ -989,7 +995,7 @@ export function runFormConformance(
           required: true,
         });
         const renamed = await doc.forms.get(signature.field.ref);
-        expect(renamed.family).toBe('signature');
+        expect(renamed.kind).toBe('signature');
         expect(renamed.name).toBe('signed_here');
         expect(renamed.alternateName).toBe('Sign here');
         expect(renamed.required).toBe(true);
@@ -1008,9 +1014,9 @@ export function runFormConformance(
       // maxlen_text, opt_check and billing.name are each one dictionary that
       // is both the field and its only widget: maxlen_text is listed in
       // /AcroForm /Fields, billing.name in its parent's /Kids.
-      const doc = opts.fixtures.deleteTarget
-        ? await open(opts.fixtures.deleteTarget)
-        : await open(opts.fixtures.toggleFields, '-delete-target');
+      const doc = options.fixtures.deleteTarget
+        ? await open(options.fixtures.deleteTarget)
+        : await open(options.fixtures.toggleFields, '-delete-target');
       const placed = async () =>
         (await doc.forms.list()).widgets.flatMap((w) =>
           w.ref.kind === 'objectNumber' ? [w.ref.objectNumber] : [],
@@ -1045,8 +1051,8 @@ export function runFormConformance(
     });
 
     test('a merged field/widget cannot be removed from its field or deleted as an annotation', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      const page = doc.page(toPageRef(opts.fixtures.toggleFields.pageObjectNumber));
+      const doc = await open(options.fixtures.toggleFields);
+      const page = doc.page(toPageRef(options.fixtures.toggleFields.pageObjectNumber));
       try {
         const field = await doc.forms.get(toFieldRef('opt_check'));
         const widgetRef = field.widgets[0]?.ref;
@@ -1087,7 +1093,7 @@ export function runFormConformance(
     });
 
     test('unknown refs fail with NotFound', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
+      const doc = await open(options.fixtures.toggleFields);
       try {
         await expect(doc.forms.get({ kind: 'fqn', name: 'no.such.field' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,

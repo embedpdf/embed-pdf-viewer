@@ -41,7 +41,7 @@
       value={typeof value === 'string' ? value : '#ffffff'}
       oninput={(event) => update(event.currentTarget.value)}
     />
-    {#if property.key === 'interiorColor'}
+    {#if property.allowsNone}
       <button type="button" class="link" onclick={() => update(null)}>
         {value === null ? 'none' : 'remove'}
       </button>
@@ -131,11 +131,11 @@
     onchange={(event) =>
       annotation.selection.updateLink(
         event.currentTarget.value === 'website'
-          ? { kind: 'uri', uri: 'https://www.embedpdf.com' }
+          ? { kind: 'uri', uri: 'https://example.com' }
           : null,
       )}
   >
     <option value="none">No link</option>
-    <option value="website">embedpdf.com</option>
+    <option value="website">example.com</option>
   </select>
 {/if}

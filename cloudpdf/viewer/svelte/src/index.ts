@@ -14,7 +14,7 @@
  * A door like the open viewer's two (docs/conventions/viewer-doors.md): it imports the cloud
  * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
  * and narrows `<PDFViewer>` to the cloud's `ViewerConfig`. `engine` takes the cloud engine's
- * settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id or a share link.
+ * settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id or a grant.
  */
 import '@cloudpdf/viewer';
 

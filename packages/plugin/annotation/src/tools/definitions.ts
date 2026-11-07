@@ -7,10 +7,10 @@
  * defaults (an "arrow" is a `line` with an arrowhead default), which is exactly
  * why defaults are keyed by the tool id (the `preset`), never by the subtype.
  *
- * The built-in {@link DEFAULT_TOOLS} are the standard tool set; an embedder tweaks
- * or extends them with `annotationPlugin({ tools: [...] })`. Same-id entries merge
- * over the built-in (configure it); a new id adds a tool; `extends` inherits an
- * existing tool's subtype/cursor/tags so a preset is one line.
+ * The built-in {@link DEFAULT_TOOLS} are the standard tool set; an embedder
+ * changes them or adds to them with `annotationPlugin({ tools: [...] })`. The
+ * entries apply in order: one with a taken id changes that tool, a new id adds
+ * a tool, and `extends` copies a tool defined before it, so a preset is one line.
  */
 import type {
   AnnotationFlags,
@@ -216,12 +216,13 @@ export type ToolDefaultsFor<K extends ToolAuthoringKind> = ToolDraftOf<K> &
  * optional: the common cases are "configure a built-in" (`{ id, defaults }`) and
  * "add a preset" (`{ id, extends, defaults }`).
  */
-export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKind> {
+export interface AnnotationToolDefinition<K extends ToolAuthoringKind = ToolAuthoringKind> {
   /** Stable tool id — the value passed to `activateTool` and the `defaults` key. */
   id: string;
-  /** Inherit `subtype` / `fieldsKind` / `cursor` / `enables` / `source` /
-   *  `selection` / `intent` / `ink` / `meta`
-   *  from an existing tool id (a built-in or another entry). Own fields win. */
+  /** Start from a copy of a tool defined before this entry: a built-in, an
+   *  earlier entry, or a tool registered while the app runs. The copy takes
+   *  everything but its `meta`, and own fields win. A later change to that
+   *  tool doesn't reach this one. */
   extends?: string;
   /** The routing kind this tool authors — the core's client kind (the geometry
    *  it draws + the props key). Usually the PDF subtype, but not always:
@@ -303,7 +304,8 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    */
   afterCreate?: Partial<AfterCreateSettings>;
   /** Your own data, such as a label and an icon for a toolbar that builds itself
-   *  from the tool table. The plugin keeps it and never reads it. */
+   *  from the tool table. The plugin keeps it and never reads it, and a tool
+   *  made with `extends` starts without it. */
   meta?: Record<string, unknown>;
 }
 
@@ -335,14 +337,14 @@ export interface BuiltinToolKindMap {
 }
 
 type DirectToolDef = {
-  [K in ToolAuthoringKind]: Omit<AnnotationToolDef<K>, 'subtype'> & { subtype: K };
+  [K in ToolAuthoringKind]: Omit<AnnotationToolDefinition<K>, 'subtype'> & { subtype: K };
 }[ToolAuthoringKind];
 // A key a shape doesn't take is `?: undefined`, not `?: never`: without `strictNullChecks` (plain
 // JavaScript, a non-strict app) a missing `never` key can't tell the shapes apart, so the union is
 // read as one, `id: 'highlight'` widens to `string` and no shape takes it.
 type BuiltinToolOverride = {
   [I in keyof BuiltinToolKindMap]: Omit<
-    AnnotationToolDef<BuiltinToolKindMap[I]>,
+    AnnotationToolDefinition<BuiltinToolKindMap[I]>,
     'id' | 'extends' | 'subtype'
   > & {
     id: I;
@@ -352,7 +354,7 @@ type BuiltinToolOverride = {
 }[keyof BuiltinToolKindMap];
 type ExtendedBuiltinToolDef = {
   [I in keyof BuiltinToolKindMap]: Omit<
-    AnnotationToolDef<BuiltinToolKindMap[I]>,
+    AnnotationToolDefinition<BuiltinToolKindMap[I]>,
     'extends' | 'subtype'
   > & {
     extends: I;
@@ -375,19 +377,19 @@ export interface ResolvedTool {
   cursor: string;
   enables: ReadonlySet<string>;
   defaults?: FieldValues;
-  /** `/F` seed for created annotations (see {@link AnnotationToolDef.flags}). */
+  /** `/F` seed for created annotations (see {@link AnnotationToolDefinition.flags}). */
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
-   *  {@link AnnotationToolDef.upright}). */
+   *  {@link AnnotationToolDefinition.upright}). */
   upright: boolean;
   /** What a bare click creates, or `false` for drag-only. */
   clickCreate: ClickCreate | false;
   /** The tool's ghost ({@link GhostPolicy}): how opaque it paints, or `false` for none. */
   ghost: ResolvedGhost;
-  /** Its own `afterCreate` (see {@link AnnotationToolDef.afterCreate}), over the setting. */
+  /** Its own `afterCreate` (see {@link AnnotationToolDefinition.afterCreate}), over the setting. */
   afterCreate?: Partial<AfterCreateSettings>;
   /** A line gesture is captured, not created ({@link CAPTURE_TOOLS}). */
   capture: boolean;
@@ -684,20 +686,42 @@ function mergeDefaults(left?: FieldValues, right?: FieldValues): FieldValues | u
   return left && right ? { ...left, ...right } : (right ?? left);
 }
 
-/** Overlay a same-id override onto a base definition (configure a built-in). */
-function mergeDef(base: AnnotationToolDef, over: AnnotationToolDef): AnnotationToolDef {
+/**
+ * A tool from `definition`, starting from `base` when it has one: the base's
+ * kind, behavior and defaults, with the definition's own fields over them. The
+ * base's `meta` stays behind, since it says which button the base is.
+ */
+function toolFrom(definition: AnnotationToolDefinition, base?: ResolvedTool): ResolvedTool {
+  const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as KindName;
   return {
-    ...base,
-    ...over,
-    enables: over.enables ?? base.enables,
-    meta: base.meta || over.meta ? { ...base.meta, ...over.meta } : undefined,
-    defaults: mergeDefaults(base.defaults, over.defaults) as AnnotationToolDef['defaults'],
-    flags: base.flags || over.flags ? { ...base.flags, ...over.flags } : undefined,
-    ink: base.ink || over.ink ? { ...base.ink, ...over.ink } : undefined,
+    id: definition.id,
+    subtype,
+    preset: definition.preset ?? definition.id,
+    fieldsKind: definition.fieldsKind ?? base?.fieldsKind ?? subtype,
+    cursor: definition.cursor ?? base?.cursor ?? 'crosshair',
+    enables: new Set(definition.enables ?? (base ? [...base.enables] : [])),
+    defaults: mergeDefaults(base?.defaults, definition.defaults),
+    flags: base?.flags || definition.flags ? { ...base?.flags, ...definition.flags } : undefined,
+    source: definition.source ?? base?.source,
+    selection: definition.selection ?? base?.selection,
+    ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
+    upright: definition.upright ?? base?.upright ?? false,
+    clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,
+    ghost: resolveGhost(definition.ghost ?? base?.ghost ?? false),
     afterCreate:
-      base.afterCreate || over.afterCreate
-        ? { ...base.afterCreate, ...over.afterCreate }
+      base?.afterCreate || definition.afterCreate
+        ? { ...base?.afterCreate, ...definition.afterCreate }
         : undefined,
+    capture: CAPTURE_TOOLS.has(definition.id) || (base?.capture ?? false),
+    meta: definition.meta,
+  };
+}
+
+/** `tool` with a change for its id merged over it: the same tool, `meta` included. */
+function changeTool(tool: ResolvedTool, change: AnnotationToolDefinition): ResolvedTool {
+  return {
+    ...toolFrom({ ...change, preset: change.preset ?? tool.preset }, tool),
+    meta: tool.meta || change.meta ? { ...tool.meta, ...change.meta } : undefined,
   };
 }
 
@@ -717,61 +741,43 @@ function validateDefaults(tool: ResolvedTool): void {
 }
 
 /**
- * Resolve {@link DEFAULT_TOOLS} + embedder overrides into the ready-to-use table.
- * A same-id override merges over the built-in; a new id adds a tool; `extends`
- * inherits from an already-defined tool. Keyed by id, so lookups are O(1).
+ * Apply one tool entry to `tools` and return the tool it leaves under its id.
+ * An entry with `extends` makes a tool from a copy of that tool as it is now,
+ * in place of any tool with its id; an entry whose id is taken changes that
+ * tool; any other entry adds one. A copy is a copy: a later change to the tool
+ * it came from doesn't reach it.
+ */
+export function applyTool(
+  tools: Map<string, ResolvedTool>,
+  entry: AnnotationToolInput,
+): ResolvedTool {
+  let tool: ResolvedTool;
+  if (entry.extends) {
+    const base = tools.get(entry.extends);
+    if (!base) {
+      throw new Error(
+        `[annotation] tool '${entry.id}' extends '${entry.extends}', which isn't defined before it`,
+      );
+    }
+    tool = toolFrom(entry, base);
+  } else {
+    const current = tools.get(entry.id);
+    tool = current ? changeTool(current, entry) : toolFrom(entry);
+  }
+  validateDefaults(tool);
+  tools.set(tool.id, tool);
+  return tool;
+}
+
+/**
+ * The tool table: {@link DEFAULT_TOOLS}, then `entries`, each applied in order
+ * by {@link applyTool}. So a change to a built-in reaches only that built-in, and
+ * an entry's `extends` sees the tool as the entries before it left it.
  */
 export function buildToolRegistry(
-  overrides: AnnotationToolInput[] = [],
+  entries: readonly AnnotationToolInput[] = [],
 ): Map<string, ResolvedTool> {
-  const defs = new Map<string, AnnotationToolDef>();
-  for (const definition of DEFAULT_TOOLS) defs.set(definition.id, definition);
-  for (const override of overrides) {
-    const previous = defs.get(override.id);
-    defs.set(override.id, previous ? mergeDef(previous, override) : override);
-  }
-
-  const out = new Map<string, ResolvedTool>();
-  const resolving = new Set<string>();
-  const resolve = (id: string): ResolvedTool => {
-    const cached = out.get(id);
-    if (cached) return cached;
-    const definition = defs.get(id);
-    if (!definition) throw new Error(`[annotation] tool '${id}' extends an unknown tool`);
-    // Inherit from the base first (guarding self / cyclic extends), then own fields win.
-    let base: ResolvedTool | undefined;
-    if (definition.extends && definition.extends !== id && !resolving.has(definition.extends)) {
-      resolving.add(id);
-      base = resolve(definition.extends);
-      resolving.delete(id);
-    }
-    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as KindName;
-    const resolved: ResolvedTool = {
-      id: definition.id,
-      subtype,
-      preset: definition.preset ?? definition.id,
-      fieldsKind: definition.fieldsKind ?? base?.fieldsKind ?? subtype,
-      cursor: definition.cursor ?? base?.cursor ?? 'crosshair',
-      enables: new Set(definition.enables ?? (base ? [...base.enables] : [])),
-      defaults: mergeDefaults(base?.defaults, definition.defaults),
-      flags: base?.flags || definition.flags ? { ...base?.flags, ...definition.flags } : undefined,
-      source: definition.source ?? base?.source,
-      selection: definition.selection ?? base?.selection,
-      ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
-      upright: definition.upright ?? base?.upright ?? false,
-      clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,
-      ghost: resolveGhost(definition.ghost ?? base?.ghost ?? false),
-      afterCreate:
-        base?.afterCreate || definition.afterCreate
-          ? { ...base?.afterCreate, ...definition.afterCreate }
-          : undefined,
-      capture: CAPTURE_TOOLS.has(definition.id) || (base?.capture ?? false),
-      meta: base?.meta || definition.meta ? { ...base?.meta, ...definition.meta } : undefined,
-    };
-    validateDefaults(resolved);
-    out.set(id, resolved);
-    return resolved;
-  };
-  for (const id of defs.keys()) resolve(id);
-  return out;
+  const tools = new Map<string, ResolvedTool>();
+  for (const entry of [...DEFAULT_TOOLS, ...entries]) applyTool(tools, entry);
+  return tools;
 }

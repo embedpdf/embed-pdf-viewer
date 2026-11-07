@@ -8,35 +8,35 @@
     type MeasurementKind,
   } from '@embedpdf/svelte/measurement';
 
-  // Points on the cover's empty lower half, in page coordinates: two for a
+  // Points on the floor plan, in page coordinates: two for a
   // distance, the corners otherwise.
   const SHAPES: Record<MeasurementKind, { x: number; y: number }[]> = {
     distance: [
-      { x: 60, y: 750 },
-      { x: 550, y: 750 },
+      { x: 62, y: 723 },
+      { x: 550, y: 723 },
     ],
     perimeter: [
-      { x: 70, y: 600 },
-      { x: 150, y: 650 },
-      { x: 250, y: 600 },
+      { x: 62, y: 613 },
+      { x: 382, y: 613 },
+      { x: 382, y: 723 },
     ],
     area: [
-      { x: 70, y: 670 },
-      { x: 250, y: 670 },
-      { x: 250, y: 730 },
-      { x: 70, y: 730 },
+      { x: 382, y: 516 },
+      { x: 550, y: 516 },
+      { x: 550, y: 723 },
+      { x: 382, y: 723 },
     ],
   };
 
-  // The cover's empty lower half, where the measurements go.
-  const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+  // The floor plan's lower half, where the measurements go.
+  const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
   const measurement = useMeasurement();
   const stage = useStage();
   const scale = usePageScale(0);
-  const cover = useAnnotationList({ pages: [0] });
+  const onPlan = useAnnotationList({ pages: [0] });
   const count = $derived(
-    cover.current.filter(
+    onPlan.current.filter(
       (annotation) => 'intent' in annotation && !!annotation.intent?.endsWith('-dimension'),
     ).length,
   );
@@ -82,6 +82,6 @@
   <span class="spacer"></span>
   <output class="readout">
     {count}
-    {count === 1 ? 'measurement' : 'measurements'} on the cover
+    {count === 1 ? 'measurement' : 'measurements'} on the plan
   </output>
 </div>

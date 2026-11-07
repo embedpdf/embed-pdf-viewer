@@ -16,10 +16,12 @@
  *   lockedContents  — `/Contents` text cannot change; geometry still can
  *   print           — include when printing (carried for the print pipeline)
  *   noZoom/noRotate — screen-anchored body (see anchor.ts)
- *   invisible       — legacy: hide unknown subtypes with no handler
+ *   invisible       — hides only a type that isn't standard; meaningless on
+ *                     a standard annotation
  */
 import {
   NO_ANNOTATION_FLAGS,
+  PdfAnnotationSubtypeCode,
   type Annotation,
   type AnnotationFlags,
 } from '@embedpdf/engine-core/runtime';
@@ -48,12 +50,28 @@ export const mergeFlags = (
 });
 
 /**
- * On-screen visibility. `hidden` beats everything; `noView` hides unless
- * `toggleNoView` and the annotation is engaged — the spec says hover/selection,
- * and v1 uses selection (the model tracks no hover).
+ * Does `invisible` leave this annotation unpainted? Only when its type isn't a
+ * standard one, which no handler draws (ISO 32000-2 12.5.3); on a standard
+ * annotation the flag means nothing. The engine's renderer and flatten follow
+ * the same rule. A type the engine doesn't model but PDFium knows (Sound,
+ * Screen, 3D…) is standard, and so is Projection, which PDFium doesn't know.
  */
-export const viewable = (flags: AnnotationFlags, engaged = false): boolean =>
-  !flags.hidden && (!flags.noView || (flags.toggleNoView && engaged));
+const hiddenByInvisibleFlag = (annotation: Annotation): boolean =>
+  annotation.invisible &&
+  annotation.subtype === 'unsupported' &&
+  annotation.rawSubtypeCode === PdfAnnotationSubtypeCode.UNKNOWN &&
+  annotation.rawSubtypeName !== 'Projection';
+
+/**
+ * On-screen visibility. `hidden` beats everything, and `invisible` hides a type
+ * that isn't standard; `noView` hides unless `toggleNoView` and the annotation
+ * is engaged — the spec says hover/selection, and v1 uses selection (the model
+ * tracks no hover).
+ */
+export const viewable = (annotation: Annotation, engaged = false): boolean =>
+  !annotation.hidden &&
+  !hiddenByInvisibleFlag(annotation) &&
+  (!annotation.noView || (annotation.toggleNoView && engaged));
 
 /** Any pointer interaction (click-to-select, hover). ReadOnly kills it. */
 export const interactive = (flags: AnnotationFlags): boolean =>

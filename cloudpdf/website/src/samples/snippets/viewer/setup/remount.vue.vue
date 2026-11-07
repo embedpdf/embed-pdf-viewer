@@ -10,7 +10,7 @@ const toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
   <!-- A new key mounts a new viewer with the new config. -->
   <PDFViewer
     :key="toolbarBelow ? 'below' : 'above'"
-    :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }"
+    :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
     :layout="toolbarBelow ? toolbarAtBottom : undefined"
     style="height: 100vh"
   />

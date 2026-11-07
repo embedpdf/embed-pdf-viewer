@@ -1,14 +1,14 @@
 /**
  * Object numbers handed to editing sessions: the counter, sessions and
- * blocks (migration 032), on SQLite. The races between replicas are in
- * object-numbers-replicas.test.ts.
+ * blocks (migrations 032, 036), on SQLite. They are the layer's by its
+ * document and name, so none of this needs a layer row. The races between
+ * replicas are in object-numbers-replicas.test.ts.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
 import { EngineErrorCode, OBJECT_NUMBER_ISSUE_LIMIT } from '@embedpdf/engine-core/runtime';
 import {
   DocumentsRepo,
-  LayersRepo,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -23,14 +23,15 @@ import {
 const TENANT = 'tenant-numbers';
 const DOC = 'doc-numbers';
 const BASE = 'a'.repeat(64);
+const NEXT_BASE = 'b'.repeat(64);
+const LAYER = { docId: DOC, layerName: 'default' };
 
 let db: Kysely<DbSchema>;
 let clock: number;
 let numbers: ObjectNumberService;
-let layerId: string;
 
 const session = (sessionId: string, sub = 'user-1'): EditSessionKey => ({
-  layerId,
+  ...LAYER,
   sessionId,
   sub,
 });
@@ -42,24 +43,17 @@ beforeEach(async () => {
   const documents = new DocumentsRepo(db);
   await documents.createPending({
     id: DOC,
+    name: DOC,
     tenantId: TENANT,
     metadata: null,
     idempotencyKey: null,
     createdBy: null,
   });
   await documents.commit({ id: DOC, tenantId: TENANT, baseSha: BASE, storageSizeBytes: 1 });
-  const layer = await new LayersRepo(db).createEmpty({
-    id: 'layer-1',
-    docId: DOC,
-    tenantId: TENANT,
-    name: 'default',
-    baseSha: BASE,
-  });
-  layerId = layer.id;
   clock = 1_000_000;
   numbers = new ObjectNumberService({ db, now: () => clock });
-  // The engine opened the layer: its last object is 99.
-  await numbers.startCounter(db, layerId, 99);
+  // The engine opened the layer on `BASE`: its last object is 99.
+  await numbers.startCounter(LAYER, BASE, 99);
 });
 
 afterEach(async () => {
@@ -68,15 +62,46 @@ afterEach(async () => {
 
 const counter = async () =>
   Number(
-    (await db.selectFrom('layers').select('next_object_number').executeTakeFirstOrThrow())
-      .next_object_number,
+    (
+      await db
+        .selectFrom('object_number_counters')
+        .select('next_object_number')
+        .executeTakeFirstOrThrow()
+    ).next_object_number,
   );
+
+const setCounter = (next: number) =>
+  db.updateTable('object_number_counters').set({ next_object_number: next }).execute();
 
 describe('the counter', () => {
   test('starts once, past what the engine reports', async () => {
     expect(await counter()).toBe(100);
-    await numbers.startCounter(db, layerId, 500);
+    await numbers.startCounter(LAYER, BASE, 500);
     expect(await counter()).toBe(100);
+    expect(await numbers.hasCounter(db, LAYER, BASE)).toBe(true);
+  });
+
+  test('on another base version, it counts anew: the blocks go, the counter moves past it', async () => {
+    await numbers.touchSession(db, session('s1'));
+    await numbers.issue(db, session('s1'), 8);
+    expect(await numbers.hasCounter(db, LAYER, NEXT_BASE)).toBe(false);
+
+    await numbers.startCounter(LAYER, NEXT_BASE, 300);
+    expect(await numbers.hasCounter(db, LAYER, NEXT_BASE)).toBe(true);
+    expect(await numbers.held(db, session('s1'))).toEqual([]);
+    expect(await counter()).toBe(301);
+    // A version with fewer objects never moves it back.
+    await numbers.startCounter(LAYER, BASE, 10);
+    expect(await counter()).toBe(301);
+  });
+
+  test('every layer of a document counts on its own', async () => {
+    const other = { docId: DOC, layerName: 'visitor-2' };
+    await numbers.startCounter(other, BASE, 99);
+    const key = { ...other, sessionId: 's1', sub: 'user-1' };
+    await numbers.touchSession(db, key);
+    await numbers.touchSession(db, session('s1'));
+    expect(await numbers.issue(db, key, 8)).toEqual(await numbers.issue(db, session('s1'), 8));
   });
 });
 
@@ -136,10 +161,10 @@ describe('handing numbers out', () => {
   });
 
   test('blocks a write gave back go before expired sessions’ and the counter', async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8); // the counter moved past the write's range
-    await numbers.releaseWrite(layerId, range);
+    await numbers.releaseWrite(LAYER, range);
 
     // A block moves whole: asking for 10 takes one returned block of 32.
     await numbers.touchSession(db, session('s2'));
@@ -149,10 +174,7 @@ describe('handing numbers out', () => {
   });
 
   test('fresh numbers stop at the issue limit; reclaimed ones still go out', async () => {
-    await db
-      .updateTable('layers')
-      .set({ next_object_number: OBJECT_NUMBER_ISSUE_LIMIT - 1 })
-      .execute();
+    await setCounter(OBJECT_NUMBER_ISSUE_LIMIT - 1);
     await numbers.touchSession(db, session('s1'));
     expect(await numbers.issue(db, session('s1'), 8)).toEqual([
       OBJECT_NUMBER_ISSUE_LIMIT - 1,
@@ -203,8 +225,8 @@ describe('writes', () => {
   test('a number in a block that starts just past a smaller one is found', async () => {
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8); // 100..107
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
-    await numbers.settleWrite(db, layerId, range, 109); // the counter comes back to 110
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
+    await numbers.settleWrite(db, LAYER, range, 109); // the counter comes back to 110
     expect(await numbers.issue(db, session('s1'), 4)).toEqual([110, 111, 112, 113]);
 
     await numbers.assertHeld(db, session('s1'), [107, 110]);
@@ -226,48 +248,45 @@ describe('writes', () => {
   });
 
   test('a write settles its range: the counter comes back when nobody moved it', async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
     expect(range).toEqual({ floor: 100, end: 164, baseSha: BASE });
-    expect(await numbers.settleWrite(db, layerId, range, 102)).toBe('settled');
+    expect(await numbers.settleWrite(db, LAYER, range, 102)).toBe('settled');
     expect(await counter()).toBe(103);
   });
 
   test('a write that needed more than its estimate moves the counter past it', async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
-    expect(await numbers.settleWrite(db, layerId, range, 199)).toBe('settled');
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
+    expect(await numbers.settleWrite(db, LAYER, range, 199)).toBe('settled');
     expect(await counter()).toBe(200);
   });
 
   test("when numbers went out meanwhile, a write's unused part becomes free blocks", async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8);
-    expect(await numbers.settleWrite(db, layerId, range, 109)).toBe('settled');
+    expect(await numbers.settleWrite(db, LAYER, range, 109)).toBe('settled');
     expect(await counter()).toBe(172);
     await numbers.touchSession(db, session('s2'));
     expect((await numbers.issue(db, session('s2'), 1))[0]).toBe(110);
   });
 
   test('a write that overran numbers handed out meanwhile runs again', async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8);
-    expect(await numbers.settleWrite(db, layerId, range, 170)).toBe('overran');
+    expect(await numbers.settleWrite(db, LAYER, range, 170)).toBe('overran');
   });
 
   test('a failed write gives its range back, unless a publish numbered anew', async () => {
-    const range = await numbers.reserveForWrite(layerId, BASE, 64);
-    await numbers.releaseWrite(layerId, range);
+    const range = await numbers.reserveForWrite(LAYER, BASE, 64);
+    await numbers.releaseWrite(LAYER, range);
     expect(await counter()).toBe(100);
 
-    const before = await numbers.reserveForWrite(layerId, BASE, 64);
+    const before = await numbers.reserveForWrite(LAYER, BASE, 64);
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8);
-    await db
-      .updateTable('layers')
-      .set({ base_sha: 'b'.repeat(64) })
-      .execute();
-    await numbers.releaseWrite(layerId, before);
+    await numbers.publish(db, LAYER, NEXT_BASE, 99);
+    await numbers.releaseWrite(LAYER, before);
     expect(
       await db
         .selectFrom('object_number_blocks')
@@ -278,8 +297,8 @@ describe('writes', () => {
   });
 
   test('a write past the ceiling is refused', async () => {
-    await db.updateTable('layers').set({ next_object_number: 8_388_600 }).execute();
-    await expect(numbers.reserveForWrite(layerId, BASE, 64)).rejects.toMatchObject({
+    await setCounter(8_388_600);
+    await expect(numbers.reserveForWrite(LAYER, BASE, 64)).rejects.toMatchObject({
       code: EngineErrorCode.LayerFull,
     });
     expect(await counter()).toBe(8_388_600);
@@ -290,10 +309,11 @@ describe('a publish', () => {
   test('drops every block and moves the counter past the new version', async () => {
     await numbers.touchSession(db, session('s1'));
     await numbers.issue(db, session('s1'), 8);
-    await numbers.publish(db, layerId, 400);
+    await numbers.publish(db, LAYER, NEXT_BASE, 400);
     expect(await numbers.held(db, session('s1'))).toEqual([]);
     expect(await counter()).toBe(401);
-    await numbers.publish(db, layerId, 10);
+    expect(await numbers.hasCounter(db, LAYER, NEXT_BASE)).toBe(true);
+    await numbers.publish(db, LAYER, NEXT_BASE, 10);
     expect(await counter()).toBe(401);
   });
 });

@@ -9,7 +9,9 @@ import { createActionsTestContext } from './helpers/context';
 function harness() {
   const ctx = createActionsTestContext({
     id: 'actions',
-    doc: { forms: { list: async () => ({ fields: [], widgets: [] }) } } as unknown as Partial<DocumentHandle>,
+    doc: {
+      forms: { list: async () => ({ fields: [], widgets: [] }) },
+    } as unknown as Partial<DocumentHandle>,
   });
   return ctx.connect(createActionsController(ctx));
 }
@@ -18,18 +20,18 @@ describe('detached-realm script surfaces', () => {
   it('forwards only alerts from a detached realm; document-targeting effects are suppressed observably', () => {
     const capability = harness();
     const alert = vi.fn();
-    const gotoPage = vi.fn();
+    const goToPage = vi.fn();
     const print = vi.fn();
-    capability.setUiAdapter({ openUri: vi.fn(), print, alert, gotoPage });
+    capability.setUiAdapter({ openUri: vi.fn(), print, alert, goToPage });
     const diagnostics: ScriptDiagnostic[] = [];
     capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
 
     capability.surfaceScriptResult({
       uiEffects: [
-        { kind: 'alert', message: 'Approved', icon: 3 },
-        { kind: 'gotoPage', page: 4 },
-        { kind: 'print' },
-        { kind: 'submitForm', url: 'https://example.test', fieldNames: null, includeEmpty: false },
+        { type: 'alert', message: 'Approved', icon: 3 },
+        { type: 'goToPage', pageIndex: 4 },
+        { type: 'print' },
+        { type: 'submitForm', url: 'https://example.test', fieldNames: null, includeEmpty: false },
       ],
       diagnostics: [],
       origin: 'user',
@@ -38,7 +40,7 @@ describe('detached-realm script surfaces', () => {
     });
 
     expect(alert).toHaveBeenCalledWith('Approved', { origin: 'user', phase: 'user', icon: 3 });
-    expect(gotoPage).not.toHaveBeenCalled();
+    expect(goToPage).not.toHaveBeenCalled();
     expect(print).not.toHaveBeenCalled();
     expect(diagnostics.map(({ code }) => code)).toEqual([
       'ui-effect-suppressed',
@@ -46,24 +48,44 @@ describe('detached-realm script surfaces', () => {
       'ui-effect-suppressed',
     ]);
     expect(diagnostics.map(({ message }) => message)).toEqual([
-      expect.stringContaining('gotoPage'),
+      expect.stringContaining('goToPage'),
       expect.stringContaining('print'),
       expect.stringContaining('submitForm'),
     ]);
   });
 
-  it("a document realm's gotoPage still reaches the adapter (the suppression is realm-keyed)", () => {
+  it("a document realm's goToPage still reaches the adapter (the suppression is realm-keyed)", () => {
     const capability = harness();
-    const gotoPage = vi.fn();
-    capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), gotoPage });
+    const goToPage = vi.fn();
+    capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), goToPage });
     capability.surfaceScriptResult({
-      uiEffects: [{ kind: 'gotoPage', page: 4 }],
+      uiEffects: [{ type: 'goToPage', pageIndex: 4 }],
       diagnostics: [],
       origin: 'user',
       phase: 'user',
       realm: 'document',
     });
-    expect(gotoPage).toHaveBeenCalledWith(4, { origin: 'user', phase: 'user' });
+    expect(goToPage).toHaveBeenCalledWith(4, { origin: 'user', phase: 'user' });
+  });
+
+  it("sends a script's setFocus to the form plugin's cursor, and says when it can't", () => {
+    const capability = harness();
+    const focus = vi.fn((field: string) => field === 'email');
+    capability.registerFormFocus(focus);
+    const diagnostics: ScriptDiagnostic[] = [];
+    capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
+    capability.surfaceScriptResult({
+      uiEffects: [
+        { type: 'focusField', field: 'email' },
+        { type: 'focusField', field: 'missing' },
+      ],
+      diagnostics: [],
+      origin: 'user',
+      phase: 'user',
+      realm: 'document',
+    });
+    expect(focus.mock.calls).toEqual([['email'], ['missing']]);
+    expect(diagnostics).toEqual([expect.objectContaining({ code: 'ui-effect-suppressed' })]);
   });
 
   it('surfaceScriptCommit splits boot and user phases; diagnostics and the error ride the user phase', () => {
@@ -78,8 +100,8 @@ describe('detached-realm script surfaces', () => {
     capability.surfaceScriptCommit(
       {
         uiEffects: [
-          { kind: 'alert', message: 'boot nag', icon: 0, phase: 'boot' },
-          { kind: 'alert', message: 'user alert', icon: 1, phase: 'user' },
+          { type: 'alert', message: 'boot nag', icon: 0, phase: 'boot' },
+          { type: 'alert', message: 'user alert', icon: 1, phase: 'user' },
         ],
         diagnostics: [{ code: 'script-error', message: 'one' }],
         error: { kind: 'exception', message: 'boom' },
@@ -124,7 +146,7 @@ describe('detached-realm script surfaces', () => {
     });
     capability.surfaceScriptCommit(
       {
-        uiEffects: [{ kind: 'alert', message: 'only user', icon: 0, phase: 'user' }],
+        uiEffects: [{ type: 'alert', message: 'only user', icon: 0, phase: 'user' }],
         diagnostics: [],
       },
       { origin: 'user', realm: 'document' },

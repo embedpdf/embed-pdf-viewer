@@ -1,9 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
+
+import { DownloadLinkRequestSchema } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  type DocumentManifest,
   type PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -12,7 +16,10 @@ import {
   decodeLayoutToken,
   decodeActionsToken,
   PdfSaveModeSchema,
+  SHAPES,
   wirePaths,
+  type CachedReadKind,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import {
   requireDocAccessOnly,
@@ -20,13 +27,26 @@ import {
   requireLayerResource,
   requireResource,
 } from '../app/jwt-plugin';
-import type { DocumentService, SavedPdfFile } from '../services/DocumentService';
-import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import type { SignDevTokenInput } from '../auth/JwtVerifier';
+import type { DocumentService, OpenContext, PdfDownload } from '../services/DocumentService';
+import {
+  abortSignalOf,
+  parseTokenOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
+import { isoTime } from '../time';
 
 export interface DocsRouteDeps {
   service: DocumentService;
+  /** Mints download links; absent where the deployment only verifies tokens (JWKS). */
+  sign?: (input: SignDevTokenInput) => string;
 }
+
+/** How long a download link works unless its maker says otherwise. */
+const DEFAULT_DOWNLOAD_LINK_SECONDS = 5 * 60;
 
 /**
  * Document-level cloud routes: heads, manifests, and pre-warm.
@@ -41,21 +61,54 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   // capability check (they drive `pdf.permissions` expansion). For
   // encrypted documents the DB row is stale (populated by an anonymous
   // probe at ingest); the authoritative bits live in the caller's
-  // active password session. `getEffectivePdfBits` encapsulates the
+  // active password session. `getEffectivePermissionFlags` encapsulates the
   // precedence so route handlers don't have to think about it.
   const bitsForDoc = async (accessCtx: ReturnType<typeof requireDocAccessOnly>, docId: string) =>
-    service.getEffectivePdfBits(accessCtx, docId);
+    service.getEffectivePermissionFlags(accessCtx, docId);
   const bitsForLayer = async (
     accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
     docId: string,
     layerName: string,
-  ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
+  ) => service.getEffectivePermissionFlags(accessCtx, docId, layerName);
+  /** Reads at one of the manifest's counters (see `readAtPins`). */
+  const atVersion = <T>(input: {
+    reply: FastifyReply;
+    ctx: OpenContext;
+    docId: string;
+    layerName: string | undefined;
+    kind: CachedReadKind;
+    label: string;
+    requested: number;
+    pin: TokenPin;
+    current: (manifest: DocumentManifest) => number;
+    read: () => Promise<T>;
+  }): Promise<T> =>
+    readAtPins({
+      documentService: service,
+      reply: input.reply,
+      docId: input.docId,
+      layerName: input.layerName,
+      assertCurrent: async () => {
+        const manifest =
+          input.layerName === undefined
+            ? await service.getManifest(input.ctx, input.docId)
+            : await service.getLayerManifest(input.ctx, input.docId, input.layerName);
+        const current = input.current(manifest);
+        if (input.requested === current) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `${input.label} version ${input.requested} no longer current (current=${current})`,
+        );
+      },
+      read: input.read,
+      token: { kind: input.kind, pin: input.pin },
+    });
 
   app.get('/v1/docs/:docId/head', async (req, reply) => {
     const { docId } = req.params as { docId: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'head', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'head', permissionFlags);
     const head = await service.getHead(ctx, docId);
     setNoStore(reply);
     return head;
@@ -64,17 +117,28 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/manifest@:token', async (req, reply) => {
     const { docId, token } = req.params as { docId: string; token: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'manifest', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'manifest', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `manifest version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    // The check and the answer are one read of the manifest.
+    const manifest = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: () => undefined,
+      read: async () => {
+        const current = await service.getManifest(ctx, docId);
+        if (requested.docVersion !== current.docVersion) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `manifest version ${requested.docVersion} no longer current (current=${current.docVersion})`,
+          );
+        }
+        return current;
+      },
+      token: { kind: 'manifest', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return manifest;
   });
@@ -82,8 +146,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/manifest', async (req, reply) => {
     const { docId } = req.params as { docId: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'manifest', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'manifest', permissionFlags);
     const manifest = await service.getManifest(ctx, docId);
     setNoStore(reply);
     return manifest;
@@ -98,15 +162,18 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'layout', ['layout']);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.layoutVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: undefined,
+      kind: 'layout',
+      label: 'layout',
+      requested: requested.layoutVersion,
+      pin: requested.pin,
+      current: (manifest) => manifest.layoutVersion,
+      read: () => service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -115,15 +182,18 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'actions', ['actions']);
     const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.actionsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: undefined,
+      kind: 'actions',
+      label: 'actions',
+      requested: requested.actionsVersion,
+      pin: requested.pin,
+      current: (manifest) => manifest.actionsVersion,
+      read: () => service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -131,8 +201,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/head', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'head', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'head', permissionFlags);
     const head = await service.getLayerHead(ctx, docId, layerName);
     setNoStore(reply);
     return head;
@@ -145,17 +215,28 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'layerDocVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layer manifest version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    // The check and the answer are one read of the manifest.
+    const manifest = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: () => undefined,
+      read: async () => {
+        const current = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested.docVersion !== current.docVersion) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `layer manifest version ${requested.docVersion} no longer current (current=${current.docVersion})`,
+          );
+        }
+        return current;
+      },
+      token: { kind: 'manifest', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return manifest;
   });
@@ -163,8 +244,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/manifest', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', permissionFlags);
     const manifest = await service.getLayerManifest(ctx, docId, layerName);
     setNoStore(reply);
     return manifest;
@@ -177,18 +258,21 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.layoutVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: layerName,
+      kind: 'layout',
+      label: 'layout',
+      requested: requested.layoutVersion,
+      pin: requested.pin,
+      current: (manifest) => manifest.layoutVersion,
+      read: () => service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -196,8 +280,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/layout', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', permissionFlags);
     const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return snapshot;
@@ -210,21 +294,44 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.actionsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: layerName,
+      kind: 'actions',
+      label: 'actions',
+      requested: requested.actionsVersion,
+      pin: requested.pin,
+      current: (manifest) => manifest.actionsVersion,
+      read: () => service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
+
+  /**
+   * A layer's PDF. Incremental (the default) is its base file followed by
+   * its stored delta, with no engine involved; a rewrite, or an artifact
+   * this server doesn't read, is saved by the engine.
+   */
+  const layerDownload = async (
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    mode: PdfSaveMode,
+    opts: { passwordChecked?: boolean } = {},
+  ): Promise<PdfDownload> => {
+    if (mode === 'incremental') {
+      const direct = await service.incrementalLayerDownload(ctx, docId, layerName, opts);
+      if (direct) return direct;
+    }
+    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, mode);
+    return { size: file.size, open: () => createReadStream(file.path), cleanup: file.cleanup };
+  };
 
   app.get('/v1/docs/:docId/layers/:layerName/download@:token', async (req, reply) => {
     const { docId, layerName, token } = req.params as {
@@ -232,30 +339,115 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       layerName: string;
       token: string;
     };
-    rejectQueryParamsOnTokenUrl(req.query);
+    // A download link (`?link=`) opens exactly the version it was made for.
+    const link = req.downloadLink;
+    rejectQueryParamsOnTokenUrl(req.query, link ? ['link'] : []);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'download-versioned', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-versioned', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDownloadToken, token, 'download token');
-    const head = await service.getLayerHead(ctx, docId, layerName);
-    if (requested.docVersion !== head.docVersion) {
-      setNoStore(reply);
+    if (link && (link.docVersion !== requested.docVersion || link.mode !== requested.mode)) {
       throw new EngineError(
-        EngineErrorCode.NotFound,
-        `download version ${requested.docVersion} no longer current (current=${head.docVersion})`,
+        EngineErrorCode.Forbidden,
+        `this link downloads version ${link.docVersion} (${link.mode}) only`,
       );
     }
-    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, requested.mode);
-    return sendDownload(reply, file, docId, layerName, requested.mode, 'immutable');
+    // The link's maker passed the password check; the link carries no password.
+    // A file prepared at a version that is refused afterwards is removed.
+    let prepared: PdfDownload | undefined;
+    let file: PdfDownload;
+    try {
+      file = await readAtPins({
+        documentService: service,
+        reply,
+        docId,
+        layerName,
+        assertCurrent: async () => {
+          const current = await service.layerDocVersion(ctx, docId, layerName);
+          if (requested.docVersion === current) return;
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `download version ${requested.docVersion} no longer current (current=${current})`,
+          );
+        },
+        token: { kind: 'download', pin: requested.pin },
+        read: async () => {
+          prepared = await layerDownload(ctx, docId, layerName, requested.mode, {
+            passwordChecked: link !== undefined,
+          });
+          return prepared;
+        },
+      });
+    } catch (err) {
+      await prepared?.cleanup();
+      throw err;
+    }
+    return sendDownload(
+      reply,
+      file,
+      docId,
+      layerName,
+      requested.mode,
+      link ? 'no-store' : 'immutable',
+    );
+  });
+
+  /**
+   * A download link: the layer's versioned download URL with a token in
+   * `link` that opens only that download, for a service that takes a plain
+   * URL and no Authorization header. It downloads the layer as it is now;
+   * once the layer changes it answers 404.
+   */
+  app.post('/v1/docs/:docId/layers/:layerName/download-link', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-current', permissionFlags);
+    const parsed = DownloadLinkRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `invalid download link request: ${parsed.error.message}`,
+      );
+    }
+    if (!deps.sign) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        'this deployment verifies tokens with its own keys: make download links on your backend, as a doc token with layer_name and a `download` claim',
+      );
+    }
+    await service.checkOpenPassword(ctx, docId, layerName);
+    const download = {
+      docVersion: await service.layerDocVersion(ctx, docId, layerName),
+      mode: 'incremental' as const,
+      pin: { engine: await service.engineValues.of('download'), shape: SHAPES.download },
+    };
+    const expiresIn = parsed.data.expiresInSeconds ?? DEFAULT_DOWNLOAD_LINK_SECONDS;
+    const linkToken = deps.sign({
+      sub: `link:${ctx.sub}`,
+      tenant_id: ctx.tenantId,
+      doc_id: docId,
+      layer_name: layerName,
+      scope: ['doc.download'],
+      jti: randomUUID(),
+      ttlSeconds: expiresIn,
+      extras: { download },
+    });
+    const path = wirePaths.layerDownloadVersioned(docId, layerName, download);
+    setNoStore(reply);
+    return {
+      url: `${req.protocol}://${req.host}${path}?link=${encodeURIComponent(linkToken)}`,
+      expiresAt: isoTime(Date.now() + expiresIn * 1000),
+    };
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/download', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'download-current', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-current', permissionFlags);
     const mode = parseDownloadMode(req.query);
-    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, mode);
+    const file = await layerDownload(ctx, docId, layerName, mode);
     return sendDownload(reply, file, docId, layerName, mode, 'no-store');
   });
 
@@ -266,15 +458,19 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     }
     const docId = body.docId;
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'head', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'head', permissionFlags);
     const head = await service.warm(ctx, docId);
     return { warmed: true, head };
   });
 }
 
-function rejectQueryParamsOnTokenUrl(query: unknown): void {
-  if (query && typeof query === 'object' && Object.keys(query).length > 0) {
+function rejectQueryParamsOnTokenUrl(query: unknown, allowed: readonly string[] = []): void {
+  if (
+    query &&
+    typeof query === 'object' &&
+    Object.keys(query).some((key) => !allowed.includes(key))
+  ) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'versioned download URLs must encode download options in the path token, not query params',
@@ -284,7 +480,7 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 function sendDownload(
   reply: FastifyReply,
-  file: SavedPdfFile,
+  file: PdfDownload,
   docId: string,
   layerName: string,
   mode: PdfSaveMode,
@@ -298,7 +494,7 @@ function sendDownload(
     `attachment; filename="${downloadFileName(docId, layerName, mode)}"`,
   );
 
-  const stream = createReadStream(file.path);
+  const stream = file.open();
   let cleaned = false;
   const cleanup = () => {
     if (cleaned) return;

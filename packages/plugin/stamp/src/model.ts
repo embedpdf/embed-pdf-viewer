@@ -7,7 +7,7 @@
  */
 import type { StampAsset, StampLibrary } from './contract';
 
-export interface StampState {
+export interface StampModel {
   readonly libraries: Readonly<Record<string, StampLibrary>>;
   /** Library display order (insertion order). */
   readonly libraryOrder: readonly string[];
@@ -16,7 +16,7 @@ export interface StampState {
   readonly armed: Readonly<Record<string, string>>;
 }
 
-export const initialStampState = (): StampState => ({
+export const initialStampModel = (): StampModel => ({
   libraries: {},
   libraryOrder: [],
   assets: {},
@@ -24,13 +24,13 @@ export const initialStampState = (): StampState => ({
 });
 
 /** Remember the asset armed on a document. */
-export function armAsset(state: StampState, documentId: string, assetId: string): StampState {
+export function armAsset(state: StampModel, documentId: string, assetId: string): StampModel {
   if (state.armed[documentId] === assetId) return state;
   return { ...state, armed: { ...state.armed, [documentId]: assetId } };
 }
 
 /** Forget what was armed on these documents. */
-export function disarmDocuments(state: StampState, documentIds: readonly string[]): StampState {
+export function disarmDocuments(state: StampModel, documentIds: readonly string[]): StampModel {
   if (!documentIds.some((documentId) => documentId in state.armed)) return state;
   const armed = { ...state.armed };
   for (const documentId of documentIds) delete armed[documentId];
@@ -38,7 +38,7 @@ export function disarmDocuments(state: StampState, documentIds: readonly string[
 }
 
 /** Append a library to the display order. */
-export function addLibrary(state: StampState, library: StampLibrary): StampState {
+export function addLibrary(state: StampModel, library: StampLibrary): StampModel {
   return {
     ...state,
     libraries: { ...state.libraries, [library.id]: library },
@@ -47,13 +47,13 @@ export function addLibrary(state: StampState, library: StampLibrary): StampState
 }
 
 /** Replace a known library's descriptor; an unknown id changes nothing. */
-export function setLibrary(state: StampState, library: StampLibrary): StampState {
+export function setLibrary(state: StampModel, library: StampLibrary): StampModel {
   if (!state.libraries[library.id]) return state;
   return { ...state, libraries: { ...state.libraries, [library.id]: library } };
 }
 
 /** Remove a library together with its assets. */
-export function removeLibrary(state: StampState, libraryId: string): StampState {
+export function removeLibrary(state: StampModel, libraryId: string): StampModel {
   const library = state.libraries[libraryId];
   if (!library) return state;
   const { [libraryId]: _removed, ...libraries } = state.libraries;
@@ -68,7 +68,7 @@ export function removeLibrary(state: StampState, libraryId: string): StampState 
 }
 
 /** Add an asset to the end of its library; an asset of an unknown library changes nothing. */
-export function addAsset(state: StampState, asset: StampAsset): StampState {
+export function addAsset(state: StampModel, asset: StampAsset): StampModel {
   const library = state.libraries[asset.libraryId];
   if (!library) return state;
   return {
@@ -82,13 +82,13 @@ export function addAsset(state: StampState, asset: StampAsset): StampState {
 }
 
 /** Replace a known asset's descriptor; an unknown id changes nothing. */
-export function setAsset(state: StampState, asset: StampAsset): StampState {
+export function setAsset(state: StampModel, asset: StampAsset): StampModel {
   if (!state.assets[asset.id]) return state;
   return { ...state, assets: { ...state.assets, [asset.id]: asset } };
 }
 
 /** Remove an asset and its entry in its library's order. */
-export function removeAsset(state: StampState, assetId: string): StampState {
+export function removeAsset(state: StampModel, assetId: string): StampModel {
   const asset = state.assets[assetId];
   if (!asset) return state;
   const { [assetId]: _removed, ...assets } = state.assets;

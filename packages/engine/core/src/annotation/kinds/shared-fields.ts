@@ -8,6 +8,7 @@ import {
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
 import { FileAnnotationActionsSchema } from '../../dto/PdfAction.schema';
+import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../../dto/RichText.schema';
 import {
   PdfPointSchema,
   PdfQuadSchema,
@@ -15,20 +16,22 @@ import {
   PdfRotationSchema,
 } from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
+import { closed } from '../../wire/reading';
 import {
   AnnotationBorderStyleSchema,
+  DashArrayWriteSchema,
   DrawnBorderStyleSchema,
   AnnotationRefSchema,
   BlendModeSchema,
   ColorSchema,
 } from '../base.schema';
 import { field } from '../declaration';
-import type { FreeTextFont } from '../primitives';
+import type { FontName } from '../primitives';
 
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
   to: AnnotationRefSchema,
-  type: z.enum(['reply', 'group']),
+  type: closed(z.enum(['reply', 'group'])),
 });
 
 /** A write may leave out `type`: an absent `/RT` means `'reply'` (ISO 32000-2 §12.5.6.2). */
@@ -38,7 +41,7 @@ export const AnnotationReplyWriteSchema = z.object({
 });
 
 /** A standard font name or a registered font key; the writer resolves which. */
-export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FreeTextFont>;
+export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FontName>;
 
 /** One `/F` bit (ISO 32000-2 §12.5.3); every bit defaults to off. */
 const flag = () => field.data(z.boolean()).optional();
@@ -60,6 +63,19 @@ export const annotationBaseFields = {
    * names, so this picks the one to show.
    */
   appearanceState: field.engine(z.string()).nullable(),
+  /**
+   * Where the annotation sits in the document's logical structure (its tags,
+   * ISO 32000-2 §14.7): from the structure tree's root down, the index of each
+   * step among its parent's kids. Compared index by index, positions give the
+   * reading order the tags say, the order a page's `/Tabs /S` gives its
+   * annotations focus in. `null` for an annotation that isn't tagged.
+   */
+  structurePosition: field.engine(z.array(z.number().int().nonnegative())).nullable(),
+  /**
+   * `/NM`, the name that tells the annotation apart on its page for other PDF
+   * apps; not its identity (that's `ref`). A create left without it gets a
+   * fresh UUIDv7; `null` is no name. A page's names are unique.
+   */
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),
@@ -78,7 +94,11 @@ export const annotationBaseFields = {
   reply: field.data(AnnotationReplySchema).writes(AnnotationReplyWriteSchema).nullable().optional(),
   /** `/Popup`, kept in sync by the engine from the popup's `parent`. */
   popup: field.engine(AnnotationRefSchema).nullable(),
-  /** `/EMBD_Metadata/GroupID`: the group that owns the annotation. */
+  /**
+   * `/EMBD_Metadata/GroupID`: the group that owns the annotation, `null` for
+   * none. A create left without it goes in the caller's own group; `null`
+   * asks for no group, refused to a caller who has one.
+   */
   groupId: field.data(z.string().min(1)).nullable().optional(),
   author: field.attribution(z.string()).nullable(),
   /** `/CreationDate`. */
@@ -95,6 +115,22 @@ export const annotationBaseFields = {
   actions: field.preserved(FileAnnotationActionsSchema).nullable().space('actions'),
 };
 
+/** Fields every markup kind has (ISO 32000-2 Table 171): the base, and its comment's rich text. */
+export const markupBaseFields = {
+  ...annotationBaseFields,
+  /**
+   * `/RC`: the comment as rich text, what its popup shows (ISO 32000-2 §12.5.6.2), with
+   * `contents` its plain projection; `null` when the comment is plain text. A comment draws
+   * nothing: only a free text's rich text is its appearance, and free text declares its own.
+   */
+  richText: field
+    .data(RichTextDocumentSchema)
+    .writes(RichTextDocumentInputSchema)
+    .nullable()
+    .optional()
+    .space('length'),
+};
+
 // ── style ──
 
 export const colorStyleFields = {
@@ -104,6 +140,12 @@ export const colorStyleFields = {
 
 export const geometryStyleFields = {
   ...colorStyleFields,
+  /**
+   * `/C`, the stroke. `null` draws none and keeps `strokeWidth`: `/C []`, ISO 32000's "no
+   * colour". A file's `/C` left out reads as `null` too, as Acrobat draws it.
+   */
+  color: field.data(ColorSchema).nullable().optional(),
+  /** Still places the outline, sizes line endings and clouds when `color` is `null`. */
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   /** `beveled` and `inset` are read from other apps' files and kept; only widgets draw them. */
   borderStyle: field
@@ -111,7 +153,11 @@ export const geometryStyleFields = {
     .writes(DrawnBorderStyleSchema)
     .readBack()
     .optional(),
-  dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
+  dashArray: field
+    .data(z.array(z.number().nonnegative()))
+    .writes(DashArrayWriteSchema)
+    .nullable()
+    .optional(),
 };
 
 export const filledStyleFields = {
@@ -176,7 +222,7 @@ export const widgetBoxFields = {
 // ── families ──
 
 export const textMarkupFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...colorStyleFields,
   /** The box around the quads. */
   ...drawnRectFields,
@@ -184,14 +230,14 @@ export const textMarkupFields = {
 };
 
 export const shapeFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...filledStyleFields,
   ...boxFields,
   cloudyIntensity: field.data(z.number().positive()).nullable().optional(),
 };
 
 export const vertexFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...filledStyleFields,
   ...drawnRectFields,
   vertices: field.data(z.array(PdfPointSchema)).space('points'),

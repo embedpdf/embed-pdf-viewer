@@ -11,10 +11,11 @@
  *     must track the fingers — the Figma/maps feel).
  *   • mouse notches — coarse steps: ±100/±120 px in Chrome, lines/pages mode
  *     in Firefox. The pinch mapping would triple per click; a notch instead
- *     steps by 1.2, the same ratio as the zoom buttons.
+ *     steps by 1.2, about one zoom-button step (the buttons land on round
+ *     levels; a notch zooms around the pointer, wherever the level is).
  *   • cmd + continuous scroll — real scroll px, big and streaming (with
  *     momentum): a gentle scrub coefficient. A cmd+mouse notch (±120 px)
- *     lands within 0.3% of the 1.2 button step, so it needs no special case.
+ *     lands within 0.3% of the 1.2 notch step, so it needs no special case.
  *
  * (Safari never synthesizes ctrl+wheel for pinch — it fires proprietary
  * gesture events with an absolute scale; that wiring lives in the adapters.)
@@ -27,12 +28,12 @@ export interface WheelSample {
   metaKey: boolean;
 }
 
-/** The per-notch step for discrete wheels — the zoom buttons' ratio. */
+/** The per-notch step for discrete wheels: about one zoom-button step. */
 const NOTCH = 1.2;
 
 /** Zoom factor for a ctrl/cmd wheel event (the caller decides zoom vs pan). */
 export function wheelZoomFactor(sample: WheelSample): number {
-  // Lines/pages mode (Firefox mouse wheels): one button-step per notch.
+  // Lines/pages mode (Firefox mouse wheels): one notch step per notch.
   if (sample.deltaMode !== 0) return Math.pow(NOTCH, -Math.sign(sample.deltaY));
   if (sample.ctrlKey) {
     // px deltas with ctrl: a real mouse notch arrives big (±100/±120) and

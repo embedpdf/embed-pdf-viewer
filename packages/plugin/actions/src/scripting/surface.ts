@@ -4,7 +4,8 @@
  * JavaScript executor extracts them and routes them through
  * `firePrintThroughAdapter` and `performSubmit` after the transaction, since
  * the /WP and /DP wrap and the post-commit dataset must run outside the host
- * transaction). Such effects here come from the form pipeline's K/V/C/F path.
+ * transaction). Such effects here come from the form pipeline's K/V/C/F path;
+ * a print goes to the kernel's print when the host gave a printer.
  */
 import type { ActionOrigin, ActionSource } from '../contract';
 import type {
@@ -18,12 +19,16 @@ import { intentOfSubmitEffect } from '../submit/intent';
 import type { ActionsSubmit } from '../submit/perform';
 
 export function createScriptSurface(
-  services: Pick<ActionsServices, 'events' | 'ports' | 'authority' | 'printLatch'>,
+  services: Pick<
+    ActionsServices,
+    'events' | 'ports' | 'authority' | 'documentPrint' | 'printLatch'
+  >,
   { performSubmit }: ActionsSubmit,
 ) {
   const { reportDiagnostic, scriptDiagnosticReported, scriptFailed } = services.events;
   const ports = services.ports.slots;
   const { allowsPrint } = services.authority;
+  const { documentPrint } = services;
   const printLatch = services.printLatch;
 
   const surfaceScriptResult = (result: ScriptSurfaceResult): void => {
@@ -34,14 +39,14 @@ export function createScriptSurface(
       // is not displayed, and this door's print, goto and submit act on this
       // document. Only alerts have a valid target (the user); everything
       // else is suppressed observably, never routed to the wrong document.
-      if (result.realm === 'detached' && effect.kind !== 'alert') {
+      if (result.realm === 'detached' && effect.type !== 'alert') {
         scriptDiagnosticReported.emit({
           code: 'ui-effect-suppressed',
-          message: `script ${effect.kind} request from a detached realm suppressed: no document surface`,
+          message: `script ${effect.type} request from a detached realm suppressed: no document surface`,
         });
         continue;
       }
-      if (effect.kind === 'submitForm') {
+      if (effect.type === 'submitForm') {
         // A form-pipeline scripted submit: the same door, not awaited (the
         // form queue must not wait on submit sinks). Policy, sinks and
         // diagnostics all live inside performSubmit.
@@ -50,7 +55,7 @@ export function createScriptSurface(
           {
             origin: result.origin,
             source: result.source ?? { kind: 'api' },
-            event: { scope: 'activate' },
+            event: { type: 'activate' },
           },
           (diagnostic) => reportDiagnostic(diagnostic, { action: 'javascript', source }),
         );
@@ -58,7 +63,7 @@ export function createScriptSurface(
       }
       // Permission, not preference: a print request without doc.print
       // authority reaches no adapter; not overridable, and observable.
-      if (effect.kind === 'print' && !allowsPrint()) {
+      if (effect.type === 'print' && !allowsPrint()) {
         scriptDiagnosticReported.emit({
           code: 'ui-effect-suppressed',
           message: 'script print request withheld: doc.print is not allowed',
@@ -68,28 +73,59 @@ export function createScriptSurface(
       // The print latch: a /WP or /DP script (or anything running while a
       // print wrapper is active) printing again is suppressed, so there is
       // one dialog per outer request.
-      if (effect.kind === 'print' && printLatch.active) {
+      if (effect.type === 'print' && printLatch.active) {
         scriptDiagnosticReported.emit({
           code: 'ui-effect-suppressed',
           message: 'script print request during a document print event — suppressed (reentrant)',
         });
         continue;
       }
+      // With the kernel's print, a user's print request prints the document, and the kernel
+      // runs /WP and /DP around it. A hover or lifecycle request never prints.
+      if (effect.type === 'print' && documentPrint.available()) {
+        if (result.origin !== 'user') {
+          scriptDiagnosticReported.emit({
+            code: 'ui-effect-suppressed',
+            message: `script print request from a ${result.origin} event suppressed`,
+          });
+          continue;
+        }
+        documentPrint.start().catch((error: unknown) =>
+          reportDiagnostic(
+            {
+              code: 'trigger-failed',
+              message: `print: ${error instanceof Error ? error.message : String(error)}`,
+            },
+            { action: 'javascript', source },
+          ),
+        );
+        continue;
+      }
+      // The cursor into a field is the form plugin's, not the app's UI.
+      if (effect.type === 'focusField') {
+        if (!ports.formFocus?.(effect.field)) {
+          scriptDiagnosticReported.emit({
+            code: 'ui-effect-suppressed',
+            message: `script setFocus on "${effect.field}" withheld: no such field to fill in on screen`,
+          });
+        }
+        continue;
+      }
       if (!ports.uiAdapter) {
         reportDiagnostic(
-          { code: 'no-adapter', message: `script ${effect.kind}: no UI adapter installed` },
+          { code: 'no-adapter', message: `script ${effect.type}: no UI adapter installed` },
           { action: 'javascript', source },
         );
         continue;
       }
-      if (effect.kind === 'alert') {
+      if (effect.type === 'alert') {
         ports.uiAdapter.alert?.(effect.message, {
           ...uiContext,
           icon: effect.icon,
           ...(effect.title !== undefined ? { title: effect.title } : {}),
         });
-      } else if (effect.kind === 'gotoPage') {
-        ports.uiAdapter.gotoPage?.(effect.page, uiContext);
+      } else if (effect.type === 'goToPage') {
+        ports.uiAdapter.goToPage?.(effect.pageIndex, uiContext);
       } else {
         ports.uiAdapter.print(uiContext);
       }

@@ -24,8 +24,8 @@ const { annotation } = await page.annotations.create({
 
 ## Text boxes
 
-The text wraps inside `box`. Start a new line with `\n` in `contents`; it reads back as `\r`,
-the line break PDF uses.
+The text wraps inside `box`. Start a new line with `\n` in `contents`. The file stores it as `\r`,
+as Acrobat does, and it reads back as `\n`.
 
 | Field           | What it is                                                       | Default       |
 | :-------------- | :--------------------------------------------------------------- | :------------ |
@@ -76,14 +76,17 @@ await page.annotations.create({
 
 ## Fonts
 
-`fontFamily` takes one of the 14 standard PDF fonts. Every PDF app has them, so nothing is
-embedded in the file:
+`fontFamily` takes the `name` of any font in [`doc.fonts.list()`](/docs/engine/documents/fonts):
+a standard PDF font, a font the engine has, or a font the document already has whole. The 14
+standard fonts are in every PDF app, so nothing is embedded in the file:
 
 `helvetica`, `helvetica-bold`, `helvetica-oblique`, `helvetica-bold-oblique`, `times-roman`,
 `times-bold`, `times-italic`, `times-bold-italic`, `courier`, `courier-bold`, `courier-oblique`,
 `courier-bold-oblique`, `symbol`, `zapf-dingbats`.
 
-The standard fonts only cover Latin text.
+The standard fonts only cover Latin text. Characters they don't have come from fallback fonts:
+Hebrew and Arabic work with no setup (see
+[Text in any language](/docs/engine/documents/fonts#text-in-any-language)).
 
 <Engine local>
 
@@ -176,7 +179,7 @@ await page.annotations.create({
 The `body` is the same style as `fontFamily`, `fontSize`, `fontColor` and `textAlign`, so you
 rarely write one. When you send both, the field wins: `fontColor: '#CC0000'` with a `body` of
 `{ color: '#0000CC' }` makes red text. `contents` always reads back as the plain text:
-`'Total is wrong, see page 4.'`, with paragraphs joined by `\r`.
+`'Total is wrong, see page 4.'`, with paragraphs joined by `\n`.
 
 A style can hold:
 
@@ -261,8 +264,9 @@ app that reads just the plain text shows a justified box left-aligned.
 
 A run names its font by family, the way the PDF does: `'Helvetica'`, `'Times'`, `'Courier'`, the
 family name of a font the engine has, or a font the document already embeds. A family the engine
-can't find is drawn in Helvetica; the run keeps the name you gave. `fontFamily` and `fontSize`
-always read back the body's font and size.
+can't find is drawn in Helvetica; the run keeps the name you gave, and
+[`doc.fonts.resolve()`](/docs/engine/documents/fonts#show-typed-text-in-a-browser) says
+`substituted: true` for it. `fontFamily` and `fontSize` always read back the body's font and size.
 
 ### Turned boxes
 

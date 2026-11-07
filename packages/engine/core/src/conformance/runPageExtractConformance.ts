@@ -28,15 +28,15 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46];
  */
 export function runPageExtractConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page extract conformance: ${opts.label}`, () => {
+  describe(`page extract conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -44,7 +44,7 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() returns standalone PDF bytes and leaves the source untouched', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const target = before.pages[before.pages.length - 1];
@@ -65,8 +65,8 @@ export function runPageExtractConformance(
     });
 
     test('extracted bytes re-open as a document with the requested pages, in caller order', async () => {
-      if (opts.openKind !== 'bytes') return;
-      const doc = await openFixture(engine, opts);
+      if (options.openKind !== 'bytes') return;
+      const doc = await openFixture(engine, options);
       let extracted: DocumentHandle | null = null;
       try {
         const list = await doc.pages.list();
@@ -77,7 +77,7 @@ export function runPageExtractConformance(
         const bytes = await doc.pages.extract([p1.ref, p0.ref]);
 
         extracted = await engine.open(
-          { kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes },
+          { kind: 'bytes', id: `${options.fixture.id}-extracted`, bytes },
           EVERY_PERMISSION,
         );
         const out = await extracted.pages.list();
@@ -91,7 +91,7 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects empty input with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         let caught: unknown;
         try {
@@ -106,7 +106,7 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects duplicate PONs with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;
@@ -123,7 +123,7 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects unknown PON with NotFound or InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         let bogus = 0;
@@ -146,7 +146,7 @@ export function runPageExtractConformance(
     });
 
     test('abort on pages.extract() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const p = doc.pages.extract([list.pages[0].ref]);

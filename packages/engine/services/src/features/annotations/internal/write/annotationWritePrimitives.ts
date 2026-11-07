@@ -62,6 +62,21 @@ export function clearAnnotColor(fn: PdfFunctions, annotPtr: Ptr, type: number): 
 }
 
 /**
+ * Write an annotation colour as `[]` via `EPDFAnnot_SetNoColor`: ISO 32000's
+ * "no colour; transparent". Acrobat and Preview both draw it as none, where a
+ * stroke colour left out of `/C` is black in Preview.
+ */
+export function setAnnotNoColor(
+  fn: PdfFunctions,
+  annotPtr: Ptr,
+  type: number = FPDFANNOT_COLORTYPE.Color,
+): void {
+  if (!fn.EPDFAnnot_SetNoColor(annotPtr, type)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetNoColor returned false');
+  }
+}
+
+/**
  * Set annotation opacity (`/CA`, 0..1, stored as given) via the dedicated
  * `EPDFAnnot_SetOpacity` extension, the form native appearance generation
  * reads, so opacity survives the bake.
@@ -376,6 +391,30 @@ export function setDefaultAppearanceRegisteredFont(
     throw new EngineError(
       EngineErrorCode.Unknown,
       'EPDFAnnot_SetDefaultAppearanceRegisteredFont returned false',
+    );
+  }
+}
+
+/**
+ * Write the `/DA` default appearance naming a font program the document
+ * already holds, by its stream's object number (via
+ * `EPDFAnnot_SetDefaultAppearanceDocumentFont`). The appearance generated
+ * next installs its `/DR` entry.
+ */
+export function setDefaultAppearanceDocumentFont(
+  fn: PdfFunctions,
+  annotPtr: Ptr,
+  programObjectNumber: number,
+  fontSize: number,
+  color: Color,
+): void {
+  const { r, g, b } = rgbOf(color);
+  if (
+    !fn.EPDFAnnot_SetDefaultAppearanceDocumentFont(annotPtr, programObjectNumber, fontSize, r, g, b)
+  ) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'EPDFAnnot_SetDefaultAppearanceDocumentFont refused the program',
     );
   }
 }

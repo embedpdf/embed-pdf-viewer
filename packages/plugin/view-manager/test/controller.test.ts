@@ -4,14 +4,14 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createViewManagerController } from '../src/controller';
-import { initialViewManagerState } from '../src/model';
+import { initialViewManagerModel } from '../src/model';
 import { viewManagerState } from '../src/state';
 
 function harness(open: string[] = []) {
   const documents = { getOrder: () => open } as unknown as DocumentsCapability;
   const ctx = createTestContext({
     id: 'view-manager',
-    state: initialViewManagerState(),
+    state: initialViewManagerModel(),
     capabilities: [[DocumentsToken, documents]],
     doc: null,
   });
@@ -50,7 +50,7 @@ describe('view-manager', () => {
     api.onDocumentMoved((event) =>
       log.push(`${event.documentId}:${event.fromPaneId}->${event.toPaneId}`),
     );
-    api.onPaneRemoved((event) => log.push(`-pane:${event.paneId}`));
+    api.onPaneDeleted((event) => log.push(`-pane:${event.paneId}`));
     const split = api.splitPane('b');
     expect(split).toBe('pane-2');
     expect(api.getPane('pane-1')?.documentIds).toEqual(['a']);
@@ -62,7 +62,7 @@ describe('view-manager', () => {
     api.moveDocumentBetween('pane-1', 'pane-2', 'a', 0);
     api.movePane('pane-2', 0);
     expect(api.getPaneOrder()).toEqual(['pane-2', 'pane-1']);
-    api.removePane('pane-2');
+    api.deletePane('pane-2');
     expect(api.listPanes().map((pane) => pane.id)).toEqual(['pane-1']);
     expect(api.getPane('pane-1')?.documentIds).toEqual(['b', 'a']);
     expect(log).toEqual([
@@ -115,7 +115,7 @@ describe('a document that gets its real id while opening', () => {
     const documents = { getOrder: () => order } as unknown as DocumentsCapability;
     const ctx = createTestContext({
       id: 'view-manager',
-      state: initialViewManagerState(),
+      state: initialViewManagerModel(),
       capabilities: [[DocumentsToken, documents]],
       doc: null,
     });

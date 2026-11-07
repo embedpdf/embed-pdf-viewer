@@ -7,11 +7,11 @@ import {
   clearSession,
   completeSession,
   failSession,
-  initialSearchState,
+  initialSearchModel,
   pagesWithHits,
   setActiveHit,
   startSession,
-  type SearchState,
+  type SearchModel,
 } from '../src/model';
 
 const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
@@ -34,13 +34,13 @@ const hit = (pageObjectNumber: number, start: number): SearchHit => ({
   bounds: { x: 0, y: 0, width: 10, height: 10 },
 });
 
-const started = (): SearchState =>
-  startSession(initialSearchState(), { text: 'test' }, 'session#1');
+const started = (): SearchModel =>
+  startSession(initialSearchModel(), { text: 'test' }, 'session#1');
 
 describe('search transitions', () => {
   test('startSession resets everything and enters searching with the operation id', () => {
-    const dirty: SearchState = {
-      ...initialSearchState(),
+    const dirty: SearchModel = {
+      ...initialSearchModel(),
       hits: [hit(5, 0)],
       hitsByPage: { 5: [hit(5, 0)] },
       activeHitIndex: 0,
@@ -102,6 +102,6 @@ describe('search transitions', () => {
     });
     expect(failed.status).toBe('error');
     expect(failed.error?.message).toBe('boom');
-    expect(clearSession(failed)).toEqual(initialSearchState());
+    expect(clearSession(failed)).toEqual(initialSearchModel());
   });
 });

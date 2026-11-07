@@ -16,7 +16,7 @@ commands you need:
 
 ## Show a command
 
-<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
+<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed` or `aria-expanded`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
 
 <Snippet name="ui/command-button" />
 
@@ -38,6 +38,11 @@ same command as a signal.
 `shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
 
+`pressable` says whether the command is a toggle: it has an `active` of its own, or opens a panel.
+Give a toggle's button `aria-pressed`, true or false, and leave it off the others, so a screen
+reader announces only toggles as toggles. A command that opens a menu is `active` while its menu is
+open, and its button says `aria-expanded` instead.
+
 There's always a command, so a button never checks for a missing one: an id no plugin registered
 comes back labelled with its id, neither visible nor enabled, the way a turned-off command does,
 and in development it warns once, with the closest id there is. Checking `visible` covers a
@@ -54,14 +59,18 @@ and says `null` for an id it doesn't have.
 | `zoom:fit-width`, `zoom:fit-page`                    | Fit the page's width, or the whole page      |                  |
 | `page:next`, `page:previous`, `page:first`, `page:last` | Move through pages                        | `→`, `←`, `Home`, `End` |
 | `view:rotate-clockwise`, `view:rotate-counterclockwise` | Turn the view                             |                  |
-| `tool:pointer`, `tool:pan`                           | Switch tools                                 | `V`, `H`         |
+| `tool:pointer`, `tool:pan`, `tool:zoom`              | Switch tools                                 | `V`, `H`, `Z`    |
 | `tool:<id>`                                          | Any registered tool, such as `tool:highlight` |                 |
+| `tool:snapshot`                                      | Switch to the [snapshot](../viewing/render#take-a-snapshot) tool |  |
 | `selection:copy`                                     | Copy the selected text                       | `Mod+C`          |
+| `snapshot:copy`, `snapshot:save`                     | Copy the snapshot, or save it as a PNG file  | `Mod+C`          |
+| `snapshot:clear`                                     | Let the snapshot go                          | `Escape`         |
 | `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
 | `document:download`, `document:print`                | Download or print the document               | `Mod+S`, `Mod+P` |
 
 Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
-`annotation:delete` a selection the user may delete.
+`annotation:delete` a selection the user may delete, the `snapshot:` commands a snapshot. Without
+[`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not allowed.
 
 ## Keyboard shortcuts
 
@@ -111,19 +120,53 @@ A disabled command is still in the results, so show it greyed out.
 | :------------ | :------------------------------------------------------------------------------- |
 | `id`          | A unique name, by convention `area:action`                                       |
 | `label`       | What the user sees, or `labelKey` for a [translated](translations) label         |
+| `labelParams` | The values for its label's `{name}` slots, as a function of the viewer's state and your app's: `({ get }) => ({ count: get(PageEditToken).getSelected().length })`. A number `count` picks the plural form. |
 | `icon`        | Your icon's name; your buttons turn it into an icon                              |
 | `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
 | `shortcutInTextFields` | `true`: its shortcut runs while the cursor is in a text field too        |
-| `enabled`     | When it can run, as a function of the viewer's state                             |
+| `enabled`     | When it can run, as a function of the viewer's state and your app's (`appState`) |
 | `active`      | When it shows as pressed, such as the current tool                               |
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
 | `requires`    | The [permissions](../concepts/permissions) it needs, such as `'doc.annotate.modify'`. Without them, it's hidden. |
+| `locked`      | The [lock](../viewing/stage#lock-a-setting) on the setting it changes, as a function of the viewer's state: `(context) => context.get(StageToken).getLock('spread')`. While there is one, it shows disabled. |
 | `categories`  | The features it belongs to, so you can [turn them off](#turn-features-off) together, such as `['annotations.highlight']` |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
-`enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
-whenever anything changes, so a button is always right without events or effects of your own.
+`enabled`, `active`, `visible` and `labelParams` get the viewer's state through `get(Token)` and
+your app's through `appState`. They're asked again whenever either changes, and after the command
+runs, so a button is always right without events or effects of your own. An `enabled`, `active` or
+`visible` that throws, because what it reads isn't there yet, counts as `false`: the button is
+disabled, not pressed, or hidden until it answers. A `labelParams` that throws gives no values, and
+its label's slots show as they are.
+
+`appState` is a setting: values, and functions that change them. Give it a new value whenever your
+state changes, and every button asks its command again:
+
+```ts
+// Your app's state, and what changes it.
+let flagged: string[] = [];
+function toggleFlag(id: string) {
+  flagged = flagged.includes(id) ? flagged.filter((f) => f !== id) : [...flagged, id];
+  // A new value: every button asks its command again.
+  commands.updateSettings({ appState: { flagged, toggleFlag } });
+}
+
+commandsPlugin({
+  appState: { flagged, toggleFlag },
+  commands: [
+    {
+      id: 'review:flag',
+      label: 'Flag for review',
+      active: ({ appState, documentId }) => appState.flagged.includes(documentId),
+      run: ({ appState, documentId }) => appState.toggleFlag(documentId),
+    },
+  ],
+});
+```
+
+A new value replaces the old one whole, never merged, and the commands see a new object, not a
+change inside the one they have (`[...flagged, id]`, not `flagged.push(id)`).
 
 ## Turn features off
 
@@ -153,7 +196,7 @@ Everything `useCommands()` gives you.
 | `execute(id, { args?, documentId? })`                                    | Runs a command. Resolves `{ status, reason? }`: `'executed'`, or `'rejected'` with why. A `run` that throws rejects. [Run a command from code](#run-a-command-from-code) |
 | `canExecute(id, documentId?)`                                            | Whether a command can run now: it's registered, enabled and visible                                                                                 |
 | `resolveCommand(id, documentId?)`                                        | A command as a button shows it: label, icon, shortcuts, and whether it's enabled, active and visible. `null` for an unknown id. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useCommand(id)`.</Fw><Fw only="angular">In a template, use the `epdfCommand` directive.</Fw> [Show a command](#show-a-command) |
-| `getRefusal(id, documentId?)`                                           | Why a command won't run whatever the moment, as `{ reason, message }`: `'turned-off'` or `'not-allowed'`, with a sentence for the user. `null` when it may run, or can't only right now, and for an unknown id |
+| `getRefusal(id, documentId?)`                                           | Why a command won't run whatever the moment, as `{ reason, message }`: `'turned-off'`, `'not-allowed'` or `'locked'`, with a sentence for the user. `null` when it may run, or can't only right now, and for an unknown id |
 | `listCommands(documentId?)`                                              | Every command, resolved the same way, in the order they were added                                                                                  |
 | `searchCommands(query, documentId?)`                                     | The visible commands whose label or id contains the query. [A command palette](#a-command-palette)                                                  |
 | `listShortcuts()`                                                        | Every shortcut with its command, as `{ commandId, shortcut }`, for a keyboard help sheet. [Keyboard shortcuts](#keyboard-shortcuts)                 |
@@ -182,6 +225,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting              | What it does                                          | Default |
 | :------------------- | :---------------------------------------------------- | :------ |
 | `commands`           | The commands your viewer has                          | none    |
+| `appState`           | Your app's state, which commands read as `appState`; replaced whole | none    |
 | `disabledCategories` | Categories that start turned off, with every category under them | none    |
 | `disabledCommands`   | Commands that start turned off, by id                 | none    |
 | `notAllowed`         | What a command the scope doesn't allow does: `'hide'` leaves it out, `'disable'` shows it disabled with `disabledReason` | `'hide'` |
@@ -194,7 +238,7 @@ Set them when you register the plugin, and change them while the app runs with
 | :------------------ | :------------------------------ | :-------------------------------- |
 | `onExecuted`        | A command ran                   | `commandId`, `documentId`, `args` |
 | `onExecutionFailed` | A command's `run` threw         | `commandId`, `documentId`, `error` |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 ## Good to know
 
@@ -208,3 +252,14 @@ command's `disabledReason` says why, for its tooltip: the i18n string for
 `commands.notAllowed.doc-print`), else `commands.notAllowed.default`. Keep `enabled` for what can't
 run right now, such as **Copy** with nothing selected. The standard commands already say what they
 need.
+
+### Commands and locked settings
+
+A command that changes a setting says which with `locked`: a function that returns the setting's
+lock, or `null`. While a [lock](../viewing/stage#lock-a-setting) holds the setting, the command
+shows disabled, whatever the `notAllowed` setting says, since the setting has a value the user can
+see and the lock is about this document now, not about the user. It stays `active` when the locked
+value is its own, so a menu shows **Single page** checked and greyed. Its `disabledReason`, and
+`getRefusal()`'s `'locked'` message, is the i18n string under the lock's `reasonKey`, else
+`commands.locked.default`. The standard commands for spreads, scroll direction and view rotation
+already say which setting they change.

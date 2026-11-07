@@ -1,4 +1,4 @@
-<!-- Pick a page, then move it. Each button uses another placement. -->
+<!-- Pick a page, then move it. Each button uses another position. -->
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';

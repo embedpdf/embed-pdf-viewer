@@ -6,7 +6,7 @@
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { measurementPlugin } from '@embedpdf/svelte/measurement';
   import { localEngine } from '@embedpdf/engine';
-  import MeasureCover from './MeasureCover.svelte';
+  import MeasurePlan from './MeasurePlan.svelte';
   import Readouts from './Readouts.svelte';
 
   import '../readout.css';
@@ -20,20 +20,20 @@
     measurementPlugin(),
   ];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source sketch]
+  const sketch = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/sketch.pdf');
+    return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: sketch }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <MeasureCover />
+    <MeasurePlan />
     <div class="viewer">
       <Stage class="stage">
         <RenderLayer />

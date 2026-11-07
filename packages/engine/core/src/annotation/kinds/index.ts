@@ -1,8 +1,12 @@
 import { z } from 'zod';
 
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
+import { withCatchAll } from '../../wire/reading';
+import { PdfAnnotationSubtypeCode } from '../subtype';
 import { CaretKind } from './caret';
 import { CircleKind } from './circle';
+import { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
+import type { Annotation, AnnotationDraft, AnnotationPatch } from './declarations';
 import { FileAttachmentKind } from './file-attachment';
 import { FreeTextKind } from './free-text';
 import { HighlightKind } from './highlight';
@@ -21,8 +25,6 @@ import { TextKind } from './text';
 import { UnderlineKind } from './underline';
 import { UnsupportedKind } from './unsupported';
 import { WidgetKind } from './widget';
-import { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
-import type { Annotation, AnnotationDraft, AnnotationPatch } from './declarations';
 
 export * from './highlight';
 export * from './underline';
@@ -71,8 +73,8 @@ export type { CreateOf, ReadOf, UpdateOf } from '../declaration';
  * Every subtype the engine has not yet wired up rides on
  * `UnsupportedKind`. The wire format is stable: when a per-subtype reader
  * lands later, the engine starts emitting the dedicated DTO instead of
- * `unsupported`, and existing clients widen their handling without a
- * version bump.
+ * `unsupported`, and clients that don't know it yet keep reading it as
+ * `unsupported` (see {@link AnnotationSchema}).
  */
 export const ANNOTATION_KINDS = [
   HighlightKind,
@@ -117,10 +119,9 @@ export const KIND_BY_SUBTYPE: Readonly<{
 /**
  * Runtime zod schema for the discriminated union. The cast unwinds the
  * generic schema map into the specific tuple form `discriminatedUnion`
- * needs. Servers and cloud clients use this to validate every annotation
- * payload on the wire.
+ * needs.
  */
-export const AnnotationSchema: z.ZodType<Annotation> = z.discriminatedUnion('subtype', [
+const KnownAnnotationSchema: z.ZodType<Annotation> = z.discriminatedUnion('subtype', [
   HighlightKind.dtoSchema,
   UnderlineKind.dtoSchema,
   SquigglyKind.dtoSchema,
@@ -145,6 +146,31 @@ export const AnnotationSchema: z.ZodType<Annotation> = z.discriminatedUnion('sub
   z.ZodDiscriminatedUnionOption<'subtype'>,
   ...z.ZodDiscriminatedUnionOption<'subtype'>[],
 ]) as unknown as z.ZodType<Annotation>;
+
+/**
+ * Every annotation on the wire, as servers and cloud clients read it. A
+ * subtype this client doesn't know, one a newer server reads, reads as
+ * `unsupported`: the fields every annotation has, with the body's
+ * `rawSubtypeCode` and `rawSubtypeName` when it carries them and `0` and
+ * `null` when it doesn't. A subtype it knows is read as that kind, so a
+ * malformed one still fails.
+ */
+export const AnnotationSchema: z.ZodType<Annotation> = withCatchAll(
+  KnownAnnotationSchema,
+  'unsupported',
+  (annotation) => ({
+    ...annotation,
+    rawSubtypeCode: Number.isInteger(annotation.rawSubtypeCode)
+      ? annotation.rawSubtypeCode
+      : PdfAnnotationSubtypeCode.UNKNOWN,
+    rawSubtypeName:
+      typeof annotation.rawSubtypeName === 'string' ? annotation.rawSubtypeName : null,
+  }),
+).describe(
+  'An annotation, by its `subtype`. A newer server can add subtypes: read one your client ' +
+    "doesn't know as `unsupported`, keeping the fields every annotation has, with " +
+    '`rawSubtypeCode` 0 and `rawSubtypeName` null when the body has neither.',
+);
 
 /** Validates a create's data against its kind. */
 export const AnnotationDraftSchema: z.ZodType<AnnotationDraft> = z.discriminatedUnion('subtype', [

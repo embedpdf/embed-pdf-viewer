@@ -10,7 +10,7 @@
 </script>
 
 <li>
-  <button type="button" class="row" onclick={() => annotations.selection.set([annotation.ref])}>
+  <button type="button" class="row" onclick={() => annotations.selection.select([annotation.ref])}>
     <span class="kind">{'unavailable' in readout.current ? 'No scale' : readout.current.kind}</span>
     <span class="value">{'unavailable' in readout.current ? '—' : readout.current.label}</span>
   </button>

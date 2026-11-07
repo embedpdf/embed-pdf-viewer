@@ -1,8 +1,4 @@
-import type {
-  BaseVersionInfo,
-  DocumentProtection,
-  SignatureDTO,
-} from '@embedpdf/engine-core/runtime';
+import type { BaseVersionInfo, DocumentProtection, Signature } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -19,7 +15,7 @@ export interface FinalizeCandidateInput {
   /** The rebuilt candidate on this filesystem; patched in place. */
   path: string;
   byteRange: [number, number, number, number];
-  contentsSize: number;
+  contentsSizeBytes: number;
   fieldObjectNumber: number;
   cms: Uint8Array;
   password: string | null;
@@ -27,7 +23,7 @@ export interface FinalizeCandidateInput {
 
 export interface FinalizedCandidate {
   /** In page space: no session outlives the finalize to measure it later. */
-  signature: SignatureDTO;
+  signature: Signature;
   protection: DocumentProtection;
   version: BaseVersionInfo;
   /** The sealed file's last object number: every object it has is at or below it. */
@@ -63,19 +59,22 @@ export class CandidateFinalizer {
     }
     // The hole is `<` + hex digits + `>`: the range's gap, less the delimiters.
     const hexLength = r2 - r1 - 2;
-    if (!Number.isSafeInteger(input.contentsSize) || hexLength !== 2 * input.contentsSize) {
+    if (
+      !Number.isSafeInteger(input.contentsSizeBytes) ||
+      hexLength !== 2 * input.contentsSizeBytes
+    ) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `the /Contents hole holds ${hexLength} hex digits, not the ${2 * input.contentsSize} of contentsSize`,
+        `the /Contents hole holds ${hexLength} hex digits, not the ${2 * input.contentsSizeBytes} of contentsSize`,
       );
     }
     if (input.cms.byteLength === 0 || input.cms[0] !== 0x30) {
       throw new EngineError(EngineErrorCode.SignatureRefused, 'the CMS is not a DER SEQUENCE');
     }
-    if (input.cms.byteLength > input.contentsSize) {
+    if (input.cms.byteLength > input.contentsSizeBytes) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
-        `the CMS (${input.cms.byteLength} bytes) does not fit the reserved ${input.contentsSize} bytes`,
+        `the CMS (${input.cms.byteLength} bytes) does not fit the reserved ${input.contentsSizeBytes} bytes`,
       );
     }
 

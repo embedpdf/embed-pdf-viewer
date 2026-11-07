@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { FormField } from '@embedpdf/engine-core/runtime';
 import type { ActionDiagnostic, SubmitIntent } from '@embedpdf/plugin-actions/contract';
 
 import { buildSubmitEntries, resolveFieldSelection } from '../src/field-selection';
@@ -9,16 +9,16 @@ import { buildSubmitEntries, resolveFieldSelection } from '../src/field-selectio
 const field = (
   name: string,
   overrides: Partial<{
-    family: string;
+    kind: string;
     noExport: boolean;
-    valueEntry: FormFieldDTO['valueEntry'];
+    valueEntry: FormField['valueEntry'];
     fieldObjectNumber: number;
   }> = {},
-): FormFieldDTO =>
+): FormField =>
   ({
     ref: { kind: 'objectNumber', objectNumber: overrides.fieldObjectNumber ?? 0 },
     name,
-    family: overrides.family ?? 'text',
+    kind: overrides.kind ?? 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -34,7 +34,7 @@ const field = (
     valueEntry: overrides.valueEntry ?? { kind: 'scalar', value: `${name}-value` },
     defaultValueEntry: { kind: 'none' },
     widgets: [],
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const intent = (overrides: Partial<SubmitIntent> = {}): SubmitIntent => ({
   url: 'https://home.test/x',
@@ -43,7 +43,6 @@ const intent = (overrides: Partial<SubmitIntent> = {}): SubmitIntent => ({
   includeNoValueFields: false,
   format: 'fdf',
   method: 'post',
-  flagsRaw: 0,
   ...overrides,
 });
 
@@ -97,8 +96,8 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
       [
         field('plain'),
         field('secret', { noExport: true }),
-        field('button', { family: 'pushbutton' }),
-        field('sig', { family: 'signature' }),
+        field('button', { kind: 'pushbutton' }),
+        field('sig', { kind: 'signature' }),
       ],
       intent(),
       diagnose,
@@ -132,7 +131,7 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
   it('an explicitly listed push-button is DIAGNOSED, never silent', () => {
     const { list, diagnose } = diagnostics();
     const entries = buildSubmitEntries(
-      [field('button', { family: 'pushbutton' })],
+      [field('button', { kind: 'pushbutton' })],
       intent({ fields: [{ kind: 'name', name: 'button' }] }),
       diagnose,
     );

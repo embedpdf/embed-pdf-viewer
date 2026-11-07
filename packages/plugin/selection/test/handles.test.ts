@@ -11,7 +11,7 @@ import {
   armSelectionHandle,
   createSelectionHandleDrag,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
 } from '../src/handles';
 import type { SelectionHandleEndpoint, SelectionHandleView } from '../src/handles';
@@ -46,23 +46,23 @@ const endpoint = (glyphQuad: Quad, advance: 1 | -1 = 1): SelectionHandleEndpoint
   advance,
 });
 
-describe('selectionHandleGeom', () => {
+describe('selectionHandleGeometry', () => {
   it('upright: bar is the rect side, marked upright, head stacked beyond it', () => {
-    const start = selectionHandleGeom(view(), endpoint(CELL), 'start')!;
+    const start = selectionHandleGeometry(view(), endpoint(CELL), 'start')!;
     expect(start.bar.from).toEqual({ x: 100, y: 200 }); // ascent corner first
     expect(start.bar.to).toEqual({ x: 100, y: 216 });
     expect(start.length).toBeCloseTo(16, 9);
     expect(start.rotation).toBeCloseTo(0, 9);
     expect(start.upright).toBe(true);
     expect(start.head).toEqual({ x: 100, y: 200 - HANDLE_HEAD / 2 }); // above the ascent
-    const end = selectionHandleGeom(view(), endpoint(CELL), 'end')!;
+    const end = selectionHandleGeometry(view(), endpoint(CELL), 'end')!;
     expect(end.bar.from).toEqual({ x: 160, y: 200 });
     expect(end.head).toEqual({ x: 160, y: 216 + HANDLE_HEAD / 2 }); // past the baseline
   });
 
   it('bar length is the ink height at every rotation — never the AABB height', () => {
     for (const deg of [30, 45, 90, 180, 270]) {
-      const geometry = selectionHandleGeom(
+      const geometry = selectionHandleGeometry(
         view(),
         endpoint(rotateQuad(CELL, deg, 100, 200)),
         'start',
@@ -75,7 +75,7 @@ describe('selectionHandleGeom', () => {
   });
 
   it('zoom scales the projected geometry with no extra factor', () => {
-    const geometry = selectionHandleGeom(
+    const geometry = selectionHandleGeometry(
       view(2.5),
       endpoint(rotateQuad(CELL, 45, 100, 200)),
       'start',
@@ -84,12 +84,12 @@ describe('selectionHandleGeom', () => {
   });
 
   it('RTL: the leading edge mirrors — start takes the end-side edge', () => {
-    const ltr = selectionHandleGeom(view(), endpoint(CELL, 1), 'start')!;
-    const rtl = selectionHandleGeom(view(), endpoint(CELL, -1), 'start')!;
+    const ltr = selectionHandleGeometry(view(), endpoint(CELL, 1), 'start')!;
+    const rtl = selectionHandleGeometry(view(), endpoint(CELL, -1), 'start')!;
     expect(ltr.bar.from.x).toBeCloseTo(100, 9);
     expect(rtl.bar.from.x).toBeCloseTo(160, 9); // the cell's end side
     // …and the same mirroring under rotation
-    const rtl45 = selectionHandleGeom(
+    const rtl45 = selectionHandleGeometry(
       view(),
       endpoint(rotateQuad(CELL, 45, 100, 200), -1),
       'start',
@@ -99,9 +99,9 @@ describe('selectionHandleGeom', () => {
 
   it('null when the page is not laid out or the cell is degenerate', () => {
     const dead: SelectionHandleView = { ...view(), toOverlay: () => null };
-    expect(selectionHandleGeom(dead, endpoint(CELL), 'start')).toBeNull();
+    expect(selectionHandleGeometry(dead, endpoint(CELL), 'start')).toBeNull();
     const flat = quadFromRect({ x: 0, y: 0, width: 10, height: 0 });
-    expect(selectionHandleGeom(view(), endpoint(flat), 'start')).toBeNull();
+    expect(selectionHandleGeometry(view(), endpoint(flat), 'start')).toBeNull();
   });
 });
 

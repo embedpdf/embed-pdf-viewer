@@ -16,11 +16,11 @@ import {
   standardCommands,
   withCommands,
 } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import { cloudEngine } from '@cloudpdf/engine';
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],
@@ -31,7 +31,7 @@ const twoPages: CommandDef = {
   },
 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Turning a category off hides its commands wherever they appear.
 @Component({
@@ -90,7 +90,7 @@ export class Toolbar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, Toolbar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withCommands({ commands: [...standardCommands, twoPages] }),

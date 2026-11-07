@@ -123,7 +123,13 @@ describe('link kind schemas', () => {
       subtype: 'link',
       target: {
         kind: 'goto',
-        destination: { kind: 'xyz', page: { kind: 'objectNumber', objectNumber: 9 }, y: 92 },
+        destination: {
+          kind: 'xyz',
+          page: { kind: 'objectNumber', objectNumber: 9 },
+          y: 92,
+          x: null,
+          zoom: null,
+        },
       },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };

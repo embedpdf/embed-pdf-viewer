@@ -47,12 +47,12 @@ From `packages/plugin/shell`:
 
 ```ts
 // model.ts
-export function openMenu(state: ShellState, id: string): ShellState {
+export function openMenu(state: ShellModel, id: string): ShellModel {
   if (state.openMenus.includes(id)) return state;
   return { ...state, openMenus: [...state.openMenus, id] };
 }
 
-export function closeMenu(state: ShellState, id: string): ShellState {
+export function closeMenu(state: ShellModel, id: string): ShellModel {
   if (!state.openMenus.includes(id)) return state;
   return { ...state, openMenus: state.openMenus.filter((menu) => menu !== id) };
 }
@@ -278,7 +278,9 @@ Built in:
   overwrites a newer value;
 - `pages.deleted` drops the deleted pages (`cause: 'drop'`);
 - `stream.desynced` and `document.versioned` re-read every loaded page;
-- a failed read keeps the page's previous value and sets its status.
+- a failed read keeps the page's previous value and sets its status;
+- a page the engine doesn't have yet ([the page list](#the-page-list)) is read
+  once the engine has it, and not at all when it goes first.
 
 From `packages/plugin/link/src/controller.ts`:
 
@@ -402,6 +404,30 @@ The annotation plugin is the reference: one change per message
 records are named by the object numbers they take, and typing is a hold
 (`write/text-editing.ts`).
 
+### The page list
+
+The document's pages (`ctx.document().pages`, `ctx.getPage`, `ctx.pageOf`,
+`documents.listPages`) are a view as well: the engine's pages, from its layout
+events, with the pending changes' page ops replayed on top through
+engine-core's `pagesAfter` (a rotate, a move, a delete, a blank insert or a
+copy that names its pages, an undo that restores pages). The Stage, the
+thumbnails and every index a verb takes read it, so a page edit shows at once
+and an index names the page the user sees. `revision` moves when the list
+does; an answer the prediction got right leaves the same list and the same
+page objects.
+
+The page label sections move with the pages (`ctx.document().pageLabels`), by
+the same rules the engine writes `/PageLabels` with (engine-core
+`pages/labels`), so each page's `label` is the one the engine will give it. An
+undo of a page edit ends with `pages.relabel`: the sections the edit found.
+
+A page a pending change makes is in the list before the engine has it.
+`ctx.document().pendingPages` names those pages, with where each one's look
+comes from (`blank`, `own`, or `copy` of another page). Code that asks the
+engine about a page waits for them: page mirrors do it for you, and the render
+plugin asks for no picture until the page lands, except that a copy draws as
+the page it copies.
+
 ### Undo and redo
 
 The history (`@embedpdf/plugin-history`) is built on the queue and keeps no
@@ -431,8 +457,8 @@ typing pauses (a hold), the ink tool waits for the next stroke of a drawing, a
 form field is written on blur. A hold (see [Pending changes](#pending-changes)) is
 how a change waits, and the kernel sends every open hold before a download
 itself. A write queue holds writes that are on their way.
-Before anything reads the whole file (`documents.download()`, `downloadLayer()`), the
-kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
+Before anything reads the whole file (`documents.download()`, `downloadLayer()`), or draws
+its pages to print them (`documents.preparePrint()`, `print()`), the kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
 flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
 file has everything the user sees.
 
@@ -444,8 +470,9 @@ file has everything the user sees.
 - A plugin whose queue carries document writes registers it:
   `ctx.onSettle(() => queue.idle())`. A queue whose operations read the file
   themselves is never registered: the actions plugin runs every download
-  inside its queue (`ctx.aroundDownload`, for the document's save actions),
-  and waiting for that queue would wait for itself.
+  inside its queue (`ctx.aroundDownload`, for the document's save actions,
+  and `ctx.aroundPrint`, for its print actions), and waiting for that queue
+  would wait for itself.
 - A failed flush is reported and does not stop the read: the file is then what
   the engine has.
 - The caller's `signal`, or the document closing, cancels the wait with

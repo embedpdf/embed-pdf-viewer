@@ -1,9 +1,15 @@
 import { z } from 'zod';
 
+import {
+  RichTextAlignSchema,
+  RichTextDocumentInputSchema,
+  RichTextDocumentSchema,
+} from '../../../dto/RichText.schema';
 import { CalloutLineSchema } from '../../../geometry/schemas';
 import {
   AnnotationBorderStyleSchema,
   ColorSchema,
+  DashArrayWriteSchema,
   DrawnBorderStyleSchema,
   FreeTextIntentSchema,
   FreeTextIntentWriteSchema,
@@ -11,11 +17,10 @@ import {
   VerticalAlignmentSchema,
 } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, boxFields, FontNameSchema } from '../shared-fields';
-import { RichTextAlignSchema, RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
+import { boxFields, FontNameSchema, markupBaseFields } from '../shared-fields';
 
 export const FreeTextDeclaration = defineKind('free-text', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...boxFields,
   /**
    * A create without it is a callout when it has a `calloutLine`, else a
@@ -47,7 +52,11 @@ export const FreeTextDeclaration = defineKind('free-text', {
     .writes(DrawnBorderStyleSchema)
     .readBack()
     .optional(),
-  dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
+  dashArray: field
+    .data(z.array(z.number().nonnegative()))
+    .writes(DashArrayWriteSchema)
+    .nullable()
+    .optional(),
   cloudyIntensity: field.data(z.number().positive()).nullable().optional(),
   calloutLine: field.data(CalloutLineSchema).nullable().optional().space('calloutLine'),
   lineEnding: field.data(LineEndingSchema).nullable().optional(),

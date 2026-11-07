@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { wireSelectionClipboard, type ClipboardSelectionSource } from '../src/clipboard';
+import { copyImage, wireSelectionClipboard, type ClipboardSelectionSource } from '../src/clipboard';
 
 /** A document stand-in that dispatches to its listeners by type. */
 function fakeDocument() {
@@ -271,5 +271,32 @@ describe('wireSelectionClipboard with an element as target', () => {
     pressCopy(shadow.getElementById('pages')!);
     await settle();
     expect(writeText).toHaveBeenCalledWith('selected text');
+  });
+});
+
+describe('copyImage', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('writes at once, in the press, and the PNG follows when the picture is there', async () => {
+    const written: Array<Record<string, Promise<Blob>>> = [];
+    vi.stubGlobal(
+      'ClipboardItem',
+      class {
+        constructor(readonly items: Record<string, Promise<Blob>>) {
+          written.push(items);
+        }
+      },
+    );
+    const write = vi.fn(async () => {});
+    vi.stubGlobal('navigator', { clipboard: { write } });
+    const png = new Blob(['png'], { type: 'image/png' });
+    let picture!: (image: { blob(): Promise<Blob> }) => void;
+    const copied = copyImage(new Promise((resolve) => (picture = resolve)));
+    // Before the picture is rendered, the write has started.
+    expect(write).toHaveBeenCalledTimes(1);
+    picture({ blob: async () => png });
+    await copied;
+    expect(Object.keys(written[0]!)).toEqual(['image/png']);
+    expect(await written[0]!['image/png']).toBe(png);
   });
 });

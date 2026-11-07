@@ -5,7 +5,6 @@ import {
   effect,
   inject,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
@@ -17,7 +16,7 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 
 const FIELD_TOOLS = [
   ['form-text', 'Text'],
@@ -40,7 +39,7 @@ const FIELD_TOOLS = [
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: registration }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -87,11 +86,7 @@ const FIELD_TOOLS = [
             </button>
           }
           <output class="readout">
-            @if (form.fields().length === 0) {
-              Click the page to place a field
-            } @else {
-              {{ form.fields().length }} fields
-            }
+            {{ form.fields().length }} fields: click the page to place another
           </output>
         </div>
       }
@@ -112,23 +107,17 @@ export class App {
   protected readonly interaction = inject(EpdfInteraction);
   protected readonly tools = FIELD_TOOLS;
   private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   /** The pointer fills the form in; every other tool here designs it. */
   protected readonly filling = computed(() => this.interaction.activeToolId() === 'pointer');
 
   constructor() {
-    // Start on the ebook's last page, which has room for a form, with the text tool picked.
+    // Start with the text tool picked: the printed form has boxes, but no fields yet.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
+      if (this.document.status() !== 'ready' || this.started) return;
       this.started = true;
-      untracked(() => {
-        stage.goToPage(page);
-        this.interaction.activateTool('form-text');
-      });
+      untracked(() => this.interaction.activateTool('form-text'));
     });
   }
 }

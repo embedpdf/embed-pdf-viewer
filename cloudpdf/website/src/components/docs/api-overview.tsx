@@ -99,16 +99,17 @@ export function ApiOperationCount() {
   return <>{getOperationCount()}</>;
 }
 
-const CREDENTIAL_ORDER = ['apiToken', 'tenantToken', 'docToken'] as const;
+const CREDENTIAL_ORDER = ['apiToken', 'tenantToken', 'docToken', 'uploadToken'] as const;
 
 const CREDENTIAL_HOLDER: Record<string, string> = {
   apiToken: 'Your server environment',
   tenantToken: 'Your backend',
   docToken: "The end user's browser",
+  uploadToken: "The end user's browser, to upload",
 };
 
 /**
- * The three credentials as a ladder. Authority mints only downward, and
+ * The credentials as a ladder. Authority mints only downward, and
  * each rung's blast radius shrinks as it moves closer to the browser —
  * the one idea that makes every per-operation auth rule obvious.
  */

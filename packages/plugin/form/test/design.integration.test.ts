@@ -8,7 +8,7 @@
  */
 import { createKernel, type DocumentHandle, type Engine } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
+import { BANDS_PDF, CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import {
   annotationKey,
   type AnnotationRef,
@@ -39,7 +39,38 @@ afterAll(async () => {
 /** The fixture's merged text field and widget `name`, and its square, on page 1. */
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
 
-async function boot(scope?: readonly string[]) {
+/**
+ * The fixture with two signature fields on `name`'s page: `approval`, empty,
+ * and `marked`, with a mark drawn in without signing.
+ */
+async function withSignatureFields(): Promise<Uint8Array> {
+  const doc = await engine.open(
+    { kind: 'bytes', id: 'signature-fields', bytes: CHANGE_FIXTURE_PDF.slice() },
+    { scope: ['*'] } as never,
+  );
+  const name = (await doc.forms.list()).fields.find((field) => field.name === 'name')!;
+  const page = name.widgets[0]!.page!;
+  const look = { color: '#1a1a1a', interiorColor: '#eeeeee' };
+  await doc.forms.create({
+    kind: 'signature',
+    name: 'approval',
+    widgets: [{ page, rect: { x: 40, y: 300, width: 160, height: 50 }, ...look }],
+  });
+  await doc.forms.create({
+    kind: 'signature',
+    name: 'marked',
+    widgets: [{ page, rect: { x: 40, y: 380, width: 160, height: 50 }, ...look }],
+  });
+  await doc.forms.setSignatureAppearance!(
+    { kind: 'fqn', name: 'marked' },
+    { pdf: BANDS_PDF.slice() },
+  );
+  const bytes = await doc.download();
+  await doc.close();
+  return bytes;
+}
+
+async function boot(scope?: readonly string[], bytes: Uint8Array = CHANGE_FIXTURE_PDF) {
   const held: HeldChange[] = [];
   let holding = false;
   let inner: DocumentHandle | null = null;
@@ -59,7 +90,7 @@ async function boot(scope?: readonly string[]) {
     ],
   });
   await kernel.documents.open(
-    { kind: 'bytes', id: `design-${Math.random()}`, bytes: CHANGE_FIXTURE_PDF.slice() },
+    { kind: 'bytes', id: `design-${Math.random()}`, bytes: bytes.slice() },
     scope ? ({ scope } as never) : undefined,
   );
   const form = kernel.capability(FormToken);
@@ -147,10 +178,10 @@ describe('design through lending', () => {
       // The annotations stay the document's own.
       expect(annotation.list().some((each) => each.subtype === 'widget')).toBe(false);
       // Back to filling: the widget leaves the annotation plugin, selection and all.
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       booted.interaction.activateDefaultTool();
       expect(annotation.get(widget)).toBeNull();
-      expect(annotation.selection.list()).toHaveLength(0);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
     } finally {
       await booted.destroy();
     }
@@ -162,17 +193,17 @@ describe('design through lending', () => {
       const { annotation, form, page } = booted;
       booted.design();
       // The first create fills the session's pool of object numbers.
-      await form.create({ family: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
+      await form.create({ kind: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
       const created = form.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page, rect: box(200, 60, 18, 18) }],
       });
       const shown = form.get({ kind: 'fqn', name: 'agree' });
-      expect(shown?.family).toBe('checkbox');
+      expect(shown?.kind).toBe('checkbox');
       const widget = booted.widgetOf({ kind: 'fqn', name: 'agree' });
-      annotation.selection.set([widget]);
-      expect(annotation.selection.list().map((each) => annotationKey(each.ref))).toEqual([
+      annotation.selection.select([widget]);
+      expect(annotation.selection.getSelected().map((each) => annotationKey(each.ref))).toEqual([
         annotationKey(widget),
       ]);
       // Drawn live until the engine has its picture.
@@ -189,7 +220,7 @@ describe('design through lending', () => {
     const booted = await boot();
     try {
       const { annotation, form, history, page, square } = booted;
-      await form.create({ family: 'text', name: 'city', widgets: [{ page, rect: box(150, 100) }] });
+      await form.create({ kind: 'text', name: 'city', widgets: [{ page, rect: box(150, 100) }] });
       await settled(booted);
       booted.design();
       const name = booted.widgetOf(NAME);
@@ -199,7 +230,7 @@ describe('design through lending', () => {
         city: (await booted.truthOf(city))!.rect,
         square: square.rect,
       };
-      annotation.selection.set([name, city, square.ref]);
+      annotation.selection.select([name, city, square.ref]);
       history.clear();
       booted.hold();
       booted.drag({ x: 50, y: 70 }, { x: 70, y: 80 });
@@ -247,7 +278,7 @@ describe('design through lending', () => {
       // Its picture, as the page draws it now.
       const pictures = await annotation.renderAppearances(page, 1);
       expect(pictures.some((each) => annotationKey(each.ref) === annotationKey(widget))).toBe(true);
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       history.clear();
       booted.hold();
       const field = form.get(NAME)!.ref;
@@ -383,6 +414,43 @@ describe('design through lending', () => {
     }
   });
 
+  it('a restyled signature field draws its box live, and one with a mark in it has no style', async () => {
+    const booted = await boot(undefined, await withSignatureFields());
+    try {
+      const { annotation, form, page } = booted;
+      booted.design();
+      const itemOf = (ref: AnnotationRef) =>
+        annotation
+          .listPageItems(page)
+          .find((item) => item.ref && annotationKey(item.ref) === annotationKey(ref))!;
+      const empty = booted.widgetOf({ kind: 'fqn', name: 'approval' });
+      expect(itemOf(empty)).toMatchObject({ subtype: 'widget-box', source: 'baked' });
+
+      booted.hold();
+      void form.updateWidget(empty, { interiorColor: '#d43c2c' }).catch(() => {});
+      // At once, drawn by the form's painter: its box, in the new background.
+      const live = itemOf(empty);
+      expect(live.source).toBe('vector');
+      expect(scene(live).some((node) => node.paint.fill === '#d43c2c')).toBe(true);
+      await booted.release();
+      await settled(booted);
+      // Confirmed: the engine has drawn the box again.
+      expect(itemOf(empty).source).toBe('baked');
+      expect(await booted.truthOf(empty)).toMatchObject({
+        interiorColor: '#d43c2c',
+        hasAppearance: true,
+        hasMark: false,
+      });
+
+      // With a mark in it: no style to change, and only its picture draws it.
+      const marked = itemOf(booted.widgetOf({ kind: 'fqn', name: 'marked' }));
+      expect(marked).toMatchObject({ subtype: 'widget-mark', source: 'baked' });
+      expect(hasLiveDrawing(marked)).toBe(false);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
   it('a field being resized draws live, by the painter, at the size the drag has, from the first drag', async () => {
     const booted = await boot();
     try {
@@ -395,7 +463,7 @@ describe('design through lending', () => {
           .find((item) => item.ref && annotationKey(item.ref) === annotationKey(widget))!;
       const before = itemOf();
       expect(before.source).toBe('baked');
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       // The south-east handle, on the box's corner, dragged 40 points right and 10 down.
       const corner = { x: before.box.x + before.box.width, y: before.box.y + before.box.height };
       annotation.editPointer('down', page, corner, false, 1);
@@ -405,7 +473,7 @@ describe('design through lending', () => {
       expect(dragging.source).toBe('vector');
       expect(dragging.box.width).toBeCloseTo(before.box.width + 40, 3);
       // The painter laid its text out in the dragged box: clipped to its right edge.
-      const text = scene(dragging).find((node) => node.kind === 'glyphs');
+      const text = scene(dragging).find((node) => node.kind === 'textRun');
       expect(text?.clip).toBeDefined();
       expect(text!.clip!.x + text!.clip!.width).toBeCloseTo(
         dragging.box.x +
@@ -434,8 +502,8 @@ describe('design through lending', () => {
       booted.design();
       const widget = booted.widgetOf(NAME);
       expect(annotation.get(widget)).toBeNull();
-      annotation.selection.set([widget]);
-      expect(annotation.selection.list()).toHaveLength(0);
+      annotation.selection.select([widget]);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
       // Nothing is lent, so the form layer keeps drawing the field.
       expect(booted.form.listShownWidgets(booted.page)).toHaveLength(1);
     } finally {
@@ -450,7 +518,7 @@ describe('design through lending', () => {
       booted.design();
       const widget = booted.widgetOf(NAME);
       const before = (await booted.truthOf(widget))!.rect;
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       booted.drag({ x: before.x + 10, y: before.y + 10 }, { x: before.x + 40, y: before.y + 10 });
       const shown = annotation.get(widget)!.rect;
       // Moved right (alignment guides may snap it a little further).

@@ -11,12 +11,22 @@
   import { untrack } from 'svelte';
   import type { CapabilityToken } from '@embedpdf/core';
   import type { PageFrame } from '@embedpdf/core-geometry';
-  import { createScrollHandler, DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
+  import {
+    createScrollHandler,
+    createZoomDragHandler,
+    DEFAULT_SETTINGS,
+    stageState,
+  } from '@embedpdf/plugin-stage';
   import type { VisiblePage } from '@embedpdf/plugin-stage';
   import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
   import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
   import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-  import { createStageSurface, stageViewProjector } from '@embedpdf/web';
+  import {
+    createStageSurface,
+    stageViewProjector,
+    ZOOM_BOX_DASH,
+    zoomBoxPaint,
+  } from '@embedpdf/web';
   import { setProjectorBinding, setShownPages, type ShownPages } from '../anchored/context';
   import {
     useCapabilityEvent,
@@ -25,6 +35,7 @@
     useOptionalCapability,
     useOptionalSelector,
   } from '../runtime/readers.svelte';
+  import { useViewerSettings } from '../runtime/documents.svelte';
   import { declaredState } from '../runtime/state.svelte';
   import { useKernelBinding } from '../runtime/binding.svelte';
   import PageSurface from './PageSurface.svelte';
@@ -72,8 +83,9 @@
   );
 
   // How this view takes pointer input is its own settings: routed to the interaction plugin
-  // (which also registers this view's pan-scroll handler, scoped to it, so two Stages on one
-  // document never pan each other), or the Stage's own drag-to-pan without it.
+  // (which also registers this view's pan-scroll and zoom-box handlers, scoped to it, so two
+  // Stages on one document never pan or zoom each other), or the Stage's own drag-to-pan
+  // without it.
   const routed = $derived(settings.current.interaction && interaction.current !== null);
   const panFallback = $derived(settings.current.panFallback);
   const zoomGestures = $derived(settings.current.zoomGestures);
@@ -99,12 +111,21 @@
             source: lens.getLensId(),
           })
         : null;
+      const offZoomDrag = hub
+        ? hub.registerHandler(createZoomDragHandler(lens, hub), { source: lens.getLensId() })
+        : null;
       return () => {
+        offZoomDrag?.();
         offScroll?.();
         detachSurface();
       };
     });
   });
+
+  // In viewport px, while the zoom tool's drag is a box; its colors follow the accent.
+  const zoomBox = useOptionalSelector(hostToken, (lens) => lens.getZoomBox(), null);
+  const accent = useViewerSettings((settings) => settings.accent);
+  const zoomBoxStyle = $derived(zoomBoxPaint(settings.current.zoomBox, accent.current));
 
   // ── two-way values ─────────────────────────────────────────────────────────
 
@@ -176,6 +197,24 @@
         chrome={pageChrome}
       />
     {/each}
+  {/if}
+  {#if zoomBox.current}
+    {@const box = zoomBox.current}
+    <svg
+      aria-hidden="true"
+      width={box.width}
+      height={box.height}
+      style="position: absolute; left: {box.x}px; top: {box.y}px; overflow: visible; pointer-events: none;"
+    >
+      <rect
+        width={box.width}
+        height={box.height}
+        stroke-width="1"
+        stroke-dasharray={ZOOM_BOX_DASH}
+        style:fill={zoomBoxStyle.fill}
+        style:stroke={zoomBoxStyle.stroke}
+      />
+    </svg>
   {/if}
   {@render overlay?.()}
 </div>

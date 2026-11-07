@@ -26,7 +26,6 @@ import { createActionsTestContext } from './helpers/context';
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
   incomplete,
-  warningFlags: 0,
   warnings: [],
 });
 const named = (name: string, next: PdfActionNode[] = []): PdfActionNode => ({
@@ -148,9 +147,9 @@ function harness(options?: {
   /** Await this to drain the serial queue behind every prior submission. */
   const drain = () =>
     capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter', // hover: never resets the cascade counter
-      ref: ref(999_999, 1),
+      annotation: ref(999_999, 1),
       page: toPageRef(999_999),
     });
 
@@ -169,15 +168,19 @@ function harness(options?: {
 describe('triggerOriginOf', () => {
   it('derives the one true mapping', () => {
     const at = (trigger: ActionTrigger) => triggerOriginOf(trigger);
-    expect(at({ scope: 'activate', ref: ref(1, 1), page: toPageRef(1) })).toBe('user');
+    expect(at({ type: 'activate', annotation: ref(1, 1), page: toPageRef(1) })).toBe('user');
     for (const event of ['mouseDown', 'mouseUp', 'focus', 'blur'] as const) {
-      expect(at({ scope: 'annotation', event, ref: ref(1, 1), page: toPageRef(1) })).toBe('user');
+      expect(at({ type: 'annotation', event, annotation: ref(1, 1), page: toPageRef(1) })).toBe(
+        'user',
+      );
     }
     for (const event of ['cursorEnter', 'cursorExit'] as const) {
-      expect(at({ scope: 'annotation', event, ref: ref(1, 1), page: toPageRef(1) })).toBe('hover');
+      expect(at({ type: 'annotation', event, annotation: ref(1, 1), page: toPageRef(1) })).toBe(
+        'hover',
+      );
     }
-    expect(at({ scope: 'page', event: 'open', page: toPageRef(1) })).toBe('lifecycle');
-    expect(at({ scope: 'document', event: 'open' })).toBe('lifecycle');
+    expect(at({ type: 'page', event: 'open', page: toPageRef(1) })).toBe('lifecycle');
+    expect(at({ type: 'document', event: 'open' })).toBe('lifecycle');
   });
 });
 
@@ -197,12 +200,12 @@ describe('queued trigger resolution', () => {
       listDelay: (pageObjectNumber) => gates.get(pageObjectNumber) ?? Promise.resolve(),
     });
     const closing = fixture.capability.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'close',
       page: toPageRef(1),
     });
     const opening = fixture.capability.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'open',
       page: toPageRef(2),
     });
@@ -219,9 +222,9 @@ describe('queued trigger resolution', () => {
       listDelay: () => Promise.reject(new Error('read exploded')),
     });
     const result = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: ref(1, 1),
+      annotation: ref(1, 1),
       page: toPageRef(1),
     });
     expect(result.status).toBe('refused');
@@ -240,9 +243,9 @@ describe('queued trigger resolution', () => {
       ],
     });
     const hit = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: ref(4, 7),
+      annotation: ref(4, 7),
       page: toPageRef(4),
     });
     expect(hit.status).toBe('executed');
@@ -253,9 +256,9 @@ describe('queued trigger resolution', () => {
       page: toPageRef(4),
     });
     const miss = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorExit',
-      ref: ref(4, 7),
+      annotation: ref(4, 7),
       page: toPageRef(4),
     });
     expect(miss.status).toBe('inert');
@@ -275,9 +278,9 @@ describe('queued trigger resolution', () => {
       ],
     });
     const result = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: ref(4, 7),
+      annotation: ref(4, 7),
       page: toPageRef(4),
       source: { kind: 'link', annotation: ref(4, 7), page: toPageRef(4) },
     });
@@ -314,7 +317,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
   it('open runs page /O first, then the /PO set; close runs /PC before /C', async () => {
     const fixture = harness({ pages: fanPages, config: { openSequence: 'off' } });
     const open = await fixture.capability.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'open',
       page: toPageRef(5),
     });
@@ -326,14 +329,14 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
       'annotation',
     ]);
     fixture.seam.length = 0;
-    await fixture.capability.dispatch({ scope: 'page', event: 'close', page: toPageRef(5) });
+    await fixture.capability.dispatch({ type: 'page', event: 'close', page: toPageRef(5) });
     expect(fixture.seam).toEqual(['named:PC-11', 'named:pageC']);
   });
 
   it('visible/invisible fan only their sets; onExecuted fires per step with the true tree', async () => {
     const fixture = harness({ pages: fanPages, config: { openSequence: 'off' } });
-    await fixture.capability.dispatch({ scope: 'page', event: 'visible', page: toPageRef(5) });
-    await fixture.capability.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(5) });
+    await fixture.capability.dispatch({ type: 'page', event: 'visible', page: toPageRef(5) });
+    await fixture.capability.dispatch({ type: 'page', event: 'invisible', page: toPageRef(5) });
     expect(fixture.seam).toEqual(['named:PV-11', 'named:PI-11']);
     const emitted = fixture.events.map(
       (event) => (event.tree.root as { name?: string } | null)?.name,
@@ -356,7 +359,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
     });
     fixture.capability.registerExecutor('javascript', () => ({ status: 'failed', error: 'boom' }));
     const result = await fixture.capability.dispatch({
-      scope: 'page',
+      type: 'page',
       event: 'close',
       page: toPageRef(6),
     });
@@ -376,19 +379,19 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
         },
       ],
     });
-    await fixture.capability.dispatch({ scope: 'page', event: 'open', page: toPageRef(7) });
+    await fixture.capability.dispatch({ type: 'page', event: 'open', page: toPageRef(7) });
     // Batch-wide deferral would order `['named:PO', 'goto:2']`.
     expect(fixture.seam).toEqual(['goto:2', 'named:PO']);
   });
 
   const readsOfPage5 = (fixture: ReturnType<typeof harness>) =>
     fixture.listCalls.filter((pageObjectNumber) => pageObjectNumber === 5).length;
-  const visible5 = { scope: 'page', event: 'visible', page: toPageRef(5) } as const;
+  const visible5 = { type: 'page', event: 'visible', page: toPageRef(5) } as const;
 
   it('caches lifecycle trees per page; annotation events and desync invalidate', async () => {
     const fixture = harness({ pages: fanPages, config: { openSequence: 'off' } });
     await fixture.capability.dispatch(visible5);
-    await fixture.capability.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(5) });
+    await fixture.capability.dispatch({ type: 'page', event: 'invisible', page: toPageRef(5) });
     expect(readsOfPage5(fixture)).toBe(1); // cache hit
     fixture.documentEvent({ type: 'annotations.updated', page: toPageRef(5) });
     await fixture.capability.dispatch(visible5);
@@ -460,17 +463,17 @@ describe('/A precedence over /AA U (ISO Table 197)', () => {
       ],
     });
     const shadowed = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'mouseUp',
-      ref: ref(3, 1),
+      annotation: ref(3, 1),
       page: toPageRef(3),
     });
     expect(shadowed.status).toBe('inert');
     expect(shadowed.steps).toEqual([]);
     const bare = await fixture.capability.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'mouseUp',
-      ref: ref(3, 2),
+      annotation: ref(3, 2),
       page: toPageRef(3),
     });
     expect(bare.status).toBe('executed');
@@ -488,9 +491,9 @@ describe('trigger config gates', () => {
       pages: [{ pageObjectNumber: 1, actions: { open: tree(named('O')) } }],
     });
     for (const trigger of [
-      { scope: 'page', event: 'open', page: toPageRef(1) },
-      { scope: 'annotation', event: 'cursorEnter', ref: ref(1, 1), page: toPageRef(1) },
-      { scope: 'document', event: 'open' },
+      { type: 'page', event: 'open', page: toPageRef(1) },
+      { type: 'annotation', event: 'cursorEnter', annotation: ref(1, 1), page: toPageRef(1) },
+      { type: 'document', event: 'open' },
     ] as ActionTrigger[]) {
       const result = await fixture.capability.dispatch(trigger);
       expect(result.status).toBe('inert');
@@ -499,7 +502,11 @@ describe('trigger config gates', () => {
     }
     expect(fixture.seam).toEqual([]);
     expect(
-      fixture.capability.canDispatch({ scope: 'activate', ref: ref(1, 1), page: toPageRef(1) }),
+      fixture.capability.canDispatch({
+        type: 'activate',
+        annotation: ref(1, 1),
+        page: toPageRef(1),
+      }),
     ).toBe(true);
   });
 });
@@ -555,7 +562,11 @@ describe('the document-open barrier + lifecycle coordinator', () => {
         },
       ],
     });
-    await fixture.capability.dispatch({ scope: 'activate', ref: ref(2, 9), page: toPageRef(2) });
+    await fixture.capability.dispatch({
+      type: 'activate',
+      annotation: ref(2, 9),
+      page: toPageRef(2),
+    });
     await fixture.drain();
     expect(fixture.seam[0]).toBe('named:OpenAction');
     expect(fixture.seam).toContain('named:click');
@@ -594,7 +605,7 @@ describe('the document-open barrier + lifecycle coordinator', () => {
   it('a replayed document-open trigger reports open-sequence-replayed', async () => {
     const fixture = harness({ config: { openSequence: 'headless' }, docActions: {} });
     await fixture.drain();
-    const result = await fixture.capability.dispatch({ scope: 'document', event: 'open' });
+    const result = await fixture.capability.dispatch({ type: 'document', event: 'open' });
     expect(result.status).toBe('inert');
     expect(result.diagnostics[0]).toMatchObject({ code: 'open-sequence-replayed' });
   });

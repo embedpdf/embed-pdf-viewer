@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { timerClock, type PageImageHandle } from '@embedpdf/core';
 
-import { resolveRenderOptions, type TilesOptions } from '../src/paint-plan';
+import { resolveRenderOptions, type TilesSettings } from '../src/paint-plan';
 import { RasterStore } from '../src/raster-store';
 import { TileManager } from '../src/tile-manager';
 
@@ -17,7 +17,7 @@ import { TileManager } from '../src/tile-manager';
 const PAGE = { width: 612, height: 792 };
 
 function createHarness(options?: {
-  tiling?: TilesOptions;
+  tiling?: TilesSettings;
   storeBudget?: number;
   handleBytes?: number;
 }) {
@@ -31,7 +31,7 @@ function createHarness(options?: {
   let liveFetches = 0;
   let maxLiveFetches = 0;
 
-  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } });
+  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleedPx: 0, ...options?.tiling } });
   const tileManager = new TileManager({
     store,
     getOptions: () => resolved,

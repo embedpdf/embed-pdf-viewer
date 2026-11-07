@@ -1,10 +1,14 @@
 /**
  * The viewer's languages: every pack has exactly the English pack's keys, with the same `{name}`
- * slots in each string; the English pack names the style panel's properties and options as the
- * annotation kinds do; Arabic and Hebrew read right to left; Traditional Chinese isn't given
- * Simplified; and the app's `strings` change a language, or add one that reads the way its code
- * says.
+ * slots in each string, and each count's plural forms as its language has them; the English pack names the style panel's properties and options as the
+ * annotation kinds do; Arabic and Hebrew read right to left; readers of Traditional Chinese get
+ * the Traditional pack, never Simplified; and the app's `strings` change a language, or add one
+ * that reads the way its code says. The keys the Translations page names are the English pack's.
  */
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { KINDS, propertiesOf } from '@embedpdf/core-annotation';
@@ -14,6 +18,7 @@ import {
   LOCALE_LOADERS,
   directionOf,
   en,
+  fallbackCodeOf,
   localeCodeOf,
   localesOf,
 } from '../../../chrome/src/locales';
@@ -32,8 +37,47 @@ function stringsOf(dictionary: TranslationDictionary, prefix = ''): Map<string, 
 const slotsOf = (text: string): string[] =>
   [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]!).sort();
 
-/** The thirteen languages the Translations page lists. */
-const LANGUAGES = ['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja', 'zh-CN', 'ko', 'ar', 'he'];
+const PLURAL_FORMS = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
+
+/** Whether a branch is a count's plural forms: only plural form names, `other` among them. */
+const isPlural = (branch: TranslationDictionary): boolean =>
+  'other' in branch && Object.keys(branch).every((key) => PLURAL_FORMS.has(key));
+
+/** Every string of a dictionary by its dotted key, a count's plural forms as one entry. */
+function entriesOf(
+  dictionary: TranslationDictionary,
+  prefix = '',
+): Map<string, string | TranslationDictionary> {
+  const entries = new Map<string, string | TranslationDictionary>();
+  for (const [key, value] of Object.entries(dictionary)) {
+    if (typeof value === 'string' || isPlural(value)) entries.set(`${prefix}${key}`, value);
+    else for (const entry of entriesOf(value, `${prefix}${key}.`)) entries.set(...entry);
+  }
+  return entries;
+}
+
+/** The plural forms a language has, as `Intl.PluralRules` says: `one` and `other` in English. */
+const pluralFormsOf = (code: string): string[] =>
+  [...new Intl.PluralRules(code).resolvedOptions().pluralCategories].sort();
+
+/** The fifteen languages the Translations page lists. */
+const LANGUAGES = [
+  'en',
+  'de',
+  'fr',
+  'es',
+  'it',
+  'nl',
+  'pt',
+  'pl',
+  'sv',
+  'ja',
+  'zh-CN',
+  'zh-TW',
+  'ko',
+  'ar',
+  'he',
+];
 const RIGHT_TO_LEFT = ['ar', 'he'];
 
 const packs = async (): Promise<Locale[]> => [
@@ -42,7 +86,7 @@ const packs = async (): Promise<Locale[]> => [
 ];
 
 describe('the language packs', () => {
-  it('are the thirteen languages, English loaded from the start and each other one when shown', async () => {
+  it('are the fifteen languages, English loaded from the start and each other one when shown', async () => {
     expect(['en', ...Object.keys(LOCALE_LOADERS)].sort()).toEqual([...LANGUAGES].sort());
     const loaded = await packs();
     expect(loaded.map((pack) => pack.code).sort()).toEqual([...LANGUAGES].sort());
@@ -52,24 +96,73 @@ describe('the language packs', () => {
   });
 
   it('each have exactly the English keys, with the same slots in every string', async () => {
-    const english = stringsOf(en.translations);
+    const english = entriesOf(en.translations);
     for (const pack of await packs()) {
-      const strings = stringsOf(pack.translations);
-      expect({ code: pack.code, keys: [...strings.keys()].sort() }).toEqual({
-        code: pack.code,
+      const { code } = pack;
+      const entries = entriesOf(pack.translations);
+      expect({ code, keys: [...entries.keys()].sort() }).toEqual({
+        code,
         keys: [...english.keys()].sort(),
       });
-      for (const [key, text] of strings) {
-        expect({ code: pack.code, key, slots: slotsOf(text) }).toEqual({
-          code: pack.code,
+      for (const [key, value] of entries) {
+        const source = english.get(key)!;
+        const kind = (entry: string | TranslationDictionary) =>
+          typeof entry === 'string' ? 'a string' : 'plural forms';
+        expect({ code, key, kind: kind(value) }).toEqual({ code, key, kind: kind(source) });
+        if (typeof value === 'string' && typeof source === 'string') {
+          expect({ code, key, slots: slotsOf(value) }).toEqual({
+            code,
+            key,
+            slots: slotsOf(source),
+          });
+          expect({ code, key, empty: value.trim() === '' }).toEqual({ code, key, empty: false });
+        }
+      }
+    }
+  });
+
+  it("give each count the plural forms of their language, `other` with English's slots", async () => {
+    const english = entriesOf(en.translations);
+    const plurals = [...english].filter(
+      (entry): entry is [string, TranslationDictionary] => typeof entry[1] !== 'string',
+    );
+    expect(plurals.map(([key]) => key).sort()).toEqual([
+      'attachments.count',
+      'commands.redact.apply',
+      'comments.count',
+      'demo.redactConfirmBody',
+      'demo.redactConfirmCollateral',
+      'demo.redactConfirmTitle',
+      'demo.searchResults',
+      'stylePanel.selected',
+    ]);
+    for (const pack of await packs()) {
+      const { code } = pack;
+      const entries = entriesOf(pack.translations);
+      for (const [key, source] of plurals) {
+        const forms = entries.get(key) as Readonly<Record<string, string>>;
+        const slots = slotsOf(source['other'] as string);
+        expect({ code, key, forms: Object.keys(forms).sort() }).toEqual({
+          code,
           key,
-          slots: slotsOf(english.get(key)!),
+          forms: pluralFormsOf(code),
         });
-        expect({ code: pack.code, key, empty: text.trim() === '' }).toEqual({
-          code: pack.code,
-          key,
-          empty: false,
-        });
+        // `other` says the number; a form for one or two may say it in words instead.
+        expect({ code, key, other: slotsOf(forms['other']!) }).toEqual({ code, key, other: slots });
+        for (const [form, text] of Object.entries(forms)) {
+          expect({
+            code,
+            key,
+            form,
+            extra: slotsOf(text).filter((s) => !slots.includes(s)),
+          }).toEqual({ code, key, form, extra: [] });
+          expect({ code, key, form, empty: text.trim() === '' }).toEqual({
+            code,
+            key,
+            form,
+            empty: false,
+          });
+        }
       }
     }
   });
@@ -82,6 +175,24 @@ describe('the language packs', () => {
         direction: RIGHT_TO_LEFT.includes(pack.code) ? 'rtl' : 'ltr',
       });
     }
+  });
+});
+
+describe('the keys the Translations page names', () => {
+  it('are in the English pack', () => {
+    const page = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        '../../../../../docs/content/viewer/customize/translations.mdx',
+      ),
+      'utf8',
+    );
+    const english = stringsOf(en.translations);
+    const named = [...page.matchAll(/`((?:pageNumber|comments|annotation|form)\.[\w.]+)`/g)].map(
+      (match) => match[1]!,
+    );
+    expect(named).toEqual(expect.arrayContaining(['pageNumber.page', 'comments.empty']));
+    expect(named.filter((key) => !english.has(key))).toEqual([]);
   });
 });
 
@@ -142,15 +253,16 @@ describe('localesOf', () => {
 
   it('makes a language of its own from strings for any other code, reading as its code says', () => {
     const { locales, codes } = localesOf({
-      sv: { 'zoom:in': 'Zooma in', 'acme.send': 'Skicka' },
+      da: { 'zoom:in': 'Zoom ind', 'acme.send': 'Send' },
       fa: { 'zoom:in': 'بزرگ‌نمایی' },
     });
-    const swedish = locales.find((locale) => locale.code === 'sv')!;
-    expect(swedish.direction).toBe('ltr');
-    expect(swedish.translations).toEqual({ 'zoom:in': 'Zooma in', acme: { send: 'Skicka' } });
-    expect(swedish.name.toLowerCase()).toBe('svenska');
+    const danish = locales.find((locale) => locale.code === 'da')!;
+    expect(danish.direction).toBe('ltr');
+    expect(danish.translations).toEqual({ 'zoom:in': 'Zoom ind', acme: { send: 'Send' } });
+    expect(danish.name.toLowerCase()).toBe('dansk');
     expect(locales.find((locale) => locale.code === 'fa')!.direction).toBe('rtl');
-    expect(codes.slice(-2)).toEqual(['sv', 'fa']);
+    expect(codes.slice(-2)).toEqual(['da', 'fa']);
+    expect(localeCodeOf('da-GL', codes)).toBe('da');
     expect(localeCodeOf('sv-FI', codes)).toBe('sv');
     expect(localeCodeOf('ar-EG', codes)).toBe('ar');
     expect(localeCodeOf('zh-Hans', codes)).toBe('zh-CN');
@@ -158,18 +270,75 @@ describe('localesOf', () => {
     expect(localeCodeOf('tlh', codes)).toBe('en');
   });
 
-  it('shows English to readers of Traditional Chinese, until there is a pack in it', () => {
+  it('shows Traditional Chinese to its readers, and Simplified only to readers of Simplified', () => {
     const { codes } = localesOf();
-    expect(localeCodeOf('zh-TW', codes)).toBe('en');
-    expect(localeCodeOf('zh-HK', codes)).toBe('en');
-    expect(localeCodeOf('zh-Hant', codes)).toBe('en');
+    expect(localeCodeOf('zh-TW', codes)).toBe('zh-TW');
+    expect(localeCodeOf('zh-HK', codes)).toBe('zh-TW');
+    expect(localeCodeOf('zh-MO', codes)).toBe('zh-TW');
+    expect(localeCodeOf('zh-Hant', codes)).toBe('zh-TW');
     expect(localeCodeOf('zh', codes)).toBe('zh-CN');
     expect(localeCodeOf('zh-SG', codes)).toBe('zh-CN');
+    expect(localeCodeOf('zh-Hans-HK', codes)).toBe('zh-CN');
   });
 
   it('changes English in place', () => {
     const { locales } = localesOf({ en: { 'document:download': 'Save a copy' } });
     expect(stringsOf(locales[0]!.translations).get('document:download')).toBe('Save a copy');
     expect(stringsOf(locales[0]!.translations).get('commands.download')).toBe('Download');
+  });
+
+  it('loads words given as a function with their language, from a module or as they are', async () => {
+    let loads = 0;
+    const { locales, loaders, codes } = localesOf({
+      sv: () => {
+        loads++;
+        return Promise.resolve({ default: { 'acme.send': 'Skicka för signering' } });
+      },
+      da: () => Promise.resolve({ 'acme.send': 'Send til underskrift' }),
+      'zh-cn': { 'zoom:in': '放大' },
+      'zh-CN': () => Promise.resolve({ 'zoom:in': '放大一点' }),
+    });
+    expect(loads).toBe(0); // nothing loads before the language is needed
+    expect(locales.map((locale) => locale.code)).toEqual(['en']);
+    expect(codes.slice(-1)).toEqual(['da']);
+
+    const swedish = await loaders.sv!();
+    expect(loads).toBe(1);
+    expect(stringsOf(swedish.translations).get('acme.send')).toBe('Skicka för signering');
+    expect(stringsOf(swedish.translations).get('commands.undo')).toBe(
+      stringsOf((await LOCALE_LOADERS.sv!()).translations).get('commands.undo'),
+    );
+
+    const danish = await loaders.da!();
+    expect(danish).toMatchObject({ code: 'da', direction: 'ltr' });
+    expect(danish.name.toLowerCase()).toBe('dansk');
+    expect(danish.translations).toEqual({ acme: { send: 'Send til underskrift' } });
+
+    // Words and a function for one language merge in the order given.
+    const chinese = await loaders['zh-CN']!();
+    expect(stringsOf(chinese.translations).get('zoom:in')).toBe('放大一点');
+  });
+
+  it('keeps English in every build, and loads your English words given as a function', async () => {
+    const { locales, loaders } = localesOf({
+      en: () => Promise.resolve({ 'acme.send': 'Send for signature' }),
+    });
+    expect(locales[0]).toBe(en); // shows meanwhile
+    const english = await loaders.en!();
+    expect(stringsOf(english.translations).get('acme.send')).toBe('Send for signature');
+    expect(stringsOf(english.translations).get('commands.download')).toBe('Download');
+  });
+});
+
+describe('fallbackCodeOf', () => {
+  it('finds the fallback language among the languages, English without one, null for none', () => {
+    const { codes } = localesOf({ da: { 'zoom:in': 'Zoom ind' } });
+    expect(fallbackCodeOf(undefined, codes)).toBe('en');
+    expect(fallbackCodeOf('sv', codes)).toBe('sv');
+    expect(fallbackCodeOf('sv-SE', codes)).toBe('sv');
+    expect(fallbackCodeOf('DA', codes)).toBe('da');
+    expect(fallbackCodeOf('fi', codes)).toBeNull();
+    // A browser language the viewer has no language for shows the fallback language.
+    expect(localeCodeOf('fi', codes, 'sv')).toBe('sv');
   });
 });

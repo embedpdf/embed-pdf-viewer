@@ -14,6 +14,7 @@ import { IntegrationSwitcher } from './integration';
 
 import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
 import { docsProductFromPath } from '@/lib/docs-products';
+import { V2_ARCHIVE_ORIGIN } from '@/lib/v2-redirects';
 
 type TreeItem = {
   name: string;
@@ -103,6 +104,13 @@ export function DocsNav() {
       <nav className="mt-7 flex flex-col border-t border-[#EAEFF7] pt-6">
         <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
       </nav>
+      {/* The 2.x docs live on as a frozen site; this link is the whole version switcher. */}
+      <a
+        href={`${V2_ARCHIVE_ORIGIN}/docs`}
+        className="text-ep-soft hover:text-ep-navy mt-7 block border-t border-[#EAEFF7] px-3 pt-6 font-sans text-[13.5px] font-medium no-underline transition-colors"
+      >
+        Docs for EmbedPDF 2.x
+      </a>
     </>
   );
 }

@@ -42,7 +42,7 @@ describe('how each kind sets its text', () => {
 
   it('a form field fills in its font, size and colour; a kind without text has none', () => {
     const field = created({ subtype: 'widget', rect: BOX });
-    expect(textOf({ ...field, fieldFamily: 'text' } as typeof field)).toMatchObject({
+    expect(textOf({ ...field, fieldKind: 'text' } as typeof field)).toMatchObject({
       fontFamily: 'helvetica',
       fontSize: 0,
       fontColor: '#000000',

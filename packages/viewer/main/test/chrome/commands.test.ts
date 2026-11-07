@@ -19,18 +19,20 @@ import { commandsPlugin } from '@embedpdf/plugin-commands';
 import {
   CommandsToken,
   type CommandContext as PluginCommandContext,
-  type CommandDef as PluginCommandDef,
+  type CommandDefinition as PluginCommandDef,
   type ResolvedCommand,
 } from '@embedpdf/plugin-commands/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
 import { defaultCommands, toolCommandsFor } from '../../../chrome/src/config/commands';
+import { FULLSCREEN_COMMAND } from '../../../chrome/src/config/fullscreen';
 import { panelCommandsFor } from '../../../chrome/src/config/panels';
 import {
   mergeCommand,
   resolveViewerCommands,
   toPluginCommand,
+  type CommandDefinition as ViewerCommandDef,
   type CommandScope,
 } from '../../../chrome/src/config/viewer-commands';
 import type { PluginTokens, Viewer } from '../../../chrome/src/handle';
@@ -47,12 +49,13 @@ const StageToken = createCapabilityToken<{ zoomIn(): void }>('stage');
 const stage = { zoomIn: vi.fn() };
 const PLUGINS: PluginTokens = { stage: StageToken as CapabilityToken<unknown> };
 
-/** A command context over one capability, for the document `doc`. */
-function pluginContext(args?: unknown): PluginCommandContext {
+/** A command context over one capability, for the document `doc`, with the app's state. */
+function pluginContext(args?: unknown, appState?: unknown): PluginCommandContext {
   const tryGet = <T>(token: CapabilityToken<T>): T | null =>
     token === (StageToken as CapabilityToken<unknown>) ? (stage as T) : null;
   return {
     documentId: 'doc',
+    appState,
     ...(args === undefined ? {} : { args }),
     tryGet,
     get: <T>(token: CapabilityToken<T>): T => {
@@ -90,6 +93,42 @@ describe('a command of yours', () => {
     command.run?.(pluginContext({ page: 2 }));
     expect(stage.zoomIn).toHaveBeenCalledTimes(1);
     expect(heard).toEqual([{ viewer: true, documentId: 'doc', args: { page: 2 }, token: stage }]);
+  });
+
+  it('gives labelParams the same context, so a label reads a plugin by its name', () => {
+    const command = toPluginCommand(
+      {
+        id: 'acme:count',
+        label: 'Zoom {count} times',
+        labelParams: ({ get, documentId }) => ({
+          count: (get('stage') as unknown) === stage ? 3 : 0,
+          document: documentId ?? 'none',
+        }),
+      },
+      scope,
+    );
+    expect(command.labelParams?.(pluginContext())).toEqual({ count: 3, document: 'doc' });
+  });
+
+  it("gets your app's state, typed by the command, and runs what it gives", () => {
+    interface Review {
+      done: string[];
+      approve(): void;
+    }
+    const approve = vi.fn();
+    // A command typed for your state goes where any command does.
+    const typed: ViewerCommandDef<Review> = {
+      id: 'acme:approve',
+      enabled: ({ appState }) => appState.done.length === 4,
+      run: ({ appState }) => appState.approve(),
+    };
+    const anyCommand: ViewerCommandDef = typed;
+    const command = toPluginCommand(anyCommand, scope);
+    expect(command.enabled?.(pluginContext(undefined, { done: [], approve }))).toBe(false);
+    const review: Review = { done: ['a', 'b', 'c', 'd'], approve };
+    expect(command.enabled?.(pluginContext(undefined, review))).toBe(true);
+    command.run?.(pluginContext(undefined, review));
+    expect(approve).toHaveBeenCalledTimes(1);
   });
 
   it('throws for a plugin name the viewer has, naming the ones it has, and before the viewer is live', () => {
@@ -159,7 +198,8 @@ describe('a command with a built-in id', () => {
     const print = find(commands, 'document:print');
     expect(print.label).toBe('Print it');
     expect(print.labelKey).toBeUndefined();
-    expect(print.run).toBe(builtIn('document:print').run);
+    expect(print.modal).toBe(builtIn('document:print').modal);
+    expect(print.modal).toBeDefined();
     expect(find(commands, 'menu:document').menu).toBeUndefined();
     expect(
       mergeCommand({ id: 'x', panel: 'notes', icon: 'eye' }, { id: 'x', menu: 'more' }),
@@ -285,6 +325,7 @@ describe('the built-in commands', () => {
         'tool:stamp',
         'tool:redact',
         'redaction:apply',
+        'annotation:apply-redaction',
         'measurement:calibrate',
         'selection:copy',
         'selection:highlight',
@@ -294,14 +335,93 @@ describe('the built-in commands', () => {
         'panel:comments',
         'panel:stamps',
         'panel:redaction',
+        'page:rotate-clockwise',
+        'page:delete',
+        'page:duplicate',
+        'page:insert-blank',
+        'page:insert-file',
+        'page:extract',
+        'menu:page',
       ]),
     ).toEqual([]);
+  });
+
+  it('say which stage setting they change, so a lock on it greys them out', () => {
+    // A stage whose every setting is locked, by the setting's own name.
+    const lockedStage = { getLock: (setting: string) => ({ by: setting }) };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+    } as unknown as PluginCommandContext;
+    const holderOf = (id: string) =>
+      (defaultCommands.find((command) => command.id === id)?.locked?.(context) ?? null)?.by;
+    expect(
+      Object.fromEntries(
+        [
+          'view:single-page',
+          'view:two-pages',
+          'view:cover-page',
+          'view:scroll-vertical',
+          'view:scroll-horizontal',
+          'view:scroll-paged',
+          'view:rotate-clockwise',
+          'view:rotate-counterclockwise',
+        ].map((id) => [id, holderOf(id)]),
+      ),
+    ).toEqual({
+      'view:single-page': 'spread',
+      'view:two-pages': 'spread',
+      'view:cover-page': 'spread',
+      'view:scroll-vertical': 'flow',
+      'view:scroll-horizontal': 'flow',
+      'view:scroll-paged': 'flow',
+      'view:rotate-clockwise': 'viewRotation',
+      'view:rotate-counterclockwise': 'viewRotation',
+    });
+    // The zoom can't be locked: its commands say nothing of locks.
+    expect(defaultCommands.find((command) => command.id === 'zoom:in')?.locked).toBeUndefined();
+  });
+
+  it('pick how the pages come: down, across or one at a time', () => {
+    const settings = { flow: 'continuous', layout: 'vertical' } as Record<string, unknown>;
+    const locks: Record<string, { by: string }> = {};
+    const fakeStage = {
+      getSettings: () => settings,
+      updateSettings: (changes: Record<string, unknown>) => Object.assign(settings, changes),
+      getLock: (setting: string) => locks[setting] ?? null,
+    };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+    } as unknown as PluginCommandContext;
+    const command = (id: string) => defaultCommands.find((candidate) => candidate.id === id)!;
+    const active = () =>
+      ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'].filter((id) =>
+        command(id).active?.(context),
+      );
+
+    expect(active()).toEqual(['view:scroll-vertical']);
+    void command('view:scroll-paged').run?.(context);
+    // Paged flow leaves the layout alone, and down is no longer the choice.
+    expect(settings).toEqual({ flow: 'paged', layout: 'vertical' });
+    expect(active()).toEqual(['view:scroll-paged']);
+    void command('view:scroll-horizontal').run?.(context);
+    expect(settings).toEqual({ flow: 'continuous', layout: 'horizontal' });
+    expect(active()).toEqual(['view:scroll-horizontal']);
+
+    // Down and across change both settings, so a lock on either holds them.
+    locks.layout = { by: 'kiosk' };
+    expect(command('view:scroll-vertical').locked?.(context)?.by).toBe('kiosk');
+    expect(command('view:scroll-paged').locked?.(context)).toBeNull();
   });
 
   it('are every one the page lists, with the panels and modes the default layout brings', () => {
     const ids = new Set([
       ...defaultCommands.map((command) => command.id),
       ...panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).map((command) => command.id),
+      FULLSCREEN_COMMAND,
     ]);
     expect(documentedIds.length).toBeGreaterThan(80);
     expect(documentedIds.filter((id) => !ids.has(id))).toEqual([]);
@@ -354,8 +474,8 @@ describe('icons', () => {
   it('are every one the page lists, and every one a built-in command names', () => {
     const listed = COMMANDS_PAGE.split("### The viewer's icons")[1]!.split('\n### ')[0]!;
     const names = [...listed.matchAll(/`([a-zA-Z0-9]+)`/g)].map((match) => match[1]!);
-    expect(names.length).toBeGreaterThan(40);
     expect(names.filter((name) => !hasIcon(name))).toEqual([]);
+    expect([...names].sort()).toEqual(Object.keys(ICON_PATHS).sort());
     expect(
       defaultCommands.filter((command) => command.icon && !hasIcon(command.icon)).map((c) => c.id),
     ).toEqual([]);

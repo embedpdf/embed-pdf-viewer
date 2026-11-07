@@ -15,8 +15,18 @@ import './tabs.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -50,8 +60,8 @@ function Tabs() {
       <button
         type="button"
         className="button"
-        aria-label="Open another copy"
-        onClick={() => documents.open(ebook, { name: `Copy ${open.length + 1}` })}
+        aria-label="Open the floor plan"
+        onClick={() => documents.open(sketch, { name: 'Floor plan' })}
       >
         +
       </button>
@@ -99,8 +109,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Contract' },
-        { source: ebook, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Tabs />

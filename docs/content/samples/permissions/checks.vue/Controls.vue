@@ -25,7 +25,9 @@ watch(
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 10, count: 52 });
+    // [!doc-range welcome firstWord]
+    if (page) selection.select({ page, start: 28, count: 9 });
+    // [!/doc-range]
   },
   { immediate: true },
 );
@@ -36,7 +38,7 @@ async function copy() {
 }
 
 async function download() {
-  saveFile(await documents.download(), 'ebook.pdf');
+  saveFile(await documents.download(), 'welcome.pdf');
 }
 </script>
 

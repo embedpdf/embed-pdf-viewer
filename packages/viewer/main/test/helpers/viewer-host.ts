@@ -79,21 +79,50 @@ export async function launchChromium(): Promise<Browser> {
   }
 }
 
-/** Wait until the viewer shows the opened document: the chrome reports its page count. */
-export function waitForDocument(page: Page): Promise<unknown> {
-  return page.waitForFunction(
-    () =>
-      /Page 1 of \d+/.test(
-        document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? '',
-      ),
+/**
+ * Wait until the viewer shows the opened document: its pages are counted, where the page number
+ * reads them (a document of one page has no page number to show), and the chrome has drawn them.
+ */
+export async function waitForDocument(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const element = document.querySelector('embedpdf-viewer') as
+        | (Element & { viewer?: { get(name: 'stage'): { getPageCount(): number } } | null })
+        | null;
+      try {
+        return (element?.viewer?.get('stage').getPageCount() ?? 0) > 0;
+      } catch {
+        // While the document loads, the Stage isn't there to ask.
+        return false;
+      }
+    },
     null,
     { timeout: 60_000 },
   );
+  await frames(page);
 }
 
 /** Let the viewer render and run its effects: two frames. */
 export function frames(page: Page): Promise<unknown> {
   return page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+}
+
+/**
+ * Wait out a slide or a fade: the time one takes, then until none is still running in the viewer
+ * (a busy machine starts one late). Endless animations, a spinner's, don't count.
+ */
+export async function settle(page: Page): Promise<void> {
+  await page.waitForTimeout(350);
+  await page.waitForFunction(() =>
+    document
+      .querySelector('embedpdf-viewer')!
+      .shadowRoot!.getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getComputedTiming().endTime === Infinity,
+      ),
   );
 }

@@ -1,5 +1,5 @@
 import type {
-  FormFieldDTO,
+  FormField,
   FormFieldRef,
   FormSnapshot,
   PdfCoordinates,
@@ -32,7 +32,7 @@ export class FormReader {
     return readForm(this.runtime, this.session, signal, this.fonts);
   }
 
-  field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO<PdfCoordinates> {
+  field(ref: FormFieldRef, signal: AbortSignal): FormField<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const { fieldIndex } = resolveFieldRef(this.runtime, model, ref);

@@ -11,9 +11,9 @@ import './pass-through.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A search hit says where it is in page coordinates; the Stage takes them as they are.
@@ -34,7 +34,7 @@ function Hits() {
             <button
               type="button"
               className="hit"
-              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, anchor: { y: 0.35 } })}
+              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, align: { y: 0.35 } })}
             >
               <span className="where">page {hit.pageIndex + 1}</span>
               <code className="rect">
@@ -50,7 +50,7 @@ function Hits() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="layout">
           <Hits />

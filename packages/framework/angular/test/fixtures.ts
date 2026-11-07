@@ -70,7 +70,7 @@ export const counterPlugin = definePlugin({
   settings: { defaults: COUNTER_DEFAULTS },
   create: (ctx) => {
     const incremented = createEventHook<{ readonly count: number }>();
-    ctx.cleanup(() => incremented.dispose());
+    ctx.cleanup(() => incremented.destroy());
     return {
       api: {
         ...ctx.settings().api,
@@ -128,11 +128,12 @@ export const pageLayout = (pageObjectNumber: number, index: number): PageLayout 
 export const handleFor = (id: string, pageCount = 1) =>
   ({
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
       list: () =>
         Promise.resolve({
           pageCount,
+          labels: [],
           pages: Array.from({ length: pageCount }, (_, index) => pageLayout(index + 1, index)),
         }),
     },

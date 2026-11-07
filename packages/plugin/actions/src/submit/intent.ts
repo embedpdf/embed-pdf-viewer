@@ -13,11 +13,10 @@ import type { ActionSubmitRequest, SubmitIntent } from '../contract';
 export const intentOfPayload = (payload: SubmitFormPayload): SubmitIntent => ({
   url: payload.url,
   fields: payload.fields,
-  exclude: payload.flags.exclude,
-  includeNoValueFields: payload.flags.includeNoValueFields,
-  format: payload.flags.format,
-  method: payload.flags.method,
-  flagsRaw: payload.flags.raw,
+  exclude: payload.exclude,
+  includeNoValueFields: payload.includeNoValueFields,
+  format: payload.format,
+  method: payload.method,
   ...(payload.charSet === undefined ? {} : { charSet: payload.charSet }),
 });
 
@@ -30,7 +29,6 @@ export const toFormSubmissionRequest = (
     url: request.url,
     format: request.format,
     method: request.method,
-    flagsRaw: request.flagsRaw,
     ...(request.charSet === undefined ? {} : { charSet: request.charSet }),
   },
   origin: request.origin,
@@ -40,7 +38,7 @@ export const toFormSubmissionRequest = (
 /** Script `doc.submitForm(...)` → the one normalized intent. Script field
  *  names are include-mode by definition (Acrobat's aFields). */
 export const intentOfSubmitEffect = (
-  effect: Extract<ScriptUiEffect, { kind: 'submitForm' }>,
+  effect: Extract<ScriptUiEffect, { type: 'submitForm' }>,
 ): SubmitIntent => {
   const format = effect.format ?? 'fdf';
   return {
@@ -50,6 +48,5 @@ export const intentOfSubmitEffect = (
     includeNoValueFields: effect.includeEmpty,
     format,
     method: effect.method ?? 'post',
-    flagsRaw: 0,
   };
 };

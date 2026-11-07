@@ -17,7 +17,7 @@ import {
   useStageState,
   useStageToken,
 } from '../src/stage';
-import type { StageCapability, StageStateValue, StageTokenProp } from '../src/stage';
+import type { StageCapability, StageState, StageTokenProp } from '../src/stage';
 import type { FieldRefs } from '../src/runtime';
 import { bytesInput, probe, settle, until, viewerWith } from './counter-plugin';
 
@@ -55,8 +55,10 @@ const threePages = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 3, pages: [0, 1, 2].map(pageAt) }) },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
+      pages: {
+        list: () => Promise.resolve({ pageCount: 3, labels: [], pages: [0, 1, 2].map(pageAt) }),
+      },
       security: { allows: () => true, allowsAnnotation: () => true },
       close: () => Promise.resolve(),
     } as unknown as DocumentHandle),
@@ -88,7 +90,7 @@ describe('useStageState', () => {
   });
 
   it('gives a ref per field without a selector', async () => {
-    let fields: FieldRefs<StageStateValue> | null = null;
+    let fields: FieldRefs<StageState> | null = null;
     const Probe = probe(() => {
       fields = useStageState();
     });

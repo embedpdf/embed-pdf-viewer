@@ -25,7 +25,7 @@ function fakeSandboxFactory(options?: { dieOnRun?: number }) {
     let disposed = false;
     let runs = 0;
     return {
-      get disposed() {
+      get destroyed() {
         return disposed;
       },
       boot: (sources, input) => {
@@ -40,7 +40,7 @@ function fakeSandboxFactory(options?: { dieOnRun?: number }) {
         if (options?.dieOnRun === runs && id === 1) disposed = true; // resource fault
         return output();
       },
-      dispose: () => {
+      destroy: () => {
         disposed = true;
       },
     };
@@ -133,7 +133,7 @@ describe('createScriptHost', () => {
     const fake = fakeSandboxFactory();
     const host = makeHost(fake, []);
     await host.transaction((txn) => txn.run('a()', world()));
-    host.dispose();
+    host.destroy();
     await expect(host.transaction(async () => undefined)).rejects.toThrow(/disposed/);
   });
 });

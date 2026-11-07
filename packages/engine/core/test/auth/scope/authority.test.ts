@@ -5,7 +5,7 @@ import {
   authorizeAnnotationCreate,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
-  decodePdfBits,
+  permissionFlagsOf,
   PermissionDenied,
   type AnnotationAuthority,
   type Identity,
@@ -17,7 +17,7 @@ import type { AnnotationRef } from '../../../src/identity/AnnotationRef';
 const BOB: Identity = { userId: 'bob', displayName: 'Bob', groupId: '5' };
 const bob = (scope: string[]): AnnotationAuthority => ({
   identity: BOB,
-  grants: { scope, pdfBits: decodePdfBits(null) },
+  grants: { scope, permissionFlags: permissionFlagsOf(null) },
 });
 const SELF_ONLY = bob([
   'doc.annotate.modify',
@@ -83,6 +83,33 @@ describe('authorizeAnnotationUpdate', () => {
       userId: 'bob',
       displayName: 'Bob',
       groupId: 'legal',
+    });
+  });
+});
+
+describe('authorizeAnnotationCreate', () => {
+  it("puts a create without a group in the caller's own", () => {
+    expect(authorizeAnnotationCreate(SELF_ONLY, 'square', undefined)).toEqual({
+      userId: 'bob',
+      displayName: 'Bob',
+      groupId: '5',
+    });
+  });
+
+  it('refuses no group to a caller who has one, as an update refuses removing it', () => {
+    expect(() => authorizeAnnotationCreate(SELF_ONLY, 'square', null)).toThrow(
+      expect.objectContaining({ code: EngineErrorCode.InvalidArg }),
+    );
+  });
+
+  it('puts a create in no group for a caller without one', () => {
+    const alone: AnnotationAuthority = {
+      identity: { userId: 'ann', displayName: 'Ann' },
+      grants: { scope: ['doc.annotate.modify'], permissionFlags: permissionFlagsOf(null) },
+    };
+    expect(authorizeAnnotationCreate(alone, 'square', null)).toEqual({
+      userId: 'ann',
+      displayName: 'Ann',
     });
   });
 });

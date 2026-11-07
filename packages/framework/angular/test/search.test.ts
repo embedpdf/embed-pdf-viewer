@@ -189,7 +189,7 @@ describe('EpdfSearch', () => {
 
     search.updateSettings({ reveal: { behavior: 'instant' } });
     expect(search.settings()).toMatchObject({
-      reveal: { anchor: { y: 0.35 }, behavior: 'instant' },
+      reveal: { align: { y: 0.35 }, behavior: 'instant' },
     });
 
     await kernel.documents.open(bytesInput('doc'));

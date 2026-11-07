@@ -37,9 +37,10 @@ export function searchEngine(): Engine {
   let script = slices();
   const handle = {
     id: 'doc',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
-      list: () => Promise.resolve({ pageCount: 2, pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
+      list: () =>
+        Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
     },
     security: { allows: () => true },
     search: {

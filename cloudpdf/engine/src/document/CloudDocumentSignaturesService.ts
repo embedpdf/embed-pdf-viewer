@@ -26,6 +26,7 @@ import {
   decodePrepared,
   toBase64,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import { buildRoleMutationForm } from './buildMutationForm';
@@ -40,14 +41,14 @@ import type { HttpClient } from '../transport/HttpClient';
  *     by the manifest's `docVersion`, like every other layer read: a
  *     signature is a layer state change, the immutable URL moves with it.
  *   - Signed bytes (`contents`, `digest`, `revisionBytes`, and `analyze`
- *     of history) belong to a base version and are content-addressed by
- *     the manifest's `baseSha`: immutable forever, shared by every layer
- *     and every caller.
+ *     of history) belong to the layer's base version (the upload, or the
+ *     version its last signature made) and are content-addressed by the
+ *     manifest's `baseSha256` under the layer: immutable forever.
  *
  * Signing is the server's two-phase protocol over the same wire shapes
  * the local engine uses. `prepare` and `complete` change the manifest in
- * ways no delta carries (a publish moves `baseSha` itself), so both
- * refresh it before returning.
+ * ways no delta carries (a completion moves the layer's `baseSha256`
+ * itself), so both refresh it before returning.
  */
 export class CloudDocumentSignaturesService implements DocumentSignaturesService {
   constructor(
@@ -67,7 +68,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       this.http.getJsonWithRefresh(
         async (s) => {
           const manifest = await this.manifest.get(s);
-          return wirePaths.layerSignatures(this.docId, this.layerName, manifest.docVersion);
+          return wirePaths.layerSignatures(
+            this.docId,
+            this.layerName,
+            manifest.docVersion,
+            tokenPinOf('signatures', manifest.engine),
+          );
         },
         (raw) => SignatureSnapshotSchema.parse(raw),
         async (s) => {
@@ -85,7 +91,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       const manifest = await this.manifest.get(signal);
       const name = await this.fieldName(field, signal);
       return this.http.getBytes(
-        wirePaths.docVersionSignatureContents(this.docId, manifest.baseSha, name),
+        wirePaths.layerVersionSignatureContents(
+          this.docId,
+          this.layerName,
+          manifest.baseSha256,
+          name,
+        ),
         signal,
       );
     });
@@ -98,7 +109,13 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       const manifest = await this.manifest.get(signal);
       const name = await this.fieldName(field, signal);
       return this.http.getBytes(
-        wirePaths.docVersionSignatureDigest(this.docId, manifest.baseSha, name, algorithm),
+        wirePaths.layerVersionSignatureDigest(
+          this.docId,
+          this.layerName,
+          manifest.baseSha256,
+          name,
+          algorithm,
+        ),
         signal,
       );
     });
@@ -110,7 +127,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const manifest = await this.manifest.get(signal);
       return this.http.getBytes(
-        wirePaths.docVersionRevision(this.docId, manifest.baseSha, revisionIndex),
+        wirePaths.layerVersionRevision(
+          this.docId,
+          this.layerName,
+          manifest.baseSha256,
+          revisionIndex,
+        ),
         signal,
       );
     });
@@ -133,6 +155,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
             const current = await this.manifest.get(s);
             return wirePaths.layerSignaturesAnalysis(this.docId, this.layerName, {
               docVersion: current.docVersion,
+              pin: tokenPinOf('analysis', current.engine),
               since: input.since,
               ...(input.exploratoryLevel !== undefined
                 ? { exploratoryLevel: input.exploratoryLevel }
@@ -148,7 +171,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         );
       }
       return this.http.getJson(
-        wirePaths.docVersionAnalysis(this.docId, manifest.baseSha, {
+        wirePaths.layerVersionAnalysis(this.docId, this.layerName, manifest.baseSha256, {
           since: input.since,
           ...(typeof input.until === 'object' ? { until: input.until.revisionIndex } : {}),
           ...(input.exploratoryLevel !== undefined
@@ -219,8 +242,8 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
             sent,
           ),
         );
-        // A publish changes the whole manifest in substance (baseSha,
-        // baseByteLength, layerVersion, working, every promoted page pin, the
+        // A publish changes the whole manifest in substance (baseSha256,
+        // baseSizeBytes, layerVersion, working, every promoted page pin, the
         // plane pointers, the scopes): refresh on `completed` and on a
         // replay alike, then announce the new version.
         await this.manifest.refresh(signal);
@@ -264,7 +287,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     const snapshot = await this.http.getJsonWithRefresh(
       async (s) => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerSignatures(this.docId, this.layerName, manifest.docVersion);
+        return wirePaths.layerSignatures(
+          this.docId,
+          this.layerName,
+          manifest.docVersion,
+          tokenPinOf('signatures', manifest.engine),
+        );
       },
       (raw) => SignatureSnapshotSchema.parse(raw),
       async (s) => {

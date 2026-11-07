@@ -10,7 +10,7 @@ import './refused.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Read and select, but no downloading.
 const scope = ['doc.open', 'doc.render', 'doc.text.select'];
@@ -51,7 +51,7 @@ function DownloadAnyway() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} scope={scope} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} scope={scope} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <DownloadAnyway />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

@@ -16,6 +16,7 @@ import { useId } from 'react';
 import { SHORTCUTS_DIALOG } from '../config/commands';
 import { Dialog } from './dialog';
 import { Icon } from './icons';
+import { TooltipButton } from './tooltip';
 
 /** One row: a command's label and its keys. */
 export interface ShortcutRow {
@@ -39,14 +40,23 @@ const GROUPS: readonly { readonly titleKey: string; readonly areas: readonly str
   },
   {
     titleKey: 'shortcuts.editing',
-    areas: ['history', 'tool', 'selection', 'annotation', 'redaction', 'measurement'],
+    areas: [
+      'history',
+      'tool',
+      'selection',
+      'annotation',
+      'snapshot',
+      'redaction',
+      'measurement',
+      'outline',
+    ],
   },
 ];
 /** Every other command, yours among them. */
 const OTHER_GROUP = 'shortcuts.other';
 
 /** The areas whose commands act on what's selected: there whether or not anything is now. */
-const ON_A_SELECTION = new Set(['selection', 'annotation']);
+const ON_A_SELECTION = new Set(['selection', 'annotation', 'snapshot']);
 
 const areaOf = (commandId: string): string => commandId.split(':')[0] ?? commandId;
 
@@ -96,15 +106,13 @@ function ShortcutsList({ onClose }: { onClose: () => void }) {
           <h2 id={titleId} className="text-fg text-base font-semibold">
             {t('commands.shortcuts')}
           </h2>
-          <button
-            type="button"
+          <TooltipButton
+            label={t('panel.close')}
             onClick={onClose}
-            aria-label={t('panel.close')}
-            title={t('panel.close')}
             className="text-fg-muted hover:bg-hover hover:text-fg grid h-7 w-7 place-items-center rounded-md"
           >
             <Icon name="x" size={16} />
-          </button>
+          </TooltipButton>
         </div>
         {groups.map((group) => (
           <section key={group.titleKey} className="mt-4">

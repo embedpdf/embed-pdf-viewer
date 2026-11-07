@@ -119,9 +119,11 @@ async function boot(fixtures: PageFixture[], allow = ALL, config?: SelectionConf
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages: layout() }) },
+    pages: {
+      list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages: layout() }),
+    },
     security: { allows: (scope: string) => allow.has(scope) },
     page: (ref: { objectNumber: number }) => ({
       text: {
@@ -171,11 +173,14 @@ async function boot(fixtures: PageFixture[], allow = ALL, config?: SelectionConf
       emit({
         type: 'pages.deleted',
         pages: [toPageRef(pageObjectNumber)],
-        layout: { pageCount: pages.length, pages: layout() },
+        layout: { pageCount: pages.length, labels: [], pages: layout() },
       });
     },
     rotateAll: () =>
-      emit({ type: 'pages.rotated', layout: { pageCount: pages.length, pages: layout(90) } }),
+      emit({
+        type: 'pages.rotated',
+        layout: { pageCount: pages.length, labels: [], pages: layout(90) },
+      }),
   };
 }
 
@@ -519,7 +524,7 @@ describe('selection — settings', () => {
       end: { page: toPageRef(101), index: 3 },
     });
 
-    fixture.selection.updateSettings({ dragThreshold: 10 });
+    fixture.selection.updateSettings({ dragThresholdPx: 10 });
     pressAndDrag(interaction, 6); // within 10 px: a click, which clears
     expect(fixture.selection.hasSelection()).toBe(false);
     await fixture.kernel.destroy();
@@ -528,7 +533,7 @@ describe('selection — settings', () => {
   it('a color change keeps what it leaves out, fires once, and reset goes back to what was registered', async () => {
     const { kernel, selection } = await boot([pageA], ALL, { color: 'rgb(0 0 255 / 0.3)' });
     const changes: unknown[] = [];
-    selection.onSettingsChanged((event) => changes.push(event.changed));
+    selection.onSettingsChanged((event) => changes.push(event.changedKeys));
 
     selection.updateSettings({ handles: { color: '#e91e63' } });
     expect(selection.getSettings().handles).toEqual({
@@ -661,7 +666,7 @@ describe('selection — events', () => {
   });
 });
 
-const origin = { kind: 'local', sessionId: 's1', sub: null, ts: 1 };
+const origin = { kind: 'local', sessionId: 's1', subject: null, at: new Date(1).toISOString() };
 const applied = (pageObjectNumber: number, status = 'applied') => ({
   page: toPageRef(pageObjectNumber),
   status,

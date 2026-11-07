@@ -21,8 +21,8 @@ only through `ctx.doc`, and to other plugins only through their capabilities.
 | Engine     | `@embedpdf/engine-core` (the contract), `@embedpdf/engine` (local), `@cloudpdf/engine` (cloud) | Reads and writes PDF documents; publishes one confirmed event per mutation. |
 | Kernel     | `@embedpdf/core`                                                                               | Scopes, plugin lifetime, the store, capability resolution, mirrors.         |
 | Pure cores | `@embedpdf/core-*`                                                                             | One domain's logic, testable without a kernel, engine or DOM.               |
-| Plugins    | `@embedpdf/plugin-*`                                                                           | One capability each, built on the kernel.                                   |
-| Adapters   | `@embedpdf/react`, `@embedpdf/angular`, `@embedpdf/web`                                        | Render capabilities in one framework; read only through capabilities.       |
+| Plugins    | `@embedpdf/plugin-*`, `@cloudpdf/plugin-*`                                                     | One capability each, built on the kernel.                                   |
+| Adapters   | `@embedpdf/react`, `@embedpdf/angular`, `@embedpdf/web`, `@cloudpdf/web`                       | Render capabilities in one framework; read only through capabilities.       |
 | Viewer     | `@embedpdf/viewer`, `@embedpdf/viewer-*`                                                       | The finished viewer, built on the adapters.                                 |
 
 Where each package lives and what it is called: [`packages.md`](./packages.md).

@@ -209,8 +209,8 @@ shadow DOM entirely — this package's own React consumers see the fallback).
 Item ids must be unique across the layout (one `<slot name>` per shadow
 tree wins projection). The slotted element is told where it sits —
 `data-orientation`, `data-edge`, `data-variant`, `data-size` — and the
-viewer's own components (`<epdf-button>`, `<epdf-menu>`) inside it are drawn
-like its own.
+viewer's own components (`<epdf-button>`, `<epdf-menu>`, `<epdf-icon>`) inside
+it are drawn like its own.
 
 ### The frame — regions: arrangement, visibility, replacement
 
@@ -294,22 +294,25 @@ DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 theme={{
   preference: 'system',
   accent: '#7c3aed',                            // both modes
-  tokens: { surface: '#fdfcff', radius: '4px' }, // both modes
+  tokens: { radius: '4px' },                    // both modes
+  light: { surface: '#fdfcff' },                // light only
   dark: { accent: '#a78bfa' },                  // dark only
 }}
 ```
 
+`light` or `dark` wins in its mode, then `tokens`, then `accent`.
+
 The tokens are `THEME_TOKENS` (`ui/theme.tsx`): `accent`, `background`,
 `surface`, `surface-raised`, `text`, `text-muted`, `border`, `hover`,
-`canvas`, `radius` and `font`, each the CSS variable `--epdf-<name>`.
-`styles.css` declares them on the viewer's root with a default for each mode,
-and every other shade the chrome draws with is mixed from them in its
-`@theme inline` block, so the Tailwind classes (`bg-surface`, `text-fg`,
-`border-border-subtle`, `rounded-md`) follow them. `accent` is the same
-variable the pages read (the headless docs' "Colors & theming"), so it themes
-the pages and the chrome together. A variable the page sets on the element or
-around it wins over the config and the defaults: the sheet reads the page's
-value on the host first. The custom element adopts the config's tokens into
+`canvas`, `page-background`, `page-shadow`, `radius` and `font`, each the CSS
+variable `--epdf-<name>`. `styles.css` declares them on the viewer's root with
+a default for each mode, and every other shade the chrome draws with is mixed
+from them in its `@theme inline` block, so the Tailwind classes
+(`bg-surface`, `text-fg`, `border-border-subtle`, `rounded-md`) follow them.
+`accent` and the two page tokens are variables the pages read too (the
+headless docs' "Colors & theming"), so they theme the pages and the chrome
+together. A variable the page sets on the element or around it wins over the
+config and the defaults: the sheet reads the page's value on the host first. The custom element adopts the config's tokens into
 its shadow root (`themeTokenCss`); direct consumers of this package set the
 variables in their own CSS.
 
@@ -327,9 +330,10 @@ embedpdf-viewer::part(tab-active) {
 ```
 
 The part vocabulary is public API, grown by demand: `toolbar` (every bar,
-the floating ones' pill and the bars over a selection), `toolbar-button(-active)`,
-`mode-tab(-active)`, `tab(-active)`, `menu`, `menu-item(-active)`, `panel`
-and `panel-header`.
+the floating ones' pill and the bars over a selection) and `toolbar-<bar id>`,
+`toolbar-button(-active)`, `toolbar-button-primary`, `mode-tab(-active)`,
+`tab(-active)`, `menu`, `menu-item(-active)`, `panel`, `panel-header` and
+`tooltip`.
 
 ### Signatures — sign with a mark, through a key you bring
 

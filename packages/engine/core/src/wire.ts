@@ -21,8 +21,8 @@ export {
   LayerAnalysisQuerySchema,
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
-  DocumentVersionSchema,
-  DocumentVersionsSchema,
+  LayerVersionSchema,
+  LayerVersionsSchema,
   DigestAlgorithmSchema,
   ModificationLevelSchema,
   SignaturePreparedWireSchema,
@@ -39,6 +39,20 @@ export {
   CustomMetadataSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
+  OutlineMutationMetaSchema,
+  OutlineOrderSchema,
+  OutlinePositionSchema,
+  OutlineCreateResultSchema,
+  OutlineUpdateResultSchema,
+  OutlineMoveResultSchema,
+  OutlineDeleteResultSchema,
+  OutlineRestoreResultSchema,
+  OutlineWireComponents,
+  FontListSchema,
+  FontProgramInfoSchema,
+  FontResolveRequestSchema,
+  FontResolutionSchema,
+  FontWireComponents,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,
@@ -57,12 +71,16 @@ export {
   LayerScopesSchema,
   CacheDeltaSchema,
   MutationMetaSchema,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
+  ErrorResponseSchema,
   AnnotationListSchema,
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
   PageNetworkRenderFormatSchema,
   PageRenderQuerySchemas,
+  PagePrintQuerySchemas,
+  PageThumbnailQuerySchemas,
+  pagePictureQuerySchema,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
   AnnotationAppearanceBatchSchema,
@@ -76,6 +94,7 @@ export {
   AnnotationReorderBodySchema,
   AnnotationReorderResultSchema,
   DocumentWireComponents,
+  SignatureWireComponents,
   FormMutationMetaSchema,
   FormWireComponents,
   FormSetValueResultSchema,
@@ -107,7 +126,6 @@ export {
   PageLayoutSchema,
   PageBoxesSchema,
   PagePositionSchema,
-  PageReorderInputSchema,
   PageReorderResultSchema,
   AnnotationFlattenInputSchema,
   AnnotationFlattenResultSchema,
@@ -121,17 +139,16 @@ export {
   PageNameInputSchema,
   PageNameResultSchema,
   PageRemoveNameInputSchema,
-  PageRotateInputSchema,
   PageRotateResultSchema,
-  PageDeleteInputSchema,
   PageDeleteResultSchema,
-  PageInsertInputSchema,
-  PageInsertBlankInputSchema,
+  PageInsertBlankSpecSchema,
   PageExtractInputSchema,
   PageInsertResultSchema,
+  PageRestoreResultSchema,
   PageFlattenInputSchema,
   PageFlattenResultSchema,
   RedactionApplyScopeSchema,
+  RedactionApplyScopeInputSchema,
   RedactionApplyResultSchema,
   SearchQuerySchema,
   SearchRequestSchema,
@@ -139,6 +156,7 @@ export {
   SearchMatchSchema,
   SearchSliceSchema,
   IdentitySchema,
+  IdentityInputSchema,
 } from './wire/schemas';
 export {
   PdfActionTypeSchema,
@@ -199,9 +217,24 @@ export {
   ResourceKeySchema,
   SourceResourceKeysSchema,
 } from './wire/resourceKeys';
-// The four page pictures: what each draws, needs, depends on and pins.
-export { PAGE_RENDER_FAMILIES, pageRenderFamilyOf } from './wire/renderFamilies';
-export type { PageRenderFamily, PageRenderFamilySpec, PageRenderPin } from './wire/renderFamilies';
+// The page pictures, screen, thumbnail and print: what each draws, needs, depends on and pins.
+export {
+  PAGE_PICTURES,
+  PAGE_PRINT_FAMILIES,
+  PAGE_PRINT_TIERS,
+  PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
+  pagePictureOf,
+  pagePrintTierOf,
+  pageRenderFamilyOf,
+} from './wire/renderFamilies';
+export type {
+  PagePrintTier,
+  PagePrintTierSpec,
+  PageRenderFamily,
+  PageRenderFamilySpec,
+  PageRenderPin,
+} from './wire/renderFamilies';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).
 export { checkResourceAccess, DOC_RESOURCES } from './wire/resources';
@@ -263,6 +296,10 @@ export {
   encodeFormExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
+  encodeOutlineToken,
+  decodeOutlineToken,
+  encodeFontsToken,
+  decodeFontsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
@@ -275,7 +312,6 @@ export {
   decodeSearchToken,
   encodeTokenText,
   decodeTokenText,
-  SEARCH_RESULT_FORMAT,
   encodeAppearanceModes,
 } from './wire/tokens';
 export type { DownloadToken, SearchToken } from './wire/tokens';
@@ -315,8 +351,6 @@ export {
 export {
   AnnotationRefSchema,
   ColorSchema,
-  PointSchema,
-  RectSchema,
   LineEndingSchema,
   LineEndingsSchema,
   AnnotationBorderStyleSchema,
@@ -405,6 +439,7 @@ export {
 export { WidgetDTOSchema, WidgetPatchSchema } from './annotation/kinds/widget';
 export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
+  AttachmentFileBaseSchema,
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,
   AttachmentSchema,
@@ -415,6 +450,8 @@ export {
   AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
+  AttachmentRestoreResultSchema,
+  AttachmentWireComponents,
 } from './wire/schemas';
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {
@@ -422,17 +459,39 @@ export type {
   SignatureAppearanceBody,
   LayerAnalysisQuery,
   VersionAnalysisQuery,
-  DocumentVersion,
-  DocumentVersions,
+  LayerVersion,
+  LayerVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken, FormExportToken } from './wire/tokens';
+export {
+  CACHED_READ_KINDS,
+  EngineValuesSchema,
+  SHAPES,
+  tokenPinOf,
+  type CachedReadKind,
+  type EngineValues,
+  type TokenPin,
+} from './wire/cachedReads';
+export { API_VERSION, apiVersionOf, parseApiVersion, type ApiVersion } from './wire/apiVersion';
+export type {
+  AnnotationsExportToken,
+  FontsToken,
+  FormExportToken,
+  OutlineToken,
+} from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';
 
 export { PageScaleResultSchema } from './wire/schemas';
 export { PageRefSchema } from './identity/PageRef.schema';
+export { OutlineItemRefSchema } from './identity/OutlineItemRef.schema';
+export {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from './dto/DocumentOutline.schema';
 export {
   CHANGE_REQUEST_LIMITS,
   ChangeAnswerSchema,
@@ -444,3 +503,4 @@ export {
   ChangeResultSchema,
   ChangeWireComponents,
 } from './wire/changeSchemas';
+export { closed, readingOf, readsUnknownAs, withCatchAll, type SetReading } from './wire/reading';

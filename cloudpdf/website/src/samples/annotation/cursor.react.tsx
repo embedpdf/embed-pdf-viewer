@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // A pen, 24 × 24, in a color: its tip is the bottom-left corner.
 const penIcon = (color: string) =>
@@ -38,10 +38,10 @@ const penIcon = (color: string) =>
 
 // The pen cursor follows the pen's color.
 function InkCursor() {
-  const { color = '#000000' } = useAnnotationDefaults('ink');
+  const { color } = useAnnotationDefaults('ink');
   useToolCursor({
     toolId: 'ink',
-    cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } },
+    cursors: { crosshair: { svg: penIcon(color ?? '#000000'), hotspot: { x: 2, y: 22 } } },
   });
   return null;
 }
@@ -99,7 +99,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InkCursor />
         <Toolbar />

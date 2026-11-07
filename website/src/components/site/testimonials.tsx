@@ -1,69 +1,92 @@
-import { StarIcon } from '@hugeicons/core-free-icons';
+import { FavouriteIcon, StarIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { DotGrid } from './dot-grid';
 import { ArrowRightIcon } from './icons';
 import { COMMUNITY_LAUNCHED } from './launch';
 
 type Testimonial = {
-  step: string;
-  title: string;
-  date: string;
-  quote: string;
+  quote: ReactNode;
   name: string;
   role: string;
+  /** Portrait under /public/testimonials, cropped to a circle. */
+  photo: string;
   company: string;
-  companyHref: string;
-  avatar: string;
+  /** What the company builds, under its name on the timeline. */
+  field: string;
+  /** Square company mark, worn as a badge on the portrait. */
+  companyMark: string;
   accent: string;
-  badge: 'page' | 'node' | 'spark';
+  /**
+   * Set for sponsors only: their company name links to their site, and the
+   * timeline marks them as a sponsor.
+   */
+  sponsorHref?: string;
 };
+
+/** A highlight annotation, painted the way a PDF viewer puts one over text. */
+function Highlight({ children }: { children: ReactNode }) {
+  return (
+    <mark className="rounded-[3px] bg-[#FFE16A] px-[3px] text-inherit [box-decoration-break:clone] [mix-blend-mode:multiply]">
+      {children}
+    </mark>
+  );
+}
 
 const TESTIMONIALS: Testimonial[] = [
   {
-    step: '01',
-    title: 'Getting started',
-    date: 'March 2024',
-    quote:
-      'Integrating EmbedPDF took us less than a day. The docs are fantastic and the API is super easy to work with.',
-    name: 'Jason Miller',
-    role: 'Senior Frontend Engineer',
-    company: 'Acme Inc.',
-    companyHref: '#',
-    avatar: '/avatar-jason.png',
+    quote: (
+      <>
+        PDFs are the lifeblood of legal work. EmbedPDF is{' '}
+        <Highlight>what we have been searching&nbsp;for</Highlight> since we started our legal
+        software company. A library that excels at handling PDFs and their annotations in a way that
+        is performant, accessible, open and secure. That it is also free is icing on the cake.
+      </>
+    ),
+    name: 'Sam Davidoff',
+    role: 'CEO',
+    photo: '/testimonials/sam-davidoff.jpg',
+    company: 'Align',
+    field: 'Legal software',
+    companyMark: '/testimonials/align-mark.jpg',
     accent: '#0876FD',
-    badge: 'page',
+    sponsorHref: 'https://align.lawyer?utm_source=embedpdf&utm_campaign=oss',
   },
   {
-    step: '02',
-    title: 'Scaling with confidence',
-    date: 'May 2024',
-    quote:
-      'We scaled to millions of document views without worrying about performance. EmbedPDF just works.',
-    name: 'Sarah Chen',
-    role: 'Engineering Lead',
-    company: 'DataFlow',
-    companyHref: '#',
-    avatar: '/avatar-sarah.png',
-    accent: '#9747FF',
-    badge: 'node',
-  },
-  {
-    step: '03',
-    title: 'Building better products',
-    date: 'July 2024',
-    quote:
-      'Our users love the fast, native-like experience. EmbedPDF helps us deliver a premium product every time.',
-    name: 'David Ramirez',
-    role: 'CTO',
-    company: 'Papertrail',
-    companyHref: '#',
-    avatar: '/avatar-david.png',
+    quote: (
+      <>
+        I love the <Highlight>modular plugin architecture</Highlight>, the flexibility to integrate
+        and customize however we need has been invaluable. A great open-source product with an
+        amazing license and community of developers ready to help.
+      </>
+    ),
+    name: 'Anthony Stirling',
+    role: 'CTO & Founder',
+    photo: '/testimonials/anthony-stirling.webp',
+    company: 'Stirling PDF',
+    field: 'PDF tools',
+    companyMark: '/testimonials/stirling-pdf-mark.svg',
     accent: '#10B981',
-    badge: 'spark',
+  },
+  {
+    quote: (
+      <>
+        After fighting with PDF.js in the browser, we found EmbedPDF with its first-class Svelte
+        support. Within minutes we had something working, its extensible nature gave us the control
+        we needed to build citation highlighting on top.{' '}
+        <Highlight>Not&nbsp;a&nbsp;single regret</Highlight>.
+      </>
+    ),
+    name: 'Hamza Aitali',
+    role: 'Founder',
+    photo: '/testimonials/hamza-aitali.jpg',
+    company: 'Grella',
+    field: 'AI citations',
+    companyMark: '/testimonials/grella-mark.svg',
+    accent: '#9747FF',
   },
 ];
 
@@ -85,61 +108,33 @@ function BigQuoteMark({ color }: { color: string }) {
   );
 }
 
-function BadgeIcon({ kind, color }: { kind: Testimonial['badge']; color: string }) {
-  if (kind === 'page') {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <path d="M14 3v5h5" stroke={color} strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (kind === 'node') {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path
-          d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <circle cx="12" cy="12" r="2.5" fill={color} />
-      </svg>
-    );
-  }
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path
-        d="m12 3 2.2 6 6 2.2-6 2.2L12 19.4 9.8 13.4l-6-2.2 6-2.2L12 3Z"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function TimelineItem({ data }: { data: Testimonial }) {
   return (
     <div
       className="grid items-stretch gap-4 max-[600px]:grid-cols-[22px_1fr] max-[600px]:gap-3.5 min-[601px]:grid-cols-[180px_28px_1fr] max-[820px]:min-[601px]:grid-cols-[120px_24px_1fr]"
       style={{ '--accent': data.accent } as CSSProperties}
     >
-      <div className="flex flex-col pt-1.5 max-[600px]:col-start-2 max-[600px]:row-start-1 max-[600px]:-mb-2 max-[600px]:flex-row max-[600px]:items-baseline max-[600px]:gap-3 max-[600px]:pt-0">
-        <div className="font-display mb-[18px] text-[28px] font-bold leading-none tracking-[-0.01em] text-[var(--accent)] max-[820px]:mb-3 max-[820px]:text-[22px] max-[600px]:m-0 max-[600px]:text-xl">
-          {data.step}
+      <div className="flex flex-col items-start pt-1.5 max-[600px]:col-start-2 max-[600px]:row-start-1 max-[600px]:-mb-2 max-[600px]:flex-row max-[600px]:flex-wrap max-[600px]:items-baseline max-[600px]:gap-x-3 max-[600px]:gap-y-1 max-[600px]:pt-0">
+        <div className="font-display mb-3 text-[24px] font-bold leading-[1.1] tracking-[-0.01em] text-[var(--accent)] max-[820px]:text-[19px] max-[600px]:m-0 max-[600px]:text-xl">
+          {data.company}
         </div>
-        <div className="text-ep-navy mb-3.5 font-sans text-[15px] font-bold leading-[1.3] max-[600px]:m-0">
-          {data.title}
+        <div className="text-ep-navy font-sans text-[15px] font-bold leading-[1.3]">
+          {data.field}
         </div>
-        <div className="font-sans text-[13px] font-medium tracking-[0.01em] text-[#8590AA] max-[600px]:ml-auto">
-          {data.date}
-        </div>
+        {data.sponsorHref && (
+          <Link
+            href="/sponsors"
+            className="font-display text-ep-blue700 hover:border-ep-blue mt-3.5 inline-flex items-center gap-1.5 rounded-full border border-[#C7DEFF] bg-white py-1 pl-2 pr-2.5 text-xs font-bold transition-colors duration-200 max-[600px]:m-0 max-[600px]:ml-auto max-[600px]:self-center"
+          >
+            <HugeiconsIcon
+              icon={FavouriteIcon}
+              size={13}
+              strokeWidth={2.2}
+              className="text-[#E5484D]"
+            />
+            Sponsor
+          </Link>
+        )}
       </div>
 
       <div
@@ -149,7 +144,7 @@ function TimelineItem({ data }: { data: Testimonial }) {
         <div className="relative z-[2] mt-[30px] h-[18px] w-[18px] rounded-full border border-[#CFD8E8] bg-white after:absolute after:inset-[5px] after:rounded-full after:bg-[var(--accent)] after:content-['']" />
       </div>
 
-      <article className="group relative rounded-[20px] bg-white p-[28px_32px] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_1px_2px_rgba(14,26,64,0.04),0_12px_36px_-16px_rgba(14,26,64,0.10)] transition-all duration-[250ms] hover:-translate-y-0.5 hover:shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(14,26,64,0.06),0_22px_48px_-18px_rgba(14,26,64,0.16)] max-[820px]:p-[22px] max-[600px]:col-start-2 max-[600px]:row-start-2">
+      <figure className="group relative m-0 rounded-[20px] bg-white p-[28px_32px] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_1px_2px_rgba(14,26,64,0.04),0_12px_36px_-16px_rgba(14,26,64,0.10)] transition-all duration-[250ms] hover:-translate-y-0.5 hover:shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(14,26,64,0.06),0_22px_48px_-18px_rgba(14,26,64,0.16)] max-[820px]:p-[22px] max-[600px]:col-start-2 max-[600px]:row-start-2">
         <div
           aria-hidden
           className="absolute left-[-11px] top-6 z-0 h-[30px] w-3.5 bg-white [clip-path:polygon(100%_0,100%_100%,0_50%)] [filter:drop-shadow(-1px_0_0_rgba(14,26,64,0.04))]"
@@ -157,35 +152,49 @@ function TimelineItem({ data }: { data: Testimonial }) {
         <div className="relative z-[1] grid items-start gap-7 max-[820px]:gap-[18px] min-[601px]:grid-cols-[116px_1fr] max-[820px]:min-[601px]:grid-cols-[88px_1fr]">
           <div className="relative h-[116px] w-[116px] max-[820px]:h-[88px] max-[820px]:w-[88px] max-[600px]:h-[72px] max-[600px]:w-[72px]">
             <Image
-              src={data.avatar}
+              src={data.photo}
               alt={data.name}
               width={116}
               height={116}
-              className="block h-full w-full rounded-full bg-[#EEF2F8] object-cover"
+              className="block h-full w-full rounded-full bg-[#EEF2F8] object-cover object-[50%_20%]"
             />
-            <div
-              className="absolute bottom-0.5 right-0.5 inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border-[3px] border-white shadow-[0_4px_10px_rgba(14,26,64,0.15)] max-[820px]:h-7 max-[820px]:w-7 max-[600px]:h-6 max-[600px]:w-6 max-[600px]:border-2"
-              style={{ background: data.accent }}
-            >
-              <BadgeIcon kind={data.badge} color="#fff" />
+            <div className="absolute bottom-0.5 right-0.5 inline-flex h-[38px] w-[38px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white shadow-[0_4px_10px_rgba(14,26,64,0.15)] max-[820px]:h-8 max-[820px]:w-8 max-[600px]:h-7 max-[600px]:w-7 max-[600px]:border-2">
+              <Image
+                src={data.companyMark}
+                alt=""
+                width={32}
+                height={32}
+                className="block h-full w-full object-contain p-[3px]"
+              />
             </div>
           </div>
           <div className="flex min-w-0 flex-col gap-3.5">
             <BigQuoteMark color={data.accent} />
-            <p className="text-ep-ink m-0 max-w-[48ch] font-sans text-[17px] leading-[1.55] [text-wrap:pretty] max-[820px]:text-[15px]">
-              {data.quote}
-            </p>
-            <div className="mt-1 flex flex-col gap-1">
+            <blockquote className="m-0">
+              <p className="text-ep-ink m-0 max-w-[48ch] font-sans text-[17px] leading-[1.55] [text-wrap:pretty] max-[820px]:text-[15px]">
+                {data.quote}
+              </p>
+            </blockquote>
+            <figcaption className="mt-1 flex flex-col gap-1">
               <b className="text-ep-navy font-sans text-[15px] font-bold leading-[1.3]">
                 {data.name}
               </b>
               <span className="text-ep-subtle font-sans text-sm leading-[1.4]">
                 {data.role} at{' '}
-                <a href={data.companyHref} className="text-ep-blue font-semibold hover:underline">
-                  {data.company}
-                </a>
+                {data.sponsorHref ? (
+                  <a
+                    href={data.sponsorHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-ep-blue font-semibold hover:underline"
+                  >
+                    {data.company}
+                  </a>
+                ) : (
+                  <span className="text-ep-slate font-semibold">{data.company}</span>
+                )}
               </span>
-            </div>
+            </figcaption>
           </div>
         </div>
         <div
@@ -206,7 +215,7 @@ function TimelineItem({ data }: { data: Testimonial }) {
             />
           </svg>
         </div>
-      </article>
+      </figure>
     </div>
   );
 }
@@ -251,7 +260,7 @@ export function Testimonials() {
 
         <div className="relative mx-auto flex max-w-[980px] flex-col gap-9 before:absolute before:bottom-0 before:left-[calc(180px+16px+14px)] before:top-0 before:z-0 before:w-0.5 before:-translate-x-px before:bg-[#CFD8E8] before:content-[''] max-[820px]:before:left-[calc(120px+12px+12px)] max-[600px]:before:hidden">
           {TESTIMONIALS.map((t) => (
-            <TimelineItem key={t.step} data={t} />
+            <TimelineItem key={t.name} data={t} />
           ))}
         </div>
 

@@ -24,24 +24,47 @@ On a phone, the main toolbar now sits at the bottom, under the thumb. The functi
 whenever the size changes, so turning the phone or resizing the window switches layouts as it
 happens.
 
+Here the viewer sits in a box as wide as a phone, with that layout function, so it has a phone's
+layout on any screen:
+
+<Example name="viewer/customize/small-screens/phone" size="tall" />
+
+> **Try it:** open the search from the bar at the bottom: it slides up as a sheet. Search for
+> "PDF" and pick a match: the sheet closes on its page. The mode tabs that don't fit are behind the
+> chevron next to **View**.
+
 ## The three sizes
 
 | `env.size` | The viewer's width | What the default does |
 | :-- | :-- | :-- |
-| `'compact'` | Under 600 px | Panels and menus are sheets from the bottom. The mode tabs after the first fold behind a chevron, which is marked while the open mode is one of them. The page number hides while you scroll. |
+| `'compact'` | Under 600 px | Panels and menus are sheets from the bottom. The mode tabs after the first fold behind a chevron, which is marked while the open mode is one of them. |
 | `'medium'` | 600 to 1023 px | Panels open over the pages instead of pushing them aside. |
 | `'expanded'` | 1024 px and wider | Panels dock beside the pages. |
 
 At every size, a toolbar keeps what fits and moves the rest into its "More" menu, least important
 first (see [Layout](layout#when-theres-no-room)).
 
+## One size at every width
+
+The viewer picks its size from its width. `size` picks one for every width instead, as for a kiosk
+on a big screen that should work like a phone:
+
+```js
+{
+  size: 'compact',
+}
+```
+
+`'auto'` (the default) measures. With a size set, `env.size` is that size, and `env.width` is still
+the viewer's own width. It's read once, when the viewer starts.
+
 ## What `env` tells you
 
 | Field | What it is |
 | :-- | :-- |
-| `size` | `'compact'`, `'medium'` or `'expanded'` |
+| `size` | `'compact'`, `'medium'` or `'expanded'`: from the viewer's width, or the [`size`](#one-size-at-every-width) you set |
 | `width` | The viewer's width in px, for a size of your own: `env.width < 480` |
-| `touch` | Whether the main way of pointing is a finger |
+| `touch` | Whether the main way of pointing is a finger, or the [`touch`](#touch) you set |
 | `dir` | `'ltr'` or `'rtl'`, from the user's language |
 
 ## Sheets
@@ -56,13 +79,27 @@ pages, with a handle at the top.
 
 To make a panel a sheet at other sizes too, or never, set its `present`. With
 `layout.panels({ present: { compact: 'overlay' } })` no panel is a sheet on a phone: each one
-opens over the pages instead. See [Panels](panels#how-a-panel-opens).
+opens over the pages instead. See [Panels](panels#how-a-panel-opens). On a wider viewer, a sheet
+is as wide as its panel, centered.
 
 ## Touch
 
-When `env.touch` is true, every button and menu row is at least 44 px tall, and the viewer listens
-for touch gestures: pinch to zoom, a long press to select a word, the handles to stretch the
-selection.
+When `env.touch` is true, every button and menu row is at least 44 px tall, the size a fingertip
+hits, the rows of a panel show their menu button without a hover, and the viewer's own fields
+write in 16 px text.
+It's true when the main way of pointing is a finger. `touch` sets it instead: `true` for every
+pointer, as on a touchscreen kiosk with a mouse plugged in, and `false` for none:
+
+```js
+{
+  touch: true,
+}
+```
+
+`'auto'` (the default) asks the browser. It's read once, when the viewer starts.
+
+Touch gestures work wherever a finger touches the pages, whatever `touch` says: pinch to zoom, a
+long press to select a word, the handles to stretch the selection.
 
 ## The notch and the home bar
 

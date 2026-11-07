@@ -1,0 +1,43 @@
+---
+title: A reader
+description: A calm viewer for long reads, with the pages as an open book on paper, one small floating pill, a night mode, and nothing that changes the document.
+---
+
+# A reader
+
+For people who read long documents and want nothing else on screen. There's no toolbar: the pages
+open as a two-page spread lying on warm paper, a small pill floating below them holds every
+control, and the viewer writes its own words in a serif. Nothing can change the document, while
+search and copying still work.
+
+<Example name="viewer/examples/reader" size="page" />
+
+> **Try it:** open **Pages** from the pill, select a sentence of "Where the time went" to copy it,
+> find "index", then press the moon at the end of the pill for night: it stays pressed until you
+> press it again.
+
+## What it uses
+
+- [A whole layout](../customize/layout#your-whole-layout): one floating bar, Copy over selected
+  text, and no tabs.
+- [A floating bar](../customize/layout#a-floating-toolbar) with the page buttons, the
+  [page number and the zoom field](../customize/layout#every-built-in-id), and groups that
+  [make room](../customize/layout#when-theres-no-room) by importance. The page number reads a
+  spread as "1–2 / 2" by itself. `hideWhenIdle: false` keeps the bar on screen, where a bar with
+  the page number would [rest out of sight while nothing moves](../customize/layout#out-of-the-way-while-reading).
+- [The zoom menu](../customize/menus#change-a-built-in-menu), with the rows a reader needs.
+- [The built-in panels](../customize/panels#how-a-panel-opens) with their own titles and icons:
+  the thumbnails as a sheet [as wide as a column of text](../customize/panels#width), the outline
+  and search over the pages.
+- [Icons of its own](../customize/commands#icons) for Contents, Pages and night.
+- [The viewer's own button](../customize/components#look-like-the-viewer) in the bar, which
+  switches night on and off and shows pressed with `active` while it's on.
+- [The theme's tokens](../customize/theming#every-color): the paper colors in `light`, the night
+  ones in `dark`, and the corners and a serif `font` in `tokens` for both. Each mode has its own
+  `page-shadow`, so the pages lie on the paper like a book.
+- [Read-only](../features/turning-off#read-only), which keeps search and copying.
+- [The Stage's settings](../code/plugins#settings): two facing pages, one spread at a time, as
+  [Scroll, zoom & layout](/docs/headless/viewing/stage#layouts) describes, with
+  [padding by side](/docs/headless/viewing/stage#space-around-pages) that leaves room for the pill
+  under the spread, and [a rule](/docs/headless/viewing/stage#adapt-to-the-space-you-have) for
+  one page when the viewer is taller than it is wide.

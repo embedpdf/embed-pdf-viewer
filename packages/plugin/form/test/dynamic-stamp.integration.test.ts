@@ -30,9 +30,11 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       name: 'proposal.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
-      revision: 0,
+      pagesSequence: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
+      pageLabels: [],
+      pendingPages: new Map(),
     });
     const realm = standaloneRealm(doc, document, {
       identity: {

@@ -15,7 +15,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     display: string;
     wrapper: AnyRecord;
   };
-  type AnnotRecord = {
+  type AnnotationRecord = {
     input: AnyRecord;
     /** Writable-key snapshots: original vs current — effects are the diff. */
     original: AnyRecord;
@@ -27,8 +27,8 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     fields: FieldRecord[];
     fieldsByName: Map<string, FieldRecord>;
     fieldsByRef: Map<string, FieldRecord>;
-    annots: AnnotRecord[];
-    annotsByPage: Map<number, AnnotRecord[]>;
+    annots: AnnotationRecord[];
+    annotsByPage: Map<number, AnnotationRecord[]>;
     annotPages: Set<number>;
     annotsCoverDocument: boolean;
     event: AnyRecord;
@@ -100,7 +100,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     const wrapper: AnyRecord = {};
     Object.defineProperties(wrapper, {
       name: { enumerable: true, get: () => input.name },
-      type: { enumerable: true, get: () => input.family },
+      type: { enumerable: true, get: () => input.kind },
       value: {
         enumerable: true,
         get: () => cloneValue(record.value),
@@ -137,7 +137,9 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       },
       source: { enumerable: false, get: () => doc },
     });
-    wrapper.setFocus = () => diagnostic('unsupported-api', 'Field.setFocus is not supported in v1');
+    wrapper.setFocus = () => {
+      state?.uiEffects.push({ type: 'focusField', field: String(input.name) });
+    };
     return wrapper;
   };
 
@@ -215,7 +217,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
   };
   const cloneAnnotValue = (value: unknown): unknown => (Array.isArray(value) ? [...value] : value);
 
-  const makeAnnot = (record: AnnotRecord): AnyRecord => {
+  const makeAnnot = (record: AnnotationRecord): AnyRecord => {
     const input = record.input;
     const subtype = String(input.subtype);
     const writable = ANNOT_WRITABLE[subtype] ?? [];
@@ -336,8 +338,8 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       enumerable: true,
       get: () => Number((state?.input.document as AnyRecord | undefined)?.pageNumber ?? 0),
       set: (value: unknown) => {
-        const page = Math.trunc(Number(value));
-        if (Number.isFinite(page)) state?.uiEffects.push({ kind: 'gotoPage', page });
+        const pageIndex = Math.trunc(Number(value));
+        if (Number.isFinite(pageIndex)) state?.uiEffects.push({ type: 'goToPage', pageIndex });
       },
     },
   });
@@ -361,7 +363,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       }
     }
   };
-  doc.print = () => state?.uiEffects.push({ kind: 'print' });
+  doc.print = () => state?.uiEffects.push({ type: 'print' });
   // Acrobat's doc.submitForm: positional (cURL, bFDF, bEmpty, aFields) or a
   // single argument object ({cURL, aFields, bEmpty, cSubmitAs, bGet}). It
   // emits a submit intent — resolution (Table 239/240 semantics) and the
@@ -391,7 +393,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
                 ? 'html'
                 : undefined;
     state.uiEffects.push({
-      kind: 'submitForm',
+      type: 'submitForm',
       url: args.cURL === undefined || args.cURL === null ? null : String(args.cURL),
       fieldNames: names,
       includeEmpty: Boolean(args.bEmpty),
@@ -416,7 +418,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     formsVersion: 21,
     alert: (message: unknown, icon?: unknown, _type?: unknown, title?: unknown): number => {
       state?.uiEffects.push({
-        kind: 'alert',
+        type: 'alert',
         message: String(message),
         icon: Number.isFinite(Number(icon)) ? Number(icon) : 0,
         ...(title === undefined ? {} : { title: String(title) }),
@@ -538,7 +540,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     });
     const fieldsByName = new Map(fields.map((field) => [String(field.input.name), field]));
     const fieldsByRef = new Map(fields.map((field) => [refKey(field.input.ref), field]));
-    const annots: AnnotRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
+    const annots: AnnotationRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
       (annotation) => {
         const writableSnapshot = (): AnyRecord => ({
           strokeColor: cloneAnnotValue(annotation.strokeColor ?? ['T']),
@@ -556,7 +558,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
           noView: Boolean(annotation.noView),
           toggleNoView: Boolean(annotation.toggleNoView),
         });
-        const record: AnnotRecord = {
+        const record: AnnotationRecord = {
           input: annotation,
           original: writableSnapshot(),
           current: writableSnapshot(),
@@ -566,7 +568,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
         return record;
       },
     );
-    const annotsByPage = new Map<number, AnnotRecord[]>();
+    const annotsByPage = new Map<number, AnnotationRecord[]>();
     for (const record of annots) {
       const page = Number(record.input.page ?? 0);
       const bucket = annotsByPage.get(page);
@@ -633,21 +635,21 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
   };
 
   const formValue = (field: FieldRecord, value: unknown): AnyRecord | null => {
-    const family = String(field.input.family);
-    if (family === 'text') return { value: String(value ?? '') };
-    if (family === 'checkbox' || family === 'radio') {
+    const kind = String(field.input.kind);
+    if (kind === 'text') return { value: String(value ?? '') };
+    if (kind === 'checkbox' || kind === 'radio') {
       // A toggle's script value is its export value, 'Off' when clear.
       return {
         value:
           value === null || value === undefined || String(value) === 'Off' ? null : String(value),
       };
     }
-    if (family === 'combobox') {
+    if (kind === 'combobox') {
       const selected = Array.isArray(value) ? value[0] : value;
       const text = selected === null || selected === undefined ? '' : String(selected);
       return { value: text === '' ? null : text };
     }
-    if (family === 'listbox') {
+    if (kind === 'listbox') {
       if (Array.isArray(value)) return { selectedValues: value.map(String) };
       return {
         selectedValues:
@@ -942,7 +944,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
 
   const rejectWithAlert = (message: string): void => {
     if (!state) return;
-    state.uiEffects.push({ kind: 'alert', message, icon: 0 });
+    state.uiEffects.push({ type: 'alert', message, icon: 0 });
     state.event.rc = false;
   };
   const formatMismatch = (): void =>
@@ -1180,12 +1182,12 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     if (!state) return;
     const raw = String(state.event.value ?? '');
     if (raw.trim() === '') return;
-    let date: Date = new FixedDate(raw);
-    if (Number.isNaN(date.getTime())) {
-      const parts = parseDateLoose(raw, format);
-      if (!parts) return; // unparsable: leave the value untouched
-      date = wallDate(parts);
-    }
+    // The field's own format first, as Acrobat reads it: '12/02/2027' under dd/mm/yyyy is
+    // 12 February. JavaScript's own parse reads it month first, so it only reads what the
+    // format can't, such as an ISO date.
+    const parts = parseDateLoose(raw, format);
+    const date = parts ? wallDate(parts) : new FixedDate(raw);
+    if (Number.isNaN(date.getTime())) return; // unparsable: leave the value untouched
     state.event.value = printd(format, date);
   };
   host.AFDate_FormatEx = afDateFormatEx;

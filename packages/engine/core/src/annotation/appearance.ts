@@ -44,7 +44,7 @@ export type AppearanceChange =
 /**
  * The kinds a write gives no appearance of the engine's: a link, which the
  * engine writes with no border to draw, and a form widget, which its form
- * field draws (one on its own has nothing to draw). A write leaves whether
+ * field's family draws as the field adopts it. A write leaves whether
  * the file holds one as it was, and a new one has none. Every other kind's
  * create bakes one, and so does every change to it that is visible and not a
  * pure move.
@@ -123,7 +123,7 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'file',
   // The field a widget belongs to, as the form reads it.
   'field',
-  'fieldFamily',
+  'fieldKind',
 ]);
 
 /**

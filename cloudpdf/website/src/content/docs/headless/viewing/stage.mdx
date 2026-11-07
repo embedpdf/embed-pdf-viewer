@@ -69,6 +69,35 @@ stage.zoomTo({ pageWidth: 200 }); // every page 200 pixels wide, for thumbnails
 stage.zoomBy(1.25, { around: { x: 400, y: 300 } }); // 25% closer, around a point in the Stage
 ```
 
+`zoomIn()` and `zoomOut()` step through round levels: 100%, 125%, 150%, 200%, 300% and so on. From a
+level in between, such as a fit, they go to the next one.
+
+To keep the zoom in a range, set `minZoom` and `maxZoom`. Nothing zooms past them: not the buttons,
+a pinch, `zoomTo()` or a fit mode, which stops at the limit.
+
+```ts
+stagePlugin({ minZoom: 0.5, maxZoom: 4 }); // from 50% to 400%
+```
+
+At a limit, `canZoomIn()` or `canZoomOut()` is `false`, for disabling your buttons.
+
+## Zoom to a box
+
+The built-in `zoom` tool zooms to what you point at, like Acrobat's Marquee Zoom. Switch to it like
+any [tool](../ui/tools), with `activateTool('zoom')`:
+
+- **Drag a box**, on one page or across several, and the view zooms straight into it: the box grows
+  until it fills the view, with its middle in the middle. Near the edge of the document the view
+  stays inside it, as on every jump.
+- **Click** to zoom in one step around that point, and **Alt-click** (Option-click on a Mac) to zoom
+  out.
+- On a touch screen, **one finger draws the box**, and two fingers still pinch and scroll.
+
+The tool stays active until you switch to another one. While you drag, the Stage draws the box,
+dashed, in the accent color: change its colors with the `zoomBox` [setting](#settings), or with
+`--epdf-zoom-box-fill` and `--epdf-zoom-box-stroke` [from CSS](../ui/theming). The zoom glides with
+the [`scrollBehavior`](#settings) setting, and jumps when it's `'instant'`.
+
 ## Move through pages
 
 <Snippet name="viewing/page-navigation" />
@@ -87,8 +116,9 @@ stage.goToLastPage();
 
 - **A page is its `ref` or its index.** Every call that takes a page takes either. An index counts
   from 0, so page "1" in your UI is `goToPage(0)`, and an index past the end goes to the last page.
-- **`nextPage()` and `previousPage()` follow spreads.** When two facing pages fit, they move a whole
-  spread; zoomed in, one page.
+- **`nextPage()` and `previousPage()` step past the pages you're on.** While a spread fits across
+  the view, its two pages side by side however tall they are, they move a whole spread; zoomed in
+  past it, one page. `listCurrentPages()` gives those pages, for your page number.
 - **`reveal()` scrolls only as far as needed.** It makes a page visible and does nothing if it
   already is. Use it for a thumbnail strip that follows along without jumping.
 - **You can navigate as soon as the document opens.** A call made before the Stage is on screen
@@ -125,16 +155,41 @@ stagePlugin({ layout: 'grid', columns: 'auto', zoom: { pageWidth: 150 } });
 `columns` applies to the grid: `'auto'` wraps to fit, `'square'` aims for a square grid, and a
 number fixes the count.
 
+## One page at a time
+
+With `flow: 'paged'`, the Stage shows one page, or one spread, and pushing past its edge turns it,
+the way a reader expects from a wheel, a trackpad and a finger:
+
+- **Scroll or swipe past the bottom** and the next page comes, at its top. Past the top, the
+  previous page comes, at its bottom.
+- **Swipe sideways past the edge** to turn it, as in an e-reader. A right-to-left document turns
+  the other way.
+- **It stops at the edge first.** Scrolling down a tall page stops at its bottom, and the next push
+  turns it. A page that fits on screen turns at the first push.
+- **One gesture, one page.** A hard flick turns one page, and its momentum doesn't scroll the page
+  that arrives.
+- **`layout` has no effect.** There is only one page or spread on screen.
+
+Buttons, keys and links turn pages with `nextPage()` and `previousPage()`. To leave turning to them,
+as in a presentation where only the presenter moves on, set `turnGestures` to `false`:
+
+```ts
+stagePlugin({ flow: 'paged', turnGestures: false });
+```
+
 ## Space around pages
 
 - **`padding`** is the space between the pages and the edge of the Stage, in screen pixels. Fit
   modes respect it, so "fit page" never touches the edges. It's `24`, or `4` on narrow screens.
+  A number is every side; `{ top, right, bottom, left }` gives each side its own, the ones you
+  leave out `0`, such as room at the bottom for a toolbar floating over the pages.
 - **`gap`** is the space between pages. A number (`16`, the default) grows with the zoom, like the
   space between sheets of paper. `{ px: 16 }` stays 16 screen pixels at every zoom, which suits a
   thumbnail strip.
 
 ```ts
 stagePlugin({ padding: 32, gap: { px: 12 } });
+stagePlugin({ padding: { top: 24, right: 24, bottom: 72, left: 24 } });
 ```
 
 <Example name="stage/spacing" />
@@ -177,6 +232,41 @@ own chrome:
 
 <Snippet name="viewing/compact-layout" />
 
+## Lock a setting
+
+Sometimes a setting has to stay as it is for one document, whatever the user or a rule asks: a
+plugin that shows one page at a time, or your app's kiosk view. Lock it:
+
+```ts
+const unlock = stage.lockSettings({
+  settings: { flow: 'paged', spread: 'none' },
+  by: 'kiosk',
+  reasonKey: 'kiosk.onePageAtATime',
+});
+// …and when it no longer has to hold:
+unlock();
+```
+
+- **A lock wins over everything.** `updateSettings()`, a responsive rule, a restored view state and
+  `resetSettings()` still change the settings underneath, but the locked ones keep the lock's value
+  until you call the function `lockSettings()` returns. Then they're what they'd be without it, the
+  user's own choice included.
+- **Its controls show it.** The viewer's commands that change a locked setting show disabled, with
+  the current value still checked and the sentence under `reasonKey` as their tooltip. See
+  [Commands and locked settings](../ui/commands#commands-and-locked-settings).
+- **One document at a time.** Each document's Stage has its own settings, so a lock holds only in
+  the document whose Stage you locked. It lasts until that document closes: call the function only
+  to let go while it stays open.
+- **A saved view keeps what's underneath.** `getViewState()` saves the locked settings as they'd be
+  without the lock, so restoring a view never makes a lock's value the user's.
+- **Two locks agree or fail.** A second lock on a setting with the same value holds too, and the
+  setting stays locked until both let go. One with a different value is refused, naming who holds
+  the setting.
+- **Every setting but `zoom`.** Pinches and zoom gestures set the zoom too, so it can't be locked.
+
+Lock in a plugin's `connect()`, before the document shows, and the Stage lays its pages out locked
+from the first frame. `getLock(setting)` says who holds a setting and why, or `null`.
+
 ## On touch screens
 
 Touch works out of the box, tuned to feel like the platform rather than a web page:
@@ -184,7 +274,8 @@ Touch works out of the box, tuned to feel like the platform rather than a web pa
 - **One finger scrolls**, with momentum: flick and the page glides to a stop.
 - **Two fingers pinch-zoom** around the point between them, and pan at the same time.
 - **Double-tap zooms in steps**: the whole page, the text at full width, closer, and back out.
-- **Edges are elastic.** Pulling past the end stretches and springs back.
+- **Edges are elastic.** Pulling past the end stretches and springs back. With `flow: 'paged'`, it
+  [turns the page](#one-page-at-a-time).
 - **Long-press selects a word** when the [Selection](../text/selection) plugin is registered.
 
 For a Stage that should scroll but not zoom under a pinch or Ctrl+wheel, such as a thumbnail strip,
@@ -242,7 +333,7 @@ Give `reveal()` a rectangle and it becomes your "go to this search result" call:
 stage.reveal(hit.page, {
   rect: hit.bounds, // a box in page coordinates
   zoom: 'fit-width', // zoom so the box spans the view, or 'keep'
-  anchor: { y: 0.35 }, // about a third from the top, like a browser's find bar
+  align: { y: 0.35 }, // about a third from the top, like a browser's find bar
 });
 ```
 
@@ -272,6 +363,16 @@ stage.goToDestination({ kind: 'xyz', page: pages[4].ref, x: 72, y: 100, zoom: 2 
 | `'fitB'`, `'fitBH'`, `'fitBV'` | The same as `fit`, `fitH` and `fitV`              |
 
 Any of `x`, `y` and `zoom` can be `null` or left out: the view keeps what it has on that axis.
+
+`getCurrentDestination()` goes the other way: where the view is now, as a destination. It names
+the page reaching past the top of the view and the spot `goToDestination()` would put at the
+top-left, with `zoom: null`, so going back keeps the reader's zoom. It's what a new
+[bookmark](/docs/headless/documents/outline) goes to:
+
+```ts
+const here = stage.getCurrentDestination(); // { kind: 'xyz', page, x, y, zoom: null }, or null
+stage.goToDestination(here!); // the view doesn't move
+```
 
 <Example name="stage/destination" />
 
@@ -402,16 +503,18 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 
 | Method                                                   | What it does                                                                                                                                                      |
 | :------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `zoomIn()`, `zoomOut()`                                  | Zooms one step in or out, around the [`zoomAlign`](#make-it-feel-right) point. [Zoom](#zoom)                                                                       |
+| `zoomIn({ around? })`, `zoomOut({ around? })`            | Zooms to the next round level in or out, around the [`zoomAlign`](#make-it-feel-right) point, or around `around`, a point in the Stage. [Zoom](#zoom) |
+| `canZoomIn()`, `canZoomOut()`                            | Whether the zoom is below `maxZoom` or above `minZoom`, to disable your buttons                                                                                   |
 | `fitWidth()`, `fitPage()`, `fitAll()`, `fitAutomatic()`  | Switches to a fit mode, which keeps applying when the window resizes                                                                                              |
 | `zoomTo(zoom, { around? })`                              | Zooms to a level (`1.5`), a mode (`{ mode: 'fit-width' }`) or a page size (`{ pageWidth }`, `{ pageHeight }`). `around` is a point in the Stage that stays put.     |
 | `zoomBy(factor, { around? })`                            | Multiplies the zoom: `1.25` is 25% closer                                                                                                                         |
 | `goToPage(page, options?)`                               | Goes to a page, by its ref or its index. [Move through pages](#move-through-pages)                                                                                |
-| `nextPage(options?)`, `previousPage(options?)`           | Goes to the next or previous page, or a whole spread when two facing pages fit                                                                                    |
+| `nextPage(options?)`, `previousPage(options?)`           | Goes past the pages you're on, to the next or previous page, or a whole spread while a spread fits across the view                                                |
 | `goToFirstPage(options?)`, `goToLastPage(options?)`      | Goes to the first or the last page                                                                                                                                |
-| `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the current one, to disable your buttons                                                                                   |
-| `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `anchor`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
+| `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the pages you're on, to disable your buttons                                                                               |
+| `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `align`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
 | `goToDestination(destination)`                           | Goes where a link, a bookmark or the document's opening view points. [Follow a destination](#follow-a-destination)                                                |
+| `getCurrentDestination()`                                | Where the view is now, as a destination that keeps the zoom; `null` before a page shows. [Follow a destination](#follow-a-destination)                          |
 | `scrollTo({ left, top })`, `scrollBy({ left, top })`     | Scrolls like a scrolling element does, in screen pixels. It jumps unless you pass `behavior: 'smooth'`. [Scrollbars](#scrollbars)                                  |
 | `panBy(x, y)`                                            | Moves the view by `x` and `y` screen pixels                                                                                                                       |
 | `resetView()`                                            | Jumps back to the first page and keeps the zoom mode                                                                                                              |
@@ -422,11 +525,13 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `getViewState()`, `applyViewState(view)`                 | Every setting and the position as one object you can store, and restoring it. The responsive rules apply again on top.                                            |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads, changes and resets the live settings, keeping you on the same page. [Settings](#settings)                                                             |
 | `setResponsiveRules(rules)`                              | Replaces the responsive rules while the app runs. [Adapt to the space you have](#adapt-to-the-space-you-have)                                                     |
+| `lockSettings(lock)`, `getLock(setting)`                 | Holds settings at a value for this document until the function it returns is called, and who holds a setting, or `null`. [Lock a setting](#lock-a-setting)        |
 | `listVisiblePages()`, `isPageVisible(page)`              | The pages on screen, each with its box in the Stage and the part of it that shows, and whether one page is on screen                                             |
-| `listCurrentItemPages()`                                 | The pages of the current spread, or the current page alone                                                                                                        |
+| `listCurrentItemPages()`                                 | The pages of the spread the current page is in, or the current page alone, at any zoom                                                                            |
+| `listCurrentPages()`                                     | The pages you're on: the current spread while it fits across the view, else the current page. What a page number names, and what `nextPage()` and `previousPage()` step past |
 | `getPageAt(point)`                                       | The page under a point in the Stage and the point on that page, or `null` over the space between pages                                                            |
 | `viewportToPage(page, point)`, `pageToViewport(page, point)`, `pageRectToViewport(page, rect)` | Converts a point between the Stage and a page, and a box on a page to the Stage. `null` when the page isn't laid out. [Page coordinates](#page-coordinates) |
-| `getPageFrame(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |
+| `getPageBox(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |
 | `getViewportSize()`                                      | The Stage's size in screen pixels, as last measured                                                                                                               |
 
 The page moves (`goToPage()`, `nextPage()`, `previousPage()`, `goToFirstPage()`, `goToLastPage()`)
@@ -477,7 +582,9 @@ Set them when you register the plugin, and change them while the app runs with
 | `sizing`         | `'intrinsic'` (true sizes) or `'uniform'` (equal widths)                                  | `'intrinsic'`                  |
 | `columns`        | Grid columns: `'square'`, `'auto'` or a number                                            | `'square'`                     |
 | `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                                      | `{ mode: 'automatic' }`        |
-| `padding`        | Space around the pages, in screen pixels                                                  | `24` (`4` when compact)        |
+| `minZoom`        | The lowest zoom: nothing zooms out past it, a fit mode included                           | `0.05` (5%)                    |
+| `maxZoom`        | The highest zoom: nothing zooms in past it, a fit mode included                           | `64` (6400%)                   |
+| `padding`        | Space around the pages, in screen pixels: a number, or `{ top, right, bottom, left }`     | `24` (`4` when compact)        |
 | `gap`            | Space between pages: a number (grows with zoom) or `{ px }`                               | `16`                           |
 | `pageFrame`      | Space reserved around each page for your labels, in screen pixels                         | `0` on every side              |
 | `bounded`        | Keep panning within the pages; `false` for an endless canvas                              | `true`                         |
@@ -491,6 +598,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
 | `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
 | `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
+| `turnGestures`   | With `flow: 'paged'`, scrolling or swiping past a page's edge [turns it](#one-page-at-a-time); `false` leaves turning to buttons and keys | `true` |
+| `zoomBox`        | The colors of the [zoom tool's box](#zoom-to-a-box): `fill` and `stroke`; `null` follows the accent | `{ fill: null, stroke: null }` |
 | `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
 
 Set once, when you register the plugin:
@@ -521,7 +630,7 @@ on the Stage, such as `stage.pageChanged$`, for code that holds it through `view
 | `onCameraChanged`   | The view moved, on every frame of a scroll or zoom   | `camera`                                  |
 | `onMotionEnded`     | Scrolling, a fling or an animated move came to rest  | `camera`                                  |
 | `onViewportChanged` | The Stage itself changed size                        | `size`                                    |
-| `onSettingsChanged` | A setting changed, by you or by a responsive rule    | `settings`, `changed`                     |
+| `onSettingsChanged` | A setting changed, by you or by a responsive rule    | `settings`, `changedKeys`                 |
 
 ## Good to know
 
@@ -545,6 +654,13 @@ view exactly, and `onMotionEnded` for anything expensive.
 the view exactly, and `stage.motionEnded$` for anything expensive.
 
 </Fw>
+
+### When the browser scrolls
+
+The Stage scrolls the pages itself, so the browser never does. When the browser would scroll to
+show something inside it, such as a field reached with Tab, an element your code calls `focus()` or
+`scrollIntoView()` on, or the cursor at the edge of a text box, the Stage scrolls that far instead:
+the pages, the scrollbar and the current page stay in step.
 
 ### Page coordinates
 

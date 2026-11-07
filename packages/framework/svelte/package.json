@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/svelte",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0",
   "private": false,
   "description": "Svelte 5 adapter for EmbedPDF v3: rune-based functions, components with bind: and snippets, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
@@ -30,6 +30,11 @@
       "types": "./src/metadata.ts",
       "svelte": "./src/metadata.ts",
       "default": "./src/metadata.ts"
+    },
+    "./outline": {
+      "types": "./src/outline.ts",
+      "svelte": "./src/outline.ts",
+      "default": "./src/outline.ts"
     },
     "./history": {
       "types": "./src/history.ts",
@@ -116,6 +121,11 @@
       "svelte": "./src/annotation.ts",
       "default": "./src/annotation.ts"
     },
+    "./attachment": {
+      "types": "./src/attachment.ts",
+      "svelte": "./src/attachment.ts",
+      "default": "./src/attachment.ts"
+    },
     "./stamp": {
       "types": "./src/stamp.ts",
       "svelte": "./src/stamp.ts",
@@ -135,6 +145,11 @@
       "types": "./src/form.ts",
       "svelte": "./src/form.ts",
       "default": "./src/form.ts"
+    },
+    "./fonts": {
+      "types": "./src/fonts.ts",
+      "svelte": "./src/fonts.ts",
+      "default": "./src/fonts.ts"
     },
     "./signature": {
       "types": "./src/signature.ts",
@@ -160,6 +175,11 @@
         "types": "./dist/metadata.d.ts",
         "svelte": "./dist/metadata.js",
         "default": "./dist/metadata.js"
+      },
+      "./outline": {
+        "types": "./dist/outline.d.ts",
+        "svelte": "./dist/outline.js",
+        "default": "./dist/outline.js"
       },
       "./history": {
         "types": "./dist/history.d.ts",
@@ -246,6 +266,11 @@
         "svelte": "./dist/annotation.js",
         "default": "./dist/annotation.js"
       },
+      "./attachment": {
+        "types": "./dist/attachment.d.ts",
+        "svelte": "./dist/attachment.js",
+        "default": "./dist/attachment.js"
+      },
       "./stamp": {
         "types": "./dist/stamp.d.ts",
         "svelte": "./dist/stamp.js",
@@ -266,6 +291,11 @@
         "svelte": "./dist/form.js",
         "default": "./dist/form.js"
       },
+      "./fonts": {
+        "types": "./dist/fonts.d.ts",
+        "svelte": "./dist/fonts.js",
+        "default": "./dist/fonts.js"
+      },
       "./signature": {
         "types": "./dist/signature.d.ts",
         "svelte": "./dist/signature.js",
@@ -285,12 +315,15 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",

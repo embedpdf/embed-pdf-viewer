@@ -1,4 +1,6 @@
 import type {
+  Annotation,
+  AnnotationPatch,
   WidgetDraft,
   WidgetPatch,
   WidgetStyleDraftFields,
@@ -10,7 +12,8 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
-  faceForFreeTextFont,
+  WIDGET_STYLE_NAMES,
+  faceForFontName,
   familyKey,
   normalizePdfRect,
   pdfQuarterTurnBox,
@@ -34,6 +37,7 @@ import {
   readDefaultAppearance,
   readDefaultAppearanceFace,
 } from '../read/annotationReadPrimitives';
+import { boxFontName } from '../read/boxFontName';
 import { readWidgetTurn } from '../read/readWidgetAnnotation';
 import { widgetBorderStyleFromCode, widgetBorderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -54,6 +58,29 @@ const MK_CAPTION = 0; // EPDF_MK_TEXT_CA
 
 export function isWidgetSubtype(subtype: string): subtype is 'widget' {
   return subtype === 'widget';
+}
+
+/**
+ * A widget with a mark in it (`hasMark`: a signature, or one drawn in) shows
+ * the mark, not its box: a change to its style, which only the box shows, is
+ * refused before anything is written. A style sent back as it reads is no
+ * change.
+ */
+export function assertMarkKeepsItsLook(
+  current: Annotation<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): void {
+  if (current.subtype !== 'widget' || !current.hasMark) return;
+  const sent = patch as Partial<Record<(typeof WIDGET_STYLE_NAMES)[number], unknown>>;
+  const changed = WIDGET_STYLE_NAMES.filter(
+    (name) => sent[name] !== undefined && !semanticEqual(sent[name], current[name]),
+  );
+  if (changed.length > 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `the widget has a mark in it, which its style doesn't draw: ${changed.join(', ')} can't change`,
+    );
+  }
 }
 
 /**
@@ -130,6 +157,10 @@ export function applyWidgetStyle(
  * says now, so a colour change keeps the font and its size. A font is a
  * standard font's name or a registered font's key; naming the face `/DA`
  * already has keeps that font, whatever the document has it as.
+ *
+ * The font a read gives is the widget's `/DA`, else the form's: `null` only
+ * when neither has one. So `null` is that read sent back, which changes
+ * nothing; a font can't be removed, and `null` beside one is refused.
  */
 function applyWidgetFont(
   fn: PdfFunctions,
@@ -139,19 +170,29 @@ function applyWidgetFont(
   ctx: AnnotationWriteContext | undefined,
 ): void {
   const current = readDefaultAppearance(fn, mem, annotPtr);
-  const fontSize =
-    style.fontSize === undefined ? (current?.fontSize ?? 12) : (style.fontSize ?? 12);
-  const color =
-    style.fontColor === undefined ? (current?.color ?? '#000000') : (style.fontColor ?? '#000000');
+  const given = [style.fontFamily, style.fontSize, style.fontColor];
+  if (given.includes(null) && current !== null) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a widget's font can't be removed: send a font, or leave the font fields out",
+      { details: { field: 'fontFamily' } },
+    );
+  }
+  // Without a font anywhere, a `null` is the read sent back: no change.
+  const fontFamily = style.fontFamily ?? undefined;
+  const fontSize = style.fontSize ?? undefined;
+  const fontColor = style.fontColor ?? undefined;
+  if (fontFamily === undefined && fontSize === undefined && fontColor === undefined) return;
+  const size = fontSize ?? current?.fontSize ?? 12;
+  const color = fontColor ?? current?.color ?? '#000000';
   const keeps =
     current !== null &&
-    (style.fontFamily === undefined ||
-      (style.fontFamily !== null && namesCurrentFace(fn, mem, annotPtr, style.fontFamily, ctx)));
+    (fontFamily === undefined || namesCurrentFace(fn, mem, annotPtr, fontFamily, ctx));
   if (keeps) {
-    setDefaultAppearance(fn, annotPtr, KEEP_FONT_CODE, fontSize, color);
+    setDefaultAppearance(fn, annotPtr, KEEP_FONT_CODE, size, color);
     return;
   }
-  applyDefaultAppearance(fn, annotPtr, style.fontFamily ?? 'helvetica', fontSize, color, ctx);
+  applyDefaultAppearance(fn, annotPtr, fontFamily ?? 'helvetica', size, color, ctx);
 }
 
 /** Whether `font` names the face `/DA` has now. */
@@ -164,7 +205,9 @@ function namesCurrentFace(
 ): boolean {
   const current = readDefaultAppearanceFace(fn, mem, annotPtr);
   if (!current) return false;
-  const named = faceForFreeTextFont(font, ctx?.describeRegisteredFont);
+  // The name a read gives the box's font (a document font's PostScript name).
+  if (boxFontName(fn, mem, annotPtr, current) === font) return true;
+  const named = faceForFontName(font, ctx?.describeFont);
   return (
     familyKey(named.family) === familyKey(current.family) &&
     (named.weight === undefined || named.weight === current.weight) &&

@@ -3,7 +3,7 @@ import {
   AbortablePromise,
   checkCapability,
   CONTINUOUS_RENDER_POLICY,
-  decodePdfBits,
+  permissionFlagsOf,
   EngineError,
   EngineErrorCode,
   generateUuid,
@@ -84,6 +84,8 @@ export class LocalEngine implements LocalEngineContract {
    * reach its internal surface without casting.
    */
   readonly fonts: LocalFontService;
+  /** The open documents' listeners for a change of the engine's fonts. */
+  private readonly engineFontListeners = new Set<() => void>();
 
   private constructor(
     private readonly transport: Transport,
@@ -101,7 +103,10 @@ export class LocalEngine implements LocalEngineContract {
         ? new PortableImageEncoder()
         : new BrowserImageEncoder());
     this.renderPolicy = renderPolicy ?? CONTINUOUS_RENDER_POLICY;
-    this.fonts = new LocalFontService(this.queue);
+    // Registering a font changes the font list of every open document.
+    this.fonts = new LocalFontService(this.queue, () => {
+      for (const listener of this.engineFontListeners) listener();
+    });
   }
 
   /**
@@ -126,7 +131,7 @@ export class LocalEngine implements LocalEngineContract {
     // the file is loaded, as the cloud refuses the token at `/head`.
     // (`pdf.permissions` grants it, and an omitted scope means every one.)
     try {
-      if (options?.scope && !checkCapability('doc.open', options.scope, decodePdfBits(null))) {
+      if (options?.scope && !checkCapability('doc.open', options.scope, permissionFlagsOf(null))) {
         return AbortablePromise.rejectReason(new PermissionDenied('doc.open', 'engine-local'));
       }
     } catch (error) {
@@ -310,6 +315,7 @@ export class LocalEngine implements LocalEngineContract {
         `local:${generateUuid()}`,
         this.renderPolicy,
         payload.objectNumbers,
+        this.engineFontListeners,
       );
       if (payload.passwordRejected) handle.security.markPasswordRejected();
       return handle;

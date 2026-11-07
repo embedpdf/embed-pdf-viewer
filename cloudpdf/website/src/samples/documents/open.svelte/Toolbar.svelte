@@ -1,12 +1,12 @@
 <script lang="ts">
   import { useDocument, useDocuments, type OpenSource } from '@embedpdf/svelte/runtime';
 
-  let { ebook }: { ebook: OpenSource } = $props();
+  let { welcome }: { welcome: OpenSource } = $props();
 
   const documents = useDocuments();
   const document = useDocument();
 
-  // A file the user picks opens next to the ebook, and becomes the active document.
+  // A file the user picks opens next to the welcome, and becomes the active document.
   async function openFile(file: File) {
     await documents.open({ kind: 'bytes', bytes: await file.arrayBuffer() }, { name: file.name });
   }
@@ -39,9 +39,9 @@
     <button
       type="button"
       class="button"
-      onclick={() => documents.open(ebook, { name: 'ebook.pdf' })}
+      onclick={() => documents.open(welcome, { name: 'welcome.pdf' })}
     >
-      Open the ebook again
+      Open the welcome again
     </button>
   {/if}
 </div>

@@ -4,7 +4,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import { MEASUREMENT_DEFAULTS, MeasurementToken, type MeasurementConfig } from './contract';
 import { createMeasurementController } from './controller';
-import { initialMeasurementState } from './model';
+import { initialMeasurementModel } from './model';
 
 /**
  * Page scale, calibration and measurement readouts, document-scoped. The
@@ -19,7 +19,7 @@ export const measurementPlugin = (config?: MeasurementConfig) =>
     scope: 'document',
     token: MeasurementToken,
     requires: [AnnotationToken, InteractionToken],
-    state: initialMeasurementState,
+    state: initialMeasurementModel,
     // A scale is one value: a change replaces it, never merges into it.
     settings: { defaults: MEASUREMENT_DEFAULTS, registered: config, whole: ['defaultScale'] },
     create: createMeasurementController,

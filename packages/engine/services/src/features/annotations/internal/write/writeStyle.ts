@@ -1,5 +1,6 @@
 import {
   ANNOTATION_DEFAULTS,
+  type Color,
   type FilledStyleDraftFields,
   type GeometryStyleDraftFields,
 } from '@embedpdf/engine-core/runtime';
@@ -12,6 +13,7 @@ import {
   clearAnnotColor,
   clearBorderDashPattern,
   setAnnotColor,
+  setAnnotNoColor,
   setAnnotOpacity,
   setBorderDashPattern,
   setBorderStyle,
@@ -45,9 +47,18 @@ export function applyGeometryStyleDraft(
 ): void {
   // A field left out takes the kind's default (`annotation/defaults.ts`).
   const defaults = ANNOTATION_DEFAULTS[draft.subtype];
-  setAnnotColor(fn, annotPtr, draft.color ?? defaults.color);
+  writeStrokeColor(fn, annotPtr, draft.color === undefined ? defaults.color : draft.color);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? defaults.opacity);
   applyBorderDraft(fn, mem, annotPtr, draft);
+}
+
+/** `/C` of a stroked kind: the stroke's colour, or `[]` for `null`, no stroke. */
+function writeStrokeColor(fn: PdfFunctions, annotPtr: Ptr, color: Color | null): void {
+  if (color === null) {
+    setAnnotNoColor(fn, annotPtr);
+  } else {
+    setAnnotColor(fn, annotPtr, color);
+  }
 }
 
 /**
@@ -87,7 +98,7 @@ export function applyGeometryStylePatch(
   patch: GeometryStyleDraftFields,
 ): void {
   if (patch.color !== undefined) {
-    setAnnotColor(fn, annotPtr, patch.color);
+    writeStrokeColor(fn, annotPtr, patch.color);
   }
   if (patch.opacity !== undefined) {
     setAnnotOpacity(fn, annotPtr, patch.opacity);

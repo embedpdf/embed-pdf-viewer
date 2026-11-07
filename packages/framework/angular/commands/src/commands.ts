@@ -99,7 +99,7 @@ export class EpdfCommands extends pluginService({
 }) {
   /**
    * One command as a signal, for what shows a command and isn't a button (a row of a shortcut
-   * sheet): its label, icon and state, `run()` and `shortcut`. Changes only when what the
+   * sheet): its label, icon and state, `run()` and `shortcutLabel`. Changes only when what the
    * command shows does. Pass a function for an id that changes. A button uses the `epdfCommand`
    * directive instead. Always a command: an id no plugin registered (or one asked for before
    * the commands plugin is there) is labelled with its id, neither visible nor enabled, and an
@@ -216,8 +216,8 @@ export class EpdfCommandShortcuts {
 
 /**
  * A button of yours that runs a command and shows its state: a click runs it, and the button's
- * `disabled`, `aria-pressed`, `title` and `hidden` follow the command. The template reference
- * gives the rest as signals:
+ * `disabled`, `aria-pressed` (a toggle's) or `aria-expanded` (a menu's), `title` and `hidden`
+ * follow the command. The template reference gives the rest as signals:
  *
  *   <button [epdfCommand]="'zoom:in'" #zoomIn="epdfCommand">
  *     {{ zoomIn.label() }} <kbd>{{ zoomIn.shortcut() }}</kbd>
@@ -232,7 +232,8 @@ export class EpdfCommandShortcuts {
   host: {
     '(click)': 'onClick()',
     '[attr.disabled]': 'enabled() ? null : ""',
-    '[attr.aria-pressed]': 'active() ? "true" : null',
+    '[attr.aria-pressed]': 'command().pressable ? active() : null',
+    '[attr.aria-expanded]': 'command().menu ? active() : null',
     '[attr.title]': 'label() || null',
     '[hidden]': '!visible()',
   },
@@ -248,7 +249,7 @@ export class EpdfCommand {
   /** Your icon's name for it, when the command has one. */
   readonly icon: Signal<string | undefined> = computed(() => this.command().icon);
   /** Its first shortcut, formatted for the platform (`'⌘K'`), or `null`. */
-  readonly shortcut: Signal<string | null> = computed(() => this.command().shortcut);
+  readonly shortcutLabel: Signal<string | null> = computed(() => this.command().shortcutLabel);
   /** Whether it can run now. */
   readonly enabled: Signal<boolean> = computed(() => this.command().enabled);
   /** Whether it shows as pressed, such as the current tool. */

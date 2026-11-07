@@ -25,7 +25,7 @@ settings are `localEngine()` options.
 | `embedpdf.wasm` (the engine, ~6.4 MB) | Emitted by your bundler as an asset of your build, streamed from your origin. Under Angular, a lazy JavaScript chunk of your build instead. | `engine.assetsUrl`, `engine.wasmUrl`, `engine.wasmBinary` |
 | The engine worker                     | A file of your build, next to the WebAssembly, emitted by your bundler. From a CDN or with the engine's portable build (Angular, plain esbuild), a `blob:` URL instead (see below). | `engine.worker`                      |
 | The image-encoder worker              | The same, with a main-thread fallback.                                                                                                      | `engine.encoderWorker`               |
-| Fonts                                 | None are fetched unless you configure them.                                                                                                 | `engine.fonts`, `engine.fallbackFonts` |
+| Fonts                                 | None are fetched unless you configure them.                                                                                                 | `fonts`, `engine.fallbackFonts`        |
 | The standard stamps                   | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`).                                                                         | `plugins.stamp.standard`             |
 | Your documents                        | Whatever you pass as `src` or open yourself.                                                                                                | —                                    |
 

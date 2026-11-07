@@ -1,4 +1,4 @@
-<!-- A word selected on load, as a long press selects one: "Viewers", on the cover. -->
+<!-- A word selected on load, as a long press selects one: "Documents", on the cover. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useSelection } from '@embedpdf/svelte/selection';
@@ -8,6 +8,6 @@
   const cover = $derived(pages.current[0]?.ref);
 
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 14, count: 7 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   });
 </script>

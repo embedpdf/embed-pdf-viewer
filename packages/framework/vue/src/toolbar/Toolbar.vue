@@ -213,19 +213,25 @@ const overflowView = computed(
  * The sections run along the toolbar. The center one carries auto margins: it
  * centers in the space the other two leave, and gives way before anything
  * overlaps. The toolbar itself has no gap, so what the fit says fits, fits.
- * Sections never grow or shrink: fitting is the solver's job, not flexbox's.
+ * Sections never shrink, and grow only to hold an item that grows (a custom
+ * item with `grow`): that section takes the space left, and each drawn
+ * section after another keeps the gap the fit counted (`section.spacing`).
  */
-const sectionStyle = (name: LiveSection['name']) => ({
+const sectionStyle = (section: LiveSection) => ({
   display: 'flex',
   flexDirection: vertical.value ? ('column' as const) : ('row' as const),
   alignItems: 'center',
   gap: `${props.gap}px`,
-  flex: '0 0 auto',
-  ...(name !== 'center'
-    ? null
-    : vertical.value
+  flex: section.grows ? '1 0 auto' : '0 0 auto',
+  ...(section.spacing === 'balance'
+    ? vertical.value
       ? { marginTop: 'auto', marginBottom: 'auto' }
-      : { marginLeft: 'auto', marginRight: 'auto' }),
+      : { marginLeft: 'auto', marginRight: 'auto' }
+    : section.spacing === 'gap'
+      ? vertical.value
+        ? { marginTop: `${props.gap}px` }
+        : { marginInlineStart: `${props.gap}px` }
+      : null),
 });
 
 /** The default separator: a 1px line across the toolbar, upright in a horizontal one, flat in a vertical one. */
@@ -241,6 +247,17 @@ const TOOLBAR_ITEM = { [TOOLBAR_ITEM_ATTRIBUTE]: '' };
 
 /** The element around an item adds no box, so the item lays out as the section's own child. */
 const ITEM_STYLE = { display: 'contents' } as const;
+
+/** Around an item that grows, a box that grows into the space the toolbar has left. */
+const itemStyle = (part: Part) =>
+  part.kind === 'custom' && part.grow
+    ? {
+        display: 'flex',
+        flexDirection: vertical.value ? ('column' as const) : ('row' as const),
+        alignItems: 'center',
+        flex: '1 0 auto',
+      }
+    : ITEM_STYLE;
 
 /** Whether slot content draws anything: more than comments (a false `v-if`) and empty fragments. */
 function draws(content: unknown): boolean {
@@ -303,12 +320,17 @@ const measureLayerStyle = computed(() => ({
       alignItems: 'center',
     }"
   >
-    <div v-for="section in layout.sections" :key="section.name" :style="sectionStyle(section.name)">
+    <div v-for="section in layout.sections" :key="section.name" :style="sectionStyle(section)">
       <template v-for="(group, index) in section.groups" :key="group.id">
         <slot v-if="index > 0" name="separator">
           <span :style="separatorStyle" />
         </slot>
-        <span v-for="part in group.parts" :key="part.key" v-bind="TOOLBAR_ITEM" :style="ITEM_STYLE">
+        <span
+          v-for="part in group.parts"
+          :key="part.key"
+          v-bind="TOOLBAR_ITEM"
+          :style="itemStyle(part)"
+        >
           <ToolbarPart :part="part" layer="live" :orientation="orientation" @length="onLength">
             <template v-if="$slots.command" #command="scope">
               <slot name="command" v-bind="scope" />

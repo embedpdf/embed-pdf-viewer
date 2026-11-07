@@ -1,4 +1,5 @@
 import {
+  ATTACHMENT_LIMITS,
   AbortablePromise,
   annotationResourceBuffers,
   CONTINUOUS_RENDER_POLICY,
@@ -118,9 +119,21 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     const docId = this.docId;
     const page = this.ref;
-    const kind = role === 'file' ? 'annotations.readFile' : 'annotations.readAppearance';
     const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) => wirePack({ kind, effect: 'read', jobId, docId, page, ref }),
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          role === 'file'
+            ? {
+                kind: 'annotations.readFile',
+                effect: 'read',
+                jobId,
+                docId,
+                page,
+                ref,
+                maxDecodedBytes: ATTACHMENT_LIMITS.decodedBytes,
+              }
+            : { kind: 'annotations.readAppearance', effect: 'read', jobId, docId, page, ref },
+        ),
     });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);

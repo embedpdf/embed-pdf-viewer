@@ -8,20 +8,47 @@ import {
   encodeAnnotationToken,
   encodeLayoutToken,
 } from '../../src/wire/tokens';
+import { SHAPES, tokenPinOf } from '../../src/wire/cachedReads';
+
+const pin = { engine: '9f2c41aa', shape: 1 };
 
 describe('versioned resource tokens', () => {
-  test('round-trips each resource version without a representation coordinate', () => {
-    expect(encodeLayoutToken(7)).toBe('layoutVersion=7');
-    expect(encodeAnnotationToken(8)).toBe('annotationVersion=8');
-    expect(encodeActionsToken(1)).toBe('actionsVersion=1');
-    expect(decodeLayoutToken(encodeLayoutToken(7))).toBe(7);
-    expect(decodeAnnotationToken(encodeAnnotationToken(8))).toBe(8);
-    expect(decodeActionsToken(encodeActionsToken(1))).toBe(1);
+  test('round-trips each resource version with its engine value and shape', () => {
+    expect(encodeLayoutToken(7, pin)).toBe('engine=9f2c41aa,layoutVersion=7,shape=1');
+    expect(encodeAnnotationToken(8, pin)).toBe('annotationVersion=8,engine=9f2c41aa,shape=1');
+    expect(encodeActionsToken(1, pin)).toBe('actionsVersion=1,engine=9f2c41aa,shape=1');
+    expect(decodeLayoutToken(encodeLayoutToken(7, pin))).toEqual({ layoutVersion: 7, pin });
+    expect(decodeAnnotationToken(encodeAnnotationToken(8, pin))).toEqual({
+      annotationVersion: 8,
+      pin,
+    });
+    expect(decodeActionsToken(encodeActionsToken(1, pin))).toEqual({ actionsVersion: 1, pin });
+  });
+
+  test('refuses a token without its engine value or shape', () => {
+    expect(() => decodeLayoutToken('layoutVersion=7')).toThrow(/engine/);
+    expect(() => decodeLayoutToken('engine=9f2c41aa,layoutVersion=7')).toThrow(/shape/);
+    expect(() => decodeLayoutToken('engine=9f2c41aa,layoutVersion=7,shape=0')).toThrow(/shape/);
   });
 
   test('rejects unknown token fields', () => {
-    expect(() => decodeLayoutToken('layoutVersion=7,unexpected=2')).toThrow();
+    expect(() =>
+      decodeLayoutToken('engine=9f2c41aa,layoutVersion=7,shape=1,unexpected=2'),
+    ).toThrow();
     expect(() => decodeAnnotationToken('annotationVersion=8,unexpected=2')).toThrow();
     expect(() => decodeActionsToken('actionsVersion=1,unexpected=2')).toThrow();
+  });
+});
+
+describe('token pins', () => {
+  test("a kind's pin is the server's engine value and this code's shape", () => {
+    expect(tokenPinOf('render', { render: 'abc123', text: 'def456' })).toEqual({
+      engine: 'abc123',
+      shape: SHAPES.render,
+    });
+  });
+
+  test('a kind the server gave no engine value for is refused', () => {
+    expect(() => tokenPinOf('render', { text: 'def456' })).toThrow(/render/);
   });
 });

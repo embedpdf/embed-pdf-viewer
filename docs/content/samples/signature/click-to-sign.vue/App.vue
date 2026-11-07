@@ -25,19 +25,19 @@ const plugins = [
   annotationPlugin(),
   formPlugin(),
   stampPlugin({ assetEngine }),
-  signaturePlugin({ key: () => signer }),
+  signaturePlugin({ signingKey: () => signer }),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source agreement]
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: agreement }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <ArmBar />

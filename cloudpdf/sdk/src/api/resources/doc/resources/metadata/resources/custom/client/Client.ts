@@ -7,6 +7,7 @@ import {
 } from "../../../../../../../../BaseClient.js";
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../../../../../core/headers.js";
 import * as core from "../../../../../../../../core/index.js";
+import * as environments from "../../../../../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../../../../../errors/index.js";
 import * as CloudPDF from "../../../../../../../index.js";
@@ -20,7 +21,7 @@ export declare namespace CustomClient {
 export class CustomClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<CustomClient.Options>;
 
-    constructor(options: CustomClient.Options) {
+    constructor(options: CustomClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -41,26 +42,30 @@ export class CustomClient {
     public get(
         request: CloudPDF.doc.metadata.GetCustomRequest,
         requestOptions?: CustomClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocMetadataCustomGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocMetadataCustomGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.metadata.GetCustomRequest,
         requestOptions?: CustomClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataCustomGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataCustomGetResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.0",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/metadata/custom`,
             ),
             method: "GET",
@@ -74,7 +79,7 @@ export class CustomClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocMetadataCustomGet200Response,
+                data: _response.body as CloudPDF.DocMetadataCustomGetResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -82,7 +87,10 @@ export class CustomClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

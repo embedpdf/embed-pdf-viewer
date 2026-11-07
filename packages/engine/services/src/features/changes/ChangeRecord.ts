@@ -3,14 +3,20 @@ import type {
   AnnotationFamily,
   AnnotationPatch,
   AnnotationRef,
+  AttachmentRef,
   ChangeItemType,
   CustomMetadataPatch,
-  FormFieldDTO,
+  FormField,
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
+  OutlineItemPatch,
+  OutlineItemRef,
+  PageLabelSection,
   PageRef,
   PdfCoordinates,
+  PdfDestination,
+  PdfRotation,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -38,7 +44,17 @@ export type ReverseStep =
   | WidgetRestoreStep
   | WidgetDeleteStep
   | CalculationOrderStep
-  | MetadataRevertStep;
+  | MetadataRevertStep
+  | OutlineRemoveStep
+  | OutlineRestoreStep
+  | OutlineMoveStep
+  | OutlineReopenStep
+  | PageRotateStep
+  | PageReorderStep
+  | PageRestoreStep
+  | PageRemoveStep
+  | AttachmentRemoveStep
+  | AttachmentRestoreStep;
 
 /**
  * One dictionary a change wrote, as it was before (the capture, with the
@@ -64,8 +80,11 @@ export interface ObjectsRevertStep {
   /** What its item reports doing: the op it puts back, or its opposite (a widget's add undoes its removal). */
   readonly reports: ChangeItemType;
   readonly objects: readonly CapturedObject[];
-  /** What the item reads back: the annotation, or the form fields. */
-  readonly subject: { readonly annotation: AnnotationRef } | { readonly fields: readonly number[] };
+  /** What the item reads back: the annotation, the form fields, or the outline item. */
+  readonly subject:
+    | { readonly annotation: AnnotationRef }
+    | { readonly fields: readonly number[] }
+    | { readonly outlineItem: OutlineItemRef };
   /** Whether the op changed what the annotation shows (its update's `appearance.changed`). */
   readonly appearanceChanged?: boolean;
   readonly fallback?: RevertFallback;
@@ -89,6 +108,13 @@ export type RevertFallback =
       readonly restore: FormFieldPatch;
       /** The values it left in them: a property still holding its value is put back. */
       readonly left: FormFieldPatch;
+    }
+  | {
+      readonly kind: 'outline';
+      /** The old values of the fields an outline item update changed, as a patch. */
+      readonly restore: OutlineItemPatch<PdfDestination>;
+      /** The values it left in them: a field still holding its value is put back. */
+      readonly left: OutlineItemPatch<PdfDestination>;
     }
   | {
       readonly kind: 'value';
@@ -152,9 +178,9 @@ export interface AnnotationReorderStep {
   readonly family: AnnotationFamily;
   /** The rows the reorder moved, in the order it was given them. */
   readonly refs: readonly AnnotationRef[];
-  /** The family's order before the reorder, bottom to top: where the rows go back to. */
+  /** The kind's order before the reorder, bottom to top: where the rows go back to. */
   readonly before: readonly AnnotationRef[];
-  /** The family's order it left. */
+  /** The kind's order it left. */
   readonly after: readonly AnnotationRef[];
 }
 
@@ -201,7 +227,7 @@ export interface FieldRemoveStep {
   readonly kind: 'field.remove';
   readonly objectNumber: number;
   /** The field as the change left it. */
-  readonly left: FormFieldDTO<PdfCoordinates>;
+  readonly left: FormField<PdfCoordinates>;
   /** The rights it takes beside `doc.forms.modify`: an import's (see {@link StepRights}). */
   readonly rights?: StepRights;
 }
@@ -227,6 +253,165 @@ export interface MetadataRevertStep {
   readonly left: MetadataPatch | CustomMetadataPatch;
 }
 
+/**
+ * Deletes outline items a create or a restore brought back, when nobody
+ * changed them since: the item and the items under it are the same ones, and
+ * their dictionaries read exactly as the change left them. Undoing a create
+ * never deletes an item someone gave a child, or renamed, since; a page its
+ * target goes to going away changes nothing of it.
+ */
+export interface OutlineRemoveStep {
+  readonly kind: 'outline.remove';
+  readonly ref: OutlineItemRef;
+  /** The item and the items under it, depth first, each as the change left it (the guard). */
+  readonly left: readonly CapturedObject[];
+}
+
+/**
+ * Opens again a parent that the op this step follows emptied, as it was open
+ * before: a parent without children has no open state, so it comes back
+ * closed with its first child. Only while its children are just the ones the
+ * undo put back: a parent someone filled since keeps what they left.
+ */
+export interface OutlineReopenStep {
+  readonly kind: 'outline.reopen';
+  readonly ref: OutlineItemRef;
+  /** The children it has once the undo put them back. */
+  readonly children: readonly number[];
+}
+
+/**
+ * Brings back what an outline delete removed: the same items, at the same
+ * numbers, at the place the item had (`EPDFOutline_ImportItemRaw`). Left
+ * alone when its parent is gone or it is back already.
+ */
+export interface OutlineRestoreStep {
+  readonly kind: 'outline.restore';
+  readonly ref: OutlineItemRef;
+  /** Its parent when it went; `null` for the top level. */
+  readonly parent: OutlineItemRef | null;
+  readonly capture: Uint8Array;
+}
+
+/**
+ * Puts outline items back where they were before a move: its reverse, and,
+ * the other way round, its redo. Each item goes only while it is still under
+ * the parent the move left it under, and its parent is still there.
+ */
+export interface OutlineMoveStep {
+  readonly kind: 'outline.move';
+  /**
+   * Where each goes back to, by object number (parent 0: the top level;
+   * after 0: first), in document order, so an anchor is placed before what
+   * follows it.
+   */
+  readonly placements: readonly {
+    readonly item: number;
+    readonly parent: number;
+    readonly after: number;
+  }[];
+  /** The parent each was left under (0: the top level). */
+  readonly left: readonly { readonly item: number; readonly parent: number }[];
+}
+
+/**
+ * Turns pages to `rotation`: its reverse, and, the other way round, its redo.
+ * Each page turns only while it still has the rotation the change left it
+ * with (`left`). A change that turned pages from several rotations has one
+ * step for each.
+ */
+export interface PageRotateStep {
+  readonly kind: 'pages.rotate';
+  /** The pages, by object number. */
+  readonly pages: readonly number[];
+  readonly rotation: PdfRotation;
+  readonly left: PdfRotation;
+}
+
+/**
+ * Puts pages back where they were before a move: its reverse, and, the other
+ * way round, its redo. Each page goes only while it still follows the page the
+ * move left it after, and the page it goes after is still there.
+ */
+export interface PageReorderStep {
+  readonly kind: 'pages.reorder';
+  /**
+   * Where each goes back to, by object number (after 0: first), in display
+   * order, so an anchor is placed before what follows it.
+   */
+  readonly placements: readonly { readonly page: number; readonly after: number }[];
+  /** The page each was left after (0: first). */
+  readonly left: readonly { readonly page: number; readonly after: number }[];
+  readonly labels?: PageLabelsStep;
+}
+
+/**
+ * The page label sections a page step puts back once its pages moved: those
+ * the change found, while the document's read as the change left them
+ * (`left`). Otherwise the sections follow the pages as an edit's do. A step
+ * whose change left the sections as they were has none.
+ */
+export interface PageLabelsStep {
+  readonly sections: readonly PageLabelSection[];
+  readonly left: readonly PageLabelSection[];
+}
+
+/**
+ * Brings back what a page delete removed: the same pages, at the same
+ * numbers, each after the page it followed while that is still there, else
+ * first (`EPDFPage_ImportRaw`), with their annotations and names. A page that
+ * is back already is left alone.
+ */
+export interface PageRestoreStep {
+  readonly kind: 'pages.restore';
+  /** Each page and its capture, in the display order they had. */
+  readonly pages: readonly { readonly page: number; readonly capture: Uint8Array }[];
+  readonly labels?: PageLabelsStep;
+}
+
+/**
+ * Deletes pages an insert or a restore brought, each while it reads as the
+ * change left it: the page and what the layer holds of its annotations,
+ * contents and resources. Undoing an insert never deletes a page someone
+ * annotated, or turned, since. A step that would delete every page is left
+ * alone: a document keeps one.
+ */
+export interface PageRemoveStep {
+  readonly kind: 'pages.remove';
+  /** Each page, and the digest of how the change left it. */
+  readonly pages: readonly { readonly page: number; readonly left: string }[];
+  readonly labels?: PageLabelsStep;
+  /**
+   * The form fields the pages brought, when an insert or a copy copied them
+   * in: they go first, those whose widgets are all on these pages still, and
+   * come back after the pages.
+   */
+  readonly fields?: readonly number[];
+}
+
+/**
+ * Deletes the embedded file a create or a restore brought, while it is still
+ * that file, as the change left it: undoing an upload never deletes a file
+ * someone put under its name since, even one with the same bytes.
+ */
+export interface AttachmentRemoveStep {
+  readonly kind: 'attachments.remove';
+  readonly ref: AttachmentRef;
+  /** The file as the change left it, in canonical bytes (the guard). */
+  readonly left: Uint8Array;
+}
+
+/**
+ * Brings back the file a delete removed, under its key, with its file
+ * specification and bytes as they were (`EPDFAttachment_ImportRaw`). Left
+ * alone when another file has the key now.
+ */
+export interface AttachmentRestoreStep {
+  readonly kind: 'attachments.restore';
+  readonly ref: AttachmentRef;
+  readonly capture: Uint8Array;
+}
+
 /** The bytes a record's captures hold. */
 export function recordBytes(record: ChangeRecord): number {
   let bytes = 0;
@@ -243,6 +428,19 @@ export function recordBytes(record: ChangeRecord): number {
         objects(step.unlinked);
         break;
       case 'field.restore':
+      case 'outline.restore':
+        bytes += step.capture.byteLength;
+        break;
+      case 'outline.remove':
+        objects(step.left);
+        break;
+      case 'pages.restore':
+        for (const { capture } of step.pages) bytes += capture.byteLength;
+        break;
+      case 'attachments.remove':
+        bytes += step.left.byteLength;
+        break;
+      case 'attachments.restore':
         bytes += step.capture.byteLength;
         break;
       default:

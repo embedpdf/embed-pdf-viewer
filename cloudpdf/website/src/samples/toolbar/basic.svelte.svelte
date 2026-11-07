@@ -21,7 +21,7 @@
     commandsPlugin({ commands: standardCommands }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
   // Your icons, by the names the standard commands give them.
   const ICONS: Record<string, string> = {
@@ -65,7 +65,7 @@
   let width = $state(100);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
@@ -84,7 +84,7 @@
             title={cmd.label}
             aria-label={cmd.label}
             disabled={!cmd.enabled}
-            aria-pressed={cmd.active}
+            aria-pressed={cmd.pressable ? cmd.active : undefined}
             onclick={run}
           >
             <span class="icon" aria-hidden="true">

@@ -19,10 +19,11 @@ import {
   unflatten,
   WidgetAppearancesQuerySchema,
   type ManifestPage,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
 
-import { parseOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import { parseOrInvalidArg, readAtPins, setImmutableCache, setNoStore } from './_helpers';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
@@ -72,17 +73,28 @@ export async function renderAppearanceBatch(input: {
   // The family's pin: the token's, against the page's in the manifest.
   let imageOptions: AnnotationAppearanceImageOptions;
   let requestedPin: number | undefined;
+  let requestedTokenPin: TokenPin | undefined;
   if (widgets) {
     const parsed = parseOrInvalidArg(WidgetAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.widgetVersion;
+    requestedTokenPin = parsed.pin;
   } else {
     const parsed = parseOrInvalidArg(AnnotationAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.annotationVersion;
+    requestedTokenPin = parsed.pin;
   }
   const pinName = widgets ? 'widgetVersion' : 'annotationVersion';
-  const currentPin = widgets ? page.cache.widgetVersion : page.cache.annotationVersion;
+  const pinOf = (current: ManifestPage) =>
+    widgets ? current.cache.widgetVersion : current.cache.annotationVersion;
+  const assertPinCurrent = (current: ManifestPage) => {
+    if (requestedPin === undefined || requestedPin === pinOf(current)) return;
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `appearance ${pinName} ${requestedPin} no longer current (current=${pinOf(current)}) for page ${input.pageObjectNumber}`,
+    );
+  };
   // Format lives in the token (versioned) or query (unversioned). The schema
   // requires it on versioned requests; the unversioned alias defaults to webp.
   const format: PageNetworkRenderFormat = parseOrInvalidArg(
@@ -91,12 +103,11 @@ export async function renderAppearanceBatch(input: {
     'render format',
   );
 
-  if (requestedPin !== undefined && requestedPin !== currentPin) {
+  try {
+    assertPinCurrent(page);
+  } catch (err) {
     setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `appearance ${pinName} ${requestedPin} no longer current (current=${currentPin}) for page ${input.pageObjectNumber}`,
-    );
+    throw err;
   }
 
   // Appearance-scale enforcement: the appearance lattice
@@ -118,14 +129,6 @@ export async function renderAppearanceBatch(input: {
     );
   }
 
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-
   // Every server render carries the deployment's output-pixel budget —
   // the worker rejects before allocating (degenerate-geometry guard).
   const renderOptions = {
@@ -142,6 +145,13 @@ export async function renderAppearanceBatch(input: {
     entries: AnnotationAppearanceBatchEntry[];
     parts: MultipartPart[];
   }> => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
     const entries: AnnotationAppearanceBatchEntry[] = [];
     const parts: MultipartPart[] = [];
     const ext = format === 'webp' ? 'webp' : 'png';
@@ -190,12 +200,12 @@ export async function renderAppearanceBatch(input: {
           width: appearance.image.width,
           height: appearance.image.height,
           format,
-          contentType: appearance.image.contentType,
+          mimeType: appearance.image.mimeType,
         });
         parts.push({
           key,
           filename: `${key}.${ext}`,
-          contentType: appearance.image.contentType,
+          contentType: appearance.image.mimeType,
           body: Buffer.from(appearance.image.bytes),
         });
       }
@@ -250,18 +260,29 @@ export async function renderAppearanceBatch(input: {
         width: appearance.raster.width,
         height: appearance.raster.height,
         format,
-        contentType: encoded.contentType,
+        mimeType: encoded.mimeType,
       });
       parts.push({
         key,
         filename: `${key}.${ext}`,
-        contentType: encoded.contentType,
+        contentType: encoded.mimeType,
         body,
       });
     }
     return { page: result.page, entries, parts };
   };
-  const collected = await collect();
+  const collected = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent: async () => assertPinCurrent(await resolvePageForRead(input)),
+    read: collect,
+    token: requestedTokenPin && {
+      kind: widgets ? 'widgetAppearances' : 'annotationAppearances',
+      pin: requestedTokenPin,
+    },
+  });
 
   const manifest: AnnotationAppearanceBatch = {
     page: collected.page,

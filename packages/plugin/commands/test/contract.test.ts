@@ -13,6 +13,7 @@ const zoomIn: ResolvedCommand = {
   shortcuts: ['Mod+=', 'Mod+Plus'],
   enabled: true,
   active: false,
+  pressable: false,
   visible: true,
   categories: ['zoom'],
 };
@@ -30,15 +31,15 @@ describe('boundCommandOf', () => {
 
   it('formats the first shortcut for the platform', () => {
     const execute = async () => executed;
-    expect(boundCommandOf(zoomIn, execute, { isMac: true }).shortcut).toBe('⌘=');
-    expect(boundCommandOf(zoomIn, execute, { isMac: false }).shortcut).toBe('Ctrl+=');
+    expect(boundCommandOf(zoomIn, execute, { isMac: true }).shortcutLabel).toBe('⌘=');
+    expect(boundCommandOf(zoomIn, execute, { isMac: false }).shortcutLabel).toBe('Ctrl+=');
   });
 
   it('has no shortcut for a command without one', () => {
     const bound = boundCommandOf({ ...zoomIn, shortcuts: [] }, async () => executed, {
       isMac: false,
     });
-    expect(bound.shortcut).toBeNull();
+    expect(bound.shortcutLabel).toBeNull();
   });
 });
 
@@ -50,6 +51,7 @@ describe('unregisteredCommand', () => {
       shortcuts: [],
       enabled: false,
       active: false,
+      pressable: false,
       visible: false,
       categories: [],
     });

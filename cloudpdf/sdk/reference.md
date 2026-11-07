@@ -41,8 +41,63 @@ await client.deployment.licenseStatus();
 </dl>
 </details>
 
+<details><summary><code>client.deployment.<a href="/src/api/resources/deployment/client/Client.ts">modules</a>() -> CloudPDF.DeploymentModulesResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+What each module declares, for a dashboard or a script that lists modules, offers their permissions in its dialogs and shows their meters. Which tenants may use one is in their `features` (`tenants.get`); what it costs, if anything, is the operator's.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.deployment.modules();
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**requestOptions:** `DeploymentClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Doc
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">head</a>({ ...params }) -> CloudPDF.DocHead200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">head</a>({ ...params }) -> CloudPDF.DocHeadResponse</code></summary>
 <dl>
 <dd>
 
@@ -93,7 +148,7 @@ await client.doc.head({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">changes</a>({ ...params }) -> CloudPDF.DocChanges200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">changes</a>({ ...params }) -> CloudPDF.DocChangesResponse</code></summary>
 <dl>
 <dd>
 
@@ -105,7 +160,7 @@ await client.doc.head({
 <dl>
 <dd>
 
-Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.
+Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`, embedded files `doc.attachments.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.
 </dd>
 </dl>
 </dd>
@@ -214,7 +269,73 @@ await client.doc.download({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">manifest</a>({ ...params }) -> CloudPDF.DocManifest200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">downloadLink</a>({ ...params }) -> CloudPDF.DocDownloadLinkResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+The link opens the layer as it is when created: once the layer changes, it answers 404, so create it right before handing it over. It downloads that one file and nothing else, and a password-protected document is checked when the link is created. Deployments that verify tokens with their own keys (JWKS) mint links on their backend: a doc token with `layer_name`, a `download: { docVersion, mode: "incremental" }` claim and a short `exp`, passed as `link` on the versioned download URL.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.downloadLink({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.DocDownloadLinkRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `DocClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">manifest</a>({ ...params }) -> CloudPDF.DocManifestResponse</code></summary>
 <dl>
 <dd>
 
@@ -333,7 +454,7 @@ await client.doc.render({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">text</a>({ ...params }) -> CloudPDF.DocText200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">text</a>({ ...params }) -> CloudPDF.DocTextResponse</code></summary>
 <dl>
 <dd>
 
@@ -386,8 +507,8 @@ await client.doc.text({
 </dl>
 </details>
 
-## Shares
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.SharesExchange200Response</code></summary>
+## Grants
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.GrantsExchangeResponse</code></summary>
 <dl>
 <dd>
 
@@ -399,7 +520,7 @@ await client.doc.text({
 <dl>
 <dd>
 
-Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. Mounted only when the deployment can sign (HS256 mode).
+Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, deleted, paused and archived grants are indistinguishable (404). Passphrase-protected grants return 422 GrantPassphraseRequired until `passphrase` is supplied. A grant that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the grant asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A grant that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any grant. Mounted only when the deployment can sign (HS256 mode).
 </dd>
 </dl>
 </dd>
@@ -414,8 +535,8 @@ Unauthenticated, but requires a browser Origin header, checked against the grant
 <dd>
 
 ```typescript
-await client.shares.exchange({
-    shareToken: "shareToken"
+await client.grants.exchange({
+    grant: "grant"
 });
 
 ```
@@ -432,7 +553,7 @@ await client.shares.exchange({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesExchangeRequest` 
+**request:** `CloudPDF.GrantsExchangeRequest` 
     
 </dd>
 </dl>
@@ -440,7 +561,7 @@ await client.shares.exchange({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -452,7 +573,7 @@ await client.shares.exchange({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">list</a>({ ...params }) -> CloudPDF.SharesList200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -465,7 +586,7 @@ await client.shares.exchange({
 <dd>
 
 ```typescript
-await client.shares.list({
+await client.grants.list({
     tenantId: "tenantId"
 });
 
@@ -483,7 +604,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-**request:** `CloudPDF.ListSharesRequest` 
+**request:** `CloudPDF.ListGrantsRequest` 
     
 </dd>
 </dl>
@@ -491,7 +612,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -503,7 +624,7 @@ await client.shares.list({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">create</a>({ ...params }) -> CloudPDF.SharesCreate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.GrantsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -515,7 +636,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-The returned share id is the public share token. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
+The returned id is what a link page or an embed opens. Its scope gives only document permissions the caller holds itself, as tokens.issue does. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
 </dd>
 </dl>
 </dd>
@@ -530,7 +651,7 @@ The returned share id is the public share token. Mounted only when the deploymen
 <dd>
 
 ```typescript
-await client.shares.create({
+await client.grants.create({
     tenantId: "tenantId",
     docId: "docId",
     scope: ["scope"]
@@ -550,7 +671,7 @@ await client.shares.create({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesCreateRequest` 
+**request:** `CloudPDF.GrantsCreateRequest` 
     
 </dd>
 </dl>
@@ -558,7 +679,7 @@ await client.shares.create({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -570,7 +691,7 @@ await client.shares.create({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">get</a>({ ...params }) -> CloudPDF.SharesGet200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.GrantsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -583,9 +704,9 @@ await client.shares.create({
 <dd>
 
 ```typescript
-await client.shares.get({
+await client.grants.get({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -602,7 +723,7 @@ await client.shares.get({
 <dl>
 <dd>
 
-**request:** `CloudPDF.GetSharesRequest` 
+**request:** `CloudPDF.GetGrantsRequest` 
     
 </dd>
 </dl>
@@ -610,7 +731,7 @@ await client.shares.get({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -622,7 +743,7 @@ await client.shares.get({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
 <dl>
 <dd>
 
@@ -635,9 +756,9 @@ await client.shares.get({
 <dd>
 
 ```typescript
-await client.shares.delete({
+await client.grants.delete({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -654,7 +775,7 @@ await client.shares.delete({
 <dl>
 <dd>
 
-**request:** `CloudPDF.DeleteSharesRequest` 
+**request:** `CloudPDF.DeleteGrantsRequest` 
     
 </dd>
 </dl>
@@ -662,7 +783,7 @@ await client.shares.delete({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -674,7 +795,7 @@ await client.shares.delete({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">update</a>({ ...params }) -> CloudPDF.SharesUpdate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.GrantsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -687,9 +808,9 @@ await client.shares.delete({
 <dd>
 
 ```typescript
-await client.shares.update({
+await client.grants.update({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -706,7 +827,7 @@ await client.shares.update({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesUpdateRequest` 
+**request:** `CloudPDF.GrantsUpdateRequest` 
     
 </dd>
 </dl>
@@ -714,7 +835,73 @@ await client.shares.update({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">archive</a>({ ...params }) -> CloudPDF.GrantsArchiveResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Archiving is final: an archived grant never exchanges again, and to give access again you create a new grant. Pausing (`disabled`) is the reversible stop. An archived grant no longer counts as using its shared layer, so that layer can be deleted.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.grants.archive({
+    tenantId: "tenantId",
+    grantId: "grantId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.ArchiveGrantsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -727,7 +914,7 @@ await client.shares.update({
 </details>
 
 ## Tenants
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.TenantsList200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.TenantsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -776,7 +963,7 @@ await client.tenants.list();
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.TenantsCreate200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.TenantsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -827,7 +1014,7 @@ await client.tenants.create({
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.TenantsGet200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.TenantsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -924,6 +1111,74 @@ await client.tenants.delete({
 <dd>
 
 **request:** `CloudPDF.DeleteTenantsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `TenantsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.TenantsUpdateResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A feature names an installed module; any other id is a 400. A module route answers a tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 FeatureStopped (details.feature, details.stopped). Other replicas apply a change within 30 seconds.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.tenants.update({
+    tenantId: "tenantId",
+    features: [{
+            id: "id"
+        }]
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.TenantsUpdateRequest` 
     
 </dd>
 </dl>
@@ -1059,7 +1314,7 @@ await client.tenants.suspend({
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">usage</a>({ ...params }) -> CloudPDF.TenantsUsage200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">usage</a>({ ...params }) -> CloudPDF.TenantsUsageResponse</code></summary>
 <dl>
 <dd>
 
@@ -1071,7 +1326,7 @@ await client.tenants.suspend({
 <dl>
 <dd>
 
-Facts only — no limits or billing state. Views count share exchanges plus authorized /v1/access grants, deduplicated across the two.
+Facts only — no limits or billing state. Views count grant exchanges plus authorized /v1/access requests, deduplicated across the two.
 </dd>
 </dl>
 </dd>
@@ -1125,7 +1380,7 @@ await client.tenants.usage({
 </details>
 
 ## Documents
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsList200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -1176,7 +1431,7 @@ await client.documents.list({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocumentsGet200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocumentsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -1191,7 +1446,7 @@ await client.documents.list({
 ```typescript
 await client.documents.get({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1243,7 +1498,7 @@ await client.documents.get({
 ```typescript
 await client.documents.delete({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1280,9 +1535,90 @@ await client.documents.delete({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">commit</a>({ ...params }) -> CloudPDF.DocumentsCommit200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocumentsUpdateResponse</code></summary>
 <dl>
 <dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A document that is being deleted answers 404.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.documents.update({
+    tenantId: "tenantId",
+    docId: "docId",
+    name: "name"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.DocumentsUpdateRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `DocumentsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">commit</a>({ ...params }) -> CloudPDF.DocumentsCommitResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+An upload token commits only the documents it started; any other document answers 404.
+</dd>
+</dl>
+</dd>
+</dl>
 
 #### 🔌 Usage
 
@@ -1295,7 +1631,7 @@ await client.documents.delete({
 ```typescript
 await client.documents.commit({
     tenantId: "tenantId",
-    id: "id",
+    docId: "docId",
     sha256: "sha256"
 });
 
@@ -1348,7 +1684,7 @@ await client.documents.commit({
 ```typescript
 await client.documents.download({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1400,7 +1736,7 @@ await client.documents.download({
 ```typescript
 await client.documents.thumbnail({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1437,7 +1773,7 @@ await client.documents.thumbnail({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">uploadProxy</a>({ ...params }) -> CloudPDF.DocumentsUploadProxy200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">uploadProxy</a>({ ...params }) -> CloudPDF.DocumentsUploadProxyResponse</code></summary>
 <dl>
 <dd>
 
@@ -1449,7 +1785,7 @@ await client.documents.thumbnail({
 <dl>
 <dd>
 
-This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.
+This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.
 </dd>
 </dl>
 </dd>
@@ -1467,7 +1803,7 @@ This bounded origin-mediated fallback must only be used after documents.init ret
 await client.documents.uploadProxy({
     file: fs.createReadStream("/path/to/your/file"),
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1573,9 +1909,23 @@ await client.documents.importFrom({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">init</a>({ ...params }) -> CloudPDF.DocumentsInit200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">init</a>({ ...params }) -> CloudPDF.DocumentsInitResponse</code></summary>
 <dl>
 <dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
+</dd>
+</dl>
+</dd>
+</dl>
 
 #### 🔌 Usage
 
@@ -1588,7 +1938,7 @@ await client.documents.importFrom({
 ```typescript
 await client.documents.init({
     tenantId: "tenantId",
-    contentLength: 1.1,
+    sizeBytes: 1,
     contentSha256: "contentSha256"
 });
 
@@ -1626,8 +1976,59 @@ await client.documents.init({
 </dl>
 </details>
 
-## Tokens
-<details><summary><code>client.tokens.<a href="/src/api/resources/tokens/client/Client.ts">issue</a>({ ...params }) -> CloudPDF.TokensIssue200Response</code></summary>
+## Folders
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">list</a>({ ...params }) -> CloudPDF.FoldersListResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.list({
+    tenantId: "tenantId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.ListFoldersRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">create</a>({ ...params }) -> CloudPDF.FoldersCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -1639,7 +2040,325 @@ await client.documents.init({
 <dl>
 <dd>
 
-kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
+409 Conflict carries `details.reason`: `name-taken` (a sibling has the name, ignoring case; `details.name`) or `too-deep` (folders nest at most 100 levels; `details.maxDepth`). 404 when the parent folder does not exist.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.create({
+    tenantId: "tenantId",
+    name: "name"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.FoldersCreateRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">get</a>({ ...params }) -> CloudPDF.FoldersGetResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.get({
+    tenantId: "tenantId",
+    folderId: "folderId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.GetFoldersRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its grants at once; their stored files and grants are removed in the background. Uploads into those folders that have not committed cannot commit.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.delete({
+    tenantId: "tenantId",
+    folderId: "folderId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.DeleteFoldersRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">update</a>({ ...params }) -> CloudPDF.FoldersUpdateResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+409 Conflict with `details.reason` `name-taken` when a sibling has the name, ignoring case.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.update({
+    tenantId: "tenantId",
+    folderId: "folderId",
+    name: "name"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.FoldersUpdateRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">moveInto</a>({ ...params }) -> void</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.folders.moveInto({
+    tenantId: "tenantId",
+    folderId: "folderId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.FoldersMoveIntoRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FoldersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Tokens
+<details><summary><code>client.tokens.<a href="/src/api/resources/tokens/client/Client.ts">issue</a>({ ...params }) -> CloudPDF.TokensIssueResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Authority mints only downward: kind "doc" gives only document permissions the caller holds itself, kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
 </dd>
 </dl>
 </dd>
@@ -1661,7 +2380,7 @@ await client.tokens.issue({
         sub: "sub",
         docId: "docId",
         scope: ["scope"],
-        expiresIn: 1
+        expiresInSeconds: 1
     }
 });
 
@@ -1766,7 +2485,7 @@ await client.tokens.revoke({
 </details>
 
 ## Doc Annotations
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">listAll</a>({ ...params }) -> CloudPDF.DocAnnotationsListAll200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">listAll</a>({ ...params }) -> CloudPDF.DocAnnotationsListAllResponse</code></summary>
 <dl>
 <dd>
 
@@ -1832,7 +2551,7 @@ await client.doc.annotations.listAll({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAnnotationsList200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAnnotationsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -1885,7 +2604,7 @@ await client.doc.annotations.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">create</a>({ ...params }) -> CloudPDF.DocAnnotationsCreate200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">create</a>({ ...params }) -> CloudPDF.DocAnnotationsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -1955,7 +2674,7 @@ await client.doc.annotations.create({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocAnnotationsDelete200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocAnnotationsDeleteResponse</code></summary>
 <dl>
 <dd>
 
@@ -1972,7 +2691,7 @@ await client.doc.annotations.delete({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -2009,7 +2728,7 @@ await client.doc.annotations.delete({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocAnnotationsUpdate200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocAnnotationsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -2026,7 +2745,7 @@ await client.doc.annotations.update({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey",
+    annotationKey: "annotationKey",
     body: {
         "key": "value"
     }
@@ -2083,7 +2802,7 @@ await client.doc.annotations.readAppearance({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -2101,6 +2820,74 @@ await client.doc.annotations.readAppearance({
 <dd>
 
 **request:** `CloudPDF.doc.ReadAppearanceAnnotationsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AnnotationsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">readFile</a>({ ...params }) -> core.BinaryResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A file that decodes past the server's limit is refused (PayloadTooLarge).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.annotations.readFile({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    annotationKey: "annotationKey"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ReadFileAnnotationsRequest` 
     
 </dd>
 </dl>
@@ -2178,7 +2965,7 @@ await client.doc.annotations.exportAppearance({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocAnnotationsFlatten200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocAnnotationsFlattenResponse</code></summary>
 <dl>
 <dd>
 
@@ -2234,7 +3021,7 @@ await client.doc.annotations.flatten({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocAnnotationsReorder200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocAnnotationsReorderResponse</code></summary>
 <dl>
 <dd>
 
@@ -2296,8 +3083,252 @@ await client.doc.annotations.reorder({
 </dl>
 </details>
 
+## Doc Attachments
+<details><summary><code>client.doc.attachments.<a href="/src/api/resources/doc/resources/attachments/client/Client.ts">download</a>({ ...params }) -> core.BinaryResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A file that decodes past the server's limit is refused (PayloadTooLarge).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.attachments.download({
+    docId: "docId",
+    layerName: "layerName",
+    fileKey: "fileKey"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DownloadAttachmentsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AttachmentsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.attachments.<a href="/src/api/resources/doc/resources/attachments/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAttachmentsListResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A file-attachment annotation's file is listed with the annotation; read its bytes with `doc.annotations.readFile`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.attachments.list({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ListAttachmentsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AttachmentsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Doc Fonts
+<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFontsListResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.fonts.list({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ListFontsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FontsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">resolve</a>({ ...params }) -> CloudPDF.DocFontsResolveResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.fonts.resolve({
+    docId: "docId",
+    layerName: "layerName",
+    body: {
+        runs: [{
+                text: "text"
+            }]
+    }
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ResolveFontsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FontsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Doc Forms
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsList200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -2349,7 +3380,7 @@ await client.doc.forms.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculations200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculationsResponse</code></summary>
 <dl>
 <dd>
 
@@ -2406,7 +3437,7 @@ await client.doc.forms.reorderCalculations({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">setValue</a>({ ...params }) -> CloudPDF.DocFormsSetValue200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">setValue</a>({ ...params }) -> CloudPDF.DocFormsSetValueResponse</code></summary>
 <dl>
 <dd>
 
@@ -2462,7 +3493,7 @@ await client.doc.forms.setValue({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsResetResponse</code></summary>
 <dl>
 <dd>
 
@@ -2514,7 +3545,7 @@ await client.doc.forms.reset({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">deleteWidget</a>({ ...params }) -> CloudPDF.DocFormsDeleteWidget200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">deleteWidget</a>({ ...params }) -> CloudPDF.DocFormsDeleteWidgetResponse</code></summary>
 <dl>
 <dd>
 
@@ -2531,7 +3562,7 @@ await client.doc.forms.deleteWidget({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -2568,7 +3599,7 @@ await client.doc.forms.deleteWidget({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">updateWidget</a>({ ...params }) -> CloudPDF.DocFormsUpdateWidget200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">updateWidget</a>({ ...params }) -> CloudPDF.DocFormsUpdateWidgetResponse</code></summary>
 <dl>
 <dd>
 
@@ -2585,7 +3616,7 @@ await client.doc.forms.updateWidget({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey",
+    annotationKey: "annotationKey",
     patch: {}
 });
 
@@ -2623,7 +3654,7 @@ await client.doc.forms.updateWidget({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderWidgets</a>({ ...params }) -> CloudPDF.DocFormsReorderWidgets200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderWidgets</a>({ ...params }) -> CloudPDF.DocFormsReorderWidgetsResponse</code></summary>
 <dl>
 <dd>
 
@@ -2686,7 +3717,7 @@ await client.doc.forms.reorderWidgets({
 </details>
 
 ## Doc Metadata
-<details><summary><code>client.doc.metadata.<a href="/src/api/resources/doc/resources/metadata/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataGet200Response</code></summary>
+<details><summary><code>client.doc.metadata.<a href="/src/api/resources/doc/resources/metadata/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -2738,8 +3769,61 @@ await client.doc.metadata.get({
 </dl>
 </details>
 
+## Doc Outline
+<details><summary><code>client.doc.outline.<a href="/src/api/resources/doc/resources/outline/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocOutlineGetResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.outline.get({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.GetOutlineRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `OutlineClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Doc Pages
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setScale</a>({ ...params }) -> CloudPDF.DocPagesSetScale200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setScale</a>({ ...params }) -> CloudPDF.DocPagesSetScaleResponse</code></summary>
 <dl>
 <dd>
 
@@ -2792,7 +3876,7 @@ await client.doc.pages.setScale({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">viewports</a>({ ...params }) -> CloudPDF.DocPagesViewports200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">viewports</a>({ ...params }) -> CloudPDF.DocPagesViewportsResponse</code></summary>
 <dl>
 <dd>
 
@@ -2845,61 +3929,6 @@ await client.doc.pages.viewports({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocPagesDelete200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.delete({
-    docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.DeletePagesRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
 <details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">extract</a>({ ...params }) -> core.BinaryResponse</code></summary>
 <dl>
 <dd>
@@ -2912,7 +3941,7 @@ await client.doc.pages.delete({
 <dl>
 <dd>
 
-A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
+A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[], "flatten"?: {"usage"?: "display" | "print"}, "includeAnnotations"?: boolean, "includeFormFields"?: boolean}`; the response body is the new PDF. With `flatten` the copy is the pages as they draw for `usage` (`"print"`: a print copy): the annotations and form fields painted in, nothing interactive left, layers in their state for the usage. A flattened copy takes `doc.download` or `doc.download.flattened`, and paints only what the caller may read; `includeAnnotations` and `includeFormFields` choose what it paints, and are refused without `flatten`.
 </dd>
 </dl>
 </dd>
@@ -2971,7 +4000,7 @@ await client.doc.pages.extract({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocPagesFlatten200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocPagesFlattenResponse</code></summary>
 <dl>
 <dd>
 
@@ -3026,143 +4055,7 @@ await client.doc.pages.flatten({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">insert</a>({ ...params }) -> CloudPDF.DocPagesInsert200Response</code></summary>
-<dl>
-<dd>
-
-#### 📝 Description
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.insert({
-    file: fs.createReadStream("/path/to/your/file"),
-    docId: "docId",
-    layerName: "layerName"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.InsertPagesRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">insertBlank</a>({ ...params }) -> CloudPDF.DocPagesInsertBlank200Response</code></summary>
-<dl>
-<dd>
-
-#### 📝 Description
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-Body is `{"size": {"width", "height"}, "count"?, "position"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.insertBlank({
-    docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.InsertBlankPagesRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setName</a>({ ...params }) -> CloudPDF.DocPagesSetName200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setName</a>({ ...params }) -> CloudPDF.DocPagesSetNameResponse</code></summary>
 <dl>
 <dd>
 
@@ -3217,7 +4110,7 @@ await client.doc.pages.setName({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">removeName</a>({ ...params }) -> CloudPDF.DocPagesRemoveName200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">removeName</a>({ ...params }) -> CloudPDF.DocPagesRemoveNameResponse</code></summary>
 <dl>
 <dd>
 
@@ -3272,120 +4165,8 @@ await client.doc.pages.removeName({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocPagesReorder200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.reorder({
-    docId: "docId",
-    layerName: "layerName",
-    pages: [{
-            kind: "objectNumber",
-            objectNumber: 1
-        }],
-    position: "start"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.DocPagesReorderRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">rotate</a>({ ...params }) -> CloudPDF.DocPagesRotate200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.rotate({
-    docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.RotatePagesRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
 ## Doc Redactions
-<details><summary><code>client.doc.redactions.<a href="/src/api/resources/doc/resources/redactions/client/Client.ts">apply</a>({ ...params }) -> CloudPDF.DocRedactionsApply200Response</code></summary>
+<details><summary><code>client.doc.redactions.<a href="/src/api/resources/doc/resources/redactions/client/Client.ts">apply</a>({ ...params }) -> CloudPDF.DocRedactionsApplyResponse</code></summary>
 <dl>
 <dd>
 
@@ -3438,7 +4219,7 @@ await client.doc.redactions.apply({
 </details>
 
 ## Doc Signatures
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocSignaturesList200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocSignaturesListResponse</code></summary>
 <dl>
 <dd>
 
@@ -3504,7 +4285,7 @@ await client.doc.signatures.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancel200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancelResponse</code></summary>
 <dl>
 <dd>
 
@@ -3557,7 +4338,7 @@ await client.doc.signatures.cancel({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">complete</a>({ ...params }) -> CloudPDF.DocSignaturesComplete200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">complete</a>({ ...params }) -> CloudPDF.DocSignaturesCompleteResponse</code></summary>
 <dl>
 <dd>
 
@@ -3569,7 +4350,7 @@ await client.doc.signatures.cancel({
 <dl>
 <dd>
 
-`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; refetch the manifest after a completion.
+`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer's own: only this layer moves to it, and the document and every other layer stay as they were. Refetch the manifest after a completion.
 </dd>
 </dl>
 </dd>
@@ -3629,7 +4410,7 @@ await client.doc.signatures.complete({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocSignaturesAnalysis200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocSignaturesAnalysisResponse</code></summary>
 <dl>
 <dd>
 
@@ -3695,7 +4476,7 @@ await client.doc.signatures.analysis({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">prepare</a>({ ...params }) -> CloudPDF.DocSignaturesPrepare200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">prepare</a>({ ...params }) -> CloudPDF.DocSignaturesPrepareResponse</code></summary>
 <dl>
 <dd>
 
@@ -3707,7 +4488,7 @@ await client.doc.signatures.analysis({
 <dl>
 <dd>
 
-Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
+Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). The signature is made over the layer's own base: the upload, or the version its last signature made.
 </dd>
 </dl>
 </dd>
@@ -3763,7 +4544,7 @@ await client.doc.signatures.prepare({
 </details>
 
 ## Doc Versions
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocVersionsList200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocVersionsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -3775,7 +4556,7 @@ await client.doc.signatures.prepare({
 <dl>
 <dd>
 
-Every completed signature publishes a new version. Never cached: the list grows.
+Every completed signature makes a new version of its layer; another layer's versions are never listed. Never cached: the list grows.
 </dd>
 </dl>
 </dd>
@@ -3791,7 +4572,8 @@ Every completed signature publishes a new version. Never cached: the list grows.
 
 ```typescript
 await client.doc.versions.list({
-    docId: "docId"
+    docId: "docId",
+    layerName: "layerName"
 });
 
 ```
@@ -3828,7 +4610,7 @@ await client.doc.versions.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocVersionsAnalysis200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocVersionsAnalysisResponse</code></summary>
 <dl>
 <dd>
 
@@ -3840,7 +4622,7 @@ await client.doc.versions.list({
 <dl>
 <dd>
 
-Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every layer and every caller.
+Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.
 </dd>
 </dl>
 </dd>
@@ -3857,7 +4639,8 @@ Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults
 ```typescript
 await client.doc.versions.analysis({
     docId: "docId",
-    sha: "sha"
+    layerName: "layerName",
+    sha256: "sha256"
 });
 
 ```
@@ -3909,7 +4692,8 @@ await client.doc.versions.analysis({
 ```typescript
 await client.doc.versions.download({
     docId: "docId",
-    sha: "sha"
+    layerName: "layerName",
+    sha256: "sha256"
 });
 
 ```
@@ -3961,7 +4745,8 @@ await client.doc.versions.download({
 ```typescript
 await client.doc.versions.revision({
     docId: "docId",
-    sha: "sha",
+    layerName: "layerName",
+    sha256: "sha256",
     index: 1
 });
 
@@ -3999,7 +4784,7 @@ await client.doc.versions.revision({
 </dl>
 </details>
 
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">signatures</a>({ ...params }) -> CloudPDF.DocVersionsSignatures200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">signatures</a>({ ...params }) -> CloudPDF.DocVersionsSignaturesResponse</code></summary>
 <dl>
 <dd>
 
@@ -4014,7 +4799,8 @@ await client.doc.versions.revision({
 ```typescript
 await client.doc.versions.signatures({
     docId: "docId",
-    sha: "sha"
+    layerName: "layerName",
+    sha256: "sha256"
 });
 
 ```
@@ -4080,7 +4866,8 @@ await client.doc.versions.signatures({
 ```typescript
 await client.doc.versions.signatureContents({
     docId: "docId",
-    sha: "sha",
+    layerName: "layerName",
+    sha256: "sha256",
     fieldKey: "fieldKey"
 });
 
@@ -4147,7 +4934,8 @@ What a CMS verifier compares its message digest to.
 ```typescript
 await client.doc.versions.signatureDigest({
     docId: "docId",
-    sha: "sha",
+    layerName: "layerName",
+    sha256: "sha256",
     fieldKey: "fieldKey",
     algorithm: "sha1"
 });
@@ -4186,8 +4974,129 @@ await client.doc.versions.signatureDigest({
 </dl>
 </details>
 
+## Doc Fonts Programs
+<details><summary><code>client.doc.fonts.programs.<a href="/src/api/resources/doc/resources/fonts/resources/programs/client/Client.ts">download</a>({ ...params }) -> core.BinaryResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A document token needs any one of the listed capabilities: one that may write text in the document. A file the list says can't be downloaded (`canDownload: false`) is not found.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.fonts.programs.download({
+    docId: "docId",
+    layerName: "layerName",
+    displaySha256: "displaySha256"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.fonts.DownloadProgramsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProgramsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.fonts.programs.<a href="/src/api/resources/doc/resources/fonts/resources/programs/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocFontsProgramsGetResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.fonts.programs.get({
+    docId: "docId",
+    layerName: "layerName",
+    displaySha256: "displaySha256"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.fonts.GetProgramsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProgramsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Doc Metadata Custom
-<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGet200Response</code></summary>
+<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -4228,6 +5137,246 @@ await client.doc.metadata.custom.get({
 <dd>
 
 **requestOptions:** `CustomClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Documents Layers
+<details><summary><code>client.documents.layers.<a href="/src/api/resources/documents/resources/layers/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsLayersListResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.documents.layers.list({
+    tenantId: "tenantId",
+    docId: "docId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.documents.ListLayersRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `LayersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.documents.layers.<a href="/src/api/resources/documents/resources/layers/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.documents.layers.delete({
+    tenantId: "tenantId",
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.documents.DeleteLayersRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `LayersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Grants Visitors
+<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsVisitorsListResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+An archived grant's visitors are listed too.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.grants.visitors.list({
+    tenantId: "tenantId",
+    grantId: "grantId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.grants.ListVisitorsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `VisitorsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.grants.visitors.delete({
+    tenantId: "tenantId",
+    grantId: "grantId",
+    visitorId: "visitorId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.grants.DeleteVisitorsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `VisitorsClient.RequestOptions` 
     
 </dd>
 </dl>

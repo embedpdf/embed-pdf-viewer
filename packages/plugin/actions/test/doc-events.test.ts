@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
+
 import type {
   DocumentActionsSnapshot,
   DocumentHandle,
@@ -19,13 +21,12 @@ import { createActionsTestContext } from './helpers/context';
 const USER: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const tree = (root: PdfActionNode | null): PdfActionTree => ({
   root,
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
@@ -42,7 +43,6 @@ const named = (name: string): PdfActionNode => ({
 });
 
 const FLAGS_ZERO = {
-  raw: 0,
   exclude: false,
   includeNoValueFields: false,
   format: 'fdf' as const,
@@ -58,7 +58,7 @@ const FLAGS_ZERO = {
 const submitPayload = (overrides: Partial<SubmitFormPayload> = {}): SubmitFormPayload => ({
   url: 'https://home.test/submit',
   fields: null,
-  flags: FLAGS_ZERO,
+  ...FLAGS_ZERO,
   ...overrides,
 });
 const submitNode = (payload: SubmitFormPayload | undefined): PdfActionNode => ({
@@ -85,8 +85,11 @@ function docHarness(options: {
   openAction?: PdfActionTree;
   readFailsFirst?: boolean;
   formsSubmit?: (request: unknown) => Promise<{ submissionId: string; receivedAt: string }>;
+  /** The host gave the kernel a printer: `documents.print()` opens the dialog. */
+  kernelPrints?: boolean;
 }) {
   let readCalls = 0;
+  const log: string[] = [];
   const snapshot: DocumentActionsSnapshot = {
     nameTreeScripts: [],
     openAction: options.openAction ?? null,
@@ -112,11 +115,24 @@ function docHarness(options: {
           ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
         },
       } as unknown as Partial<DocumentHandle>,
+      ...(options.kernelPrints
+        ? {
+            capabilities: [
+              [
+                DocumentsToken as CapabilityToken<unknown>,
+                {
+                  canPrint: () => true,
+                  // As the kernel does: the dialog inside every `aroundPrint` wrap.
+                  print: () => ctx.print(async () => void log.push('dialog')),
+                },
+              ],
+            ],
+          }
+        : {}),
     },
     config,
   );
   const capability = ctx.connect(createActionsController(ctx, config));
-  const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);
     return { status: 'executed' };
@@ -144,7 +160,7 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       'did-print',
       'will-close',
     ] as const) {
-      const result = await capability.dispatch({ scope: 'document', event });
+      const result = await capability.dispatch({ type: 'document', event });
       expect(result.status).toBe('executed');
     }
     expect(log).toEqual(['ws', 'ds', 'wp', 'dp', 'wc']);
@@ -157,10 +173,10 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       trees: { willSave: tree(script('ws')) },
     });
     // No adapter, no user activity — the open latch is still armed.
-    await capability.dispatch({ scope: 'document', event: 'will-save' });
+    await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(log).toEqual(['open', 'ws']);
     // And the sequence counts as fired: a document-open trigger replays inert.
-    const replay = await capability.dispatch({ scope: 'document', event: 'open' });
+    const replay = await capability.dispatch({ type: 'document', event: 'open' });
     expect(replay.status).toBe('inert');
     expect(
       replay.diagnostics.some((diagnostic) => diagnostic.code === 'open-sequence-replayed'),
@@ -231,6 +247,35 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
     expect(log).toEqual(['wp', 'wp', 'print-2', 'dp']);
   });
 
+  it("with the kernel's printer, Named Print prints the document, inside /WP and /DP", async () => {
+    const { capability, log } = docHarness({
+      kernelPrints: true,
+      trees: { willPrint: tree(script('wp')), didPrint: tree(script('dp')) },
+    });
+    const adapterPrint = vi.fn();
+    capability.setUiAdapter({ openUri: vi.fn(), print: adapterPrint });
+    const result = await capability.execute(tree(named('Print')), USER);
+    expect(result.nodes[0]?.status).toBe('executed');
+    // The kernel's print waits for the dispatch to finish, then runs the wrap.
+    await tick();
+    await tick();
+    expect(log).toEqual(['wp', 'dialog', 'dp']);
+    expect(adapterPrint).not.toHaveBeenCalled();
+  });
+
+  it("with the kernel's printer, a print requested by /WP is suppressed", async () => {
+    const { capability, log, diagnostics } = docHarness({
+      kernelPrints: true,
+      config: { policy: { print: { user: 'adapter', hover: 'block', lifecycle: 'adapter' } } },
+      trees: { willPrint: tree(script('wp', [named('Print')])), didPrint: tree(script('dp')) },
+    });
+    await capability.execute(tree(named('Print')), USER);
+    await tick();
+    await tick();
+    expect(log).toEqual(['wp', 'dialog', 'dp']);
+    expect(diagnostics.some((diagnostic) => diagnostic.code === 'reentrant-print')).toBe(true);
+  });
+
   it('a before-event failure never cancels the operation', async () => {
     const { capability, log } = docHarness({ trees: { willSave: tree(script('ws')) } });
     capability.registerExecutor('javascript', () => ({ status: 'failed', error: 'ws broke' }));
@@ -266,7 +311,7 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
     });
     expect(value).toBe('ok');
     expect(log).toEqual(['op']);
-    const dispatched = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const dispatched = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(dispatched.status).toBe('inert');
     expect(
       dispatched.diagnostics.some((diagnostic) => diagnostic.code === 'trigger-disabled'),
@@ -285,10 +330,10 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       readFailsFirst: true,
       trees: { willSave: tree(script('ws')) },
     });
-    const first = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const first = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(first.status).toBe('inert');
     expect(diagnostics.some((diagnostic) => diagnostic.code === 'trigger-failed')).toBe(true);
-    const second = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const second = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(second.status).toBe('executed');
     expect(log).toEqual(['ws']);
     expect(readCallCount()).toBe(2);
@@ -309,7 +354,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -331,7 +375,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -341,7 +384,7 @@ describe('the submit sink chain', () => {
     expect(formsSubmit).toHaveBeenCalledTimes(1);
     expect(formsSubmit.mock.calls[0]?.[0]).toMatchObject({
       entries: [{ name: 'plain', value: 'visible' }],
-      intent: { url: 'https://home.test/submit', format: 'fdf', method: 'post', flagsRaw: 0 },
+      intent: { url: 'https://home.test/submit', format: 'fdf', method: 'post' },
       origin: 'user',
     });
   });
@@ -353,7 +396,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -378,7 +420,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -394,7 +435,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,

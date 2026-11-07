@@ -53,6 +53,7 @@ The returned context adds:
 | `capabilities`             | The token map, to add or replace capabilities during a test.                                                       |
 | `settle(signal?)`          | Runs every `ctx.onSettle` flush and waits for them, as `documents.download()` does before it reads the file.       |
 | `download(read)`           | Runs `read` inside every `ctx.aroundDownload` wrap, as `documents.download()` does after settling.                 |
+| `print(print)`             | Runs `print` inside every `ctx.aroundPrint` wrap, as a prepared print does around the print dialog.                |
 | `dispose()`                | Aborts the lifetime and runs every registered cleanup.                                                             |
 
 `manualClock(options?)` from `@embedpdf/core/testing` is time that moves only
@@ -71,7 +72,7 @@ The smallest harness (`packages/plugin/shell/test/shell.test.ts`):
 
 ```ts
 const harness = () => {
-  const ctx = createTestContext({ id: 'shell', state: initialShellState() });
+  const ctx = createTestContext({ id: 'shell', state: initialShellModel() });
   return ctx.connect(createShellController(ctx));
 };
 ```
@@ -89,7 +90,7 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createTitleController } from '../src/controller';
-import { foldTitle, initialTitleState } from '../src/model';
+import { foldTitle, initialTitleModel } from '../src/model';
 
 const origin = (kind: 'local' | 'remote') => ({
   kind,
@@ -113,7 +114,7 @@ function harness(initial: string | null) {
   let metadata = { title: initial } as DocumentMetadata;
   const ctx = createTestContext({
     id: 'title',
-    state: initialTitleState(),
+    state: initialTitleModel(),
     doc: {
       metadata: {
         read: async () => metadata,

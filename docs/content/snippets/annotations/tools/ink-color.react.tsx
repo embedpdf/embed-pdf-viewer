@@ -7,7 +7,7 @@ export function InkColor() {
   return (
     <input
       type="color"
-      value={defaults.color}
+      value={defaults.color ?? '#000000'}
       onChange={(event) => annotation.tools.updateDefaults('ink', { color: event.target.value })}
     />
   );

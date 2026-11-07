@@ -25,6 +25,7 @@ import {
   type RichTextEditorBinding,
   type RichTextEditorCommand,
   type RichTextEditorDocument,
+  type RichTextEditorFace,
   type RichTextEditorHost,
   type RichTextEditorRange,
 } from './rich-text-editor';
@@ -35,16 +36,22 @@ export interface TextBoxEditorItem<Ref> {
   /** `null` for a box that isn't written yet: nothing to route typing to. */
   readonly ref: Ref | null;
   readonly richText: RichTextEditorDocument;
+  /** The face of its text without one of its own: the box's body. */
+  readonly face: RichTextEditorFace;
   /** True while someone types in this box. */
   readonly editing: boolean;
 }
 
 /** The annotation plugin's text-editing calls (its host capability satisfies it). */
 export interface TextBoxEditorAnnotation<Ref> {
-  draftRichText(ref: Ref, document: RichTextEditorDocument): void;
+  /** Returns the document it keeps (the text typed at the caret in a style chosen there). */
+  draftRichText(ref: Ref, document: RichTextEditorDocument): RichTextEditorDocument | void;
   setTextSelection(ref: Ref, range: RichTextEditorRange | null): void;
   readonly text: { toggleFormat(format: RichTextEditorCommand): unknown };
-  getCssFontFamily(family: string): string;
+  /** The CSS family list a face is drawn with in the box `id` (`null`: no box yet). */
+  getCssFontFamily(face: RichTextEditorFace, id: string | null): string;
+  /** The family a CSS family the editor drew with stands for. */
+  getFamilyOfCss(cssFamily: string): string | undefined;
   getEditingId(): string | null;
 }
 
@@ -76,14 +83,13 @@ export function attachTextBoxEditor<Ref>(
   let shownEditing: boolean | null = null;
 
   const host: RichTextEditorHost = {
-    onInput: (document) => {
-      if (item?.ref) annotation.draftRichText(item.ref, document);
-    },
+    onInput: (document) => (item?.ref ? annotation.draftRichText(item.ref, document) : undefined),
     onSelectionChange: (range) => {
       if (item?.ref) annotation.setTextSelection(item.ref, range);
     },
     onCommand: (command) => void annotation.text.toggleFormat(command),
-    cssFontFamily: (family) => annotation.getCssFontFamily(family),
+    cssFontFamily: (face) => annotation.getCssFontFamily(face, item?.id ?? null),
+    familyOfCss: (cssFamily) => annotation.getFamilyOfCss(cssFamily),
   };
 
   // A press inside the editor stays there: it must not reach the Stage's
@@ -110,7 +116,11 @@ export function attachTextBoxEditor<Ref>(
     update(next, scale) {
       item = next;
       if (next && !binding) {
-        binding = attachRichTextEditor(element, host, { document: next.richText, scale });
+        binding = attachRichTextEditor(element, host, {
+          document: next.richText,
+          scale,
+          body: next.face,
+        });
       } else if (!next && binding) {
         binding.detach();
         binding = null;
@@ -118,7 +128,7 @@ export function attachTextBoxEditor<Ref>(
       // Model → DOM: the binding skips its own echo and redraws, caret kept,
       // for a restyle, a remote edit or a zoom; otherwise it states the line
       // model for the (maybe restyled) font again.
-      if (next) binding?.update({ document: next.richText, scale });
+      if (next) binding?.update({ document: next.richText, scale, body: next.face });
 
       const editing = next?.editing ?? false;
       if (editing === shownEditing) return;
@@ -229,6 +239,8 @@ export interface TextBoxCss {
 /** A text box's body style as CSS. */
 export type TextBoxStyle = {
   fontFamily: string;
+  /** `none`: the browser never fakes a bold or an italic the engine won't draw. */
+  fontSynthesis: 'none';
   /** In pixels, with its unit. */
   fontSize: string;
   color: string;
@@ -246,6 +258,7 @@ export type TextBoxStyle = {
 export function textBoxStyleOf(css: TextBoxCss, scale: number): TextBoxStyle {
   return {
     fontFamily: css.fontFamily,
+    fontSynthesis: 'none',
     fontSize: `${css.fontSize * scale}px`,
     color: css.color,
     fontWeight: css.fontWeight,

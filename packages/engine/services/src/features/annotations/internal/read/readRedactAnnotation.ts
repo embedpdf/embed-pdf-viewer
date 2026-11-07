@@ -1,5 +1,4 @@
 import {
-  freeTextFontForFace,
   type AnnotationBase,
   type Color,
   type RedactAnnotation,
@@ -8,7 +7,7 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
-import { readEngineRichText } from '../richTextWire';
+import { readCommentRichText } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
 import type { AnnotationReadContext } from './annotationReadContext';
@@ -16,11 +15,13 @@ import {
   readAnnotColor,
   readAnnotOpacity,
   readDefaultAppearance,
+  readDefaultAppearanceFace,
   readOverlayText,
   readOverlayTextRepeat,
   readQuadPoints,
   readTextAlignment,
 } from './annotationReadPrimitives';
+import { boxFontName } from './boxFontName';
 
 /** Default `/C` marking outline (red) — the redaction marking convention and
  *  the AP generator's default. */
@@ -52,14 +53,12 @@ export function readRedact(
   const da = readDefaultAppearance(fn, mem, annotPtr);
   // The face the /DA names, resolved by identity as free text does, so a
   // registered font reads back as its key (`standardFontFromCode` only
-  // knows the 14).
-  const face = da ? readEngineRichText(fn, mem, annotPtr)?.body : undefined;
+  // knows the 14). Not the rich text's body: a redact's rich text is its
+  // comment, whose own font isn't the overlay's.
+  const face = da ? readDefaultAppearanceFace(fn, mem, annotPtr) : null;
   const fonts = ctx?.fonts;
   const fontFamily = face?.family
-    ? freeTextFontForFace(
-        face,
-        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
-      )
+    ? boxFontName(fn, mem, annotPtr, face, fonts)
     : da
       ? standardFontFromCode(da.fontCode)
       : DEFAULT_STANDARD_FONT;
@@ -68,6 +67,7 @@ export function readRedact(
 
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'redact',
     quadPoints: readQuadPoints(fn, mem, annotPtr),
     color,

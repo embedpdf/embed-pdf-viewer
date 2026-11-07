@@ -22,4 +22,4 @@ export {
   useStageSettings,
   useStageState,
 } from './stage/composables';
-export type { StageStateValue, StageTokenSource } from './stage/composables';
+export type { StageTokenSource } from './stage/composables';

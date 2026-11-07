@@ -22,11 +22,11 @@ import {
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationContext } from '../services';
 import type { AnnotationReads } from '../read/annotations';
 import type { ChromeReads } from '../read/chrome';
 import type { PropertyReads } from '../read/properties';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
+import type { AnnotationContext } from '../services';
 import type { AnnotationServices } from '../services';
 import { appliedOrThrow, batchResultOf, throwIfFailed } from './outcomes';
 import type { TextEditing } from './text-editing';
@@ -47,9 +47,9 @@ export function createSelectionWrites(
     lending,
   }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors' | 'lending'>,
   annotations: Pick<AnnotationReads, 'selectedRecords' | 'listSelected'>,
-  properties: Pick<PropertyReads, 'activeTextRange' | 'selectionPropertiesOf'>,
+  properties: Pick<PropertyReads, 'activeTextRange' | 'activeCaret' | 'selectionPropertiesOf'>,
   chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
-  text: Pick<TextEditing, 'type'>,
+  text: Pick<TextEditing, 'type' | 'styleTyping'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
@@ -69,28 +69,31 @@ export function createSelectionWrites(
    * member takes the fields its kind has, and the change shows at once, as
    * one change. While the text editor holds a range, the font, size, colour
    * and formats restyle the runs it covers (a delta over the body, through
-   * the pure run algebra) as part of the typing, and the rest goes to the
-   * annotation: its change sends the typing first, so the body it writes is
-   * the latest.
+   * the pure run algebra) as part of the typing; at its caret they are the
+   * style of the text typed next, and nothing is written. The rest goes to
+   * the annotation: its change sends the typing first, so the body it writes
+   * is the latest.
    */
   const restyle = (patch: FieldValues | ((annotation: Annotation) => FieldValues)): Commit[] => {
     const model = store.model();
-    const range = properties.activeTextRange(model);
+    const editor = properties.activeTextRange(model) ?? properties.activeCaret(model);
     const commits: Commit[] = [];
     const patches: Record<Id, FieldValues> = {};
     for (const id of model.selected) {
       const record = model.byId[id];
       if (!record) continue;
       const own = typeof patch === 'function' ? patch(record.annotation) : patch;
-      if (range?.id !== id) {
+      if (editor?.id !== id) {
         patches[id] = own;
         continue;
       }
       const { delta, rest } = runDeltaForFields(own, fonts);
-      if (Object.keys(delta).length) {
+      if (Object.keys(delta).length && editor.start === editor.end) {
+        text.styleTyping(id, delta);
+      } else if (Object.keys(delta).length) {
         const next = applyStyleToRange(
           { paragraphs: richDocOf(record.annotation, fonts).paragraphs },
-          range,
+          editor,
           delta,
         );
         commits.push(text.type(id, { type: 'setRichText', id, doc: next }));
@@ -109,13 +112,16 @@ export function createSelectionWrites(
   };
 
   /**
-   * Bold, italic or underline on or off: the words selected while typing, or
-   * the whole of each selected text box once the text being typed has landed.
+   * Bold, italic or underline on or off: the words selected while typing, the
+   * text typed next at the caret, or all the text of each selected box once
+   * the text being typed has landed. On, unless all of it already has it.
    */
   const toggleFormat = async (format: TextFormat, options: OperationOptions = {}) => {
-    const on = properties.selectionPropertiesOf().values[format] !== true;
-    const range = properties.activeTextRange(store.model());
-    const commits = range
+    const { values, mixed } = properties.selectionPropertiesOf();
+    const on = values[format] !== true || mixed.includes(format);
+    const model = store.model();
+    const editor = properties.activeTextRange(model) ?? properties.activeCaret(model);
+    const commits = editor
       ? restyle({ [format]: on })
       : [store.commit({ type: 'setTextFormat', format, on })];
     const outcomes = await ctx.cancellable(
@@ -129,7 +135,7 @@ export function createSelectionWrites(
   const selection = {
     // `set([])` selects nothing, as its name says: the reducer leaves an empty `select` alone,
     // so an `add` of nothing stays a no-op.
-    set: (refs: readonly AnnotationRef[]) =>
+    select: (refs: readonly AnnotationRef[]) =>
       refs.length ? select(refs, false) : void store.commit({ type: 'deselect' }),
     add: (refs: readonly AnnotationRef[]) => select(refs, true),
     selectAll: (page?: PageRef | number) => {
@@ -158,7 +164,7 @@ export function createSelectionWrites(
     clear: () => {
       store.commit({ type: 'deselect' });
     },
-    list: () => annotations.listSelected(),
+    getSelected: () => annotations.listSelected(),
     update: (
       changes: AnnotationPatch | ((annotation: Annotation) => AnnotationPatch),
       options: OperationOptions = {},

@@ -28,9 +28,9 @@ export interface LinkActionSource<Ref, Page> {
 /** The actions plugin, as an anchor uses it. */
 export interface LinkActionDispatcher<Ref, Page> {
   dispatch(trigger: {
-    readonly scope: 'annotation';
+    readonly type: 'annotation';
     readonly event: LinkAnchorEvent;
-    readonly ref: Ref;
+    readonly annotation: Ref;
     readonly page: Page;
     readonly source: LinkActionSource<Ref, Page>;
   }): unknown;
@@ -73,7 +73,7 @@ export function sendLinkEvent<Ref, Page>(
 ): void {
   if (!actions || !link.ref) return;
   const source: LinkActionSource<Ref, Page> = { kind: 'link', annotation: link.ref, page };
-  void actions.dispatch({ scope: 'annotation', event, ref: link.ref, page, source });
+  void actions.dispatch({ type: 'annotation', event, annotation: link.ref, page, source });
 }
 
 /**

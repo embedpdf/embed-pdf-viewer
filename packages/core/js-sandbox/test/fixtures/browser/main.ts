@@ -2,7 +2,7 @@ import { createQuickJsSandbox } from '../../../src';
 
 void createQuickJsSandbox()
   .then((sandbox) => {
-    sandbox.dispose();
+    sandbox.destroy();
     document.body.dataset.quickjs = 'ready';
     document.body.textContent = 'QuickJS ready';
   })

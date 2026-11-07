@@ -8,90 +8,27 @@ import {
   KmsAadMismatch,
   SecretNotFound,
 } from '../src/index';
+import { DefaultAzureCredential, identity } from '../__mocks__/@azure/identity';
+import { CryptographyClient, keyVaultKeys } from '../__mocks__/@azure/keyvault-keys';
+import { SecretClient, keyVaultSecrets } from '../__mocks__/@azure/keyvault-secrets';
+import { KeyManagementServiceClient, cloudKms } from '../__mocks__/@google-cloud/kms';
+import {
+  SecretManagerServiceClient,
+  secretManager,
+} from '../__mocks__/@google-cloud/secret-manager';
 
-const cloud = vi.hoisted(() => ({
-  gcpSecretAccess: vi.fn(),
-  gcpKmsEncrypt: vi.fn(),
-  gcpKmsDecrypt: vi.fn(),
-  azureSecretGet: vi.fn(),
-  azureEncrypt: vi.fn(),
-  azureDecrypt: vi.fn(),
-  azureWrapKey: vi.fn(),
-  azureUnwrapKey: vi.fn(),
-  azureCredentials: 0,
-  azureSecretClientOptions: [] as unknown[],
-  azureCryptoClientOptions: [] as unknown[],
-}));
-
-vi.mock('@google-cloud/secret-manager', () => ({
-  SecretManagerServiceClient: class {
-    accessSecretVersion(input: unknown) {
-      return cloud.gcpSecretAccess(input);
-    }
-  },
-}));
-
-vi.mock('@google-cloud/kms', () => ({
-  KeyManagementServiceClient: class {
-    encrypt(input: unknown) {
-      return cloud.gcpKmsEncrypt(input);
-    }
-
-    decrypt(input: unknown) {
-      return cloud.gcpKmsDecrypt(input);
-    }
-  },
-}));
-
-vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: class {
-    constructor() {
-      cloud.azureCredentials++;
-    }
-  },
-}));
-
-vi.mock('@azure/keyvault-secrets', () => ({
-  SecretClient: class {
-    constructor(vaultUrl: string, credential: unknown) {
-      cloud.azureSecretClientOptions.push({ vaultUrl, credential });
-    }
-
-    getSecret(name: string, opts?: unknown) {
-      return cloud.azureSecretGet(name, opts);
-    }
-  },
-}));
-
-vi.mock('@azure/keyvault-keys', () => ({
-  CryptographyClient: class {
-    constructor(keyId: string, credential: unknown) {
-      cloud.azureCryptoClientOptions.push({ keyId, credential });
-    }
-
-    encrypt(input: unknown) {
-      return cloud.azureEncrypt(input);
-    }
-
-    decrypt(input: unknown) {
-      return cloud.azureDecrypt(input);
-    }
-
-    wrapKey(algorithm: string, key: Buffer) {
-      return cloud.azureWrapKey(algorithm, key);
-    }
-
-    unwrapKey(algorithm: string, encryptedKey: Buffer) {
-      return cloud.azureUnwrapKey(algorithm, encryptedKey);
-    }
-  },
-}));
+// No factories: vitest serves each SDK's fake from __mocks__/.
+vi.mock('@google-cloud/secret-manager');
+vi.mock('@google-cloud/kms');
+vi.mock('@azure/identity');
+vi.mock('@azure/keyvault-secrets');
+vi.mock('@azure/keyvault-keys');
 
 describe('GcpSecretManagerProvider', () => {
   beforeEach(() => resetCloudMocks());
 
   test('reads a JSON-keyed secret from Google Secret Manager', async () => {
-    cloud.gcpSecretAccess.mockResolvedValue([
+    secretManager.accessSecretVersion.mockResolvedValue([
       {
         name: 'projects/acme/secrets/prod-embedpdf/versions/7',
         payload: { data: Buffer.from(JSON.stringify({ jwtSecret: 'gcp-secret' })) },
@@ -108,13 +45,15 @@ describe('GcpSecretManagerProvider', () => {
 
     expect(value.bytes.toString('utf8')).toBe('gcp-secret');
     expect(value.version).toBe('7');
-    expect(cloud.gcpSecretAccess).toHaveBeenCalledWith({
+    expect(secretManager.accessSecretVersion).toHaveBeenCalledWith({
       name: 'projects/acme/secrets/prod-embedpdf/versions/7',
     });
   });
 
   test('maps Google not-found responses to SecretNotFound', async () => {
-    cloud.gcpSecretAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 5 }));
+    secretManager.accessSecretVersion.mockRejectedValue(
+      Object.assign(new Error('missing'), { code: 5 }),
+    );
 
     const provider = new GcpSecretManagerProvider({ project: 'acme' });
     await expect(provider.get({ provider: 'gcp', name: 'missing' })).rejects.toBeInstanceOf(
@@ -128,7 +67,7 @@ describe('GcpKmsKeyring', () => {
 
   test('wraps local data keys with Google KMS and native AAD', async () => {
     const ciphertext = Buffer.from('gcp-wrapped-data-key');
-    cloud.gcpKmsEncrypt.mockResolvedValue([{ ciphertext }]);
+    cloudKms.encrypt.mockResolvedValue([{ ciphertext }]);
 
     const keyring = new GcpKmsKeyring({
       keyId: 'projects/acme/locations/global/keyRings/embedpdf/cryptoKeys/main',
@@ -143,19 +82,19 @@ describe('GcpKmsKeyring', () => {
       version: 1,
     });
     expect(dataKey.wrapped.ciphertext.equals(ciphertext)).toBe(true);
-    expect(cloud.gcpKmsEncrypt.mock.calls[0]?.[0]).toMatchObject({
+    expect(cloudKms.encrypt.mock.calls[0]?.[0]).toMatchObject({
       name: 'projects/acme/locations/global/keyRings/embedpdf/cryptoKeys/main',
       additionalAuthenticatedData: Buffer.from('[["tenantId","tenant-a"]]'),
     });
     expect(
-      (cloud.gcpKmsEncrypt.mock.calls[0]?.[0] as { plaintext: Buffer }).plaintext.byteLength,
+      (cloudKms.encrypt.mock.calls[0]?.[0] as { plaintext: Buffer }).plaintext.byteLength,
     ).toBe(32);
   });
 
   test('decrypts with the same Google KMS AAD and maps auth failures', async () => {
     const plaintext = Buffer.alloc(32, 4);
     const ciphertext = Buffer.from('gcp-wrapped-data-key');
-    cloud.gcpKmsDecrypt.mockResolvedValueOnce([{ plaintext }]);
+    cloudKms.decrypt.mockResolvedValueOnce([{ plaintext }]);
 
     const keyring = new GcpKmsKeyring({
       keyId: 'projects/acme/locations/global/keyRings/r/cryptoKeys/k',
@@ -172,13 +111,13 @@ describe('GcpKmsKeyring', () => {
         { tenantId: 'tenant-a' },
       ),
     ).resolves.toEqual(plaintext);
-    expect(cloud.gcpKmsDecrypt.mock.calls[0]?.[0]).toMatchObject({
+    expect(cloudKms.decrypt.mock.calls[0]?.[0]).toMatchObject({
       name: 'projects/acme/locations/global/keyRings/r/cryptoKeys/k',
       ciphertext,
       additionalAuthenticatedData: Buffer.from('[["tenantId","tenant-a"]]'),
     });
 
-    cloud.gcpKmsDecrypt.mockRejectedValueOnce(Object.assign(new Error('bad aad'), { code: 3 }));
+    cloudKms.decrypt.mockRejectedValueOnce(Object.assign(new Error('bad aad'), { code: 3 }));
     await expect(
       keyring.decryptDataKey(
         {
@@ -198,7 +137,7 @@ describe('AzureKeyVaultSecretsProvider', () => {
   beforeEach(() => resetCloudMocks());
 
   test('reads a JSON-keyed secret from Azure Key Vault', async () => {
-    cloud.azureSecretGet.mockResolvedValue({
+    keyVaultSecrets.getSecret.mockResolvedValue({
       value: JSON.stringify({ jwtSecret: 'azure-secret' }),
       properties: { version: 'v1' },
     });
@@ -215,11 +154,11 @@ describe('AzureKeyVaultSecretsProvider', () => {
 
     expect(value.bytes.toString('utf8')).toBe('azure-secret');
     expect(value.version).toBe('v1');
-    expect(cloud.azureSecretGet).toHaveBeenCalledWith('embedpdf', { version: 'v1' });
+    expect(keyVaultSecrets.getSecret).toHaveBeenCalledWith('embedpdf', { version: 'v1' });
   });
 
   test('maps Azure not-found responses to SecretNotFound', async () => {
-    cloud.azureSecretGet.mockRejectedValue(
+    keyVaultSecrets.getSecret.mockRejectedValue(
       Object.assign(new Error('missing'), { statusCode: 404 }),
     );
 
@@ -238,7 +177,7 @@ describe('AzureKeyVaultKeyring', () => {
   test('uses Managed HSM A256GCM with native Azure AAD', async () => {
     const ciphertext = Buffer.from('azure-managed-hsm-ciphertext');
     const tag = Buffer.from('azure-managed-hsm-tag');
-    cloud.azureEncrypt.mockResolvedValue({ result: ciphertext, authenticationTag: tag });
+    keyVaultKeys.encrypt.mockResolvedValue({ result: ciphertext, authenticationTag: tag });
 
     const keyring = new AzureKeyVaultKeyring({
       vaultUrl: 'https://hsm.managedhsm.azure.net',
@@ -255,19 +194,19 @@ describe('AzureKeyVaultKeyring', () => {
       algorithm: 'AES_256_GCM',
       version: 1,
     });
-    expect(cloud.azureEncrypt.mock.calls[0]?.[0]).toMatchObject({
+    expect(keyVaultKeys.encrypt.mock.calls[0]?.[0]).toMatchObject({
       algorithm: 'A256GCM',
       plaintext: expect.any(Buffer),
       additionalAuthenticatedData: Buffer.from('[["tenantId","tenant-a"]]'),
       iv: expect.any(Buffer),
     });
-    expect((cloud.azureEncrypt.mock.calls[0]?.[0] as { iv: Buffer }).iv.byteLength).toBe(12);
+    expect((keyVaultKeys.encrypt.mock.calls[0]?.[0] as { iv: Buffer }).iv.byteLength).toBe(12);
 
-    cloud.azureDecrypt.mockResolvedValue({ result: dataKey.plaintext });
+    keyVaultKeys.decrypt.mockResolvedValue({ result: dataKey.plaintext });
     await expect(
       keyring.decryptDataKey(dataKey.wrapped, { tenantId: 'tenant-a' }),
     ).resolves.toEqual(dataKey.plaintext);
-    expect(cloud.azureDecrypt.mock.calls[0]?.[0]).toMatchObject({
+    expect(keyVaultKeys.decrypt.mock.calls[0]?.[0]).toMatchObject({
       algorithm: 'A256GCM',
       ciphertext,
       additionalAuthenticatedData: Buffer.from('[["tenantId","tenant-a"]]'),
@@ -276,7 +215,7 @@ describe('AzureKeyVaultKeyring', () => {
   });
 
   test('uses standard Key Vault RSA wrapping and enforces AAD with an envelope MAC', async () => {
-    cloud.azureWrapKey.mockResolvedValue({ result: Buffer.from('azure-wrapped-data-key') });
+    keyVaultKeys.wrapKey.mockResolvedValue({ result: Buffer.from('azure-wrapped-data-key') });
 
     const keyring = new AzureKeyVaultKeyring({
       vaultUrl: 'https://vault.vault.azure.net',
@@ -293,13 +232,13 @@ describe('AzureKeyVaultKeyring', () => {
       algorithm: 'AES_256_GCM',
       version: 1,
     });
-    expect(cloud.azureCryptoClientOptions[0]).toMatchObject({
+    expect(keyVaultKeys.clientOptions[0]).toMatchObject({
       keyId: 'https://vault.vault.azure.net/keys/embedpdf/123',
     });
-    expect(cloud.azureWrapKey.mock.calls[0]?.[0]).toBe('RSA-OAEP-256');
-    expect((cloud.azureWrapKey.mock.calls[0]?.[1] as Buffer).byteLength).toBe(32);
+    expect(keyVaultKeys.wrapKey.mock.calls[0]?.[0]).toBe('RSA-OAEP-256');
+    expect((keyVaultKeys.wrapKey.mock.calls[0]?.[1] as Buffer).byteLength).toBe(32);
 
-    cloud.azureUnwrapKey.mockResolvedValue({ result: dataKey.plaintext });
+    keyVaultKeys.unwrapKey.mockResolvedValue({ result: dataKey.plaintext });
     await expect(
       keyring.decryptDataKey(dataKey.wrapped, { tenantId: 'tenant-a' }),
     ).resolves.toEqual(dataKey.plaintext);
@@ -357,16 +296,62 @@ describe('AzureKeyVaultKeyring', () => {
   });
 });
 
+describe('adapters built back to back', () => {
+  // Each constructor starts its own SDK imports, so these imports overlap.
+  // A vi.mock factory hands some of them the real clients.
+  const azureFake = (c: unknown, Client: typeof SecretClient | typeof CryptographyClient) =>
+    c instanceof Client && c.credential instanceof DefaultAzureCredential;
+  test.each([
+    {
+      name: 'GcpSecretManagerProvider',
+      make: () => new GcpSecretManagerProvider({ project: 'acme' }),
+      isFake: (c: unknown) => c instanceof SecretManagerServiceClient,
+    },
+    {
+      name: 'GcpKmsKeyring',
+      make: () =>
+        new GcpKmsKeyring({
+          keyId: 'projects/acme/locations/global/keyRings/embedpdf/cryptoKeys/main',
+        }),
+      isFake: (c: unknown) => c instanceof KeyManagementServiceClient,
+    },
+    {
+      name: 'AzureKeyVaultSecretsProvider',
+      make: () => new AzureKeyVaultSecretsProvider({ vaultUrl: 'https://vault.vault.azure.net' }),
+      isFake: (c: unknown) => azureFake(c, SecretClient),
+    },
+    {
+      name: 'AzureKeyVaultKeyring',
+      make: () =>
+        new AzureKeyVaultKeyring({
+          vaultUrl: 'https://vault.vault.azure.net',
+          keyName: 'embedpdf',
+          keyVersion: '123',
+          mode: 'key-vault-rsa-oaep-256',
+        }),
+      isFake: (c: unknown) => azureFake(c, CryptographyClient),
+    },
+  ])('every $name gets the fake SDK clients', async ({ make, isFake }) => {
+    const clients = await Promise.all(Array.from({ length: 8 }, () => clientOf(make())));
+    expect(clients.every(isFake)).toBe(true);
+  });
+});
+
+/** An adapter's SDK client, read without calling it: a real one would call the cloud. */
+function clientOf(adapter: object): Promise<unknown> {
+  return (adapter as { clientPromise?: Promise<unknown> }).clientPromise!;
+}
+
 function resetCloudMocks(): void {
-  cloud.gcpSecretAccess.mockReset();
-  cloud.gcpKmsEncrypt.mockReset();
-  cloud.gcpKmsDecrypt.mockReset();
-  cloud.azureSecretGet.mockReset();
-  cloud.azureEncrypt.mockReset();
-  cloud.azureDecrypt.mockReset();
-  cloud.azureWrapKey.mockReset();
-  cloud.azureUnwrapKey.mockReset();
-  cloud.azureCredentials = 0;
-  cloud.azureSecretClientOptions.length = 0;
-  cloud.azureCryptoClientOptions.length = 0;
+  secretManager.accessSecretVersion.mockReset();
+  cloudKms.encrypt.mockReset();
+  cloudKms.decrypt.mockReset();
+  keyVaultSecrets.getSecret.mockReset();
+  keyVaultKeys.encrypt.mockReset();
+  keyVaultKeys.decrypt.mockReset();
+  keyVaultKeys.wrapKey.mockReset();
+  keyVaultKeys.unwrapKey.mockReset();
+  identity.credentials = 0;
+  keyVaultSecrets.clientOptions.length = 0;
+  keyVaultKeys.clientOptions.length = 0;
 }

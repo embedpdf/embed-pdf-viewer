@@ -6,7 +6,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
@@ -43,15 +43,15 @@ const CALCULATE = script('event.value = 1;');
 
 export function runFormScriptConformance(
   runner: ConformanceTestRunner,
-  opts: FormScriptConformanceOptions,
+  options: FormScriptConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`form script conformance: ${opts.label}`, () => {
+  describe(`form script conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -62,7 +62,7 @@ export function runFormScriptConformance(
       body: (doc: DocumentHandle) => Promise<void>,
       scope: readonly string[] = EVERYTHING,
     ) => {
-      const doc = await opts.open(engine, scope);
+      const doc = await options.open(engine, scope);
       try {
         await body(doc);
       } finally {
@@ -70,7 +70,7 @@ export function runFormScriptConformance(
       }
     };
 
-    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormFieldDTO> => {
+    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormField> => {
       const field = (await doc.forms.list()).fields.find((f) => f.name === name);
       if (!field) throw new Error(`no field '${name}'`);
       return field;
@@ -78,7 +78,7 @@ export function runFormScriptConformance(
 
     /** The script an event runs, or null. */
     const scriptOf = (
-      field: FormFieldDTO,
+      field: FormField,
       event: 'keystroke' | 'format' | 'validate' | 'calculate',
     ) => {
       const root = field.actions?.[event]?.root;
@@ -95,7 +95,7 @@ export function runFormScriptConformance(
     };
 
     const createCalculated = async (doc: DocumentHandle, name: string) =>
-      doc.forms.create({ family: 'text', name, actions: { calculate: CALCULATE } });
+      doc.forms.create({ kind: 'text', name, actions: { calculate: CALCULATE } });
 
     const outcome = (attempt: Promise<unknown>) =>
       attempt.then(
@@ -106,7 +106,7 @@ export function runFormScriptConformance(
     test("create writes a field's scripts; a calculate script puts it in the order", async () => {
       await withDoc(async (doc) => {
         const created = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'total',
           readOnly: true,
           actions: {
@@ -247,7 +247,7 @@ export function runFormScriptConformance(
     test("a widget's actions are written with its placement and read back from its row", async () => {
       await withDoc(async (doc) => {
         const { field } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'clearing',
           widgets: [
             {
@@ -339,7 +339,7 @@ export function runFormScriptConformance(
         expect(
           await outcome(
             doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: 'y',
               widgets: [
                 {
@@ -385,7 +385,7 @@ export function runFormScriptConformance(
         const refused = [
           await outcome(doc.forms.update(NAME, { actions: { format: script('f();') } })),
           await outcome(
-            doc.forms.create({ family: 'text', name: 'x', actions: { calculate: CALCULATE } }),
+            doc.forms.create({ kind: 'text', name: 'x', actions: { calculate: CALCULATE } }),
           ),
           await outcome(
             doc.apply({
@@ -401,7 +401,7 @@ export function runFormScriptConformance(
         ];
         expect(refused.every((code) => code === EngineErrorCode.Forbidden)).toBe(true);
         // A field without scripts, and a removal, need only doc.forms.modify.
-        await doc.forms.create({ family: 'text', name: 'plain' });
+        await doc.forms.create({ kind: 'text', name: 'plain' });
         await doc.forms.update(NAME, { actions: { format: null } });
       }, DESIGN_ONLY);
     });

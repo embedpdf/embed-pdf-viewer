@@ -2,23 +2,30 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addTranslations,
+  arriveLocale,
+  endFallbackLoad,
   endLocaleLoad,
-  initialI18nState,
+  followFallback,
+  initialI18nModel,
+  isLoaded,
+  isReady,
   nestKeys,
   registerLocale,
   seedFromSettings,
   setLocale,
   startLocaleLoad,
   unregisterLocale,
-  type I18nState,
+  type I18nModel,
 } from '../src/model';
 import { I18N_DEFAULTS, type I18nSettings } from '../src/contract';
 import { ar, en, es } from './fixtures';
 
-const stateWith = (overrides: Partial<I18nState> = {}): I18nState => ({
+const stateWith = (overrides: Partial<I18nModel> = {}): I18nModel => ({
   locale: 'es',
   locales: { en, es },
   loading: null,
+  loadingFallback: null,
+  fetched: {},
   waitingTranslations: {},
   ...overrides,
 });
@@ -31,23 +38,74 @@ describe('i18n transitions', () => {
 
   it('seeds from the settings: their languages loaded, the start language current', () => {
     const state = seedFromSettings(
-      initialI18nState(),
+      initialI18nModel(),
       settingsWith({ locales: [en, es], locale: 'es' }),
     );
     expect(state.locale).toBe('es');
     expect(Object.keys(state.locales)).toEqual(['en', 'es']);
     expect(state.loading).toBeNull();
-    const fallback = seedFromSettings(initialI18nState(), settingsWith({ locales: [en] }));
+    const fallback = seedFromSettings(initialI18nModel(), settingsWith({ locales: [en] }));
     expect(fallback.locale).toBe('en');
   });
 
   it('shows the fallback language while a start language from loaders loads', () => {
     const state = seedFromSettings(
-      initialI18nState(),
+      initialI18nModel(),
       settingsWith({ locales: [en], locale: 'ar', loaders: { ar: async () => ar } }),
     );
     expect(state.locale).toBe('en');
     expect(state.loading).toBe('ar');
+  });
+
+  it('waits for a fallback language from loaders, showing the first language in locales meanwhile', () => {
+    const load = async () => ar;
+    const state = seedFromSettings(
+      initialI18nModel(),
+      settingsWith({
+        locales: [en, es],
+        locale: 'es',
+        fallbackLocale: 'ar',
+        loaders: { ar: load },
+      }),
+    );
+    expect(state.locale).toBe('en');
+    expect(state.loading).toBe('es');
+    expect(state.loadingFallback).toBe('ar');
+    expect(isLoaded(state, { ar: load }, 'es')).toBe(true);
+    expect(isReady(state, { ar: load }, 'es')).toBe(false);
+
+    const arrived = arriveLocale(state, 'ar', ar);
+    expect(arrived.loadingFallback).toBeNull();
+    expect(arrived.fetched).toEqual({ ar: true });
+    expect(isReady(arrived, { ar: load }, 'es')).toBe(true);
+  });
+
+  it('counts a language in locales and loaders as loaded only once its loader has run', () => {
+    const loaders = { en: async () => en };
+    const state = seedFromSettings(
+      initialI18nModel(),
+      settingsWith({ locales: [{ ...en, translations: {} }], loaders }),
+    );
+    expect(state.locale).toBe('en'); // its strings from locales show meanwhile
+    expect(state.loading).toBe('en');
+    expect(state.loadingFallback).toBe('en');
+    expect(isLoaded(state, loaders, 'en')).toBe(false);
+
+    const arrived = setLocale(arriveLocale(state, 'en', en), 'en');
+    expect(isLoaded(arrived, loaders, 'en')).toBe(true);
+    expect(arrived.locales.en).toEqual(en); // the loader's language replaces them
+    expect(arrived.loading).toBeNull();
+    expect(unregisterLocale(arrived, 'en').fetched).toEqual({});
+  });
+
+  it('follows a new fallback language, and ends its wait only for the code in flight', () => {
+    const loaders = { ar: async () => ar };
+    const waiting = followFallback(stateWith(), { fallbackLocale: 'ar', loaders });
+    expect(waiting.loadingFallback).toBe('ar');
+    expect(followFallback(waiting, { fallbackLocale: 'ar', loaders })).toBe(waiting);
+    expect(followFallback(waiting, { fallbackLocale: 'en', loaders }).loadingFallback).toBeNull();
+    expect(endFallbackLoad(waiting, 'fr')).toBe(waiting);
+    expect(endFallbackLoad(waiting, 'ar').loadingFallback).toBeNull();
   });
 
   it('ignores setLocale for an unregistered pack', () => {

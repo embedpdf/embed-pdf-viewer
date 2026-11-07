@@ -6,15 +6,14 @@
  *
  *   • a flat props patch → the run delta it means for a text range (font,
  *     size, colour, bold/italic/underline) and the keys left for the body
- *   • what a range reads back for those keys (agree → the value, else mixed)
- *   • faces: the DTO font a face names, and a CSS family list for either
+ *   • what a range reads back for those keys (agree → the value, else mixed),
+ *     and a caret: the text typed there next
+ *   • faces: the DTO font a face names
  *   • the commit rule: a document nothing overrides on a plain annotation
  *     commits as `contents`; anything else as `richText`
  */
 import {
   faceForFont,
-  mountedFontFamily,
-  STANDARD_FONT_STACKS,
   type FieldValues,
   type FontLookup,
   locateOffset,
@@ -22,9 +21,11 @@ import {
   richDocOf,
   type RichTextRange,
   type RichTextStyleDelta,
+  styleAt,
 } from '@embedpdf/core-annotation';
 import {
-  STANDARD_FACES,
+  familyKey,
+  fontNameForFace,
   type RichTextBody,
   type RichTextDocument,
   type RichTextParagraph,
@@ -34,9 +35,18 @@ import {
 export type TextFormat = 'bold' | 'italic' | 'underline';
 
 /** The editor's selection inside one free-text annotation: flat offsets over
- *  the plain projection (paragraphs joined by `\r`). */
+ *  the plain projection (paragraphs joined by `\n`). */
 export interface TextSelection extends RichTextRange {
   id: string;
+}
+
+/**
+ * The editor's selection as the plugin keeps it: at a caret, with the style
+ * chosen there for the text typed next. A selection that moves is a new one,
+ * without it.
+ */
+export interface EditorSelection extends TextSelection {
+  readonly typing?: RichTextStyleDelta;
 }
 
 /** The face a run or a body names. */
@@ -58,73 +68,22 @@ export const RANGE_KEYS: readonly string[] = [
 
 // ---- Faces ---------------------------------------------------------------------
 
-type StandardFamily = (typeof STANDARD_FACES)[keyof typeof STANDARD_FACES]['family'];
-
-/** Family names compare without case, spaces, hyphens, underscores and
- *  quotes — the engine's own rule. */
-export function familyKey(family: string): string {
-  return family.toLowerCase().replace(/[\s\-_'"]/g, '');
-}
-
-const STANDARD_FAMILY_KEYS: Record<string, StandardFamily> = {
-  helvetica: 'Helvetica',
-  arial: 'Helvetica',
-  arialmt: 'Helvetica',
-  sansserif: 'Helvetica',
-  times: 'Times',
-  timesroman: 'Times',
-  timesnewroman: 'Times',
-  timesnewromanpsmt: 'Times',
-  serif: 'Times',
-  courier: 'Courier',
-  couriernew: 'Courier',
-  couriernewpsmt: 'Courier',
-  monospace: 'Courier',
-  symbol: 'Symbol',
-  zapfdingbats: 'ZapfDingbats',
-  dingbats: 'ZapfDingbats',
-};
-
 /** The DTO font for a face: the registered key whose identity matches (the
  *  closest weight, italic first), else the standard kebab name, else the
  *  family itself. The inverse of {@link faceForFont}. */
 export function fontForFace(face: Face, fonts?: FontLookup): string {
-  const wanted = familyKey(face.family);
   const weight = face.weight ?? 400;
   const italic = face.italic ?? false;
-  let best: { key: string; score: number } | undefined;
-  for (const handle of fonts?.() ?? []) {
-    if (familyKey(handle.familyName) !== wanted) continue;
-    const score = Math.abs(handle.weight - weight) + (handle.italic === italic ? 0 : 1000);
-    if (!best || score < best.score) best = { key: handle.key, score };
-  }
-  if (best) return best.key;
-  const standard = STANDARD_FAMILY_KEYS[wanted];
-  if (standard) {
-    const bold = weight >= 600;
-    for (const [name, spec] of Object.entries(STANDARD_FACES)) {
-      if (spec.family === standard && spec.weight >= 600 === bold && spec.italic === italic) {
-        return name;
-      }
+  return fontNameForFace({ family: face.family, weight, italic }, (family) => {
+    const wanted = familyKey(family);
+    let best: { key: string; score: number } | undefined;
+    for (const handle of fonts?.() ?? []) {
+      if (familyKey(handle.familyName) !== wanted) continue;
+      const score = Math.abs(handle.weight - weight) + (handle.italic === italic ? 0 : 1000);
+      if (!best || score < best.score) best = { key: handle.key, score };
     }
-    for (const [name, spec] of Object.entries(STANDARD_FACES)) {
-      if (spec.family === standard) return name; // Symbol/ZapfDingbats: one face
-    }
-  }
-  return face.family;
-}
-
-/** The CSS family list for a face family: a standard family's web stack, a
- *  registered family's mounted `@font-face` ({@link mountedFontFamily}), else
- *  the family itself with a generic fallback. A DTO font's list is
- *  `cssFontFamilyForFont`'s, in `@embedpdf/core-annotation`. */
-export function cssFontFamilyForFace(family: string, fonts?: FontLookup): string {
-  const standard = STANDARD_FAMILY_KEYS[familyKey(family)];
-  if (standard) return STANDARD_FONT_STACKS[standard];
-  const wanted = familyKey(family);
-  const registered = fonts?.().find((handle) => familyKey(handle.familyName) === wanted);
-  if (registered) return mountedFontFamily(registered.key);
-  return `"${family}", sans-serif`;
+    return best?.key;
+  });
 }
 
 // ---- Documents -----------------------------------------------------------------
@@ -249,15 +208,42 @@ export function runsInRange(
   return out;
 }
 
-/** The values a range reads back for the range keys — resolved against the
- *  body, one value where every run agrees, `mixed` where they don't. */
+/** What text reads back for the range keys: a value each, and the keys its runs disagree on. */
+export interface TextProps {
+  values: Record<string, unknown>;
+  mixed: string[];
+}
+
+/** The values a range reads back for the range keys: the runs it covers (`runProps`). */
 export function rangeProps(
   doc: RichTextDocument,
   range: RichTextRange,
   fonts?: FontLookup,
-): { values: Record<string, unknown>; mixed: string[] } {
-  const runs = runsInRange(doc, range);
-  const body = doc.body;
+): TextProps {
+  return runProps(doc.body, runsInRange(doc, range), fonts);
+}
+
+/**
+ * The values a caret reads back for the range keys: the text typed there
+ * next, in the style of the text before it (`styleAt`) with the style chosen
+ * at the caret over it.
+ */
+export function caretProps(
+  doc: RichTextDocument,
+  at: number,
+  typing: RichTextStyleDelta | undefined,
+  fonts?: FontLookup,
+): TextProps {
+  return runProps(doc.body, [{ ...styleAt(doc, at), ...typing }], fonts);
+}
+
+/** The values runs read back for the range keys: resolved against the
+ *  body, one value where every run agrees, `mixed` where they don't. */
+function runProps(
+  body: RichTextBody,
+  runs: readonly RichTextStyleDelta[],
+  fonts?: FontLookup,
+): TextProps {
   const resolve = (delta: RichTextStyleDelta): Partial<RichTextRunStyle> => ({
     family: delta.family ?? body.family,
     weight: delta.weight ?? body.weight,

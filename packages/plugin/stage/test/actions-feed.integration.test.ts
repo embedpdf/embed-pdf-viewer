@@ -67,9 +67,9 @@ async function boot() {
   const firstPageObjectNumber = 3; // the fixture's first page is object 3
   const drain = () =>
     actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: {
+      annotation: {
         kind: 'objectNumber',
         page: toPageRef(firstPageObjectNumber),
         objectNumber: 999,

@@ -3,7 +3,12 @@ import type {
   PageObjectNumber,
   PageTextSnapshot,
 } from '@embedpdf/engine-core/runtime';
-import { charMapViolation, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  charMapViolation,
+  EngineError,
+  EngineErrorCode,
+  toPageText,
+} from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -75,7 +80,9 @@ export class PageTextReader {
             `char map invariant violated for page object ${pageObjectNumber}: ${violation}`,
           );
         }
-        return charMap.length > 0 ? { text, charCount, charMap } : { text, charCount };
+        // The fork returns the text as PDFium extracted it; what counts as
+        // text is decided here, once, for search, `doc.text` and copy alike.
+        return toPageText(charMap.length > 0 ? { text, charCount, charMap } : { text, charCount });
       } finally {
         fn.FPDFText_ClosePage(textPagePtr);
       }

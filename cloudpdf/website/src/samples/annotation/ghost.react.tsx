@@ -27,7 +27,7 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 const TOOLS = [
   { id: 'note', label: 'Note' },
@@ -95,7 +95,7 @@ export default function App() {
   const ghostOpacity = opacity === null ? undefined : { '--epdf-ghost-opacity': opacity };
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar opacity={opacity} onOpacity={setOpacity} />
         <Stage className="stage" style={ghostOpacity as CSSProperties | undefined}>

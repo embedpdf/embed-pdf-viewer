@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { RedactionApplyScope } from '@embedpdf/engine-core/runtime';
-import { RedactionApplyScopeSchema } from '@embedpdf/engine-core/wire';
+import { RedactionApplyScopeInputSchema } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -37,22 +37,33 @@ export async function registerRedactionRoutes(
   app.post('/v1/docs/:docId/layers/:layerName/redactions/apply', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
-    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
-    requireLayerCapability(req, docId, layerName, 'doc.redact', pdfBits, protection);
+    requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.annotate.modify',
+      permissionFlags,
+      protection,
+    );
+    requireLayerCapability(req, docId, layerName, 'doc.redact', permissionFlags, protection);
 
     // The body is what `redaction.apply()` takes: `{ pages }` or `{ annotations }`.
     const scope = parseOrInvalidArg<RedactionApplyScope>(
-      RedactionApplyScopeSchema as unknown as SchemaLike<RedactionApplyScope>,
+      RedactionApplyScopeInputSchema as unknown as SchemaLike<RedactionApplyScope>,
       req.body ?? {},
       'request body',
     );

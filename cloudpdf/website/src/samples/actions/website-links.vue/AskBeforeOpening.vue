@@ -4,17 +4,22 @@ import { onMounted, ref } from 'vue';
 import { useActions, useActionsUiAdapter } from '@embedpdf/vue/actions';
 import type { ActionContext, PdfActionTree } from '@embedpdf/vue/actions';
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
-  root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+  root: {
+    type: 'uri',
+    subtype: 'URI',
+    uri: 'https://www.w3.org/TR/WCAG22/',
+    isMap: false,
+    next: [],
+  },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const actions = useActions();
@@ -39,13 +44,14 @@ function openInNewTab(uri: string) {
 
 <template>
   <section class="panel">
-    <p class="lead">The document links to <code>https://www.embedpdf.com</code>.</p>
+    <p class="lead">The document links to <code>https://www.w3.org/TR/WCAG22/</code>.</p>
     <button type="button" class="button" @click="actions.execute(websiteLink, click)">
       Click the link
     </button>
     <div v-if="asking" class="prompt" role="alertdialog" aria-label="Open a website">
       <p class="prompt-text">
-        This document wants to open <strong>{{ asking }}</strong>.
+        This document wants to open <strong>{{ asking }}</strong
+        >.
       </p>
       <div class="prompt-actions">
         <button type="button" class="button" @click="asking = null">Stay here</button>

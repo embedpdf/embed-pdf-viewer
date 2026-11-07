@@ -1,32 +1,37 @@
 /**
  * @embedpdf/plugin-commands/standard — the commands every viewer has: zoom,
- * pages, view rotation, a command for every tool, copy, delete, download and
- * print, with shortcuts, and labels in EmbedPDF's eight languages (the i18n
- * plugin has the strings). Three of them reach the browser (the clipboard, a
- * file download, the print dialog), which plugins never touch, so each
+ * pages, view rotation, a command for every tool, copy, the snapshot, delete,
+ * download and print, with shortcuts, and labels in EmbedPDF's eight
+ * languages (the i18n plugin has the strings). Some of them reach the browser
+ * (the clipboard, a file download), which plugins never touch, so each
  * framework's `/commands` builds them with its platform: that is the
- * `standardCommands` an app imports.
+ * `standardCommands` an app imports. Print goes through the kernel, which has
+ * the host's printer.
  */
 import { DocumentsToken } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken, type Tool } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken, SNAPSHOT_TOOL, type PageImage } from '@embedpdf/plugin-render/contract';
 import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
-import type { CommandContext, CommandDef, CommandFamily } from './contract';
+import type { CommandContext, CommandDefinition, CommandFamily } from './contract';
 
 /** What the standard commands need from the browser. */
 export interface StandardCommandsPlatform {
   /** Copy the selected text to the clipboard. */
   copySelection(selection: SelectionCapability): Promise<unknown>;
-  /** Give the user the bytes as a file download. */
-  saveFile(bytes: Uint8Array, fileName: string): void;
-  /** Open the print dialog. */
-  print(): void;
+  /**
+   * Copy an image to the clipboard. Called in the press or key itself, before
+   * the image is there: a browser may take the clipboard only then.
+   */
+  copyImage(image: Promise<PageImage>): Promise<unknown>;
+  /** Give the user the bytes as a file download, of the given content type. */
+  saveFile(bytes: Uint8Array | Blob, fileName: string, contentType: string): void;
 }
 
 const stageOf = (context: CommandContext) => context.tryGet(StageToken);
+const snapshotOf = (context: CommandContext) => context.tryGet(RenderToken)?.getSnapshot() ?? null;
 const interactionOf = (context: CommandContext) => context.tryGet(InteractionToken);
 
 /** Enabled while the document has a Stage. */
@@ -53,7 +58,7 @@ const mayUseTool = (context: CommandContext, toolId: string): boolean => {
 };
 
 /** Switching to a tool: active while it's the tool, there only when the document has it. */
-const toolCommand = (toolId: string): Omit<CommandDef, 'id' | 'shortcut'> => ({
+const toolCommand = (toolId: string): Omit<CommandDefinition, 'id' | 'shortcut'> => ({
   labelKey: `commands.tool.${toolId}`,
   label: toolId,
   icon: toolId,
@@ -77,7 +82,7 @@ const toolCommands: CommandFamily = {
 /** The standard commands, with the browser's part from `platform`. */
 export function createStandardCommands(
   platform: StandardCommandsPlatform,
-): readonly (CommandDef | CommandFamily)[] {
+): readonly (CommandDefinition | CommandFamily)[] {
   return [
     // ── zoom ──
     {
@@ -88,7 +93,7 @@ export function createStandardCommands(
       shortcut: ['Mod+=', 'Mod+NumpadAdd'],
       categories: ['zoom'],
       run: (context) => stageOf(context)?.zoomIn(),
-      enabled: hasStage,
+      enabled: (context) => stageOf(context)?.canZoomIn() ?? false,
     },
     {
       id: 'zoom:out',
@@ -98,7 +103,7 @@ export function createStandardCommands(
       shortcut: ['Mod+-', 'Mod+NumpadSubtract'],
       categories: ['zoom'],
       run: (context) => stageOf(context)?.zoomOut(),
-      enabled: hasStage,
+      enabled: (context) => stageOf(context)?.canZoomOut() ?? false,
     },
     {
       id: 'zoom:fit-width',
@@ -183,9 +188,16 @@ export function createStandardCommands(
       enabled: hasStage,
     },
 
-    // ── tools: the two built-in ones have shortcuts; the family covers every other ──
+    // ── tools: the built-in ones have Acrobat's single keys; the family covers every other ──
     { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
     { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
+    { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
+    {
+      ...toolCommand(SNAPSHOT_TOOL),
+      id: 'tool:snapshot',
+      allowed: (context) => context.tryGet(RenderToken)?.canSnapshot() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-content-copy',
+    },
     toolCommands,
 
     // ── selections ──
@@ -216,13 +228,58 @@ export function createStandardCommands(
       enabled: (context) => {
         const annotation = context.tryGet(AnnotationToken);
         if (!annotation) return false;
-        const selected = annotation.selection.list();
+        const selected = annotation.selection.getSelected();
         // `isEditable`: the annotation plugin's `editable` setting lets people change it by hand.
         return (
           selected.length > 0 &&
           selected.every(({ ref }) => annotation.canDelete(ref) && annotation.isEditable(ref))
         );
       },
+    },
+
+    // ── the snapshot the snapshot tool holds ──
+    {
+      id: 'snapshot:copy',
+      labelKey: 'commands.snapshot.copy',
+      label: 'Copy',
+      icon: 'copy',
+      shortcut: 'Mod+C',
+      categories: ['snapshot'],
+      // Straight to the clipboard, in the press itself: the picture follows when it's there.
+      run: (context) => {
+        const snapshot = snapshotOf(context);
+        return snapshot ? platform.copyImage(snapshot.image) : undefined;
+      },
+      enabled: (context) => snapshotOf(context) !== null,
+    },
+    {
+      id: 'snapshot:save',
+      labelKey: 'commands.snapshot.save',
+      label: 'Save image',
+      icon: 'download',
+      categories: ['snapshot'],
+      run: async (context) => {
+        const snapshot = snapshotOf(context);
+        if (!snapshot) return;
+        const documents = context.get(DocumentsToken);
+        const id = context.documentId ?? undefined;
+        const blob = await (await snapshot.image).blob();
+        const number =
+          documents
+            .listPages(id)
+            .findIndex((page) => page.ref.objectNumber === snapshot.page.objectNumber) + 1;
+        platform.saveFile(blob, snapshotFileNameOf(documents.get(id)?.name, number), 'image/png');
+      },
+      enabled: (context) => snapshotOf(context) !== null,
+    },
+    {
+      id: 'snapshot:clear',
+      labelKey: 'commands.snapshot.clear',
+      label: 'Clear snapshot',
+      shortcut: 'Escape',
+      categories: ['snapshot'],
+      run: (context) => context.get(RenderToken).clearSnapshot(),
+      enabled: (context) => snapshotOf(context) !== null,
     },
 
     // ── the document ──
@@ -239,7 +296,7 @@ export function createStandardCommands(
         const documents = context.get(DocumentsToken);
         const id = context.documentId ?? undefined;
         const bytes = await documents.download(id, { signal: context.signal });
-        platform.saveFile(bytes, fileNameOf(documents.get(id)?.name));
+        platform.saveFile(bytes, fileNameOf(documents.get(id)?.name), 'application/pdf');
       },
       enabled: (context) => context.documentId !== null,
     },
@@ -252,12 +309,11 @@ export function createStandardCommands(
       categories: ['document'],
       allowed: (context) => context.tryGet(DocumentsToken)?.canPrint() ?? true,
       notAllowedKey: 'commands.notAllowed.doc-print',
-      // The document's own print actions run around the dialog when the
-      // actions plugin is there.
-      run: (context) => {
-        const actions = context.tryGet(ActionsToken);
-        if (actions) return actions.runDocumentVerb('print', () => platform.print());
-        platform.print();
+      // The kernel prints the document's pages, and runs the document's own
+      // print actions around the dialog when the actions plugin is there.
+      run: async (context) => {
+        const documents = context.get(DocumentsToken);
+        await documents.print(context.documentId ?? undefined, { signal: context.signal });
       },
       enabled: (context) => context.documentId !== null,
     },
@@ -268,4 +324,10 @@ export function createStandardCommands(
 function fileNameOf(name: string | undefined): string {
   if (!name) return 'document.pdf';
   return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
+}
+
+/** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
+function snapshotFileNameOf(name: string | undefined, pageNumber: number): string {
+  const base = (name ?? 'document').replace(/\.pdf$/i, '');
+  return `${base} p${pageNumber}.png`;
 }

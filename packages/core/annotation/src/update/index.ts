@@ -45,7 +45,7 @@ import {
   setLink,
   setTextFormat,
 } from './selection-edits';
-import { forget, initialSession, setDefaults } from './session';
+import { forget, initialSession, replaceDefaults, setDefaults } from './session';
 import { setRichText, setText } from './text';
 import { createCaret, createMarkup, createReplaceText, setMarkupPreview } from './text-markup';
 
@@ -152,9 +152,10 @@ function changeBetween(before: Model, after: Model): ChangeSet {
       put.push(record);
       continue;
     }
+    // A kind change states its new subtype; every other patch names the kind it has.
     const fields = annotationPatchBetween(previous.annotation, record.annotation);
     if (!Object.keys(fields).length) continue;
-    const patch = { ...fields, subtype: previous.annotation.subtype } as AnnotationPatch;
+    const patch = { subtype: previous.annotation.subtype, ...fields } as AnnotationPatch;
     patches[id] = patch;
     put.push(applyChange(previous, patch));
   }
@@ -232,6 +233,8 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
       return setFlags(model, message.patch, message.ids);
     case 'setDefaults':
       return setDefaults(model, message.preset, message.patch);
+    case 'replaceDefaults':
+      return replaceDefaults(model, message.preset, message.defaults);
     case 'setSnap':
       return [{ ...model, snap: { ...model.snap, ...message.patch } }, []];
     case 'rotateSelection':
