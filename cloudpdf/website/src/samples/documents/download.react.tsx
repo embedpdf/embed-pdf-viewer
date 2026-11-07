@@ -34,7 +34,8 @@ function DownloadBar() {
     return () => cancel.abort();
   }, [documents]);
 
-  const download = async () => saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
+  const download = async () =>
+    saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
 
   return (
     <div className="toolbar">

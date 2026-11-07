@@ -3,7 +3,7 @@ import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-react';
 
 import './status.css';
 
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 
 const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-svelte';
 
-  const links = '/pdfs/links.pdf';
+  const links = 'https://www.embedpdf.com/pdfs/links.pdf';
 
   const config: ViewerConfig = {
     plugins: {

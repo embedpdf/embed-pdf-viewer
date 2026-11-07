@@ -4,7 +4,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-vue';
 
 import './on-ready.css';
 
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
 const viewer = shallowRef<Viewer | null>(null);
 const page = ref<number | null>(null);

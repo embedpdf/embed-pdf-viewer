@@ -13,7 +13,7 @@
   import { toggleNotes, onSaved } from './review.js'; // your app
 
   document.getElementById('viewer').config = {
-    src: '/pdfs/welcome.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     layout: (layout) => layout.add({ custom: 'review' }, { to: 'main', section: 'end' }),
   };
   const notes = document.getElementById('notes');

@@ -7,5 +7,9 @@ function onReady(viewer: Viewer) {
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" style="height: 100vh" @ready="onReady" />
+  <PDFViewer
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
+    style="height: 100vh"
+    @ready="onReady"
+  />
 </template>

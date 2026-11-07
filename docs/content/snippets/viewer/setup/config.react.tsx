@@ -3,7 +3,7 @@ import { PDFViewer } from '@embedpdf/viewer-react';
 export function Report() {
   return (
     <PDFViewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       theme="system"
       disable={['forms']}
       onReady={(viewer) => console.log('ready', viewer)}

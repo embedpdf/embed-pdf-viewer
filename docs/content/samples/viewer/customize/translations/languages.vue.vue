@@ -5,7 +5,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 import './languages.css';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 // Your own words for two of the viewer's labels, in each language.

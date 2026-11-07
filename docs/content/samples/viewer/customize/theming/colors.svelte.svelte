@@ -4,7 +4,7 @@
   import './colors.css';
 
   // [!doc-source welcome]
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
   // [!/doc-source]
 
   // What both modes share, then the colors of each.

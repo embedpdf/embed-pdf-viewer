@@ -9,7 +9,11 @@ const viewer = shallowRef<Viewer | null>(null);
 
 <template>
   <button :disabled="!viewer" @click="viewer?.commands.execute('document:print')">Print</button>
-  <PDFViewer src="/report.pdf" style="height: 80vh" @ready="viewer = $event">
+  <PDFViewer
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
+    style="height: 80vh"
+    @ready="viewer = $event"
+  >
     <ToolbarItem id="first-page"><FirstPage /></ToolbarItem>
   </PDFViewer>
 </template>

@@ -1,8 +1,8 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 
-const welcome = '/pdfs/welcome.pdf';
-const article = '/pdfs/article.pdf';
-const report = '/pdfs/report.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
+const report = 'https://www.embedpdf.com/pdfs/report.pdf';
 
 const config: ViewerConfig = {
   documents: [

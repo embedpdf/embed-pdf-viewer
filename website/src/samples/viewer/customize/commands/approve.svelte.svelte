@@ -2,7 +2,7 @@
   import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-svelte';
   import './approve.css';
 
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
   let status = $state('Waiting for approval');
 

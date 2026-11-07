@@ -7,7 +7,11 @@ import { EpdfPdfViewer, type Layout } from '@cloudpdf/viewer-angular';
   template: `
     <!-- Each branch mounts its own viewer with its own config. -->
     @if (toolbarBelow()) {
-      <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" [layout]="toolbarAtBottom" style="height: 100vh" />
+      <epdf-pdf-viewer
+        [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
+        [layout]="toolbarAtBottom"
+        style="height: 100vh"
+      />
     } @else {
       <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 100vh" />
     }

@@ -13,7 +13,7 @@ from that handle.
 <Engine local>
 
 ```ts
-const response = await fetch('/contract.pdf');
+const response = await fetch('https://www.cloudpdf.com/pdfs/welcome.pdf');
 const doc = await engine.open({ kind: 'bytes', bytes: await response.arrayBuffer() });
 ```
 

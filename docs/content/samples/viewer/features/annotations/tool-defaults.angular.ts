@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
 // [!doc-source article]
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 // [!/doc-source]
 
 @Component({

@@ -3,7 +3,7 @@
 
   import './phone.css';
 
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
   const layout = (layout: Layout, env: LayoutEnv) =>
     env.size === 'compact' ? layout.place('main', 'bottom') : layout;

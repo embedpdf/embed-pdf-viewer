@@ -12,7 +12,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -51,7 +51,11 @@ const welcome = async (): Promise<OpenInput> => {
       @if (document.id()) {
         <button type="button" class="button" (click)="documents.close(document.id())">Close</button>
       } @else {
-        <button type="button" class="button" (click)="documents.open(welcome, { name: 'welcome.pdf' })">
+        <button
+          type="button"
+          class="button"
+          (click)="documents.open(welcome, { name: 'welcome.pdf' })"
+        >
           Open the welcome again
         </button>
       }

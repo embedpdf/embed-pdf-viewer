@@ -8,7 +8,7 @@ import {
 } from '@embedpdf/viewer-angular';
 
 // [!doc-source proposal]
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 // [!/doc-source]
 
 type Status = 'review' | 'approved' | 'changes';

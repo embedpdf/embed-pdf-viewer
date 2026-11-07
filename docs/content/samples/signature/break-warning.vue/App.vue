@@ -17,7 +17,7 @@ const engine = localEngine();
 // The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
 // makes the signature read 'valid'; your app trusts its own certificates the same way.
 const lanternfieldCertificate = async () => {
-  const response = await fetch('/pdfs/agreement.cer');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.cer');
   return new Uint8Array(await response.arrayBuffer());
 };
 
@@ -32,7 +32,7 @@ const plugins = [
 
 // [!doc-source agreement]
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/agreement.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

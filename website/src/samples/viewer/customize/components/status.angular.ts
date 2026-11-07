@@ -1,7 +1,7 @@
 import { Component, model, signal, ViewEncapsulation } from '@angular/core';
 import { EpdfPdfViewer, EpdfToolbarItem, type Layout } from '@embedpdf/viewer-angular';
 
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 
 @Component({
   selector: 'demo-review-status',

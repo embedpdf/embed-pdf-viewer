@@ -9,7 +9,7 @@
   const container = EmbedPDF.init({
     type: 'container',
     target: document.getElementById('pdf-viewer'),
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
   });
   const registry = await container.registry;
 
@@ -28,7 +28,7 @@
 
   EmbedPDF.init({
     target: '#viewer',
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     onReady: (viewer) => {
       print.disabled = false;
       print.onclick = () => viewer.commands.execute('document:print');

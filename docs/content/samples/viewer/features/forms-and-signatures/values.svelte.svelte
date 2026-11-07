@@ -4,7 +4,7 @@
   import './values.css';
 
   // [!doc-source forms]
-  const forms = '/pdfs/forms.pdf';
+  const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
   // [!/doc-source]
 
   let values = $state('{}');

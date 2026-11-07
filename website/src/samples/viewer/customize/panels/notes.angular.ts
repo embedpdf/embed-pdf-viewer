@@ -1,7 +1,7 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 import { EpdfPanel, EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
 @Component({
   selector: 'demo-root',

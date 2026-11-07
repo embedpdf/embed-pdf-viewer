@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-vue';
 
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
 const config: ViewerConfig = {
   layout: (layout) =>

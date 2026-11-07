@@ -9,7 +9,7 @@
 <Viewer
   {engine}
   {plugins}
-  initialDocuments={[{ source: { kind: 'url', url: '/files/contract.pdf' } }]}
+  initialDocuments={[{ source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } }]}
 >
   <DocumentGate>
     {#snippet fallback()}

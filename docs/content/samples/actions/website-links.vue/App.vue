@@ -12,7 +12,7 @@ const plugins = [actionsPlugin()];
 
 // [!doc-source links]
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

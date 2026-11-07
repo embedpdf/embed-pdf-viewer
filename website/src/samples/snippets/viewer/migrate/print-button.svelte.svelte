@@ -10,7 +10,7 @@
 </script>
 
 <button disabled={!registry} onclick={print}>Print</button>
-<PDFViewer config={{ src: '/report.pdf' }} style="height: 80vh" onready={(r) => (registry = r)} />
+<PDFViewer config={{ src: 'https://www.embedpdf.com/pdfs/welcome.pdf' }} style="height: 80vh" onready={(r) => (registry = r)} />
 -->
 
 <script lang="ts">
@@ -20,4 +20,8 @@
 </script>
 
 <button disabled={!viewer} onclick={() => viewer?.commands.execute('document:print')}>Print</button>
-<PDFViewer src="/report.pdf" onready={(v) => (viewer = v)} style="height: 80vh" />
+<PDFViewer
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
+  onready={(v) => (viewer = v)}
+  style="height: 80vh"
+/>

@@ -4,7 +4,7 @@
   import './phone.css';
 
   // [!doc-source welcome]
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
   // [!/doc-source]
 
   const layout = (layout: Layout, env: LayoutEnv) =>

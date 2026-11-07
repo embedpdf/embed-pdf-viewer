@@ -9,7 +9,7 @@ const onReady = (registry: PluginRegistry) => console.log('ready', registry);
 <template>
   <PDFViewer
     :config="{
-      src: '/report.pdf',
+      src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
       theme: { preference: 'dark' },
       disabledCategories: ['redaction', 'document-print'],
     }"
@@ -27,7 +27,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     theme="dark"
     :disable="['redaction', 'documents.print']"
     style="height: 100vh"

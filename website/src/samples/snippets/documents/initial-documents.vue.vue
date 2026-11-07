@@ -10,7 +10,9 @@ import Spinner from './Spinner.vue';
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: { kind: 'url', url: '/files/contract.pdf' } }]"
+    :initial-documents="[
+      { source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } },
+    ]"
   >
     <DocumentGate>
       <template #fallback><Spinner /></template>

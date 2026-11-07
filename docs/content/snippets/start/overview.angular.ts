@@ -11,7 +11,9 @@ import { localEngine } from '@embedpdf/engine';
     provideEmbedPdf(
       {
         engine: () => localEngine(),
-        initialDocuments: [{ source: { kind: 'url', url: '/contract.pdf' } }],
+        initialDocuments: [
+          { source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } },
+        ],
       },
       withStage(),
       withRender(),

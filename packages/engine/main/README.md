@@ -17,7 +17,7 @@ const engine = localEngine(); // synchronous, allocates nothing yet
 const document = await engine.open({
   kind: 'url',
   id: 'doc',
-  url: '/report.pdf',
+  url: 'https://www.embedpdf.com/pdfs/welcome.pdf',
 });
 const { pageCount } = await document.pages.list();
 await document.close();

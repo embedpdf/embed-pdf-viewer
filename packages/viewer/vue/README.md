@@ -13,7 +13,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" style="height: 100vh" />
+  <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
 </template>
 ```
 
@@ -38,7 +38,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'm
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" :layout="layout">
+  <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" :layout="layout">
     <ToolbarItem id="doc-picker"><DocPicker /></ToolbarItem>
   </PDFViewer>
 </template>
@@ -50,7 +50,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'm
 ## Driving the viewer
 
 ```vue
-<PDFViewer src="/report.pdf" @ready="(viewer) => viewer.commands.execute('zoom:in')" />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" @ready="(viewer) => viewer.commands.execute('zoom:in')" />
 ```
 
 `@ready` hands you the `viewer`: each plugin's API by its name

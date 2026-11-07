@@ -9,7 +9,9 @@ export function ContractViewer() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: { kind: 'url', url: '/files/contract.pdf' } }]}
+      initialDocuments={[
+        { source: { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/welcome.pdf' } },
+      ]}
     >
       <DocumentGate fallback={<Spinner />}>
         <Stage>{() => <RenderLayer />}</Stage>
