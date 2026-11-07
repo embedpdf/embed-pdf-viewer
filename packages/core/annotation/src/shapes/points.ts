@@ -75,6 +75,8 @@ export interface InkShape {
   inkList: Point[][];
   /** Degrees clockwise about the middle of the box around the upright points; 0 when upright. */
   rotation: number;
+  /** The last stroke is still being drawn (an ink draft with the pen down): it draws as its points. */
+  drawing?: boolean;
 }
 
 /** A points family record's shape. */
@@ -408,15 +410,37 @@ export function strokedOutlineOf(nodes: readonly RenderNode[], strokeWidth: numb
   });
 }
 
-const fitted = new WeakMap<Point[][], InkStrokeCurves[]>();
+const fitted = new WeakMap<Point[], InkStrokeCurves | null>();
 
-/** Each drawn ink stroke as Acrobat draws it (`ink-curves.ts`). The same lists for the same strokes. */
+/**
+ * Each drawn ink stroke as Acrobat draws it (`ink-curves.ts`), fitted once
+ * per stroke: a stroke the pen has left is fitted once while the next is drawn.
+ */
 function inkCurvesOf(strokes: Point[][]): InkStrokeCurves[] {
-  const cached = fitted.get(strokes);
-  if (cached) return cached;
-  const out = strokes.flatMap((stroke) => fitInkStroke(stroke) ?? []);
-  fitted.set(strokes, out);
-  return out;
+  return strokes.flatMap((stroke) => {
+    let curves = fitted.get(stroke);
+    if (curves === undefined) {
+      curves = fitInkStroke(stroke);
+      fitted.set(stroke, curves);
+    }
+    return curves ?? [];
+  });
+}
+
+/**
+ * An ink shape's strokes: the ones drawn as their curves, and the one the pen
+ * is still drawing ({@link InkShape.drawing}), drawn as its points. Its curves
+ * would move all along it as it grows: the fit splits a stroke where its worst
+ * point lies, and each new point can move that. A stroke of one point is its
+ * dot either way.
+ */
+function inkStrokesOf(
+  shape: InkShape,
+  strokes: Point[][],
+): { fitted: Point[][]; drawing: Point[] | null } {
+  const last = strokes[strokes.length - 1];
+  if (!shape.drawing || !last || last.length < 2) return { fitted: strokes, drawing: null };
+  return { fitted: strokes.slice(0, -1), drawing: last };
 }
 
 /** The unit direction from `from` to the first of `points` apart from it; none when all sit on it. */
@@ -532,7 +556,7 @@ function endingSegs(shape: PointsShape): EndingSeg[] {
 /**
  * What the shape draws, as the engine's `rect` takes it in. Ink is its points
  * and the box around what its curves paint ({@link inkOutlinePoints}), as the
- * runtime frames it. A line or poly wraps its actual stroke outline (per join,
+ * runtime frames it, and the pen around the stroke still being drawn. A line or poly wraps its actual stroke outline (per join,
  * and each ending's own outline), so a mitred arrowhead tip is enclosed
  * exactly. A closed poly's cloud reaches past its vertices by the cloud's
  * extent.
@@ -540,11 +564,15 @@ function endingSegs(shape: PointsShape): EndingSeg[] {
 function pointsDrawnBounds(shape: PointsShape, stroke: Stroke): Rect {
   const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
-  if (shape.kind === 'ink')
+  if (shape.kind === 'ink') {
+    // The stroke being drawn has round caps and joins: the pen reaches half the width past its points.
+    const { fitted, drawing } = inkStrokesOf(shape, strokes);
     return unionRect([
       ...strokes.flat(),
-      ...inkCurvesOf(strokes).flatMap((curves) => inkOutlinePoints(curves, strokeWidth)),
+      ...inkCurvesOf(fitted).flatMap((curves) => inkOutlinePoints(curves, strokeWidth)),
+      ...(drawing ? rectCornerPoints(expandRect(unionRect(drawing), strokeWidth / 2)) : []),
     ]);
+  }
   const points = strokes[0]!;
   const closed = shape.kind === 'poly' && shape.closed;
   if (closed && cloudyIntensity) return cloudyPolyBounds(points, cloudyIntensity, strokeWidth);
@@ -580,26 +608,32 @@ function pointsCorners(shape: PointsShape, stroke: Stroke): [Point, Point, Point
  * What the shape paints: each drawn stroke's ink, a filled polygon's inside,
  * and the endings. A cloudy polygon's ink runs along its cloud's curves, and
  * filled, it paints the polygon and the ring its curves close. Ink runs along
- * its fitted curves, and a stroke of one point is a filled dot.
+ * its fitted curves (the stroke still being drawn along its points), and a
+ * stroke of one point is a filled dot.
  */
 function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): PaintedPiece[] {
   const { strokeWidth, cloudyIntensity } = stroke;
   const halfWidth = strokeWidth / 2;
   const strokes = drawnStrokesOf(shape);
-  if (shape.kind === 'ink')
-    return inkCurvesOf(strokes).map((curves) =>
-      curves.kind === 'dot'
-        ? {
-            kind: 'oval',
-            center: curves.center,
-            rx: INK_DOT_RADIUS,
-            ry: INK_DOT_RADIUS,
-            rotation: 0,
-            halfWidth,
-            filled: true,
-          }
-        : { kind: 'stroke', points: inkCurvesPolyline(curves), closed: false, halfWidth },
+  if (shape.kind === 'ink') {
+    const { fitted, drawing } = inkStrokesOf(shape, strokes);
+    const pieces = inkCurvesOf(fitted).map(
+      (curves): PaintedPiece =>
+        curves.kind === 'dot'
+          ? {
+              kind: 'oval',
+              center: curves.center,
+              rx: INK_DOT_RADIUS,
+              ry: INK_DOT_RADIUS,
+              rotation: 0,
+              halfWidth,
+              filled: true,
+            }
+          : { kind: 'stroke', points: inkCurvesPolyline(curves), closed: false, halfWidth },
     );
+    if (drawing) pieces.push({ kind: 'stroke', points: drawing, closed: false, halfWidth });
+    return pieces;
+  }
   const closed = shape.kind === 'poly' && shape.closed;
   const outline = strokes[0];
   const pieces: PaintedPiece[] = [];
@@ -628,25 +662,30 @@ function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): Pai
  * What the shape draws, where it is drawn: a line, a poly (a closed one's
  * cloud as PDFium bakes it: curls on the vertex path, reaching out), each
  * ink stroke as the curves Acrobat draws it with (a stroke of one point as a
- * dot), and the endings.
+ * dot, the stroke still being drawn as its points), and the endings.
  */
 function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
   const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
-  if (shape.kind === 'ink')
-    return inkCurvesOf(strokes).map((curves) =>
-      curves.kind === 'dot'
-        ? {
-            kind: 'ellipse',
-            rect: {
-              x: curves.center.x - INK_DOT_RADIUS,
-              y: curves.center.y - INK_DOT_RADIUS,
-              width: 2 * INK_DOT_RADIUS,
-              height: 2 * INK_DOT_RADIUS,
-            },
-          }
-        : { kind: 'path', d: inkCurvesPath(curves) },
+  if (shape.kind === 'ink') {
+    const { fitted, drawing } = inkStrokesOf(shape, strokes);
+    const nodes = inkCurvesOf(fitted).map(
+      (curves): RenderNode =>
+        curves.kind === 'dot'
+          ? {
+              kind: 'ellipse',
+              rect: {
+                x: curves.center.x - INK_DOT_RADIUS,
+                y: curves.center.y - INK_DOT_RADIUS,
+                width: 2 * INK_DOT_RADIUS,
+                height: 2 * INK_DOT_RADIUS,
+              },
+            }
+          : { kind: 'path', d: inkCurvesPath(curves) },
     );
+    if (drawing) nodes.push({ kind: 'poly', points: drawing, closed: false });
+    return nodes;
+  }
   const points = strokes[0]!;
   if (shape.kind === 'poly' && shape.closed && cloudyIntensity && points.length >= 3)
     return [{ kind: 'path', d: cloudyPolyPath(points, cloudyIntensity, strokeWidth) }];

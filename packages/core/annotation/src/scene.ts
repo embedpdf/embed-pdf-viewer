@@ -373,12 +373,18 @@ export function scene(item: RenderItem): SceneNode[] {
     };
     // Ink is drawn as Acrobat draws it: round caps and no join (its curves
     // meet smoothly), and a stroke of one point is a dot filled in the
-    // stroke's colour. Every other kind keeps the default butt caps and
-    // miter joins: square corners and poly knees stay crisp.
+    // stroke's colour. The stroke the pen is still drawing is its points (a
+    // `poly`), joined round as a pen lays them. Every other kind keeps the
+    // default butt caps and miter joins: square corners and poly knees stay crisp.
     return {
       ...node,
       paint: ink
-        ? { ...paint, fill: closed ? (item.style.color ?? undefined) : undefined, lineCap: 'round' }
+        ? {
+            ...paint,
+            fill: closed ? (item.style.color ?? undefined) : undefined,
+            lineCap: 'round',
+            ...(node.kind === 'poly' ? { join: 'round' } : {}),
+          }
         : paint,
     } as SceneNode;
   });

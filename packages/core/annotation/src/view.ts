@@ -314,7 +314,12 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
               lineEndings: draft.closed ? undefined : lineEndingsOf(tool),
               rotation: 0,
             }
-          : { kind: 'ink', inkList: draft.strokes, rotation: 0 };
+          : {
+              kind: 'ink',
+              inkList: draft.strokes,
+              rotation: 0,
+              ...(draft.drawing ? { drawing: true } : {}),
+            };
     const measure =
       draft.kind === 'create-distance' || draft.kind === 'create-poly' ? draft.measure : undefined;
     const distance = measure && measurementLayout(geometry, measure, style);
