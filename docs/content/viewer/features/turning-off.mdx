@@ -1,100 +1,108 @@
 ---
-title: Turn features off
-description: Leave out a whole feature or one button, make the viewer read-only, and say what a user may do, with the right tool for each.
+title: Turn features on and off
+description: Say what people can do in this viewer, move one button, make the viewer read-only, and say what a user may do, with the right tool for each.
 ---
 
-# Turn features off
+# Turn features on and off
 
-Leave out a feature, everywhere it appears, with `disable`:
+Say what people can do in this viewer with `features`. A feature you name is on or off everywhere at
+once; one you leave out keeps its default:
 
 ```js
-{ disable: ['redaction', 'measurement'] }
+{
+  features: {
+    measurement: true,
+    redaction: true,
+    'documents.download': false,
+  },
+}
 ```
 
-The Redact and Measure tabs are gone, with their tools, panels, menu rows and shortcuts.
+The Measure and Redact tabs appear, and nothing downloads the file: no Download in the document
+menu, and no shortcut.
+
+Most features are on from the start. Measuring, redaction, building forms and snapshots wait until
+you turn them on, because most viewers don't need them.
 
 ## Which one to use
 
-Three questions, three tools. Each one only takes away:
+Three questions, three tools, each with its own names:
 
-<Engine local>
+| You want to say | Use | It names | Reach |
+| :-- | :-- | :-- | :-- |
+| What people can do in this viewer | `features`, or `readOnly` | Features: `annotations`, `documents.download` | Everywhere at once: every button, menu row, tab, panel and shortcut |
+| Where a button goes | [`layout`](../customize/layout) | Buttons: `tool:highlight`, `document:print` | One place: a bar or a menu. The feature still works everywhere else. |
+| What this user may do | The [scope](#what-a-user-may-do) | Permissions: `doc.download` | Everything, your code included: the engine refuses it |
 
-| You want to say | Use | Reach |
-| :-- | :-- | :-- |
-| Where something goes | [`layout`](../customize/layout) | One place: a bar or a menu. It can still be elsewhere, and its shortcut still works. |
-| Whether this viewer has it | `disable`, or `readOnly` | Everywhere at once: every button, menu row, tab, panel and shortcut |
-| What this user may do | `scope` | Everything, your code included: the engine refuses it |
-
-</Engine>
-
-<Engine cloud>
-
-| You want to say | Use | Reach |
-| :-- | :-- | :-- |
-| Where something goes | [`layout`](../customize/layout) | One place: a bar or a menu. It can still be elsewhere, and its shortcut still works. |
-| Whether this viewer has it | `disable`, or `readOnly` | Everywhere at once: every button, menu row, tab, panel and shortcut |
-| What this user may do | The scope in the user's [token](#what-a-user-may-do) | Everything, your code included: the server refuses it |
-
-</Engine>
-
-A button shows when it's in the layout, isn't disabled, is allowed by the scope, and makes sense
+A button shows when its feature is on, it's in the layout, the scope allows it, and it makes sense
 right now (Copy needs a selection).
 
 | I want | Write |
 | :-- | :-- |
-| No annotating at all | `disable: ['annotations']` |
-| No highlighter anywhere: toolbar, selection bar, shortcut | `disable: ['annotations.highlight']` |
-| Only the toolbar's Highlight button gone | `disable: ['tool:highlight']` |
+| No annotating at all | `features: { annotations: false }` |
+| No highlighter anywhere: the Annotate bar, the selection bar, the shortcut | `features: { 'annotations.highlight': false }` |
+| Only the highlighter, no other annotating | `features: { annotations: false, 'annotations.highlight': true }` |
+| Highlighting from the selection bar only, no Highlight in the Annotate bar | `layout.remove('tool:highlight', { from: 'annotate' })` |
 | The highlighter in my own bar instead of the Annotate bar | `layout.remove('tool:highlight', { from: 'annotate' })`, then [add it](../customize/layout#add-a-button) to yours |
-| No Measure tab, and no measuring | `disable: ['measurement']` |
-| No Measure tab, but its tools in my own bar | `layout.removeBar('measure')`, then add the tools to yours |
-| No downloading in this viewer | `disable: ['documents.download']` |
+| Measuring | `features: { measurement: true }` |
+| Measuring, with its tools in my own bar instead of a Measure tab | `features: { measurement: true }` and `layout.removeBar('measure')`, then add the tools to yours |
+| Redaction | `features: { redaction: true }` |
+| Building forms: the Form tab | `features: { 'forms.building': true }` |
+| Snapshots | `features: { snapshots: true }` |
+| Every feature, the ones that start off too | `features: { measurement: true, redaction: true, 'forms.building': true, snapshots: true }` |
+| No downloading or printing in this viewer | `features: { 'documents.download': false, 'documents.print': false }` |
 | This user may never download, not even from code | Leave `doc.download` out of the [scope](#what-a-user-may-do) |
 | Read-only | `readOnly: true` |
 | Read-only, but people fill in the form | `readOnly: { except: ['forms.filling'] }` |
 
-## Turn off a feature, or one button
+## Every feature
 
-`disable` takes two kinds of names, in one list:
+| Feature | Its parts | On from the start | Off with `readOnly` |
+| :-- | :-- | :-- | :-- |
+| `annotations` | `.highlight`, `.markup` (underline, strike out, squiggly), `.drawing` (ink and ink highlighter), `.text` (text boxes, callouts, insert and replace text), `.notes`, `.links` | yes | all |
+| `shapes` | | yes | yes |
+| `stamps` | Stamps and images | yes | yes |
+| `comments` | `.writing` (new comments and replies) | yes | `.writing` only, so people still read them |
+| `forms` | `.filling`, `.building` | `.filling` only | both |
+| `signatures` | `.signing`, `.checking` | yes | `.signing` only |
+| `redaction` | | no | yes |
+| `measurement` | | no | yes |
+| `pages` | Rotating, moving, inserting and deleting pages in the thumbnails panel | yes | yes |
+| `attachments` | `.adding` (the attachment tool, and attaching and deleting files in the attachments panel) | yes | `.adding` only, so people still see and save the files |
+| `text` | `.selection`, `.copy` | yes | no |
+| `snapshots` | | no | no |
+| `search` | | yes | no |
+| `thumbnails` | | yes | no |
+| `outline` | `.editing` (adding, renaming, moving and deleting items) | yes | `.editing` only, so people still follow it |
+| `documents` | `.open`, `.download`, `.print`, `.tabs` | yes | no |
 
-- **A feature**, such as `annotations`, or a part of one, such as `annotations.highlight`. Everything
-  that belongs to it goes.
-- **One command**, such as `tool:highlight`. Its name has a colon. Only that command goes; the rest
-  of its feature stays.
+A feature takes `true` or `false`, and so does each part, by its feature's name and its own:
+`'annotations.highlight'`. The dot makes it a string, so it goes in quotes.
+
+When a feature and one of its parts are both there, the part wins, in any order:
 
 ```js
-{ disable: ['forms.building', 'annotations.drawing', 'document:open'] }
+{ features: { annotations: false, 'annotations.highlight': true } }
 ```
 
-| Feature | Its parts | Off with `readOnly` |
-| :-- | :-- | :-- |
-| `annotations` | `.highlight`, `.markup` (underline, strike out, squiggly), `.drawing` (ink and ink highlighter), `.text` (text boxes, callouts, insert and replace text), `.notes`, `.links` | all |
-| `shapes` | | yes |
-| `stamps` | Stamps and images | yes |
-| `comments` | `.writing` (new comments and replies) | `.writing` only, so people still read them |
-| `forms` | `.filling`, `.building` | both |
-| `signatures` | `.signing`, `.checking` | `.signing` only |
-| `redaction` | | yes |
-| `measurement` | | yes |
-| `pages` | Rotating, moving, inserting and deleting pages in the thumbnails panel | yes |
-| `attachments` | `.adding` (the attachment tool, and attaching and deleting files in the attachments panel) | `.adding` only, so people still see and save the files |
-| `text` | `.selection`, `.copy` | no |
-| `snapshots` | | no |
-| `search` | | no |
-| `thumbnails` | | no |
-| `outline` | `.editing` (adding, renaming, moving and deleting items) | `.editing` only, so people still follow it |
-| `documents` | `.open`, `.download`, `.print`, `.tabs` | no |
+That's highlighting and nothing else. A part added in a later version follows its feature, so here
+it stays off. The same goes the other way: `forms: true` turns on building forms too, while
+`'forms.building': true` adds building to the filling that's already on.
 
 Extracting pages into a new PDF is a download: it goes with `documents.download`, so `readOnly`
 keeps it for your code (`page:extract`).
 
 A mode tab disappears by itself when only its bar's
 [dependent groups](../customize/layout#build-a-bar), undo, redo and style, are left, so
-`disable: ['shapes']` removes the Shapes tab. Annotations, comments and form values already in the
+`features: { shapes: false }` removes the Shapes tab. Annotations, comments and form values already in the
 document still show; only making and changing them goes.
 
-`disable` and `readOnly` follow their props: change them while the viewer runs, and the tools
-disappear or come back without a reload.
+`features` and `readOnly` follow their props: change them while the viewer runs, and the tools
+disappear or come back without a reload. That's how a feature can follow a user's plan:
+
+```js
+{ features: { measurement: user.plan === 'pro' } }
+```
 
 ## Read-only
 
@@ -104,19 +112,22 @@ disappear or come back without a reload.
 
 It turns off every feature that changes the document, marked in the table above. People still
 scroll, zoom, search, select and copy text, read annotations and comments, follow links, download
-and print. A small **View only** label in the toolbar says why the tools are gone.
+and print, and take snapshots when they're on. A small **View only** label in the toolbar says why
+the tools are gone.
 
-Keep one way of changing it with `except`, and combine it with `disable` for what else should go:
+`readOnly` comes after `features`, so `measurement: true` doesn't bring the Measure tab back into a
+read-only viewer. Keep one way of changing the document with `except`, and use `features` for what
+else should go:
 
 ```js
 {
   readOnly: { except: ['forms.filling'] },
-  disable: ['documents.download', 'documents.print'],
+  features: { 'documents.download': false, 'documents.print': false },
 }
 ```
 
 That's a form people fill in and can't otherwise change, with no download or print button. Here
-is `readOnly: true` with the same `disable`, on a report someone marked up:
+is `readOnly: true` with the same `features`, on a report someone marked up:
 
 <Example name="viewer/features/turning-off/read-only" />
 
@@ -126,7 +137,7 @@ is `readOnly: true` with the same `disable`, on a report someone marked up:
 
 ## What a user may do
 
-`disable` and `readOnly` decide what the viewer offers. To decide what a user *may* do, give the
+`features` and `readOnly` decide what the viewer offers. To decide what a user *may* do, give the
 document a scope: the list of permissions the engine checks on every call, from a button or from
 your code.
 
@@ -152,7 +163,7 @@ carries](/docs/engine/authentication#what-a-token-carries).
 
 </Engine>
 
-What the scope doesn't allow is hidden, like a disabled feature: a user without
+What the scope doesn't allow is hidden, like a feature that's off: a user without
 `doc.annotate.modify` gets no annotation tools and no Annotate tab, and one without
 `doc.render.thumbnail` (which `doc.render` includes) no thumbnails panel. To show those buttons greyed out
 instead, with the reason in their tooltip, for example to offer an upgrade:
@@ -187,14 +198,15 @@ The same rule holds on the server, so a document behaves the same on both engine
 
 ## Your own code
 
-- **Commands follow the viewer.** A disabled command doesn't run, from a button or from
-  `viewer.commands.execute()`, because commands are what the interface does.
+- **Commands follow the viewer.** A command whose feature is off doesn't run, from a button or from
+  `viewer.commands.execute()`, because commands are what the interface does. Your own Snapshot
+  button needs `snapshots: true` too.
 - **Plugins follow the scope.** `viewer.get('form').importValues(…)` works in a read-only viewer,
   so your app can fill in a form from its own data and show it read-only.
 
-So `disable` and `readOnly` are about the interface, and `scope` is about security. Someone who opens
-the browser's developer tools can call the plugins too, so whatever a user truly may not do belongs in
-the scope.
+So `features` and `readOnly` are about the interface, and `scope` is about security. Someone who
+opens the browser's developer tools can call the plugins too, so whatever a user truly may not do
+belongs in the scope.
 
 <Engine local>
 
@@ -217,12 +229,27 @@ copy never receives the text.
 
 ### Shortcuts don't fall through
 
-A turned-off or not-allowed command still catches its keys. `Ctrl`/`Cmd`+`C` on text the user may
+A command that's off or not allowed still catches its keys. `Ctrl`/`Cmd`+`C` on text the user may
 not copy says so, instead of the browser doing something else with the key.
 
 ### Your own commands
 
-A command of yours joins features through `categories`, so `disable` turns it off with them, and a
+A command of yours joins a feature through `categories`, so `features` turns it off with it, and a
 name of your own makes a new feature: `categories: ['acme.review']`, then
-`disable: ['acme.review']`. A command that needs a permission says which with `requires`. See
-[Buttons & commands](../customize/commands#permissions).
+`features: { 'acme.review': false }`. A command that needs a permission says which with `requires`.
+See [Buttons & commands](../customize/commands#permissions).
+
+### One button, everywhere
+
+The layout takes a button out of one bar or menu, and its shortcut still works. To take a button out
+of every bar and menu and its shortcut too, while its feature stays, turn the command off in the
+commands plugin:
+
+```js
+{ plugins: { commands: { disabledCommands: ['zoom:in', 'zoom:out'] } } }
+```
+
+### `disable`, from 3.0
+
+`disable` still works, until 4.0: a feature in it counts as `false` under `features`, and a button
+in it as one in `disabledCommands`. Where both name the same feature, `features` wins.

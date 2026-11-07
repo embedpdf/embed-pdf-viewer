@@ -4,7 +4,7 @@ const report = { grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 const config: ViewerConfig = {
   readOnly: true,
-  disable: ['documents.download', 'documents.print'],
+  features: { 'documents.download': false, 'documents.print': false },
 };
 
 export default function App() {

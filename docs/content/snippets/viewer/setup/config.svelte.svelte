@@ -4,4 +4,4 @@
   const onready = (viewer: Viewer) => console.log('ready', viewer);
 </script>
 
-<PDFViewer src="/report.pdf" theme="system" disable={['forms']} {onready} style="height: 100vh" />
+<PDFViewer src="/report.pdf" theme="system" features={{ forms: false }} {onready} style="height: 100vh" />

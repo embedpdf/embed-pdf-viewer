@@ -55,7 +55,7 @@ Here **Approve** writes to a status line of your app, above the viewer:
 | `menu` | A [menu](menus) it opens, instead of `run` |
 | `panel` | A [panel](panels) it opens and closes, instead of `run` |
 | `requires` | The [permissions](#permissions) it needs from the scope. Without them, it's hidden. |
-| `categories` | The features it belongs to, so [`disable`](../features/turning-off) turns it off with them. A name of your own makes a new feature. |
+| `categories` | The features it belongs to, so [`features`](../features/turning-off) turns it off with them. A name of your own makes a new feature. |
 
 A command is the same thing as in headless: see [Commands &
 shortcuts](/docs/headless/ui/commands#define-a-command).
@@ -188,8 +188,9 @@ doesn't have it, the command is gone from every bar and menu, and its shortcut d
 The names are the scope's permissions, listed on [Permissions](/docs/headless/concepts/permissions).
 The built-in commands already say what they need, so for a user whose scope doesn't allow
 changes the editing tools are gone, and with `notAllowed: 'disable'` they show greyed out instead,
-with the reason in their tooltip. To leave a command out for everyone, [disable](../features/turning-off)
-it instead: `disable: ['acme:approve']`.
+with the reason in their tooltip. To leave a command out for everyone, turn off its feature instead:
+`categories: ['acme.approve']`, then `features: { 'acme.approve': false }`. See
+[Your own commands](../features/turning-off#your-own-commands).
 
 A command whose setting a plugin [locks](/docs/headless/viewing/stage#lock-a-setting) for the
 document, such as the facing-pages choices while a plugin shows one page at a time, shows greyed

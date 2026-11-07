@@ -5,7 +5,7 @@
 
   const config: ViewerConfig = {
     readOnly: true,
-    disable: ['documents.download', 'documents.print'],
+    features: { 'documents.download': false, 'documents.print': false },
   };
 </script>
 

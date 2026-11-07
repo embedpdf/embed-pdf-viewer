@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PDFViewer, type Viewer } from '@cloudpdf/viewer-vue';
 
-const disable = ['forms'];
+const features = { forms: false };
 const onReady = (viewer: Viewer) => console.log('ready', viewer);
 </script>
 
@@ -9,7 +9,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
   <PDFViewer
     :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
     theme="system"
-    :disable="disable"
+    :features="features"
     style="height: 100vh"
     @ready="onReady"
   />

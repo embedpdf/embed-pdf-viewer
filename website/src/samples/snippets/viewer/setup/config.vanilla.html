@@ -7,7 +7,7 @@
     target: '#viewer',
     src: '/report.pdf',
     theme: 'system',
-    disable: ['forms'],
+    features: { forms: false },
     onReady: (viewer) => console.log('ready', viewer),
   });
 </script>

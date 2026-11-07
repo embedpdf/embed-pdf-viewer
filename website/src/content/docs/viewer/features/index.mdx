@@ -1,51 +1,51 @@
 ---
 title: All features
-description: Everything the viewer can do, how to leave a feature out, who the user is, and where each feature's settings go.
+description: Everything the viewer can do, how to turn a feature on or off, who the user is, and where each feature's settings go.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
 # All features
 
-Every feature is on from the start. Leave out the ones you don't need with `disable`, by the name
-in the first column:
+Most features are on from the start; measuring, redaction, building forms and snapshots wait until
+you turn them on. Turn features on or off with `features`, by the name in the first column:
 
 ```js
-{ disable: ['forms', 'redaction', 'measurement'] }
+{ features: { measurement: true, redaction: true, comments: false } }
 ```
 
-| Feature | What people can do | Settings |
-| :-- | :-- | :-- |
-| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts | [Annotations](features/annotations) |
-| `shapes` | Draw rectangles, circles, lines, arrows and polygons | [Annotations](features/annotations#the-tools) |
-| `comments` | Comment on annotations and reply, in a panel with every thread | [Annotations](features/annotations#comments) |
-| `stamps` | Place stamps: the standard ones, their own, or images | [Annotations](features/annotations#stamps) |
-| `signatures` | Draw, type or upload a signature; sign fields; check signatures | [Forms & signatures](features/forms-and-signatures#signatures) |
-| `forms` | Fill in forms; build them in the Form mode | [Forms & signatures](features/forms-and-signatures) |
-| `redaction` | Mark text and areas, then remove them from the file for good | [Annotations](features/annotations#redaction) |
-| `measurement` | Measure distances, perimeters and areas at the drawing's scale | [Annotations](features/annotations#measurements) |
-| `pages` | Rotate, move, insert, duplicate and delete pages in the thumbnails panel, each step undoable | [Panels](customize/panels#organize-pages) |
-| `attachments` | See, save, attach and remove files inside the PDF | [Panels](customize/panels#the-attachments) |
-| `search` | Find text, with every match highlighted and listed | [`plugins.search`](/docs/headless/text/search#settings) |
-| `text` | Select and copy text | [`plugins.selection`](/docs/headless/text/selection#settings) |
-| `snapshots` | Copy or save part of a page as a picture | [Documents](documents#take-a-snapshot) |
-| `thumbnails` | A picture of every page, to jump around | [Panels](customize/panels) |
-| `outline` | The document's table of contents | [Panels](customize/panels) |
-| `documents` | Open other files (with the local engine), download, print, several documents in tabs | [Documents](documents) |
+| Feature | What people can do | On from the start | Settings |
+| :-- | :-- | :-- | :-- |
+| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts | yes | [Annotations](features/annotations) |
+| `shapes` | Draw rectangles, circles, lines, arrows and polygons | yes | [Annotations](features/annotations#the-tools) |
+| `comments` | Comment on annotations and reply, in a panel with every thread | yes | [Annotations](features/annotations#comments) |
+| `stamps` | Place stamps: the standard ones, their own, or images | yes | [Annotations](features/annotations#stamps) |
+| `signatures` | Draw, type or upload a signature; sign fields; check signatures | yes | [Forms & signatures](features/forms-and-signatures#signatures) |
+| `forms` | Fill in forms; build them in the Form mode | Filling only | [Forms & signatures](features/forms-and-signatures) |
+| `redaction` | Mark text and areas, then remove them from the file for good | no | [Annotations](features/annotations#redaction) |
+| `measurement` | Measure distances, perimeters and areas at the drawing's scale | no | [Annotations](features/annotations#measurements) |
+| `pages` | Rotate, move, insert, duplicate and delete pages in the thumbnails panel, each step undoable | yes | [Panels](customize/panels#organize-pages) |
+| `attachments` | See, save, attach and remove files inside the PDF | yes | [Panels](customize/panels#the-attachments) |
+| `search` | Find text, with every match highlighted and listed | yes | [`plugins.search`](/docs/headless/text/search#settings) |
+| `text` | Select and copy text | yes | [`plugins.selection`](/docs/headless/text/selection#settings) |
+| `snapshots` | Copy or save part of a page as a picture | no | [Documents](documents#take-a-snapshot) |
+| `thumbnails` | A picture of every page, to jump around | yes | [Panels](customize/panels) |
+| `outline` | The document's table of contents | yes | [Panels](customize/panels) |
+| `documents` | Open other files (with the local engine), download, print, several documents in tabs | yes | [Documents](documents) |
 
-## Leave features out
+## Turn features on and off
 
-A feature in `disable` is gone everywhere at once: its buttons, its mode tab, its panel, its menu
+A feature that's off is gone everywhere at once: its buttons, its mode tab, its panel, its menu
 rows and its shortcuts. Annotations already in the document still show; people just can't add new
-ones. Most features have parts you can turn off on their own, such as `forms.building` or
-`documents.download`, and one button goes by its command's name, such as `tool:highlight`.
+ones. Most features have parts you can turn on or off on their own, such as `'forms.building'` or
+`'documents.download'`.
 
-`disable` follows its prop, so a feature can come and go while the viewer runs, for example when
+`features` follows its prop, so a feature can come and go while the viewer runs, for example when
 a user's plan changes.
 
-[Turn features off](features/turning-off) has every name, read-only, and what to use when: the
-layout for where something goes, `disable` for whether the viewer has it, and the scope for what a
-user may do.
+[Turn features on and off](features/turning-off) has every feature and part, read-only, and what to
+use when: `features` for what people can do, the layout for where a button goes, and the scope for
+what a user may do.
 
 ## Who the user is
 
@@ -89,7 +89,7 @@ while the viewer runs.
 
 ### What loads when
 
-A feature you disable is still in the viewer's code: `disable` changes what people see, not what
+A feature that's off is still in the viewer's code: `features` changes what people see, not what
 you ship. The first load stays small another way. Each feature's panels and dialogs are files of
 their own, which the viewer fetches in the background once the document shows, so they open at
 once. The heavier parts wait until they're used: the signature checks until a signature is

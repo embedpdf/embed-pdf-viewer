@@ -26,7 +26,7 @@
 <PDFViewer
   src="/report.pdf"
   theme="dark"
-  disable={['redaction', 'documents.print']}
+  features={{ 'documents.print': false }}
   style="height: 100vh"
   {onready}
 />

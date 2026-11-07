@@ -26,7 +26,7 @@
 <PDFViewer
   src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
   theme="dark"
-  disable={['redaction', 'documents.print']}
+  features={{ 'documents.print': false }}
   style="height: 100vh"
   {onready}
 />

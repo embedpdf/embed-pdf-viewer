@@ -8,7 +8,7 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
     <epdf-pdf-viewer
       src="/report.pdf"
       theme="system"
-      [disable]="['forms']"
+      [features]="{ forms: false }"
       style="height: 100vh"
       (ready)="onReady($event)"
     />

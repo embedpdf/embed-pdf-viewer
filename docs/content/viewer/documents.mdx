@@ -245,8 +245,13 @@ await viewer.documents.print();
 
 ## Take a snapshot
 
-**Take a Snapshot**, in the document menu, takes part of a page as a picture, like Acrobat's
-snapshot tool. Drag a box over a page, or click a page for all of it. The box stays, with a bar
+Snapshots start off. Turn them on, and **Take a Snapshot** joins the document menu:
+
+```js
+{ features: { snapshots: true } }
+```
+
+It takes part of a page as a picture, like Acrobat's snapshot tool. Drag a box over a page, or click a page for all of it. The box stays, with a bar
 under it:
 
 - **Copy** puts the picture on the clipboard, to paste into a message, a document or a slide.
@@ -267,8 +272,7 @@ pictures, raise the [render plugin's](/docs/headless/viewing/render#take-a-snaps
 ```
 
 A PDF that doesn't allow copying doesn't allow snapshots either, as in Acrobat: **Take a Snapshot**
-isn't in the menu. To leave snapshots out everywhere, `disable: ['snapshots']`. From your own
-button, run `tool:snapshot`.
+isn't in the menu. From your own button, run `tool:snapshot`; it needs `snapshots: true` too.
 
 ## Save to your server
 

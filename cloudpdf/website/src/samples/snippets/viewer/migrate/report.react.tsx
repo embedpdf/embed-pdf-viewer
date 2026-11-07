@@ -23,7 +23,7 @@ export function Report() {
     <PDFViewer
       src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
       theme="dark"
-      disable={['redaction', 'documents.print']}
+      features={{ 'documents.print': false }}
       onReady={(viewer) => console.log('ready', viewer)}
       style={{ height: '100vh' }}
     />

@@ -29,7 +29,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
   <PDFViewer
     src="/report.pdf"
     theme="dark"
-    :disable="['redaction', 'documents.print']"
+    :features="{ 'documents.print': false }"
     style="height: 100vh"
     @ready="onReady"
   />

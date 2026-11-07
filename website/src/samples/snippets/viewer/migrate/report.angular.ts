@@ -32,7 +32,7 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
     <epdf-pdf-viewer
       src="/report.pdf"
       theme="dark"
-      [disable]="['redaction', 'documents.print']"
+      [features]="{ 'documents.print': false }"
       style="height: 100vh"
       (ready)="onReady($event)"
     />
