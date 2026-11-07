@@ -3,7 +3,7 @@
 
   import './on-ready.css';
 
-  const article = '/pdfs/article.pdf';
+  const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
   let viewer = $state.raw<Viewer | null>(null);
   let page = $state<number | null>(null);

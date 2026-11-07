@@ -8,7 +8,7 @@ import {
 } from '@embedpdf/viewer-angular';
 
 // [!doc-source article]
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 // [!/doc-source]
 
 // Paper by day and a warm dark at night, with a book's serif for the viewer's own words in both.

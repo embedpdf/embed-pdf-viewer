@@ -2,7 +2,7 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-vue';
 
 // [!doc-source article]
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 // [!/doc-source]
 
 const config: ViewerConfig = {

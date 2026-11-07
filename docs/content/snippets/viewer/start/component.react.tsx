@@ -10,7 +10,11 @@ function DocumentStatus() {
 
 export function App() {
   return (
-    <PDFViewer src="/report.pdf" layout={layout} style={{ height: '100vh' }}>
+    <PDFViewer
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
+      layout={layout}
+      style={{ height: '100vh' }}
+    >
       <ToolbarItem id="status">
         <DocumentStatus />
       </ToolbarItem>

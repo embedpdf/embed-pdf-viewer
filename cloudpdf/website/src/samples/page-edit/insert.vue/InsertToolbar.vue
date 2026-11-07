@@ -7,7 +7,8 @@ import { useStage, useStageState } from '@embedpdf/vue/stage';
 import { usePageEdit } from '@embedpdf/vue/page-edit';
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
+const otherPdf = async () =>
+  (await fetch('https://www.cloudpdf.com/pdfs/welcome.pdf')).arrayBuffer();
 
 const pageEdit = usePageEdit();
 const stage = useStage();

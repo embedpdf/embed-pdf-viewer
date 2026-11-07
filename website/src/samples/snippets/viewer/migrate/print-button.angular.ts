@@ -18,7 +18,7 @@
 //     const container = EmbedPDF.init({
 //       type: 'container',
 //       target: this.host.nativeElement,
-//       src: '/report.pdf',
+//       src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
 //     });
 //     this.registry = await container?.registry;
 //   }
@@ -38,7 +38,11 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
     <button [disabled]="!viewer()" (click)="viewer()?.commands?.execute('document:print')">
       Print
     </button>
-    <epdf-pdf-viewer src="/report.pdf" style="height: 80vh" (ready)="viewer.set($event)" />
+    <epdf-pdf-viewer
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
+      style="height: 80vh"
+      (ready)="viewer.set($event)"
+    />
   `,
 })
 export class Review {

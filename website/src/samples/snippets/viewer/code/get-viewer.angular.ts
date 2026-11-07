@@ -16,7 +16,7 @@ export class FirstPage {
   imports: [EpdfPdfViewer, EpdfToolbarItem, FirstPage],
   template: `
     <button [disabled]="!viewer()" (click)="viewer()?.commands?.execute('document:print')">Print</button>
-    <epdf-pdf-viewer src="/report.pdf" style="height: 80vh" (ready)="viewer.set($event)">
+    <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 80vh" (ready)="viewer.set($event)">
       <ng-template epdfToolbarItem="first-page"><app-first-page /></ng-template>
     </epdf-pdf-viewer>
   `,

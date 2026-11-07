@@ -133,7 +133,7 @@ export default function SveltePdfViewerPage() {
 </script>
 
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   style="height: 100vh"
 />`,
         }}
@@ -246,7 +246,7 @@ export default function SveltePdfViewerPage() {
   import { PDFViewer } from '@embedpdf/viewer-svelte';
 </script>
 
-<PDFViewer src="/report.pdf" style="height: 100vh" />`,
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />`,
             },
           },
           {
@@ -268,7 +268,7 @@ export default function SveltePdfViewerPage() {
   }
 </script>
 
-<PDFViewer src="/report.pdf" {onready} style="height: 100vh" />`,
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {onready} style="height: 100vh" />`,
             },
           },
         ]}

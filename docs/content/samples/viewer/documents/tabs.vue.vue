@@ -2,13 +2,13 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-vue';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 // [!doc-source article]
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 // [!/doc-source]
 // [!doc-source report]
-const report = '/pdfs/report.pdf';
+const report = 'https://www.embedpdf.com/pdfs/report.pdf';
 // [!/doc-source]
 
 const config: ViewerConfig = {

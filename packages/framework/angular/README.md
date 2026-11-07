@@ -18,7 +18,7 @@ throughout, built on signals, server-rendering safe (the engine only starts in t
     provideEmbedPdf(
       {
         engine: () => localEngine(),
-        initialDocuments: [{ source: { kind: 'url', url: '/c.pdf' } }],
+        initialDocuments: [{ source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } }],
       },
       withStage(),
       withRender(),

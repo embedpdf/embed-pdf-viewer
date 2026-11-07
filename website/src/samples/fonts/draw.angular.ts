@@ -12,7 +12,7 @@ import { EpdfFonts, injectFontCss, withFonts } from '@embedpdf/angular/fonts';
 import { localEngine } from '@embedpdf/engine';
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

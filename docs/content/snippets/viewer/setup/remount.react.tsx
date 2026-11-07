@@ -7,7 +7,7 @@ export function Report({ toolbarBelow }: { toolbarBelow: boolean }) {
   return (
     <PDFViewer
       key={toolbarBelow ? 'below' : 'above'}
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       layout={toolbarBelow ? toolbarAtBottom : undefined}
       style={{ height: '100vh' }}
     />

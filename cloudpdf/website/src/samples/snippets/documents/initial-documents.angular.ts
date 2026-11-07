@@ -10,7 +10,12 @@ import { Spinner } from './spinner';
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, Spinner],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: { kind: 'url', url: '/files/contract.pdf' } }] },
+      {
+        engine,
+        initialDocuments: [
+          { source: { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/welcome.pdf' } },
+        ],
+      },
       withStage(),
       withRender(),
     ),

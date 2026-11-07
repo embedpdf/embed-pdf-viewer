@@ -42,7 +42,7 @@ export function ReviewApp() {
         ))}
       </fieldset>
       <PDFViewer
-        src="/report.pdf"
+        src="https://www.embedpdf.com/pdfs/welcome.pdf"
         {...config}
         appState={{ done, status, approve: () => setStatus('approved') }}
         style={{ height: '100vh' }}

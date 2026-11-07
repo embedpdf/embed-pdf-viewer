@@ -11,7 +11,9 @@ export function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: { kind: 'url', url: '/contract.pdf' } }]}
+      initialDocuments={[
+        { source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } },
+      ]}
     >
       <DocumentGate fallback={<p>Opening…</p>}>
         <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>

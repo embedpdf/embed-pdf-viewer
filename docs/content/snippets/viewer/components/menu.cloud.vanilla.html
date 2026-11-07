@@ -10,7 +10,7 @@
   import { copyLink, emailLink } from './share.js'; // your app
 
   document.getElementById('viewer').config = {
-    src: '/pdfs/welcome.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     layout: (layout) => layout.add({ custom: 'share' }, { to: 'main', section: 'end' }),
   };
   document.getElementById('copy-link').addEventListener('select', copyLink);

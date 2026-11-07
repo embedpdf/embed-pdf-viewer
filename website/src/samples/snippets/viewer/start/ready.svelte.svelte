@@ -6,4 +6,4 @@
   }
 </script>
 
-<PDFViewer src="/report.pdf" {onready} style="height: 100vh" />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {onready} style="height: 100vh" />

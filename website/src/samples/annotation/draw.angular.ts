@@ -15,7 +15,7 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { localEngine } from '@embedpdf/engine';
 
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/article.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/article.pdf');
   return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

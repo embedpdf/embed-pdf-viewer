@@ -23,7 +23,7 @@ const engine = localEngine();
 const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
 
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/agreement.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

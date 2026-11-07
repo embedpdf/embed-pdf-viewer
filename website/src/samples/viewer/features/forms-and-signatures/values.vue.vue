@@ -4,7 +4,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-vue';
 
 import './values.css';
 
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
 const values = ref('{}');
 

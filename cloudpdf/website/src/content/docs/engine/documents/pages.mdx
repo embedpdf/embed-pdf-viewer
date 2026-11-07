@@ -210,7 +210,7 @@ document keeps at least one page: deleting every page fails with `InvalidArg`.
 annotations and form fields. Without a position, the pages go at the end:
 
 ```ts
-const response = await fetch('/appendix.pdf');
+const response = await fetch('https://www.cloudpdf.com/pdfs/article.pdf');
 const { insertedPages } = await doc.pages.insert(await response.arrayBuffer());
 ```
 

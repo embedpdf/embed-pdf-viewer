@@ -4,4 +4,10 @@
   const onready = (viewer: Viewer) => console.log('ready', viewer);
 </script>
 
-<PDFViewer src="/report.pdf" theme="system" features={{ forms: false }} {onready} style="height: 100vh" />
+<PDFViewer
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
+  theme="system"
+  features={{ forms: false }}
+  {onready}
+  style="height: 100vh"
+/>

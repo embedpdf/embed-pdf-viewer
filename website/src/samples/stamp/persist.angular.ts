@@ -29,7 +29,7 @@ const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
 
 const approvals = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/approvals.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/approvals.pdf');
   return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

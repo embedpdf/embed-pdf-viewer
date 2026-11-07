@@ -12,7 +12,7 @@ npm install @embedpdf/viewer-svelte
   import { PDFViewer } from '@embedpdf/viewer-svelte';
 </script>
 
-<PDFViewer src="/report.pdf" style="height: 100vh" />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
 ```
 
 No engine or wasm configuration is needed: the built-in local engine (PDFium
@@ -32,11 +32,10 @@ state, your CSS:
   import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-svelte';
   import DocPicker from './DocPicker.svelte';
 
-  const layout = (layout: Layout) =>
-    layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' });
+  const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' });
 </script>
 
-<PDFViewer src="/report.pdf" {layout}>
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {layout}>
   <ToolbarItem id="doc-picker"><DocPicker /></ToolbarItem>
 </PDFViewer>
 ```
@@ -47,10 +46,7 @@ state, your CSS:
 ## Driving the viewer
 
 ```svelte
-<PDFViewer
-  src="/report.pdf"
-  onready={(viewer) => viewer.commands.execute('zoom:in')}
-/>
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" onready={(viewer) => viewer.commands.execute('zoom:in')} />
 ```
 
 `onready` hands you the `viewer`: each plugin's API by its name

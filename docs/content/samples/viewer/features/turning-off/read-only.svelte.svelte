@@ -2,7 +2,7 @@
   import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-svelte';
 
   // [!doc-source report]
-  const report = '/pdfs/report.pdf';
+  const report = 'https://www.embedpdf.com/pdfs/report.pdf';
   // [!/doc-source]
 
   const config: ViewerConfig = {

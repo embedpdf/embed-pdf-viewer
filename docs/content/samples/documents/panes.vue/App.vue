@@ -14,14 +14,14 @@ const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // [!doc-source article]
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/article.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

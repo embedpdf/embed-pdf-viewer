@@ -14,7 +14,7 @@ async function print() {
 
 <template>
   <button @click="print">Print</button>
-  <PDFViewer ref="viewer" :config="{ src: '/report.pdf' }" :style="{ height: '80vh' }" />
+  <PDFViewer ref="viewer" :config="{ src: 'https://www.embedpdf.com/pdfs/welcome.pdf' }" :style="{ height: '80vh' }" />
 </template>
 -->
 
@@ -27,5 +27,9 @@ const viewer = shallowRef<Viewer | null>(null);
 
 <template>
   <button :disabled="!viewer" @click="viewer?.commands.execute('document:print')">Print</button>
-  <PDFViewer src="/report.pdf" style="height: 80vh" @ready="viewer = $event" />
+  <PDFViewer
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
+    style="height: 80vh"
+    @ready="viewer = $event"
+  />
 </template>

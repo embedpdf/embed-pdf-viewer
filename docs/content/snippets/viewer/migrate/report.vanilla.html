@@ -8,7 +8,7 @@
   const container = EmbedPDF.init({
     type: 'container',
     target: document.getElementById('pdf-viewer'),
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     theme: { preference: 'dark' },
     disabledCategories: ['redaction', 'document-print'],
   });
@@ -23,7 +23,7 @@
 
   EmbedPDF.init({
     target: '#viewer',
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     theme: 'dark',
     features: { 'documents.print': false },
     onReady: (viewer) => console.log('ready', viewer),

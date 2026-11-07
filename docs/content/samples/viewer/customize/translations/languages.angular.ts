@@ -2,7 +2,7 @@ import { Component, signal, ViewEncapsulation } from '@angular/core';
 import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 // Your own words for two of the viewer's labels, in each language.

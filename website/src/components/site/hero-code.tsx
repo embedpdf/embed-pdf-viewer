@@ -19,7 +19,7 @@ const SNIPPETS: { id: string; label: string; icon: ReactNode; code: string }[] =
 export function App() {
   return (
     <PDFViewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       style={{ height: '100vh' }}
     />
   );
@@ -37,7 +37,7 @@ import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: \`
     <epdf-pdf-viewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       style="height: 100vh"
     />
   \`,
@@ -54,7 +54,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     style="height: 100vh"
   />
 </template>`,
@@ -68,7 +68,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 </script>
 
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   style="height: 100vh"
 />`,
   },
@@ -88,7 +88,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 
   EmbedPDF.init({
     target: '#viewer',
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
   });
 </script>`,
   },

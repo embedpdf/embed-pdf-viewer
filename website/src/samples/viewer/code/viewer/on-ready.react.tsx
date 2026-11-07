@@ -3,7 +3,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
 
 import './on-ready.css';
 
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
 export default function App() {
   const [viewer, setViewer] = useState<Viewer | null>(null);

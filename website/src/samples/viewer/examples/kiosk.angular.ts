@@ -8,7 +8,7 @@ import {
   type ViewerPlugins,
 } from '@embedpdf/viewer-angular';
 
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
 type Form = ViewerPlugins['form'];
 

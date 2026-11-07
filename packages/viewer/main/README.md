@@ -11,8 +11,8 @@ version matrix, no style collisions (shadow DOM; theming stays inside it).
 ```html
 <div id="viewer" style="height: 100vh"></div>
 <script type="module">
-  import EmbedPDF from 'https://cdn.embedpdf.com/v3/embedpdf.js';
-  EmbedPDF.init({ target: '#viewer', src: '/report.pdf' });
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+  EmbedPDF.init({ target: '#viewer', src: 'https://www.embedpdf.com/pdfs/welcome.pdf' });
 </script>
 ```
 
@@ -20,7 +20,7 @@ Or declaratively — it's a real custom element:
 
 ```html
 <embedpdf-viewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   locale="auto"
   theme="system"
   style="height: 100vh"
@@ -37,7 +37,7 @@ import at all:
 ```js
 EmbedPDF.init({
   target: '#viewer',
-  src: '/report.pdf',
+  src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
   layout: (layout, env) =>
     layout
       .remove('tool:pan', { from: 'main' })

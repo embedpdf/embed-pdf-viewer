@@ -7,7 +7,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     theme="system"
     :features="features"
     style="height: 100vh"

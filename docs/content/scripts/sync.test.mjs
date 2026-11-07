@@ -6,12 +6,21 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
-import { pageExamples, siteFiles, sitePages, transformFile, transformViewerFile } from './sync.mjs';
+import {
+  documentProblems,
+  pageExamples,
+  siteFiles,
+  sitePages,
+  transformFile,
+  transformViewerFile,
+} from './sync.mjs';
 
 const cloud = (source, file) => transformViewerFile(source, 'cloud', file);
 const document = DEMO_DOCUMENTS.welcome.viewerCloud;
+const WELCOME = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
 describe('the cloud site’s copy of a viewer file', () => {
   it('names the cloud packages, but not a subpath only the local door has', () => {
@@ -41,7 +50,7 @@ describe('the cloud site’s copy of a viewer file', () => {
   it('loads the cloud CDN script, under its own default name', () => {
     const source = `<script type="module">
   import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
-  EmbedPDF.init({ target: '#viewer', src: '/report.pdf' });
+  EmbedPDF.init({ target: '#viewer', src: '${WELCOME}' });
 </script>
 `;
     assert.equal(
@@ -55,7 +64,7 @@ describe('the cloud site’s copy of a viewer file', () => {
   });
 
   it('binds a document attribute the way each framework binds one', () => {
-    const attribute = 'src="/report.pdf"';
+    const attribute = `src="${WELCOME}"`;
     assert.equal(
       cloud(`<PDFViewer ${attribute} />`, 'viewer/a.react.tsx'),
       `<PDFViewer src={${document}} />`,
@@ -86,13 +95,13 @@ describe('the cloud site’s copy of a viewer file', () => {
 
   it('keeps a doc-source block’s declaration and gives it the cloud document', () => {
     const source = `  // [!doc-source welcome]
-  readonly welcome = '/pdfs/welcome.pdf';
+  readonly welcome = '${WELCOME}';
   // [!/doc-source]
 `;
     assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly welcome = ${document};\n`);
     assert.equal(
       transformViewerFile(source, 'local', 'viewer/a.angular.ts'),
-      "  readonly welcome = '/pdfs/welcome.pdf';\n",
+      `  readonly welcome = '${WELCOME}';\n`,
     );
     assert.throws(
       () =>
@@ -116,8 +125,7 @@ describe('the cloud site’s copy of a viewer file', () => {
   });
 
   it('leaves embedpdf.com’s copy as written', () => {
-    const source =
-      'import { PDFViewer } from \'@embedpdf/viewer-react\';\n<PDFViewer src="/report.pdf" />\n';
+    const source = `import { PDFViewer } from '@embedpdf/viewer-react';\n<PDFViewer src="${WELCOME}" />\n`;
     assert.equal(transformViewerFile(source, 'local', 'viewer/a.react.tsx'), source);
   });
 });
@@ -151,6 +159,42 @@ describe('characters of a demo document', () => {
       () => sample('cloud', source.replace('firstWord', 'lastWord')),
       /unknown doc-range 'welcome lastWord'/,
     );
+  });
+});
+
+describe('a demo document’s URL', () => {
+  const sample = (engine, source) =>
+    transformFile(source, engine, 'page-edit/a.react.tsx', { viewer: false });
+
+  it('names the site’s own copy of the file', () => {
+    const source = "const response = await fetch('https://www.embedpdf.com/pdfs/sketch.pdf');\n";
+    assert.equal(sample('local', source), source);
+    assert.equal(
+      sample('cloud', source),
+      "const response = await fetch('https://www.cloudpdf.com/pdfs/sketch.pdf');\n",
+    );
+  });
+
+  it('still gives the viewer the cloud document', () => {
+    assert.equal(
+      transformFile(`<PDFViewer src="${WELCOME}" />`, 'cloud', 'viewer/a.react.tsx', {
+        viewer: true,
+      }),
+      `<PDFViewer src={${document}} />`,
+    );
+  });
+
+  it('is a full URL of a file the site serves', () => {
+    const site = fileURLToPath(new URL('../../../website', import.meta.url));
+    const expected = new Map([
+      ['a.tsx', `fetch('${WELCOME}')`],
+      ['b.tsx', "fetch('/pdfs/welcome.pdf')"],
+      ['c.tsx', "fetch('https://www.embedpdf.com/pdfs/missing.pdf')"],
+    ]);
+    const [relative, missing, ...rest] = documentProblems(expected, 'local', site);
+    assert.match(relative, /^b\.tsx: .*give its full URL/);
+    assert.match(missing, /^c\.tsx: .*isn't a file the site serves/);
+    assert.deepEqual(rest, []);
   });
 });
 
@@ -200,6 +244,14 @@ describe('a site’s pages', () => {
     const [, code] = page('cloud', 'setup').mdx.split('```');
     assert.match(code, /from '@cloudpdf\/viewer'/);
     assert.match(page('cloud', 'setup').mdx, /install\n`@embedpdf\/viewer`/);
+  });
+
+  it('opens a demo document on the site’s own copy', () => {
+    assert.match(
+      page('cloud', 'documents').mdx,
+      /'https:\/\/www\.cloudpdf\.com\/pdfs\/invoice\.pdf'/,
+    );
+    assert.doesNotMatch(page('cloud', 'documents').mdx, /www\.embedpdf\.com\/pdfs/);
   });
 });
 

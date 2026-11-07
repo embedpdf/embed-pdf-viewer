@@ -12,12 +12,13 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
+const otherPdf = async () =>
+  (await fetch('https://www.embedpdf.com/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 function InsertToolbar() {

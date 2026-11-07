@@ -13,8 +13,12 @@
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
   const registration = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/registration.pdf');
-    return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
+    const response = await fetch('https://www.embedpdf.com/pdfs/registration.pdf');
+    return {
+      kind: 'bytes',
+      id: 'registration',
+      bytes: new Uint8Array(await response.arrayBuffer()),
+    };
   };
 </script>
 

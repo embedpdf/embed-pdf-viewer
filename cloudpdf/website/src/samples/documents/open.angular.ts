@@ -46,7 +46,11 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
       @if (document.id()) {
         <button type="button" class="button" (click)="documents.close(document.id())">Close</button>
       } @else {
-        <button type="button" class="button" (click)="documents.open(welcome, { name: 'welcome.pdf' })">
+        <button
+          type="button"
+          class="button"
+          (click)="documents.open(welcome, { name: 'welcome.pdf' })"
+        >
           Open the welcome again
         </button>
       }

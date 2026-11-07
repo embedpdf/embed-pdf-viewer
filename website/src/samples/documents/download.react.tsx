@@ -11,7 +11,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -37,7 +37,8 @@ function DownloadBar() {
     return () => cancel.abort();
   }, [documents]);
 
-  const download = async () => saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
+  const download = async () =>
+    saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
 
   return (
     <div className="toolbar">

@@ -143,7 +143,7 @@ export default function ReactPdfViewerPage() {
 export function App() {
   return (
     <PDFViewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       style={{ height: '100vh' }}
     />
   );

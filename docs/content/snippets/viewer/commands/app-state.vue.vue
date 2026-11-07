@@ -40,5 +40,10 @@ const appState = computed<Review>(() => ({
       <input v-model="done" type="checkbox" :value="check" /> {{ check }}
     </label>
   </fieldset>
-  <PDFViewer src="/report.pdf" v-bind="config" :app-state="appState" style="height: 100vh" />
+  <PDFViewer
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
+    v-bind="config"
+    :app-state="appState"
+    style="height: 100vh"
+  />
 </template>

@@ -4,7 +4,7 @@
   import './on-ready.css';
 
   // [!doc-source article]
-  const article = '/pdfs/article.pdf';
+  const article = 'https://www.embedpdf.com/pdfs/article.pdf';
   // [!/doc-source]
 
   let viewer = $state.raw<Viewer | null>(null);

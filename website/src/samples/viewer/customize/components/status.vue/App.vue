@@ -5,7 +5,7 @@ import ReviewStatus from './ReviewStatus.vue';
 
 import '../status.css';
 
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 
 const status = ref('review');
 

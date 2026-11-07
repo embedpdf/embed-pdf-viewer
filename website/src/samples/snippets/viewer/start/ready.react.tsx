@@ -5,5 +5,11 @@ function onReady(viewer: Viewer) {
 }
 
 export function App() {
-  return <PDFViewer src="/report.pdf" onReady={onReady} style={{ height: '100vh' }} />;
+  return (
+    <PDFViewer
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
+      onReady={onReady}
+      style={{ height: '100vh' }}
+    />
+  );
 }

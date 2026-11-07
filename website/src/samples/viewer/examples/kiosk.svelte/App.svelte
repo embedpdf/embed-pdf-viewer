@@ -10,7 +10,7 @@
 
   import '../kiosk.css';
 
-  const forms = '/pdfs/forms.pdf';
+  const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
   type Form = ViewerPlugins['form'];
 

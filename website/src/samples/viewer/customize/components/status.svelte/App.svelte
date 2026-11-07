@@ -4,7 +4,7 @@
 
   import '../status.css';
 
-  const proposal = '/pdfs/proposal.pdf';
+  const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 
   let status = $state('review');
 

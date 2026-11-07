@@ -7,9 +7,13 @@ import { EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
   template: `
     <!-- Each branch mounts its own viewer with its own config. -->
     @if (toolbarBelow()) {
-      <epdf-pdf-viewer src="/report.pdf" [layout]="toolbarAtBottom" style="height: 100vh" />
+      <epdf-pdf-viewer
+        src="https://www.embedpdf.com/pdfs/welcome.pdf"
+        [layout]="toolbarAtBottom"
+        style="height: 100vh"
+      />
     } @else {
-      <epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />
+      <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
     }
   `,
 })

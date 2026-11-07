@@ -22,7 +22,7 @@ interface Review {
       }
     </fieldset>
     <epdf-pdf-viewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       [config]="config"
       [appState]="appState()"
       style="height: 100vh"
