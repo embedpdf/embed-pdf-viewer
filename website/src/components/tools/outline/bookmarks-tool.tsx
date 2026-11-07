@@ -28,18 +28,16 @@ const ToolViewer = dynamic(
  * thumbnails and search to find a place, and text selection, because a selected heading becomes
  * a new bookmark's title.
  */
-const DISABLED = [
-  'annotations',
-  'shapes',
-  'stamps',
-  'comments',
-  'forms',
-  'signatures',
-  'redaction',
-  'measurement',
-  'attachments',
-  'pages',
-];
+const FEATURES = {
+  annotations: false,
+  shapes: false,
+  stamps: false,
+  comments: false,
+  forms: false,
+  signatures: false,
+  attachments: false,
+  pages: false,
+} as const;
 
 /** The viewer says "outline" and "item"; people who come here say "bookmarks". */
 const STRINGS = {
@@ -114,7 +112,7 @@ export function BookmarksTool({ file }: { file: OpenFile }) {
           name={file.name}
           bytes={file.bytes}
           password={file.password}
-          disable={DISABLED}
+          features={FEATURES}
           panel="outline"
           strings={STRINGS}
           onViewer={(ready) => {

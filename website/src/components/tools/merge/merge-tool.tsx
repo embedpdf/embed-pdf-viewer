@@ -53,18 +53,16 @@ const ToolViewer = dynamic(
  * What the merged file doesn't need for moving pages around. What stays: the page thumbnails and
  * their page commands, reading and printing.
  */
-const ORGANIZE_DISABLED = [
-  'annotations',
-  'shapes',
-  'stamps',
-  'comments',
-  'forms',
-  'signatures',
-  'redaction',
-  'measurement',
-  'attachments',
-  'outline',
-];
+const ORGANIZE_FEATURES = {
+  annotations: false,
+  shapes: false,
+  stamps: false,
+  comments: false,
+  forms: false,
+  signatures: false,
+  attachments: false,
+  outline: false,
+} as const;
 
 type Phase =
   | { readonly kind: 'edit' }
@@ -442,7 +440,7 @@ export function MergeTool() {
           <ToolViewer
             name={phase.file.name}
             bytes={phase.file.bytes}
-            disable={ORGANIZE_DISABLED}
+            features={ORGANIZE_FEATURES}
             panel="thumbnails"
             onViewer={(viewer) => {
               viewerRef.current = viewer;

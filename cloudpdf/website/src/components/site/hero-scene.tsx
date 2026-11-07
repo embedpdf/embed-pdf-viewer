@@ -20,7 +20,7 @@ const SNIPPETS: Record<Tab, string> = {
     '',
     '<span class="tk-tag">&lt;PDFViewer</span>',
     '  <span class="tk-attr">src</span>=<span class="tk-pun">{{</span> token <span class="tk-pun">}}</span>',
-    '  <span class="tk-attr">disable</span>=<span class="tk-pun">{[</span><span class="tk-str">\'documents.download\'</span><span class="tk-pun">]}</span>',
+    '  <span class="tk-attr">features</span>=<span class="tk-pun">{{</span> <span class="tk-str">\'documents.download\'</span><span class="tk-pun">:</span> <span class="tk-kw">false</span> <span class="tk-pun">}}</span>',
     '  <span class="tk-attr">theme</span>=<span class="tk-str">"light"</span>',
     '<span class="tk-tag">/&gt;</span>',
   ].join('\n'),

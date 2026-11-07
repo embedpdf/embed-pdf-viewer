@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { toolEngine } from './engine';
 
 type ViewerStrings = ComponentProps<typeof PDFViewer>['strings'];
+type ViewerFeatures = NonNullable<ComponentProps<typeof PDFViewer>['features']>;
 
 /** Open `panel` once the document is: the panels belong to an open document, and the viewer is ready before the file is. */
 function openPanel(viewer: Viewer, panel: string) {
@@ -30,7 +31,7 @@ export function ToolViewer({
   name,
   bytes,
   password,
-  disable,
+  features,
   panel,
   strings,
   onViewer,
@@ -38,7 +39,7 @@ export function ToolViewer({
   name: string;
   bytes: Uint8Array;
   password?: string;
-  disable: readonly string[];
+  features: ViewerFeatures;
   panel: string;
   strings?: ViewerStrings;
   onViewer: (viewer: Viewer) => void;
@@ -58,9 +59,14 @@ export function ToolViewer({
     ],
     [bytes, name, password],
   );
-  const off = useMemo(
-    () => [...disable, 'documents.download', 'documents.open', 'documents.tabs'],
-    [disable],
+  const toolFeatures = useMemo(
+    () => ({
+      ...features,
+      'documents.download': false,
+      'documents.open': false,
+      'documents.tabs': false,
+    }),
+    [features],
   );
   if (!engine) return null;
   return (
@@ -68,7 +74,7 @@ export function ToolViewer({
       documents={documents}
       engine={engine}
       theme="light"
-      disable={off}
+      features={toolFeatures}
       strings={strings}
       onReady={(viewer) => {
         openPanel(viewer, panel);
