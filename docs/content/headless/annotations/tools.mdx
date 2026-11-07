@@ -22,9 +22,9 @@ annotationPlugin({
 });
 ```
 
-The first entry changes the built-in `ink` tool. The second adds an `arrow` tool: a line with an
-arrowhead. Activate a tool with `interaction.activateTool('arrow')`, as on the
-[overview](../annotations#let-people-draw).
+The first entry changes the built-in `ink` tool, and only that tool: the highlighter stays as it
+is. The second adds an `arrow` tool: a line with an arrowhead. Activate a tool with
+`interaction.activateTool('arrow')`, as on the [overview](../annotations#let-people-draw).
 
 ## Change the default color, width and font
 
@@ -70,8 +70,23 @@ annotationPlugin({
 });
 ```
 
+The entries apply in order, so `extends` starts from the tool as the entries above it left it.
+Change a tool first, then make tools from it:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'ink', defaults: { strokeWidth: 3 } },
+    // Starts from your ink: 3 wide, in red.
+    { id: 'red-pen', extends: 'ink', defaults: { color: '#ff0000' } },
+  ],
+});
+```
+
+From then on the new tool is its own: a change written after it reaches only the tool it names.
+
 Give a tool a label and an icon for your toolbar in `meta`. The plugin keeps it and never reads
-it:
+it, and `extends` doesn't copy it, so every tool you make gets a label of its own:
 
 ```ts
 annotationPlugin({
@@ -86,8 +101,9 @@ annotationPlugin({
 > **Try it:** every button but **Select** comes from a tool's `meta`. Draw with **Red pen**, then
 > place a **To do** note.
 
-Tools can also be added while the app runs. `register()` returns a function that removes the tool
-again:
+Tools can also be added or changed while the app runs. `register()` takes one more entry, after
+the `tools` setting's, and returns a function that takes it back: a tool it added goes away, and a
+tool it changed goes back to what it was:
 
 ```ts
 const remove = annotation.tools.register({
@@ -371,7 +387,7 @@ zoom. Click tools (notes, stamps) place with a tap, and a drag still scrolls.
 | Option        | What it is                                                                              |
 | :------------ | :-------------------------------------------------------------------------------------- |
 | `id`          | The tool's name, used with `interaction.activateTool(id)`.                              |
-| `extends`     | A tool to start from.                                                                   |
+| `extends`     | A tool listed before this one to start from: everything but its `meta`.                 |
 | `subtype`     | The kind of annotation it draws, for a tool that doesn't extend another.                |
 | `defaults`    | The fields every new annotation starts with.                                            |
 | `cursor`      | The cursor while the tool is active.                                                    |
@@ -380,4 +396,4 @@ zoom. Click tools (notes, stamps) place with a tap, and a drag still scrolls.
 | `afterCreate` | Select the new annotation? Keep the tool? Start typing?                                 |
 | `upright`     | Turn new annotations upright on rotated pages.                                          |
 | `source`      | For stamp tools: fixed bytes, or ask for a file.                                        |
-| `meta`        | Your own data, such as a label and an icon for a toolbar.                               |
+| `meta`        | Your own data, such as a label and an icon for a toolbar. `extends` doesn't copy it.    |

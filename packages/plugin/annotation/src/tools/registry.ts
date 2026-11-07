@@ -11,6 +11,7 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import {
+  applyTool,
   buildToolRegistry,
   toolTouchOf,
   type AnnotationToolInput,
@@ -26,8 +27,7 @@ import type { AnnotationStore } from '../services/store';
  * The resolved tool table (built-ins + the `tools` setting). A tool is a named
  * authoring preset: it maps its id → a routing subtype, a `defaults` key
  * (`preset`), the kind whose properties it shows, and, for stamps, a source
- * spec. The setting's tools are kept so `tools.register` can re-resolve
- * `extends` against the same base pool.
+ * spec. `tools.register` applies one more entry to the same table.
  */
 export function createToolRegistry(
   ctx: Pick<AnnotationContext, 'tryGet'>,
@@ -35,8 +35,7 @@ export function createToolRegistry(
   store: AnnotationStore,
   events: Pick<AnnotationEvents, 'toolDefaultsChanged'>,
 ) {
-  const configTools = [...settingTools];
-  const registry = buildToolRegistry(configTools);
+  const registry = buildToolRegistry(settingTools);
   // Every tool's next annotation starts from its defaults.
   for (const tool of registry.values()) {
     if (tool.defaults) {
@@ -130,26 +129,55 @@ export function createToolRegistry(
     return hit;
   };
 
+  /** Put `tool` on the hub, in place of any tool with its id. */
+  const registerOnHub = (tool: ResolvedTool) => {
+    const { id, cursor, enables } = tool;
+    const hubTool = { id, cursor, enables, touch: toolTouchOf(enables) };
+    return ctx.tryGet(InteractionToken)?.registerTool(hubTool, { replace: true });
+  };
+
+  /**
+   * The registrations in place, per tool id, oldest first, each with the tool
+   * it replaced. Removing the newest puts that tool back; removing an older one
+   * hands what it replaced to the one after it. So removals in any order end
+   * with the tool the first registration replaced.
+   */
+  const registrations = new Map<string, Array<{ replaced: ResolvedTool | undefined }>>();
+
   const register = (definition: AnnotationToolInput) => {
-    // Re-resolve against the same base pool so `extends` can reach built-ins /
-    // setting tools, then register just this one with the hub + seed its defaults.
-    const resolved = buildToolRegistry([...configTools, definition]).get(definition.id);
-    if (!resolved) throw new Error(`[annotation] could not resolve tool '${definition.id}'`);
-    registry.set(resolved.id, resolved);
-    const un = ctx.tryGet(InteractionToken)?.registerTool(
-      {
-        id: resolved.id,
-        cursor: resolved.cursor,
-        enables: resolved.enables,
-        touch: toolTouchOf(resolved.enables),
-      },
-      { replace: true },
-    );
-    if (resolved.defaults)
-      store.commit({ type: 'setDefaults', preset: resolved.preset, patch: resolved.defaults });
+    const replaced = registry.get(definition.id);
+    const tool = applyTool(registry, definition);
+    const unregister = registerOnHub(tool);
+    if (tool.defaults)
+      store.commit({ type: 'setDefaults', preset: tool.preset, patch: tool.defaults });
+    const registration = { replaced };
+    registrations.set(tool.id, [...(registrations.get(tool.id) ?? []), registration]);
+
     return () => {
-      registry.delete(resolved.id);
-      un?.();
+      const stack = registrations.get(tool.id) ?? [];
+      const at = stack.indexOf(registration);
+      if (at < 0) return;
+      const rest = stack.filter((other) => other !== registration);
+      if (rest.length) registrations.set(tool.id, rest);
+      else registrations.delete(tool.id);
+      const newer = stack[at + 1];
+      if (newer) {
+        newer.replaced = registration.replaced;
+        return;
+      }
+      const previous = registration.replaced;
+      if (!previous) {
+        registry.delete(tool.id);
+        unregister?.();
+        return;
+      }
+      registry.set(previous.id, previous);
+      registerOnHub(previous);
+      store.commit({
+        type: 'replaceDefaults',
+        preset: previous.preset,
+        defaults: previous.defaults ?? {},
+      });
     };
   };
 
