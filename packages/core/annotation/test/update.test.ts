@@ -186,6 +186,22 @@ describe('update', () => {
     });
   });
 
+  it("a tool's defaults take a patch over them, or a replacement that drops what it leaves out", () => {
+    const defaults = { ink: { color: '#ff0000', opacity: 0.5 } };
+    const [patched] = step(modelWith([], { defaults }), {
+      type: 'setDefaults',
+      preset: 'ink',
+      patch: { strokeWidth: 3 },
+    });
+    expect(patched.defaults.ink).toEqual({ color: '#ff0000', opacity: 0.5, strokeWidth: 3 });
+    const [replaced] = step(patched, {
+      type: 'replaceDefaults',
+      preset: 'ink',
+      defaults: { color: '#00a000' },
+    });
+    expect(replaced.defaults.ink).toEqual({ color: '#00a000' });
+  });
+
   it("a free text's draft carries the tool's font defaults, and opens for typing", () => {
     const defaults = { 'free-text': { fontFamily: 'courier', fontSize: 18, textAlign: 'right' } };
     const click = (phase: 'down' | 'up'): Message => ({
