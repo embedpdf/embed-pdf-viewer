@@ -705,6 +705,7 @@ describe('itemOfPage', () => {
   it('keeps the nearest item before a page the layout leaves out', () => {
     const scene = S.linearLayout(pages, [[0], [2], [3]]);
     expect(scene.itemOfPage(1)).toBe(0);
+    expect(scene.itemOfPage(9)).toBe(2);
   });
 });
 
