@@ -77,7 +77,23 @@ export const DEMO_DOCUMENTS = {
   layout: { cloudSource: cloudSource('layout'), ...viewerForms('layout') },
   notice: { cloudSource: cloudSource('notice'), ...viewerForms('notice') },
   approvals: { cloudSource: cloudSource('approvals'), ...viewerForms('approvals') },
-  article: { cloudSource: cloudSource('article'), ...viewerForms('article') },
+  article: {
+    cloudSource: cloudSource('article'),
+    ...viewerForms('article'),
+    /**
+     * Characters on the cover the samples select, by the name a `[!doc-range article <name>]`
+     * block gives: `text` is what they read. A made-up company's document is the same on both
+     * sites, so both read the same characters. The letterhead's "Engineering blog" comes before
+     * the title in the cover's text.
+     */
+    ranges: {
+      firstLine: {
+        text: 'How the first page of a large PDF',
+        local: { start: 18, count: 33 },
+        cloud: { start: 18, count: 33 },
+      },
+    },
+  },
   sketch: { cloudSource: cloudSource('sketch'), ...viewerForms('sketch') },
   invoice: { cloudSource: cloudSource('invoice'), ...viewerForms('invoice') },
   registration: { cloudSource: cloudSource('registration'), ...viewerForms('registration') },
