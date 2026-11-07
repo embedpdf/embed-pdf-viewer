@@ -225,9 +225,10 @@ export interface AfterCreateSettings {
  */
 export interface AnnotationSettings {
   /**
-   * Change the built-in tools or add your own. An entry with a built-in's id
-   * changes it (`{ id: 'ink', defaults: { strokeWidth: 6 } }`), a new id adds
-   * a tool, and `extends` starts from another tool.
+   * Change the built-in tools or add your own, entry by entry in order. An
+   * entry with a tool's id changes only that tool
+   * (`{ id: 'ink', defaults: { strokeWidth: 6 } }`), a new id adds a tool, and
+   * `extends` starts from a copy of a tool listed before it, without its `meta`.
    */
   readonly tools: readonly AnnotationToolInput[];
   readonly afterCreate: AfterCreateSettings;
@@ -652,7 +653,11 @@ export interface AnnotationToolsCapability {
   list(): readonly AnnotationTool[];
   /** One tool, or `null`. */
   get(id: string): AnnotationTool | null;
-  /** Add a tool while the app runs, or replace the one with the same id. Returns a function that removes it. */
+  /**
+   * Add or change a tool while the app runs: one more entry after the `tools`
+   * setting's. Returns a function that takes it back: a tool it added goes
+   * away, a tool it changed goes back to what it was.
+   */
   register(tool: AnnotationToolInput): Unsubscribe;
   /** The fields a tool's next annotation starts with: its defaults over the engine's. The same object until they change. */
   getDefaults(id: string): ToolDefaults;

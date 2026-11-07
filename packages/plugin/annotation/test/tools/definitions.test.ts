@@ -83,6 +83,85 @@ describe('annotation tool registry', () => {
     expect(tools.get('line')?.capture).toBe(false);
   });
 
+  it('changes only the built-in a change names, never the built-ins made from it', () => {
+    const tools = buildToolRegistry([
+      { id: 'ink', defaults: { opacity: 0.5 }, meta: { label: 'Blue pen' } },
+      { id: 'line', defaults: { color: '#0000ff' }, cursor: 'pen' },
+      { id: 'polygon', defaults: { interiorColor: '#ffff00' } },
+      { id: 'polyline', defaults: { color: '#00ff00' } },
+    ]);
+    expect(tools.get('ink')).toMatchObject({
+      defaults: { opacity: 0.5 },
+      meta: { label: 'Blue pen' },
+    });
+    expect(tools.get('ink-highlight')?.defaults?.opacity).toBeUndefined();
+    expect(tools.get('ink-highlight')?.meta).toBeUndefined();
+    expect(tools.get('line')).toMatchObject({ defaults: { color: '#0000ff' }, cursor: 'pen' });
+    for (const id of ['distance', 'calibrate']) {
+      expect(tools.get(id)).toMatchObject({ defaults: { color: '#e5484d' }, cursor: 'crosshair' });
+    }
+    expect(tools.get('area')?.defaults?.interiorColor).toBeUndefined();
+    expect(tools.get('perimeter')?.defaults?.color).toBe('#e5484d');
+  });
+
+  it('`extends` copies the tool as the entries before it left it, except its `meta`', () => {
+    const tools = buildToolRegistry([
+      {
+        id: 'ink',
+        defaults: { strokeWidth: 3 },
+        ink: { groupStrokesMs: 0 },
+        meta: { label: 'Pen' },
+      },
+      { id: 'thick-pen', extends: 'ink', defaults: { strokeWidth: 10 } },
+    ]);
+    expect(tools.get('thick-pen')).toMatchObject({
+      subtype: 'ink',
+      defaults: { color: '#ef4444', strokeWidth: 10 },
+      ink: { groupStrokesMs: 0 },
+    });
+    expect(tools.get('thick-pen')?.meta).toBeUndefined();
+  });
+
+  it('a change written after a tool was copied does not reach the copy', () => {
+    const tools = buildToolRegistry([
+      { id: 'red-pen', extends: 'ink', defaults: { color: '#ff0000' } },
+      { id: 'ink', defaults: { strokeWidth: 2 } },
+    ]);
+    expect(tools.get('ink')?.defaults?.strokeWidth).toBe(2);
+    expect(tools.get('red-pen')?.defaults).toMatchObject({ color: '#ff0000', strokeWidth: 6 });
+  });
+
+  it('refuses `extends` of a tool not defined before the entry', () => {
+    expect(() =>
+      buildToolRegistry([
+        { id: 'b', extends: 'a' } as unknown as AnnotationToolInput,
+        { id: 'a', subtype: 'square' },
+      ]),
+    ).toThrow("tool 'b' extends 'a', which isn't defined before it");
+  });
+
+  it('merges a change into the tool it names, `meta` and preset included', () => {
+    const tools = buildToolRegistry([
+      { id: 'ink', meta: { label: 'Pen' } },
+      { id: 'ink', meta: { icon: 'pen' } },
+      { id: 'insert-text', defaults: { color: '#000000' } },
+    ]);
+    expect(tools.get('ink')?.meta).toEqual({ label: 'Pen', icon: 'pen' });
+    expect(tools.get('insert-text')).toMatchObject({
+      preset: 'caret',
+      defaults: { color: '#000000' },
+    });
+  });
+
+  it('puts a tool made with `extends` in place of the one with its id', () => {
+    const tools = buildToolRegistry([
+      { id: 'pen', subtype: 'ink', meta: { label: 'Pen' } },
+      { id: 'pen', extends: 'line' },
+    ]);
+    expect(tools.get('pen')?.subtype).toBe('line');
+    expect(tools.get('pen')?.meta).toBeUndefined();
+  });
+
   it('rejects unsupported defaults from untyped JavaScript/JSON configuration', () => {
     expect(() => buildToolRegistry([invalidCircleDefaults])).toThrow(
       "tool 'invalid-circle' does not support default 'lineEndings'",

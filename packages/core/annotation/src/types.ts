@@ -761,6 +761,8 @@ export type Message =
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
   // Merge fields into a tool's defaults (keyed by its preset).
   | { type: 'setDefaults'; preset: string; patch: FieldValues }
+  // Set a tool's defaults to exactly these, dropping any field they leave out.
+  | { type: 'replaceDefaults'; preset: string; defaults: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
   // Turn the selection a quarter turn, clockwise (90) or back (-90): the
