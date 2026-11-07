@@ -1,5 +1,5 @@
 ---
-'@embedpdf/plugin-annotation': minor
+'@embedpdf/plugin-annotation': patch
 ---
 
 The `tools` setting applies its entries in order, so each tool behaves the way the list reads:

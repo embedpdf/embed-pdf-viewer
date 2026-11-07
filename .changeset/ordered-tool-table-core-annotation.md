@@ -1,5 +1,5 @@
 ---
-'@embedpdf/core-annotation': minor
+'@embedpdf/core-annotation': patch
 ---
 
 A `replaceDefaults` message sets a tool's defaults to exactly the fields it gives, where
