@@ -34,7 +34,7 @@ const plugins = [
 ];
 
 const sketch = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/sketch.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/sketch.pdf');
   return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

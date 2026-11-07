@@ -10,7 +10,11 @@ function DocumentStatus() {
 
 export function App() {
   return (
-    <PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} layout={layout} style={{ height: '100vh' }}>
+    <PDFViewer
+      src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
+      layout={layout}
+      style={{ height: '100vh' }}
+    >
       <ToolbarItem id="status">
         <DocumentStatus />
       </ToolbarItem>

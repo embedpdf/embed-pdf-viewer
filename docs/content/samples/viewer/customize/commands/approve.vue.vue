@@ -4,7 +4,7 @@ import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-vue';
 import './approve.css';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 const status = ref('Waiting for approval');

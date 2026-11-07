@@ -2,7 +2,7 @@
 import { PDFViewer, Panel, type ViewerConfig } from '@embedpdf/viewer-vue';
 import './notes.css';
 
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
 const config: ViewerConfig = {
   layout: (layout) =>

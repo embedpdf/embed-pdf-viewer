@@ -6,7 +6,7 @@ import { DocumentStatus } from './document-status';
   selector: 'app-root',
   imports: [EpdfPdfViewer, EpdfToolbarItem, DocumentStatus],
   template: `
-    <epdf-pdf-viewer src="/report.pdf" [layout]="layout" style="height: 100vh">
+    <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" [layout]="layout" style="height: 100vh">
       <ng-template epdfToolbarItem="status">
         <app-document-status />
       </ng-template>

@@ -7,7 +7,7 @@ import {
   type ViewerConfig,
 } from '@embedpdf/viewer-angular';
 
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
 // Paper by day and a warm dark at night, with a book's serif for the viewer's own words in both.
 const book: ThemeConfig = {

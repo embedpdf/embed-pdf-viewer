@@ -40,5 +40,10 @@ const appState = computed<Review>(() => ({
       <input v-model="done" type="checkbox" :value="check" /> {{ check }}
     </label>
   </fieldset>
-  <PDFViewer :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" v-bind="config" :app-state="appState" style="height: 100vh" />
+  <PDFViewer
+    :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
+    v-bind="config"
+    :app-state="appState"
+    style="height: 100vh"
+  />
 </template>

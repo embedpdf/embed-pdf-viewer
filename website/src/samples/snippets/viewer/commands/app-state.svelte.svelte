@@ -34,7 +34,7 @@
   {/each}
 </fieldset>
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   {...config}
   appState={{ done, status, approve: () => (status = 'approved') }}
   style="height: 100vh"

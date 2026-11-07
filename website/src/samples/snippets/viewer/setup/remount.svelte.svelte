@@ -9,7 +9,7 @@
 <!-- A new key mounts a new viewer with the new config. -->
 {#key toolbarBelow}
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     layout={toolbarBelow ? toolbarAtBottom : undefined}
     style="height: 100vh"
   />

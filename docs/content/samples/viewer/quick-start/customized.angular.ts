@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 @Component({

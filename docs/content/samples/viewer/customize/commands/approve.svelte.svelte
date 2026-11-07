@@ -3,7 +3,7 @@
   import './approve.css';
 
   // [!doc-source welcome]
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
   // [!/doc-source]
 
   let status = $state('Waiting for approval');

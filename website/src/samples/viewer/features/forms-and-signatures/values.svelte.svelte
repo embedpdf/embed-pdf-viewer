@@ -3,7 +3,7 @@
 
   import './values.css';
 
-  const forms = '/pdfs/forms.pdf';
+  const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
   let values = $state('{}');
 

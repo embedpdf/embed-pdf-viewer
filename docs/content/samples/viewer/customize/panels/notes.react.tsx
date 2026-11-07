@@ -2,7 +2,7 @@ import { PDFViewer, Panel, type ViewerConfig } from '@embedpdf/viewer-react';
 import './notes.css';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 const config: ViewerConfig = {

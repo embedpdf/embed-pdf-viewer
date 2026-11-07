@@ -21,7 +21,7 @@ import { scopeStylesheet } from './sample-stylesheets';
  *   (`getElementById`, `querySelector`, `querySelectorAll`), so two examples on a page that both
  *   name an element `id="viewer"` each find their own.
  * - The viewer's CDN script (imported, or a `<script src>`) is the site's own build of it
- *   (`ViewerScript.module`, the viewer's `./snippet`). Nothing else loads from another origin.
+ *   (`ViewerScript.module`, the viewer's `./snippet`). No other script loads from another origin.
  */
 
 /** The viewer's CDN script, as a page loads it, and the package entry that is that script here. */

@@ -1,6 +1,6 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
 const config: ViewerConfig = {
   plugins: {

@@ -10,8 +10,8 @@ pnpm --filter @embedpdf/docs-content pdfs forms    # one
 ```
 
 Each PDF lands in both sites' `public/pdfs/<folder>.pdf`, so embedpdf.com and cloudpdf.com both
-serve it at `/pdfs/<folder>.pdf`. The build needs Google Chrome installed (`CHROME_PATH` names
-another).
+serve it at `https://www.<site>/pdfs/<folder>.pdf`. The build needs Google Chrome installed
+(`CHROME_PATH` names another).
 
 ## What a document is
 
@@ -105,8 +105,10 @@ drop the tool's own scripts and stylesheets.
 ## In a sample
 
 Each document has a key in `../documents.mjs`. A sample opens it with a
-`// [!doc-source <key>]` block that fetches `/pdfs/<key>.pdf`; the docs sync gives the cloud
-site's copy its own form of the block, which opens the document's grant.
+`// [!doc-source <key>]` block that fetches `https://www.embedpdf.com/pdfs/<key>.pdf`, the full
+URL, so the code opens it on any page a reader pastes it into. The docs sync gives the cloud
+site's copy its own form of the block, which opens the document's grant, and any other URL of a
+document cloudpdf.com's own (`DOCUMENT_SITES`).
 
 A sample that selects characters by index names them in a `// [!doc-range <key> <name>]` block.
 The welcome's cover has a different tagline per brand, so its title starts at another character

@@ -10,7 +10,7 @@ description: Open a PDF, or several as tabs, handle passwords, and download, pri
 Give the viewer a document with `src`: a URL, a `File`, or bytes.
 
 ```js
-{ src: '/reports/2026-q3.pdf' }
+{ src: 'https://www.embedpdf.com/pdfs/welcome.pdf' }
 ```
 
 A relative URL is relative to your page. A URL on another site needs CORS headers that allow
@@ -70,9 +70,9 @@ Give `documents` instead of `src` to open several at once. Each one gets a tab:
 ```js
 {
   documents: [
-    { src: '/contract.pdf', name: 'Contract' },
-    { src: '/appendix.pdf', name: 'Appendix A' },
-    { src: '/scan.pdf', name: 'Signed scan', active: true },
+    { src: 'https://www.embedpdf.com/pdfs/welcome.pdf', name: 'Guide' },
+    { src: 'https://www.embedpdf.com/pdfs/article.pdf', name: 'Article' },
+    { src: 'https://www.embedpdf.com/pdfs/sketch.pdf', name: 'Floor plan', active: true },
   ],
 }
 ```
@@ -186,8 +186,8 @@ your token goes only to your own server.
 
 ```js
 const { document } = await viewer.documents.open(
-  { kind: 'url', url: '/invoice-1042.pdf' },
-  { name: 'Invoice 1042' },
+  { kind: 'url', url: 'https://www.embedpdf.com/pdfs/invoice.pdf' },
+  { name: 'Invoice' },
 );
 
 viewer.documents.setActive(document.id);

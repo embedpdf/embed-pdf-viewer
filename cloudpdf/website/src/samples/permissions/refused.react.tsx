@@ -51,7 +51,12 @@ function DownloadAnyway() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} scope={scope} initialDocuments={[{ source: welcome }]}>
+    <Viewer
+      engine={engine}
+      plugins={plugins}
+      scope={scope}
+      initialDocuments={[{ source: welcome }]}
+    >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <DownloadAnyway />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

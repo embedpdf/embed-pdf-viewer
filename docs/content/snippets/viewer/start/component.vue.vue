@@ -6,7 +6,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main'
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" :layout="layout" style="height: 100vh">
+  <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" :layout="layout" style="height: 100vh">
     <ToolbarItem id="status">
       <DocumentStatus />
     </ToolbarItem>

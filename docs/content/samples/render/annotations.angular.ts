@@ -9,7 +9,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source report]
 const report = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/report.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/report.pdf');
   return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

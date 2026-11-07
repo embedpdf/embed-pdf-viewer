@@ -4,5 +4,9 @@ import { config } from './viewer-config';
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" v-bind="config" style="height: 100vh" />
+  <PDFViewer
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
+    v-bind="config"
+    style="height: 100vh"
+  />
 </template>

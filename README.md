@@ -36,7 +36,7 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
 In plain HTML, from a CDN:
 
 ```html
-<embedpdf-viewer src="/report.pdf" style="height: 100vh"></embedpdf-viewer>
+<embedpdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh"></embedpdf-viewer>
 
 <script
   type="module"
@@ -54,7 +54,7 @@ npm install @embedpdf/viewer-react
 import { PDFViewer } from '@embedpdf/viewer-react';
 
 export function App() {
-  return <PDFViewer src="/report.pdf" style={{ height: '100vh' }} />;
+  return <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style={{ height: '100vh' }} />;
 }
 ```
 

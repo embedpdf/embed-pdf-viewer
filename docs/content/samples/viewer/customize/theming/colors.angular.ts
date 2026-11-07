@@ -2,7 +2,7 @@ import { Component, computed, signal, ViewEncapsulation } from '@angular/core';
 import { EpdfPdfViewer, type ThemeConfig } from '@embedpdf/viewer-angular';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 // What both modes share, then the colors of each.

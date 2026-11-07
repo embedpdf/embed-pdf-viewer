@@ -3,7 +3,7 @@ import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 import './approve.css';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 // [!/doc-source]
 
 // A constant: the command calls your app through `appState`, so it never holds an old value.

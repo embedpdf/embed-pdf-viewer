@@ -11,7 +11,7 @@ npm install @embedpdf/viewer-react
 import { PDFViewer } from '@embedpdf/viewer-react';
 
 export function App() {
-  return <PDFViewer src="/report.pdf" style={{ height: '100vh' }} />;
+  return <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style={{ height: '100vh' }} />;
 }
 ```
 
@@ -29,7 +29,7 @@ state, your CSS:
 
 ```tsx
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   layout={(layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' })}
 >
   <ToolbarItem id="doc-picker">
@@ -45,7 +45,7 @@ state, your CSS:
 
 ```tsx
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   onReady={(viewer) => viewer.commands.execute('zoom:in')}
 />
 ```

@@ -16,7 +16,7 @@ const plugins = [stagePlugin(), renderPlugin()];
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: { kind: 'url', url: '/file.pdf' } }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: { kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' } }]">
     <DocumentGate>
       <template #fallback><p>Opening…</p></template>
       <Stage style="height: 600px">

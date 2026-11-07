@@ -69,7 +69,7 @@ Give the engine the file's bytes. Here we fetch them from a URL; a file the user
 the same way (`await file.arrayBuffer()`).
 
 ```ts
-const response = await fetch('/invoice.pdf');
+const response = await fetch('https://www.cloudpdf.com/pdfs/invoice.pdf');
 const doc = await engine.open({ kind: 'bytes', bytes: await response.arrayBuffer() });
 ```
 

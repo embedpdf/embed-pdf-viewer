@@ -1,7 +1,7 @@
 import { Component, signal, ViewEncapsulation } from '@angular/core';
 import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
 
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
 @Component({
   selector: 'demo-root',

@@ -30,12 +30,26 @@ const READ_ONLY_GRANT = 'shr_WGj1goAtlNN_fQ5OswPrbJQM';
 const grantOf = (key) => CLOUD_GRANTS[key]?.grant ?? READ_ONLY_GRANT;
 
 /**
+ * Where each site serves the demo documents: `pdfs/build.mjs` writes the same files into both
+ * sites' `public/pdfs/`, each with its own brand's welcome. Docs code gives a document by its full
+ * URL on embedpdf.com, never a site-relative one, so code a reader copies opens it on their own
+ * page too; a flavor's copy names its own site (the sync's `swapDocumentSite`).
+ */
+export const DOCUMENT_SITES = {
+  local: 'https://www.embedpdf.com',
+  cloud: 'https://www.cloudpdf.com',
+};
+
+/** A demo document's file as docs code names it: its full URL on embedpdf.com. */
+const documentUrl = (file) => `${DOCUMENT_SITES.local}/pdfs/${file}`;
+
+/**
  * A document as the ready-made viewer's samples give it: the cloud viewer's `src` on cloudpdf.com,
  * and the URL embedpdf.com's copy gives it at (see `welcome`).
  */
 const viewerForms = (key) => ({
   viewerCloud: `{ grant: '${grantOf(key)}' }`,
-  viewerUrls: [`/pdfs/${key}.pdf`],
+  viewerUrls: [documentUrl(`${key}.pdf`)],
 });
 
 /** `const <name> = …` emitted for the cloud flavor of a headless sample: an engine open input. */
@@ -54,8 +68,8 @@ export const DEMO_DOCUMENTS = {
      * the sync fails on a grant in it that isn't one of these.
      */
     viewerCloud: `{ grant: '${grantOf('welcome')}' }`,
-    /** The demo file itself, and `/report.pdf`, the path the snippets give for a reader's own PDF. */
-    viewerUrls: ['/pdfs/welcome.pdf', '/report.pdf'],
+    /** The demo file: the samples open it, and the snippets give it where a reader's own PDF goes. */
+    viewerUrls: [documentUrl('welcome.pdf')],
     /**
      * Characters on the cover the samples select, in each site's welcome, by the name a
      * `[!doc-range welcome <name>]` block gives: `text` is what they read. The brand's tagline

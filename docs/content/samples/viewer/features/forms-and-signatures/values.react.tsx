@@ -4,7 +4,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
 import './values.css';
 
 // [!doc-source forms]
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 // [!/doc-source]
 
 export default function App() {

@@ -4,7 +4,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
 import './on-ready.css';
 
 // [!doc-source article]
-const article = '/pdfs/article.pdf';
+const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 // [!/doc-source]
 
 export default function App() {

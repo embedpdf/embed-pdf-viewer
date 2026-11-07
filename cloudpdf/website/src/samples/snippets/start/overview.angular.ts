@@ -11,7 +11,9 @@ import { cloudEngine } from '@cloudpdf/engine';
     provideEmbedPdf(
       {
         engine: () => cloudEngine(),
-        initialDocuments: [{ source: { kind: 'url', url: '/contract.pdf' } }],
+        initialDocuments: [
+          { source: { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/welcome.pdf' } },
+        ],
       },
       withStage(),
       withRender(),

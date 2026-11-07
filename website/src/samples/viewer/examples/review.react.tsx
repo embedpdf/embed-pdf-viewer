@@ -9,7 +9,7 @@ import {
 
 import './review.css';
 
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 
 type Status = 'review' | 'approved' | 'changes';
 

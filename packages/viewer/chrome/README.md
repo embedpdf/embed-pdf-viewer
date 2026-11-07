@@ -183,7 +183,7 @@ Reserve a socket in the layout (`{ custom, command }`), then — through
 ```tsx
 // @embedpdf/viewer-react
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   commands={[{ id: 'acme:status', labelKey: 'acme.status', run: () => {} }]}
   layout={(layout) =>
     layout.add(

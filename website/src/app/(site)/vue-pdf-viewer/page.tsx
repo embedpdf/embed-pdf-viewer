@@ -127,7 +127,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     style="height: 100vh"
   />
 </template>`,
@@ -269,7 +269,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main'
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" :layout="layout" style="height: 100vh">
+  <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" :layout="layout" style="height: 100vh">
     <ToolbarItem id="status">
       <DocumentStatus />
     </ToolbarItem>
@@ -368,7 +368,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" style="height: 100vh" />
+  <PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
 </template>`,
         }}
         links={<TextLink href={viewerDocs('vue', 'setup')}>Setup and server rendering</TextLink>}

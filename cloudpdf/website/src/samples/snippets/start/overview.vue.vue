@@ -12,7 +12,9 @@ const plugins = [stagePlugin(), renderPlugin()];
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: { kind: 'url', url: '/contract.pdf' } }]"
+    :initial-documents="[
+      { source: { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/welcome.pdf' } },
+    ]"
   >
     <DocumentGate>
       <template #fallback><p>Opening…</p></template>

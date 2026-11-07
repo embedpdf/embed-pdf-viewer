@@ -11,7 +11,7 @@ export class Contract {
   constructor() {
     // Runs in the browser only, after the first render
     afterNextRender(() => {
-      void this.documents.open({ kind: 'url', url: '/files/contract.pdf' });
+      void this.documents.open({ kind: 'url', url: 'https://www.embedpdf.com/pdfs/welcome.pdf' });
     });
   }
 }

@@ -26,7 +26,7 @@
   ];
 
   const notice = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/notice.pdf');
+    const response = await fetch('https://www.embedpdf.com/pdfs/notice.pdf');
     return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 

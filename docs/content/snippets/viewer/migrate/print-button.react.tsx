@@ -12,7 +12,7 @@
 //   return (
 //     <>
 //       <button onClick={print}>Print</button>
-//       <PDFViewer ref={viewerRef} config={{ src: '/report.pdf' }} style={{ height: '80vh' }} />
+//       <PDFViewer ref={viewerRef} config={{ src: 'https://www.embedpdf.com/pdfs/welcome.pdf' }} style={{ height: '80vh' }} />
 //     </>
 //   );
 // }
@@ -27,7 +27,11 @@ export function Review() {
       <button disabled={!viewer} onClick={() => viewer?.commands.execute('document:print')}>
         Print
       </button>
-      <PDFViewer src="/report.pdf" onReady={setViewer} style={{ height: '80vh' }} />
+      <PDFViewer
+        src="https://www.embedpdf.com/pdfs/welcome.pdf"
+        onReady={setViewer}
+        style={{ height: '80vh' }}
+      />
     </>
   );
 }

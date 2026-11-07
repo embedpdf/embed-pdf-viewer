@@ -3,7 +3,7 @@ import { PDFViewer, type ThemeConfig } from '@embedpdf/viewer-react';
 
 import './colors.css';
 
-const welcome = '/pdfs/welcome.pdf';
+const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
 
 // What both modes share, then the colors of each.
 const brand: ThemeConfig = {

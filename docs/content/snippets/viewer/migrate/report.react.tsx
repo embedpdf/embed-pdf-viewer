@@ -6,7 +6,7 @@
 //   return (
 //     <PDFViewer
 //       config={{
-//         src: '/report.pdf',
+//         src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
 //         theme: { preference: 'dark' },
 //         disabledCategories: ['redaction', 'document-print'],
 //       }}
@@ -21,7 +21,7 @@ import { PDFViewer } from '@embedpdf/viewer-react';
 export function Report() {
   return (
     <PDFViewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       theme="dark"
       disable={['redaction', 'documents.print']}
       onReady={(viewer) => console.log('ready', viewer)}

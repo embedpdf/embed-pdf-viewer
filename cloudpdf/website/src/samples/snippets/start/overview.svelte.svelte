@@ -8,7 +8,11 @@
   const plugins = [stagePlugin(), renderPlugin()];
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: { kind: 'url', url: '/contract.pdf' } }]}>
+<Viewer
+  {engine}
+  {plugins}
+  initialDocuments={[{ source: { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/welcome.pdf' } }]}
+>
   <DocumentGate>
     {#snippet fallback()}
       <p>Opening…</p>

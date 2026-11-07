@@ -3,7 +3,7 @@ import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
 
 import './values.css';
 
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
 export default function App() {
   const [values, setValues] = useState('{}');

@@ -8,7 +8,7 @@
       .add('panel:notes', { to: 'main', section: 'end' });
 </script>
 
-<PDFViewer src="/report.pdf" {layout} style="height: 100vh">
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {layout} style="height: 100vh">
   <Panel id="notes">
     <Notes />
   </Panel>

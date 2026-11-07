@@ -3,4 +3,4 @@
   import { config } from './viewer-config';
 </script>
 
-<PDFViewer src="/report.pdf" {...config} style="height: 100vh" />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {...config} style="height: 100vh" />

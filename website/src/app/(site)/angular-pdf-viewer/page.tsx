@@ -136,7 +136,7 @@ import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: \`
     <epdf-pdf-viewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       style="height: 100vh"
     />
   \`,
@@ -246,7 +246,7 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
 @Component({
   selector: 'app-root',
   imports: [EpdfPdfViewer],
-  template: \`<epdf-pdf-viewer src="/report.pdf" style="height: 100vh" (ready)="onReady($event)" />\`,
+  template: \`<epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" (ready)="onReady($event)" />\`,
 })
 export class App {
   onReady(viewer: Viewer) {
@@ -277,7 +277,7 @@ import { DocumentStatus } from './document-status';
   selector: 'app-root',
   imports: [EpdfPdfViewer, EpdfToolbarItem, DocumentStatus],
   template: \`
-    <epdf-pdf-viewer src="/report.pdf" [layout]="layout" style="height: 100vh">
+    <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" [layout]="layout" style="height: 100vh">
       <ng-template epdfToolbarItem="status">
         <app-document-status />
       </ng-template>
@@ -449,7 +449,7 @@ import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: \`
     @defer (on viewport) {
-      <epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />
+      <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
     } @placeholder {
       <div style="height: 100vh"></div>
     }
