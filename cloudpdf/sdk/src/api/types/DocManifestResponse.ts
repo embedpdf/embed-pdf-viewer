@@ -11,6 +11,7 @@ export interface DocManifestResponse {
     annotationsVersion?: number | undefined;
     formsVersion?: number | undefined;
     outlineVersion?: number | undefined;
+    viewportsVersion?: number | undefined;
     fontsVersion?: number | undefined;
     contentsVersion?: number | undefined;
     auditHead: number;

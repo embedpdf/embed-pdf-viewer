@@ -33,6 +33,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.OutlineDelete
     | CloudPDF.ChangeItem.OutlineRestore
     | CloudPDF.ChangeItem.PagesRotate
+    | CloudPDF.ChangeItem.PagesSetScale
     | CloudPDF.ChangeItem.PagesReorder
     | CloudPDF.ChangeItem.PagesDelete
     | CloudPDF.ChangeItem.PagesInsertBlank
@@ -77,6 +78,7 @@ export namespace ChangeItem {
             OutlineMove: "outline.move",
             OutlineDelete: "outline.delete",
             PagesRotate: "pages.rotate",
+            PagesSetScale: "pages.setScale",
             PagesReorder: "pages.reorder",
             PagesDelete: "pages.delete",
             PagesInsertBlank: "pages.insertBlank",
@@ -335,133 +337,233 @@ export namespace ChangeItem {
         type: "pages.rotate";
         pages: CloudPDF.PageRef[];
         rotation: number;
-        layout: ChangeItemPagesRotate.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
     }
 
-    export namespace ChangeItemPagesRotate {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
+    export interface PagesSetScale {
+        type: "pages.setScale";
+        pages: CloudPDF.PageRef[];
+        measure: ChangeItemPagesSetScale.Measure | null;
+        page: CloudPDF.PageRef;
+        layout: CloudPDF.PageListSnapshot;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesSetScale {
+        export interface Measure {
+            subtype: Measure.Subtype;
+            ratio?: string | undefined;
+            x: Measure.X.Item[];
+            y?: Measure.Y.Item[] | undefined;
+            distance: Measure.Distance.Item[];
+            area: Measure.Area.Item[];
+            angle?: Measure.Angle.Item[] | undefined;
+            slope?: Measure.Slope.Item[] | undefined;
+            origin?: Measure.Origin | undefined;
+            cyx?: number | undefined;
         }
 
-        export namespace Layout {
-            export type Pages = Pages.Item[];
+        export namespace Measure {
+            export const Subtype = {
+                Rectilinear: "rectilinear",
+            } as const;
+            export type Subtype = (typeof Subtype)[keyof typeof Subtype];
+            export type X = X.Item[];
 
-            export namespace Pages {
+            export namespace X {
                 export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
                 }
 
                 export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
+                    export const Fraction = {
                         Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
                     } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
                 }
             }
 
-            export type NamedPages = NamedPages.Item[];
+            export type Y = Y.Item[];
 
-            export namespace NamedPages {
+            export namespace Y {
                 export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesRotateLayoutNamedPagesItemTarget;
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
                 }
+
+                export namespace Item {
+                    export const Fraction = {
+                        Decimal: "decimal",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
+                    } as const;
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
+                }
+            }
+
+            export type Distance = Distance.Item[];
+
+            export namespace Distance {
+                export interface Item {
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
+                }
+
+                export namespace Item {
+                    export const Fraction = {
+                        Decimal: "decimal",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
+                    } as const;
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
+                }
+            }
+
+            export type Area = Area.Item[];
+
+            export namespace Area {
+                export interface Item {
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
+                }
+
+                export namespace Item {
+                    export const Fraction = {
+                        Decimal: "decimal",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
+                    } as const;
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
+                }
+            }
+
+            export type Angle = Angle.Item[];
+
+            export namespace Angle {
+                export interface Item {
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
+                }
+
+                export namespace Item {
+                    export const Fraction = {
+                        Decimal: "decimal",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
+                    } as const;
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
+                }
+            }
+
+            export type Slope = Slope.Item[];
+
+            export namespace Slope {
+                export interface Item {
+                    unit: string;
+                    conversion?: number | undefined;
+                    fraction?: Item.Fraction | undefined;
+                    precision?: number | undefined;
+                    fixed?: boolean | undefined;
+                    thousands?: string | undefined;
+                    decimal?: string | undefined;
+                    prefixSpacing?: string | undefined;
+                    suffixSpacing?: string | undefined;
+                    labelPosition?: Item.LabelPosition | undefined;
+                }
+
+                export namespace Item {
+                    export const Fraction = {
+                        Decimal: "decimal",
+                        Fraction: "fraction",
+                        Round: "round",
+                        Truncate: "truncate",
+                    } as const;
+                    export type Fraction = (typeof Fraction)[keyof typeof Fraction];
+                    export const LabelPosition = {
+                        Suffix: "suffix",
+                        Prefix: "prefix",
+                    } as const;
+                    export type LabelPosition = (typeof LabelPosition)[keyof typeof LabelPosition];
+                }
+            }
+
+            export interface Origin {
+                x: number;
+                y: number;
             }
         }
     }
@@ -469,805 +571,43 @@ export namespace ChangeItem {
     export interface PagesReorder {
         type: "pages.reorder";
         pages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesReorder.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesReorder {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesReorderLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface PagesDelete {
         type: "pages.delete";
         pages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesDelete.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesDelete {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesDeleteLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface PagesInsertBlank {
         type: "pages.insertBlank";
         insertedPages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesInsertBlank.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesInsertBlank {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesInsertBlankLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface PagesInsert {
         type: "pages.insert";
         insertedPages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesInsert.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesInsert {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesInsertLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface PagesCopy {
         type: "pages.copy";
         insertedPages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesCopy.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesCopy {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesCopyLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface PagesRestore {
         type: "pages.restore";
         pages: CloudPDF.PageRef[];
-        layout: ChangeItemPagesRestore.Layout;
+        layout: CloudPDF.PageListSnapshot;
         meta: CloudPDF.MutationMeta;
-    }
-
-    export namespace ChangeItemPagesRestore {
-        export interface Layout {
-            pageCount: number;
-            pages: Layout.Pages.Item[];
-            labels: Layout.Labels.Item[];
-            namedPages: Layout.NamedPages.Item[];
-        }
-
-        export namespace Layout {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    index: number;
-                    ref: CloudPDF.PageRef;
-                    label: string | null;
-                    size: Item.Size;
-                    rotation: number;
-                    userUnit: number;
-                    tabOrder: Item.TabOrder | null;
-                    boxes: Item.Boxes;
-                    pdfCropBox: Item.PdfCropBox;
-                    actions?: CloudPDF.PdfPageActions | undefined;
-                }
-
-                export namespace Item {
-                    export interface Size {
-                        width: number;
-                        height: number;
-                    }
-
-                    export const TabOrder = {
-                        Rows: "rows",
-                        Columns: "columns",
-                        Structure: "structure",
-                        Annotations: "annotations",
-                        Widgets: "widgets",
-                    } as const;
-                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
-
-                    export interface Boxes {
-                        media: Boxes.Media;
-                        crop: Boxes.Crop;
-                        bleed: Boxes.Bleed;
-                        trim: Boxes.Trim;
-                        art: Boxes.Art;
-                    }
-
-                    export namespace Boxes {
-                        export interface Media {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Crop {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Bleed {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Trim {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-
-                        export interface Art {
-                            x: number;
-                            y: number;
-                            width: number;
-                            height: number;
-                        }
-                    }
-
-                    export interface PdfCropBox {
-                        left: number;
-                        bottom: number;
-                        right: number;
-                        top: number;
-                    }
-                }
-            }
-
-            export type Labels = Labels.Item[];
-
-            export namespace Labels {
-                export interface Item {
-                    firstPage: number;
-                    style: Item.Style | null;
-                    firstNumber: number;
-                    prefix: string;
-                }
-
-                export namespace Item {
-                    export const Style = {
-                        Decimal: "decimal",
-                        UpperRoman: "upperRoman",
-                        LowerRoman: "lowerRoman",
-                        UpperLetters: "upperLetters",
-                        LowerLetters: "lowerLetters",
-                    } as const;
-                    export type Style = (typeof Style)[keyof typeof Style];
-                }
-            }
-
-            export type NamedPages = NamedPages.Item[];
-
-            export namespace NamedPages {
-                export interface Item {
-                    name: string;
-                    target: CloudPDF.ChangeItemPagesRestoreLayoutNamedPagesItemTarget;
-                }
-            }
-        }
     }
 
     export interface AttachmentsCreate {
