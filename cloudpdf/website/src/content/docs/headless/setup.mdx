@@ -340,7 +340,8 @@ storage are the server's to configure.
 ## Tokens
 
 Each document opens with a token your backend creates: it says who the user is and what they may
-do. Pass a function, so a long session gets fresh tokens:
+do. Pass a function: the engine calls it for a token, and again a minute before that token
+expires, so a long session never runs out:
 
 <Snippet name="start/tokens" />
 

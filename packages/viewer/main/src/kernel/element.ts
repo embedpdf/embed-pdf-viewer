@@ -56,6 +56,13 @@ export interface DoorEngine {
    * element applies it to `src`, `documents` and `.src`.
    */
   readonly sourceOf?: SourceOf;
+  /**
+   * Whether `next` names the same document as the one `opened` opened (`opened` is what
+   * `sourceOf` made of the `src` that opened it): then the element keeps that document open,
+   * and the door takes what it needs from `next`, such as the cloud's next token. Without it,
+   * every new `src` opens again.
+   */
+  readonly follows?: (opened: ElementSrc, next: ElementSrc) => boolean;
   /** Plugin settings this engine needs, under the config's own, per plugin: a door whose stamp
    *  libraries open in another engine names that engine here. */
   readonly plugins?: ViewerPluginsConfig;
@@ -195,6 +202,8 @@ interface SrcDocument {
   readonly reserved: string;
   id: string;
   readonly opened: Promise<string | null>;
+  /** What the door made of the `src` (see `DoorEngine.follows`). */
+  readonly input: ElementSrc;
 }
 
 export class EmbedPdfViewerElement extends ElementBase {
@@ -216,6 +225,8 @@ export class EmbedPdfViewerElement extends ElementBase {
   #props: FullViewerProps | null = null;
   /** What the running viewer's door makes of a `src` (`DoorEngine.sourceOf`). */
   #sourceOf: SourceOf = (src) => src;
+  /** Whether the running viewer's door keeps a document open under a new `src` (`DoorEngine.follows`). */
+  #follows: DoorEngine['follows'];
   #viewer: Viewer | null = null;
   #srcDocument: SrcDocument | null = null;
   /** The ids of `src` documents still closing, which a new one must not take. */
@@ -420,6 +431,9 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (!viewer || !config || config.documents) return;
     const { documents } = viewer;
     const previous = this.#srcDocument;
+    // The same document under a new `src`, such as the cloud's `{ id, token }` with a new token
+    // function: it stays open, and the door takes the rest.
+    if (previous && config.src != null && this.#follows?.(previous.input, config.src)) return;
     this.#srcDocument = null;
     // A tab's id changes once its source has said which document it is.
     const previousId = previous && documents.has(previous.id) ? previous.id : previous?.reserved;
@@ -461,7 +475,12 @@ export class EmbedPdfViewerElement extends ElementBase {
       () => null,
     );
     if (!reserved) return;
-    const shown: SrcDocument = { reserved, id: isOpenInput(src) ? reserved : id, opened };
+    const shown: SrcDocument = {
+      reserved,
+      id: isOpenInput(src) ? reserved : id,
+      opened,
+      input: src,
+    };
     this.#srcDocument = shown;
     void opened.then((openedId) => {
       if (openedId !== null) shown.id = openedId;
@@ -505,8 +524,9 @@ export class EmbedPdfViewerElement extends ElementBase {
     } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
-    const { engine, sourceOf = (src) => src, plugins } = engineOf(config);
+    const { engine, sourceOf = (src) => src, follows, plugins } = engineOf(config);
     this.#sourceOf = sourceOf;
+    this.#follows = follows;
     this.#props = {
       engine,
       initialDocuments: documents && initialDocumentsOf(documents, sourceOf),

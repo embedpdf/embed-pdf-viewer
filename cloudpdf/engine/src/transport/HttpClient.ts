@@ -17,6 +17,8 @@ import {
   type CdnAccessInfoForApply,
 } from '@embedpdf/engine-core/wire';
 
+import { askedToken, fixedToken, keptToken, type TokenKeeper } from './tokenKeeper';
+
 /** CloudPDF SaaS: where an engine connects when it names no server of its own. */
 export const CLOUDPDF_SAAS_URL = 'https://engine.cloudpdf.com';
 
@@ -25,14 +27,20 @@ export interface HttpClientOptions {
    *  ({@link CLOUDPDF_SAAS_URL}) when left out. */
   baseUrl?: string;
   /**
-   * Optional bearer token. Either a string or a function that
-   * returns a fresh token on every call (so callers can rotate
-   * without re-creating the engine). When absent, requests go out
-   * without an `Authorization` header — useful for the public-share
-   * scenario where the doc-scoped token is provided per-`open` and
+   * Optional bearer token. Either a string or a function that gives one: the client calls it
+   * when it first needs a token, keeps that token, and calls it again in the background a minute
+   * before the expiry the token carries, so a short-lived token never runs out, no request waits
+   * for a renewal, and the function runs once per token, not once per request. A server that
+   * refuses the kept token (401) gets the request again with the next one. When absent, requests go out without an `Authorization` header:
+   * useful for the public-share scenario where the doc-scoped token is provided per-`open` and
    * the engine itself has no engine-level credentials.
    */
   token?: TokenSource;
+  /**
+   * `false` asks a `token` function every time instead of keeping its token: for a function that
+   * keeps and renews its own, as a grant session does. Default `true`.
+   */
+  keepToken?: boolean;
   /**
    * The open document's session id, sent as `X-Engine-Session-Id` where the
    * server reads it: on writes, `/access`, the event stream and the bulk
@@ -139,7 +147,7 @@ export interface HttpFileResponse {
 
 export class HttpClient {
   private readonly base: string;
-  private readonly tokenFn: (() => string | Promise<string>) | null;
+  private tokens: TokenKeeper | null;
   private readonly fetchFn: typeof globalThis.fetch;
   private readonly docAffinityHeader: boolean;
   private readonly onRetry: HttpClientOptions['onRetry'];
@@ -156,8 +164,7 @@ export class HttpClient {
 
   constructor(private readonly options: HttpClientOptions) {
     this.base = (options.baseUrl ?? CLOUDPDF_SAAS_URL).replace(/\/$/, '');
-    const token = options.token;
-    this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
+    this.tokens = tokenKeeperOf(options.token, options.keepToken ?? true);
     this.sessionId = options.sessionId ?? null;
     this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.docAffinityHeader = options.docAffinityHeader ?? true;
@@ -202,16 +209,27 @@ export class HttpClient {
   /**
    * A client for one open document: this client's settings, the document's
    * own editing session, its own CDN binding, and `token` as its bearer
-   * when the open names one (else this client's). Two open documents never
-   * share object numbers, event echoes or a CDN binding, even two opens of
-   * the same document on one engine.
+   * when the open names one (else this client's, and the token this client
+   * keeps). Two open documents never share object numbers, event echoes or
+   * a CDN binding, even two opens of the same document on one engine.
    */
-  forDocument({ sessionId, token }: { sessionId: string; token?: TokenSource }): HttpClient {
-    return new HttpClient({
+  forDocument({
+    sessionId,
+    token,
+    keepToken,
+  }: {
+    sessionId: string;
+    token?: TokenSource;
+    keepToken?: boolean;
+  }): HttpClient {
+    const client = new HttpClient({
       ...this.options,
       ...(token !== undefined ? { token } : {}),
+      ...(keepToken !== undefined ? { keepToken } : {}),
       sessionId,
     });
+    if (token === undefined) client.tokens = this.tokens;
+    return client;
   }
 
   /**
@@ -295,17 +313,16 @@ export class HttpClient {
   }
 
   /**
-   * Resolve the current bearer token. Awaits the user-supplied
-   * token factory if it returns a promise. Used by the cloud
-   * engine to read doc-scoped claims **without** verifying — the
-   * server is the verifier of record. Throws when no token is
-   * configured.
+   * Resolve the current bearer token: the kept one, or the token function's
+   * next. Used by the cloud engine to read doc-scoped claims **without**
+   * verifying — the server is the verifier of record. Throws when no token
+   * is configured.
    */
   async currentToken(): Promise<string> {
-    if (!this.tokenFn) {
+    if (!this.tokens) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'http client has no token configured');
     }
-    return await this.tokenFn();
+    return await this.tokens.token();
   }
 
   async getJson<T>(path: string, parser: (raw: unknown) => T, signal: AbortSignal): Promise<T> {
@@ -563,10 +580,8 @@ export class HttpClient {
       options.origin === true,
     );
     const headers = new Headers(init.headers ?? {});
-    if (this.tokenFn) {
-      const token = await this.tokenFn();
-      headers.set('Authorization', `Bearer ${token}`);
-    }
+    let token = this.tokens ? await this.tokens.token() : null;
+    if (token !== null) headers.set('Authorization', `Bearer ${token}`);
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
     // The session header only where the server reads it: on any other read
     // it would turn a plain CDN request into one that needs a preflight.
@@ -597,7 +612,7 @@ export class HttpClient {
     // shed before dispatch, `EngineRestarting` = the apply never landed)
     // — both mean nothing happened, so retrying is method-agnostic-safe,
     // mutations included. A foreign 503 is returned without a retry.
-    for (let attempt = 0, networkFailures = 0; ; attempt++) {
+    for (let attempt = 0, networkFailures = 0, refusedOnce = false; ; attempt++) {
       let res: Response;
       try {
         res = await this.execute(url, { ...init, headers });
@@ -617,6 +632,21 @@ export class HttpClient {
         const waitMs = wait * (0.9 + 0.2 * Math.random());
         this.onRetry?.({ path, code: EngineErrorCode.Network, attempt, waitMs });
         await sleepRacingAbort(waitMs, init.signal ?? null);
+        continue;
+      }
+      // A refused token was kept past its time (revoked, or a clock ahead of
+      // the server's): once, the request goes again with the next token. A
+      // refused request changed nothing, so a write is safe to repeat.
+      if (
+        res.status === 401 &&
+        token !== null &&
+        !refusedOnce &&
+        !isStreamBody(init.body ?? null) &&
+        this.tokens?.refused(token)
+      ) {
+        refusedOnce = true;
+        token = await this.tokens.token();
+        headers.set('Authorization', `Bearer ${token}`);
         continue;
       }
       // The server answered with another engine value than the URL named:
@@ -801,4 +831,11 @@ function sleepRacingAbort(ms: number, signal: AbortSignal | null): Promise<void>
     };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+/** Where a client's token comes from: a literal, a function it keeps the answer of, or none. */
+function tokenKeeperOf(token: TokenSource | undefined, keep: boolean): TokenKeeper | null {
+  if (token === undefined) return null;
+  if (typeof token !== 'function') return fixedToken(token);
+  return keep ? keptToken(token) : askedToken(token);
 }

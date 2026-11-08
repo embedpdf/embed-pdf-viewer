@@ -166,7 +166,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const engine = cloudEngine({
   baseUrl: 'https://pdf.your-app.com',
-  token: () => fetchFreshDocToken(), // called on every request
+  token: () => fetchFreshDocToken(), // asked again before each token expires
 });
 ```
 

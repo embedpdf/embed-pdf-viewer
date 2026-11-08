@@ -138,7 +138,8 @@ it's called is a fresh one. The engine's own files never go through it.
 | `{ kind: 'grant', grant }`          | A document opened with a grant.                               |
 | `{ kind: 'id', id }`                     | A document by its id, when the engine has a token for the user.    |
 
-Pass `token` as a function, so a long session always has a fresh one. See
+Pass `token` as a function: the engine asks it again a minute before each token expires, so a
+long session never runs out. See
 [Authentication](/docs/engine/authentication).
 
 </Engine>

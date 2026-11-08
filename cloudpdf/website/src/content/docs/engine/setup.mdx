@@ -42,8 +42,10 @@ document:
 const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken(documentId) });
 ```
 
-Pass a function rather than a string: the engine calls it for every request, so when your
-backend hands out short-lived tokens, a long session keeps working. [Authentication](/docs/engine/authentication) covers the three ways
+Pass a function rather than a string: the engine calls it when it needs a token, keeps that
+token, and calls it again in the background a minute before it expires. So a long session keeps
+working with short-lived tokens, and your backend makes one token per lifetime, not one per
+request. [Authentication](/docs/engine/authentication) covers the three ways
 to open a document and what goes in a token.
 
 ## Options

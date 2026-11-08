@@ -30,14 +30,23 @@ and who opens it:
 | `src` | What it is |
 | :-- | :-- |
 | `{ token }` | A token your backend creates for the user and one document. It says who they are and what they may do. |
+| `{ id, token }` | The same, with the document's id: when `src` changes but the id doesn't, the document stays open |
 | `{ id }` | A document by its id, when the engine's own token allows it (`engine: { token }`) |
 | `{ grant }` | A grant from the CloudPDF dashboard (`grt_…`): public access, which needs no backend |
 
 ```js
-{ src: { token: () => fetchDocumentToken('contract-42') } }
+{
+  src: {
+    id: contract.documentId,
+    token: () => fetchDocumentToken(contract.id),
+  },
+}
 ```
 
-A token is a string, or a function that gives a fresh one when the old one runs out. The pages come
+A token is a string, or a function. The viewer calls the function for a token, keeps it, and calls
+it again in the background a minute before it expires, so a long session never runs out. With `id`,
+a function written inline in a component is fine: a new one on every render is still the same
+document. The pages come
 from CloudPDF, so there's no file to serve and no CORS to set up; a grant opens only on the
 websites it allows. [Authentication](/docs/engine/authentication) has what a token carries.
 

@@ -94,6 +94,17 @@ const PAGES = {
     warnBeforeLeaving: false,
   }`),
   '/token.html': page(`{ engine: tokenEngine, src: { kind: 'token', token: 'a' } }`),
+  // A door that says a renewed token ('a renewed') is the same document as 'a'.
+  '/follows.html': page(`(() => {
+    EmbedPdfViewerElement.defaultEngineProvider = () => ({
+      engine: tokenEngine,
+      follows: (opened, next) =>
+        opened.kind === 'token' &&
+        next.kind === 'token' &&
+        opened.token.split(' ')[0] === next.token.split(' ')[0],
+    });
+    return { src: { kind: 'token', token: 'a' } };
+  })()`),
   // The page's own fetch, with the token the page has when it's called.
   '/signed-in.html': page(`{
     documents: [{ src: '/private.pdf', name: 'Private' }],
@@ -433,6 +444,32 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('documents', () => {
     // null closes it.
     await tab.evaluate(() => (window.element.src = null));
     await tab.waitForFunction(() => window.element.viewer.documents.getCount() === 0);
+    await tab.close();
+  });
+
+  it("keeps the document open when the door says a new src is the same one", async () => {
+    const tab = await open('/follows.html');
+    await waitForSettled(tab, 1);
+    await tab.evaluate(() => {
+      (window as any).closedIds = [];
+      window.element.viewer.documents.onClosed(({ documentId }: { documentId: string }) =>
+        (window as any).closedIds.push(documentId),
+      );
+    });
+
+    // The same document, by the door's word: nothing closes or opens.
+    await tab.evaluate(() => (window.element.src = { kind: 'token', token: 'a renewed' }));
+    await frames(tab);
+    expect(await tab.evaluate(() => (window as any).closedIds)).toEqual([]);
+    expect((await documentsOf(tab)).tabs.map(({ id }) => id)).toEqual(['doc-a']);
+
+    // Another document still opens in its place.
+    await tab.evaluate(() => (window.element.src = { kind: 'token', token: 'b' }));
+    await tab.waitForFunction(() => {
+      const list = window.element.viewer.documents.list();
+      return list.length === 1 && list[0].id === 'doc-b' && list[0].status === 'ready';
+    });
+    expect(await tab.evaluate(() => (window as any).closedIds)).toEqual(['doc-a']);
     await tab.close();
   });
 

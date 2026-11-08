@@ -156,8 +156,8 @@ they may do:
 }
 ```
 
-Pass a function to get a fresh token when an old one runs out:
-`src: { token: () => fetchDocumentToken('contract-42') }`. See
+Pass a function, and the viewer asks it again a minute before each token expires:
+`src: { id: contract.documentId, token: () => fetchDocumentToken(contract.id) }`. See
 [Authentication](/docs/engine/authentication) for the ways to open a document and what a token
 carries.
 
