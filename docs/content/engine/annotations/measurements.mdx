@@ -149,13 +149,13 @@ When there's no value, `unavailable` says why; see
 `captionEnabled: true` draws the label on the measurement. Whether a label shows and where it
 sits are separate fields, so hiding a label keeps its position.
 
-| Field             | Kind            | What it is                                                                     | Default    |
-| :---------------- | :-------------- | :----------------------------------------------------------------------------- | :--------- |
+| Field             | Kind            | What it is                                                                     | Default                            |
+| :---------------- | :-------------- | :----------------------------------------------------------------------------- | :--------------------------------- |
 | `captionEnabled`  | all             | Draw the label. A perimeter or area never given one reads `null`.              | `false` on a distance, else `null` |
-| `captionPosition` | distance        | `'inline'` (in the line) or `'top'` (above it).                                | `'inline'` |
-| `captionOffset`   | distance        | `{ along, perpendicular }`: points along the line and square to it, or `null`. | `null`     |
-| `captionCenter`   | perimeter, area | The label's centre `{ x, y }`, upright like the points, or `null`.             | `null`     |
-| `leader`          | distance        | Leader lines at the ends: `{ length, extension?, offset? }` in points.         | none       |
+| `captionPosition` | distance        | `'inline'` (in the line) or `'top'` (above it).                                | `'inline'`                         |
+| `captionOffset`   | distance        | `{ along, perpendicular }`: points along the line and square to it, or `null`. | `null`                             |
+| `captionCenter`   | perimeter, area | The label's centre `{ x, y }`, upright like the points, or `null`.             | `null`                             |
+| `leader`          | distance        | Leader lines at the ends: `{ length, extension?, offset? }` in points.         | none                               |
 
 `null` for `captionOffset` or `captionCenter` places the label automatically. `captionEnabled:
 false` hides the label and keeps its place. On a perimeter or area, `captionEnabled: null` removes
@@ -176,12 +176,15 @@ it:
 ```ts
 await page.measure.setScale(scale); // the whole page is at this scale
 await page.measure.setScale(null); // remove it
+await doc.pages.setScale([pageA.ref, pageB.ref], scale); // several pages, one change
 
 const { viewports } = await page.measure.listViewports();
 ```
 
 A page can have several measured regions, called viewports, each with its own scale: a plan and a
-detail at another scale on one sheet. `listViewports()` returns them in the order they're drawn:
+detail at another scale on one sheet. `listViewports()` returns them in the order they're drawn,
+and every page's are also on its entry in `pages.list()`, as `viewports`, so reading the scales of
+all pages takes no extra calls:
 
 | Field     | What it is                                       |
 | :-------- | :----------------------------------------------- |
@@ -210,8 +213,24 @@ if (region?.measure?.subtype === 'rectilinear') {
 
 A page's scale isn't applied for you: each measurement carries its own copy of the scale it was
 made with. Setting or removing the page's scale leaves existing measurements as they are; to
-recalibrate one, update its `measure`. Each change fires a `pages.scaleSet`
-[event](/docs/engine/concepts/events).
+recalibrate one, update its `measure`. Put both in one change, and they apply together and undo as
+one step:
+
+```ts
+await doc.apply({
+  ops: [
+    { type: 'pages.setScale', pages: [page.ref], measure: scale },
+    {
+      type: 'annotations.update',
+      ref: measurement.ref,
+      patch: { subtype: 'line', measure: scale },
+    },
+  ],
+});
+```
+
+Each scale change fires a `pages.scaleSet` [event](/docs/engine/concepts/events) with the new page
+list, as a rotation does.
 
 ## Permissions
 
