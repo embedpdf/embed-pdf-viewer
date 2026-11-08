@@ -66,6 +66,7 @@ export function resultInPageSpace(
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
     case 'pages.setName':
     case 'pages.removeName':
+    case 'measure.setScale':
       return {
         ...payload,
         result: { ...payload.result, layout: pageListOf(payload.result.layout) },
@@ -293,6 +294,9 @@ export function opInFileSpace(
         ? { ...rest, expect: pdfWidgetPatchOf(expect, boxOf(op.widget.page), boxOf) }
         : rest;
     }
+    // Each page takes the scale on its own visible box as it's written (scaleChanges.ts).
+    case 'pages.setScale':
+      return op;
     case 'outline.create':
       return { ...op, data: pdfOutlineDraftOf(op.data, boxOf) };
     case 'outline.update': {
@@ -367,6 +371,7 @@ export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: Visible
     case 'outline.restore':
       return { ...item, items: item.items.map((read) => pageOutlineItemOf(read, boxOf)) };
     case 'pages.rotate':
+    case 'pages.setScale':
     case 'pages.reorder':
     case 'pages.delete':
     case 'pages.insertBlank':

@@ -79,6 +79,7 @@ export function layoutFromEvent(event: DocumentEvent) {
   switch (event.type) {
     case 'pages.reordered':
     case 'pages.rotated':
+    case 'pages.scaleSet':
     case 'pages.deleted':
     case 'pages.inserted':
     case 'pages.restored':
@@ -92,6 +93,7 @@ export function layoutFromEvent(event: DocumentEvent) {
 export function predictPages(list: PageList, op: PredictedOp): PageList {
   switch (op.type) {
     case 'pages.rotate':
+    case 'pages.setScale':
     case 'pages.reorder':
     case 'pages.delete':
     case 'pages.insertBlank':

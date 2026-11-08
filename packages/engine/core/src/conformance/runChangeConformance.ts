@@ -7,6 +7,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { PageBox } from '../geometry/pageSpace';
+import { measureFromKnownLength } from '../measure/calibrate';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toOutlineItemRef } from '../identity/OutlineItemRef';
@@ -66,6 +67,9 @@ const FILE_WIDGET = at(9);
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
 
 const BLUE = '#0000ff';
+/** Two page scales: 72 points (an inch) are 2 m, and 72 points are 50 m. */
+const DRAWING_SCALE = measureFromKnownLength(72, { value: 2, unit: 'm' });
+const SITE_SCALE = measureFromKnownLength(72, { value: 50, unit: 'm' });
 /** A calculate script: a field with one is in the form's calculation order. */
 const CALCULATE = { type: 'javascript', script: 'event.value = 1;' } as const;
 const box = (x: number, y = 120): PageBox => ({ x, y, width: 40, height: 30 });
@@ -371,6 +375,11 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
   },
   'pages.rotate': {
     ops: () => [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
+  },
+  'pages.setScale': {
+    // One page had a scale of its own and the other none: the undo puts each back.
+    setup: () => [{ type: 'pages.setScale', pages: [PAGE], measure: DRAWING_SCALE }],
+    ops: () => [{ type: 'pages.setScale', pages: [PAGE, EMPTY_PAGE], measure: SITE_SCALE }],
   },
   'pages.reorder': {
     ops: () => [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],

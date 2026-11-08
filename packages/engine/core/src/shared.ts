@@ -56,6 +56,7 @@ export {
   reorderBackOf,
   restoredPagesOf,
   rotateBackOf,
+  scaleBackOf,
   type PageList,
   type PredictablePageOp,
   type RestoredPage,

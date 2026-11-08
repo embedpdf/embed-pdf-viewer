@@ -78,6 +78,7 @@ import {
   rotatePages,
   rotatePagesBack,
 } from './internal/pageChanges';
+import { setPageScales, setPageScalesBack } from './internal/scaleChanges';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -279,6 +280,8 @@ function runOp(
       return deleteOutlineItem(ctx, op, at);
     case 'pages.rotate':
       return changingPageTree(ctx, () => rotatePages(ctx, op));
+    case 'pages.setScale':
+      return setPageScales(ctx, op);
     case 'pages.reorder':
       return changingPageTree(ctx, () => reorderPages(ctx, op));
     case 'pages.delete':
@@ -334,6 +337,8 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return reopenOutlineItem(ctx, step);
     case 'pages.rotate':
       return changingPageTree(ctx, () => rotatePagesBack(ctx, step));
+    case 'pages.setScale':
+      return setPageScalesBack(ctx, step);
     case 'pages.reorder':
       return changingPageTree(ctx, () => reorderPagesBack(ctx, step));
     case 'pages.restore':

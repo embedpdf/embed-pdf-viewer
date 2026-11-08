@@ -66,7 +66,7 @@ import {
   WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
-import { PdfMeasurementSchema } from '../dto/Measure.schema';
+import { PageMeasurementViewportSchema, PdfMeasurementSchema } from '../dto/Measure.schema';
 import {
   PageBoxSchema,
   PageQuadSchema,
@@ -1448,6 +1448,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   boxes: PageBoxesSchema,
   pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
+  viewports: z.array(PageMeasurementViewportSchema).optional(),
 });
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
@@ -2321,5 +2322,6 @@ export { DigestAlgorithmSchema, ModificationLevelSchema };
 
 export const PageScaleResultSchema = z.object({
   page: PageRefSchema,
+  layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
 });

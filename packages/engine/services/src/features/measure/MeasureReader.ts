@@ -6,7 +6,6 @@ import type {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import type { Slices } from '../../shared/slices';
 import { readViewports } from './internal/readViewports';
 
 export class MeasureReader {
@@ -14,19 +13,13 @@ export class MeasureReader {
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
   ) {}
-  /** The page's measurement viewports; a page not parsed yet loads in slices. */
-  async viewports(
+  /** The page's measurement viewports, read from its dictionary: the page isn't loaded. */
+  viewports(
     pageObjectNumber: PageObjectNumber,
     signal: AbortSignal,
-    slices: Slices,
-  ): Promise<PageMeasurementViewport<PdfCoordinates>[]> {
+  ): PageMeasurementViewport<PdfCoordinates>[] {
     throwIfAborted(signal);
-    const pool = this.session.pagePool(),
-      page = await pool.acquireInSlices(pageObjectNumber, signal, slices);
-    try {
-      return readViewports(this.runtime.fn, this.runtime.mem, page);
-    } finally {
-      pool.release(pageObjectNumber);
-    }
+    const index = this.session.recordByObjectNumber(pageObjectNumber).pageIndex;
+    return readViewports(this.runtime.fn, this.runtime.mem, this.session.requireDocPtr(), index);
   }
 }
