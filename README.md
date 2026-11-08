@@ -30,7 +30,9 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
   wide screens and stack on phones. Between cards, a transparent 1px image
   floated left makes the gap: GitHub pads img[align=left] 20px on the right. The
   image width (230) sets the card width: keep every text line shorter than it,
-  or the three cards no longer fit in one row at 1280px.
+  or the three cards no longer fit in one row at 1280px. The empty <p> after
+  each link keeps space under it: GitHub drops the margin of a cell's last
+  element.
 -->
 
 <table align="left">
@@ -45,6 +47,7 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
       <h3>Viewer</h3>
       <p>A complete viewer, toolbar<br>and panels included: one tag,<br>made yours with plain config.</p>
       <p><a href="https://www.embedpdf.com/docs/viewer/vanilla/quick-start"><b>Viewer docs →</b></a></p>
+      <p></p>
     </td>
   </tr>
 </table>
@@ -63,6 +66,7 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
       <h3>Headless components</h3>
       <p>The same plugins without the<br>UI, to build your own viewer in<br>React, Vue, Svelte or Angular.</p>
       <p><a href="https://www.embedpdf.com/docs/headless/react"><b>Headless docs →</b></a></p>
+      <p></p>
     </td>
   </tr>
 </table>
@@ -81,6 +85,7 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
       <h3>Engine</h3>
       <p>Open, read, change and render<br>PDFs from your own code, in<br>the browser or in Node.</p>
       <p><a href="https://www.embedpdf.com/docs/engine/quick-start"><b>Engine docs →</b></a></p>
+      <p></p>
     </td>
   </tr>
 </table>
