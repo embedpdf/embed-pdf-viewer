@@ -21,23 +21,31 @@ const pages = resolve(
   '../../../../../docs/content/viewer/features',
 );
 
-/** The rows of the Markdown table whose header row starts with `header`, as trimmed cells. */
-function tableRows(file: string, header: string): string[][] {
-  const lines = readFileSync(resolve(pages, file), 'utf8').split('\n');
-  const start = lines.findIndex((line) => line.startsWith(`| ${header} |`));
-  if (start < 0) throw new Error(`${file}: no table headed "${header}"`);
-  const rows: string[][] = [];
-  // Past the header and its divider, to the first line that isn't a row.
-  for (const line of lines.slice(start + 2)) {
-    if (!line.startsWith('|')) break;
-    rows.push(
-      line
-        .slice(1, -1)
-        .split('|')
-        .map((cell) => cell.trim()),
-    );
-  }
-  return rows;
+const read = (file: string): string => readFileSync(resolve(pages, file), 'utf8');
+
+/**
+ * The Markdown tables whose header row starts with `header`, in the page's order: each its rows,
+ * as trimmed cells.
+ */
+function tablesHeaded(file: string, header: string): string[][][] {
+  const lines = read(file).split('\n');
+  const tables = lines.flatMap((line, start) => {
+    if (!line.startsWith(`| ${header} |`)) return [];
+    const rows: string[][] = [];
+    // Past the header and its divider, to the first line that isn't a row.
+    for (const row of lines.slice(start + 2)) {
+      if (!row.startsWith('|')) break;
+      rows.push(
+        row
+          .slice(1, -1)
+          .split('|')
+          .map((cell) => cell.trim()),
+      );
+    }
+    return [rows];
+  });
+  if (tables.length === 0) throw new Error(`${file}: no table headed "${header}"`);
+  return tables;
 }
 
 /** The names in backticks in a cell: `` `annotations` ``, `` `.highlight` ``. */
@@ -63,7 +71,7 @@ const startsOff = (feature: string): string[] =>
   START_OFF_FEATURES.filter((name) => name === feature || name.startsWith(`${feature}.`));
 
 describe('All features', () => {
-  const rows = tableRows('index.mdx', 'Feature');
+  const [rows] = tablesHeaded('index.mdx', 'Feature') as [string[][]];
 
   it('lists every feature of the tree, once, and nothing else', () => {
     const listed = rows.map((row) => namesIn(row[0]!)[0]);
@@ -80,53 +88,50 @@ describe('All features', () => {
 });
 
 describe('Turn features on and off', () => {
-  const rows = tableRows('turning-off.mdx', 'Feature').map(
-    ([features, parts, onFromTheStart, readOnly]) => ({
-      features: namesIn(features!),
-      parts: namesIn(parts!),
-      onFromTheStart: onFromTheStart!,
-      readOnly: readOnly!,
+  type Row = { feature: string; parts: string[]; readOnly: string | undefined };
+  // Two tables: the features `readOnly` turns off, then the ones it keeps. A cell names the
+  // feature's parts first; "`readOnly` turns off only …" after them says it turns off one part.
+  const [changing, keeping] = tablesHeaded('turning-off.mdx', 'Feature').map((rows) =>
+    rows.map(([name, covers]): Row => {
+      const [parts, readOnly] = covers!.split('`readOnly`');
+      return { feature: namesIn(name!)[0]!, parts: namesIn(parts!), readOnly };
     }),
-  );
+  ) as [Row[], Row[]];
+  const rows = [...changing, ...keeping];
 
   it('lists every feature of the tree, once, and nothing else', () => {
-    const listed = rows.flatMap((row) => row.features);
+    const listed = rows.map((row) => row.feature);
     expect([...listed].sort()).toEqual(Object.keys(TREE).sort());
     expect(new Set(listed).size).toBe(listed.length);
   });
 
   it("names each feature's parts as the tree has them", () => {
-    for (const row of rows) {
-      for (const feature of row.features) {
-        expect(row.parts, feature).toEqual(TREE[feature]!.map((part) => `.${part}`));
-      }
+    for (const { feature, parts } of rows) {
+      expect(parts, feature).toEqual(TREE[feature]!.map((part) => `.${part}`));
     }
   });
 
   it('says what starts off as the defaults have it', () => {
-    for (const row of rows) {
-      for (const feature of row.features) {
-        expect(startsOffPerPage(feature, row.onFromTheStart), feature).toEqual(startsOff(feature));
-      }
-    }
+    // "All of them start on, except `forms.building`, … and `snapshots`."
+    const except = /All of them start on, except ([\s\S]+?)\.\s/.exec(read('turning-off.mdx'));
+    if (!except) throw new Error('turning-off.mdx: no "All of them start on, except …"');
+    expect(namesIn(except[1]!).sort()).toEqual([...START_OFF_FEATURES].sort());
   });
 
   it('says what readOnly turns off as readOnly does', () => {
-    /** What the page's cell says goes: the whole feature, some of its parts, or nothing. */
-    const offPerPage = (feature: string, cell: string): string[] => {
-      if (cell === 'no') return [];
-      if (['all', 'yes', 'both'].includes(cell)) return [feature];
-      // `.writing` only, maybe with why after a comma.
-      if (/^`[^`]+` only\b/.test(cell)) return namesIn(cell).map((part) => `${feature}${part}`);
-      throw new Error(`${feature}: "${cell}" says neither all, some or none`);
-    };
-    for (const row of rows) {
-      for (const feature of row.features) {
-        const off = READ_ONLY_FEATURES.filter(
-          (name) => name === feature || name.startsWith(`${feature}.`),
-        );
-        expect(offPerPage(feature, row.readOnly), feature).toEqual(off);
+    /** What a row says `readOnly` turns off: the whole feature, or the one part it names. */
+    const offPerPage = ({ feature, parts, readOnly }: Row): string[] => {
+      if (readOnly === undefined) return [feature];
+      // "turns off only this part", of a feature with one, or "turns off only `.signing`".
+      const only = /^ turns off only (?:this part\b|`(\.\w+)`)/.exec(readOnly);
+      if (!only || (!only[1] && parts.length !== 1)) {
+        throw new Error(`${feature}: "${readOnly}" names no one part`);
       }
-    }
+      return [`${feature}${only[1] ?? parts[0]}`];
+    };
+    const off = (feature: string): string[] =>
+      READ_ONLY_FEATURES.filter((name) => name === feature || name.startsWith(`${feature}.`));
+    for (const row of changing) expect(offPerPage(row), row.feature).toEqual(off(row.feature));
+    for (const { feature } of keeping) expect(off(feature), feature).toEqual([]);
   });
 });

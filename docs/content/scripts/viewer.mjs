@@ -177,7 +177,6 @@ const VIEWER_ITEMS = new Set([
   'page-number',
   'quick-stamps',
   'measurement-scale',
-  'view-only',
   'outline-filter',
   'attachments-count',
 ]);
