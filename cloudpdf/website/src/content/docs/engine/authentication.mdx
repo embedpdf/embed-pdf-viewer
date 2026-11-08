@@ -30,7 +30,10 @@ const doc = await engine.open({
 ```
 
 The token names the document, so you don't pass an id. Pass a function rather than a string: the
-engine calls it for every request, so a short-lived token never runs out mid-session.
+engine calls it when it needs a token, keeps that token, and calls it again in the background a
+minute before it expires. A short-lived token never runs out mid-session, and nothing waits for
+the renewal. When CloudPDF refuses a kept token (it was revoked), the engine asks the function
+once more and tries again.
 
 One engine can hold many documents opened this way, each with its own token.
 

@@ -8,7 +8,7 @@ import type { OpenInput } from '@cloudpdf/engine';
 import { EmbedPdfViewerElement, type DoorEngine } from '@embedpdf/viewer/core';
 import { describe, expect, it } from 'vitest';
 
-import { openInputOf } from '../src/config';
+import { followsSource, openInputOf } from '../src/config';
 import '../src/index';
 
 /** What the door makes of a config's `engine` settings. */
@@ -55,7 +55,7 @@ describe('the cloud door', () => {
 
   it('names the cloud documents as the engine opens them, and leaves the rest as they are', () => {
     expect(openInputOf({ token: 't' })).toEqual({ kind: 'token', token: 't' });
-    expect(openInputOf({ id: 'doc', token: 't' })).toEqual({ kind: 'id', id: 'doc', token: 't' });
+    expect(openInputOf({ id: 'doc' })).toEqual({ kind: 'id', id: 'doc' });
     expect(openInputOf({ grant: 'shr', passphrase: 'pw' })).toEqual({
       kind: 'grant',
       grant: 'shr',
@@ -65,6 +65,28 @@ describe('the cloud door', () => {
     expect(openInputOf(input)).toBe(input);
     expect(openInputOf('/report.pdf')).toBe('/report.pdf');
     expect(doorFor().sourceOf).toBe(openInputOf);
+  });
+
+  it('opens { id, token } by id, asking the token the latest src gives', async () => {
+    const opened = openInputOf({ id: 'doc', token: () => 'first' }) as {
+      kind: string;
+      id: string;
+      token: () => Promise<string>;
+    };
+    expect(opened).toMatchObject({ kind: 'id', id: 'doc' });
+    expect(await opened.token()).toBe('first');
+
+    // The same id with a new function, as an inline one on every render: it stays open.
+    expect(followsSource(opened, { id: 'doc', token: () => 'second' })).toBe(true);
+    expect(await opened.token()).toBe('second');
+    expect(followsSource(opened, { id: 'doc', token: 'literal' })).toBe(true);
+    expect(await opened.token()).toBe('literal');
+
+    // Another id, or a document named another way, opens again.
+    expect(followsSource(opened, { id: 'other', token: () => 'x' })).toBe(false);
+    expect(followsSource(opened, { token: () => 'x' })).toBe(false);
+    expect(followsSource(openInputOf({ token: 't' }), { token: 't' })).toBe(false);
+    expect(doorFor().follows).toBe(followsSource);
   });
 
   it('gives stamp libraries a local engine, loaded on first use', () => {

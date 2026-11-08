@@ -2,8 +2,8 @@
  * Registers the cloud engine as the element's default, as `@embedpdf/viewer` registers the
  * built-in one: what makes this package's door the cloud door.
  *
- * The door also says how its documents open (`{ token }` is the engine's `{ kind: 'token' }`) and
- * the engine stamp libraries and signature marks open in. The cloud engine renders the pages, but
+ * The door also says how its documents open (`{ token }` is the engine's `{ kind: 'token' }`), that
+ * an `{ id, token }` with the same `id` is the same document, and the engine stamp libraries and signature marks open in. The cloud engine renders the pages, but
  * a stamp library is a PDF cut into stamps and previewed in the browser, which takes a local
  * engine: it's imported the first time someone opens Stamps or Signatures, so a viewer that
  * never does never downloads the WebAssembly.
@@ -17,7 +17,7 @@ import { cloudEngine, type CloudEngineOptions } from '@cloudpdf/engine';
 import { protectedDisplayPlugin } from '@cloudpdf/plugin-protected-display';
 import { EmbedPdfViewerElement } from '@embedpdf/viewer/core';
 
-import { openInputOf } from './config';
+import { followsSource, openInputOf } from './config';
 
 const localAssetEngine = () => import('@embedpdf/engine').then((engine) => engine.localEngine());
 const browserPlayer = () => import('@cloudpdf/web').then((web) => web.browserProtectedPlayer());
@@ -29,6 +29,7 @@ export function registerCloudEngine(): void {
     return {
       engine: () => cloudEngine(settings),
       sourceOf: openInputOf,
+      follows: followsSource,
       plugins: {
         stamp: { assetEngine: localAssetEngine },
         protectedDisplay: protectedDisplayPlugin({ player: browserPlayer }),
