@@ -188,8 +188,8 @@ export interface ViewerCustomization<AppState = any> {
    * definitions (`annotation.tools`, `commands.commands`) adds to the viewer's. The i18n plugin
    * takes only `fallbackLocale`: the languages are `locale`'s and `strings`'. `notAllowed`, when
    * given, wins over the plugin's. `stamp`
-   * and `signature` also take settings only the viewer has: the standard and quick stamps, and
-   * which marks people keep and their fonts. Read once.
+   * and `signature` also take settings only the viewer has: the standard stamps, your own and
+   * the quick stamps, and which marks people keep and their fonts. Read once.
    */
   plugins?: ViewerPluginsConfig;
   /**

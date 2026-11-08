@@ -66,7 +66,7 @@ export interface ResolvedViewerConfig {
   readonly icons: Readonly<Record<string, IconDef>>;
   /** Your commands over the built-in ones, for the commands the layout brings too. */
   readonly viewerCommands: ViewerCommands;
-  /** What the viewer adds to `plugins.stamp`: the standard stamps, the quick stamps. */
+  /** What the viewer adds to `plugins.stamp`: the standard stamps, your own, the quick stamps. */
   readonly stamp: ViewerStampSettings;
   /** What the viewer adds to `plugins.signature`: which marks people keep, their fonts. */
   readonly signature: ViewerSignatureSettings;

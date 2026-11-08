@@ -107,9 +107,79 @@ a PDF they import. The libraries they make are kept in the browser across visits
 | Setting | What it does | Default |
 | :-- | :-- | :-- |
 | `standard` | Where the standard stamps come from: `true` (from your own build), a URL with `{locale}`, or `false` for none | `true` |
-| `quick` | Stamps to show as buttons in the Insert toolbar, by library and name | none |
+| `libraries` | Your own stamp libraries, each `{ id, url }` or `{ id, data }`: see [Your own stamps](#your-own-stamps) | none |
+| `quick` | Stamps to show as buttons in the Insert toolbar, as `library:name` | none |
 
 The stamp plugin's own settings go in the same place: see [Stamps](/docs/headless/annotations/stamps#settings).
+
+### Your own stamps
+
+Give the viewer stamps of your own, such as a check mark and a cross for ticking off a printed or
+scanned form, as a stamp library: a PDF with one page per stamp, the way Acrobat keeps its stamps.
+`libraries` loads it under an id you choose, and `quick` puts its stamps in the Insert toolbar as
+`<id>:<name>`:
+
+```js
+{
+  plugins: {
+    stamp: {
+      libraries: [{ id: 'marks', url: '/marks.pdf' }],
+      quick: ['marks:Check', 'marks:Cross'],
+    },
+  },
+}
+```
+
+<Example name="viewer/features/annotations/own-stamps" />
+
+> **Try it:** open **Insert**. Next to **Stamp** are the check mark and the cross. Pick the check
+> mark and click the **Vegetarian** box of the printed form, then pick the cross for one of the
+> workshops.
+
+A stamp's name is its page's name in the library. A library you export from the stamps panel, or
+one of Acrobat's own stamp files, works as it is: see [A library is a
+PDF](/docs/headless/annotations/stamps#a-library-is-a-pdf) to make one.
+
+Your libraries load when the viewer starts, from your app every time. They're never kept in the
+browser, unlike the libraries people make, so a new version of the file shows on the next visit,
+and the stamps panel lists them with no way to remove them.
+
+### A button of your own
+
+A quick stamp's button shows the stamp itself. For a button with your own icon and label, give it a
+[command](../customize/commands) that arms the stamp, and put the command in the Insert toolbar:
+
+```js
+{
+  icons: {
+    tick: [
+      'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+      'M8.5 12.5l2.5 2.5 5-5',
+    ],
+  },
+  commands: [
+    {
+      id: 'lanternfield:tick',
+      label: 'Tick a box',
+      icon: 'tick',
+      run: ({ get }) => get('stamp').armAsset('marks:Check'),
+      active: ({ get }) =>
+        get('stamp').getArmedAsset()?.id === 'marks:Check',
+    },
+  ],
+  layout: (layout) =>
+    layout.add('lanternfield:tick', {
+      to: 'insert',
+      after: 'tool:stamp',
+    }),
+}
+```
+
+<Example name="viewer/features/annotations/stamp-command" />
+
+> **Try it:** open **Insert** and pick **Tick a box**, the circled tick next to **Stamp**. It stays
+> pressed while the check mark follows the pointer: click the boxes of the printed form to tick
+> them.
 
 ## Redaction
 

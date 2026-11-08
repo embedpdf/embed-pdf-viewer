@@ -91,6 +91,14 @@ headings, tables and a `.page-footer`, and a `.note-slot` in the margin of a `.w
 for a note's icon. `shared/annotations.mjs` has the reviewers (`DANA`, `ADA`) and helpers that
 write annotations the way the viewer does: `markText()`, `addNote()`, `reply()`, `setStatus()`.
 
+## A stamp library
+
+`marks` is not a document an example opens but a stamp library one loads, the app's own check
+mark and cross (`plugins.stamp.libraries`). Its HTML prints one small page per stamp, with an
+`@page` size and no background, and its bake gives the library its title and each page its stamp's
+`identifier=label` name (`doc.pages.setName()`). Since no example opens it, `cloud.mjs` makes no
+grant for it (`NOT_OPENED`).
+
 ## From a design tool
 
 A page made in a design tool, such as Claude Design, keeps its markup: copy each page's

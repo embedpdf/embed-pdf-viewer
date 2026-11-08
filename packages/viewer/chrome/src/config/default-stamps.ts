@@ -20,6 +20,7 @@
 import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { negotiateLocale } from '@embedpdf/react/i18n';
 import type { StampCapability } from '@embedpdf/react/stamp';
+import { fetchBytes } from './file-bytes';
 
 /** The built-in library's PieceInfo id — excluded from persistence (it is
  *  loaded again on every first open, in the locale of that moment). */
@@ -42,12 +43,6 @@ export function resolveStampsLocale(chromeLocale: string): string {
   const languages = typeof navigator !== 'undefined' ? (navigator.languages ?? []) : [];
   return negotiateLocale(LOCALES, [chromeLocale, ...languages]) ?? 'en';
 }
-
-const fetchBytes = async (url: string): Promise<Uint8Array> => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
-};
 
 /** The library bytes for `locale`: your URL when you gave one, otherwise the
  *  copy that shipped with the viewer. Never anything else. */

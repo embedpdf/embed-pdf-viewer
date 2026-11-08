@@ -619,6 +619,22 @@ describe('stamp plugin: assets', () => {
     expect(stamp.listAssets()[0].id).not.toBe(stamp.listAssets()[1].id);
   });
 
+  it('imports under the id the caller gives, over the file’s, and a fresh one when it is taken', async () => {
+    const { engine } = makeAssetEngine(1, {
+      catalog: { Id: { type: 'string', value: 'file-library-id' } },
+      names: { 'Paid=Paid': 100 },
+    });
+    const { stamp } = makeStamp(engine);
+
+    const given = (await stamp.importLibrary(pdfBytes(), { id: 'acme' })).library.id;
+    const again = (await stamp.importLibrary(pdfBytes(), { id: 'acme' })).library.id;
+
+    expect(given).toBe('acme');
+    expect(stamp.getAsset('acme:Paid')).not.toBeNull();
+    expect(again).not.toBe('acme');
+    expect(again).not.toBe('file-library-id');
+  });
+
   it('removeLibrary drops the library, its assets, and their binaries', async () => {
     const { engine } = makeAssetEngine(2);
     const { stamp } = makeStamp(engine);
