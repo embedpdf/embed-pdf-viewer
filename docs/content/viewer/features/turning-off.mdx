@@ -112,8 +112,16 @@ disappear or come back without a reload. That's how a feature can follow a user'
 
 It turns off every feature that changes the document, marked in the table above. People still
 scroll, zoom, search, select and copy text, read annotations and comments, follow links, download
-and print, and take snapshots when they're on. A small **View only** label in the toolbar says why
-the tools are gone.
+and print, and take snapshots when they're on. The tools just aren't there, as in a PDF reader. To
+tell people why, add the **View only** label to your [layout](../customize/layout); it shows while
+nothing can change the document:
+
+```js
+{
+  readOnly: true,
+  layout: (layout) => layout.add({ custom: 'view-only' }, { to: 'main', before: 'panel:search' }),
+}
+```
 
 `readOnly` comes after `features`, so `measurement: true` doesn't bring the Measure tab back into a
 read-only viewer. Keep one way of changing the document with `except`, and use `features` for what
@@ -132,8 +140,8 @@ is `readOnly: true` with the same `features`, on a report someone marked up:
 <Example name="viewer/features/turning-off/read-only" />
 
 > **Try it:** the highlight, the underline and the red box around the "Documents opened" row show,
-> and nothing changes them: **View only** at the top right says why. The menu at the top left has
-> no Download or Print, and search and copy still work.
+> and nothing changes them. The menu at the top left has no Download or Print, and search and copy
+> still work.
 
 ## What a user may do
 

@@ -1,8 +1,8 @@
 /**
- * The View only label: the `{ custom: 'view-only' }` item, in the main bar by default. It says why
- * the tools are gone, while nothing that changes the document is on (`readOnly`, or `disable`
- * naming every such feature), or while the scope lets this user change nothing in the open
- * document. Otherwise it draws nothing.
+ * The View only label: the `{ custom: 'view-only' }` item, which the default layout leaves out (a
+ * reader expects no tools; the embedder adds it to say why there are none). It shows while nothing
+ * that changes the document is on (`readOnly`, or `features` turning off every such feature), or
+ * while the scope lets this user change nothing in the open document. Otherwise it draws nothing.
  */
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { AnnotationToken, type AnnotationCapability } from '@embedpdf/react/annotation';
