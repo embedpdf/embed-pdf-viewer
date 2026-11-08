@@ -72,6 +72,9 @@
   );
 
   let image: HTMLImageElement | undefined;
+  // Svelte clones its markup from a <template>, and Chrome paints a cloned <img> with no source
+  // as a broken image, `alt=""` or not: the image is hidden until it has its first source.
+  let sourced = $state(false);
 
   // Which page and which view the layer reports on: the page context is a new value whenever the
   // camera changes it, and these change only when the page or the view does.
@@ -124,7 +127,10 @@
         revoke = objectUrl.revoke;
         // The source is set on a stable element: the browser keeps the old picture until the new
         // one decodes, and never asks for the old URL again, so revoking it on cleanup is safe.
-        if (image) image.src = objectUrl.url;
+        if (image) {
+          image.src = objectUrl.url;
+          sourced = true;
+        }
       } catch (error) {
         // Cancelled (the camera moved, the layer unmounted), or the render failed: the page
         // can't show.
@@ -143,6 +149,7 @@
   alt=""
   draggable="false"
   style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
+  style:visibility={sourced ? null : 'hidden'}
 />
 {#if tiles && !thumbnail && settings.current?.tiles && layers}
   <TilePlane {layers} />

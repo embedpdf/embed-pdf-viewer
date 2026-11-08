@@ -46,6 +46,19 @@ describe('RenderLayer', () => {
     });
   });
 
+  it('keeps a picture hidden until it has a source', async () => {
+    const { view, sources } = await renderedStage();
+    const hidden = () =>
+      [...view.container.querySelectorAll('img')].map(
+        (image) => image.style.visibility === 'hidden',
+      );
+    expect(sources().some((source) => !source)).toBe(true);
+    expect(hidden()).toEqual(sources().map((source) => !source));
+    await waitFor(() => expect(sources().filter(Boolean).length).toBeGreaterThan(0));
+    flushSync();
+    expect(hidden()).toEqual(sources().map((source) => !source));
+  });
+
   it('leaves out what a layer on the page paints, from the first request', async () => {
     const { sources, renders } = await renderedStage({ painter: true });
     await waitFor(() => expect(sources().filter(Boolean).length).toBeGreaterThan(0));
