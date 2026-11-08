@@ -28,53 +28,121 @@ you turn them on, because most viewers don't need them.
 
 Three questions, three tools, each with its own names:
 
-| You want to say | Use | It names | Reach |
-| :-- | :-- | :-- | :-- |
-| What people can do in this viewer | `features`, or `readOnly` | Features: `annotations`, `documents.download` | Everywhere at once: every button, menu row, tab, panel and shortcut |
-| Where a button goes | [`layout`](../customize/layout) | Buttons: `tool:highlight`, `document:print` | One place: a bar or a menu. The feature still works everywhere else. |
-| What this user may do | The [scope](#what-a-user-may-do) | Permissions: `doc.download` | Everything, your code included: the engine refuses it |
+- **What people can do in this viewer:** `features`, or `readOnly`. They name features, such as
+  `annotations` and `documents.download`, and reach everywhere at once: every button, menu row,
+  tab, panel and shortcut.
+- **Where a button goes:** the [`layout`](../customize/layout). It names buttons, such as
+  `tool:highlight` and `document:print`, and changes one place: a bar or a menu. The feature still
+  works everywhere else.
+- **What this user may do:** the [scope](#what-a-user-may-do). It names permissions, such as
+  `doc.download`, and reaches everything, your code included: the engine refuses it.
 
 A button shows when its feature is on, it's in the layout, the scope allows it, and it makes sense
 right now (Copy needs a selection).
 
-| I want | Write |
-| :-- | :-- |
-| No annotating at all | `features: { annotations: false }` |
-| No highlighter anywhere: the Annotate bar, the selection bar, the shortcut | `features: { 'annotations.highlight': false }` |
-| Only the highlighter, no other annotating | `features: { annotations: false, 'annotations.highlight': true }` |
-| Highlighting from the selection bar only, no Highlight in the Annotate bar | `layout.remove('tool:highlight', { from: 'annotate' })` |
-| The highlighter in my own bar instead of the Annotate bar | `layout.remove('tool:highlight', { from: 'annotate' })`, then [add it](../customize/layout#add-a-button) to yours |
-| Measuring | `features: { measurement: true }` |
-| Measuring, with its tools in my own bar instead of a Measure tab | `features: { measurement: true }` and `layout.removeBar('measure')`, then add the tools to yours |
-| Redaction | `features: { redaction: true }` |
-| Building forms: the Form tab | `features: { 'forms.building': true }` |
-| Snapshots | `features: { snapshots: true }` |
-| Every feature, the ones that start off too | `features: { measurement: true, redaction: true, 'forms.building': true, snapshots: true }` |
-| No downloading or printing in this viewer | `features: { 'documents.download': false, 'documents.print': false }` |
-| This user may never download, not even from code | Leave `doc.download` out of the [scope](#what-a-user-may-do) |
-| Read-only | `readOnly: true` |
-| Read-only, but people fill in the form | `readOnly: { except: ['forms.filling'] }` |
+## What to write
+
+Annotating, all of it or one tool:
+
+```js
+// No annotating at all
+{ features: { annotations: false } }
+
+// No highlighter in any bar, and no shortcut
+{ features: { 'annotations.highlight': false } }
+
+// Only the highlighter, no other annotating
+{
+  features: {
+    annotations: false,
+    'annotations.highlight': true,
+  },
+}
+
+// Highlighting from selected text only, not the Annotate bar
+{
+  layout: (layout) =>
+    layout.remove('tool:highlight', { from: 'annotate' }),
+}
+```
+
+The features that start off:
+
+```js
+// Measuring
+{ features: { measurement: true } }
+
+// Redaction
+{ features: { redaction: true } }
+
+// Building forms: the Form tab
+{ features: { 'forms.building': true } }
+
+// Snapshots
+{ features: { snapshots: true } }
+
+// All four
+{
+  features: {
+    measurement: true,
+    redaction: true,
+    'forms.building': true,
+    snapshots: true,
+  },
+}
+```
+
+Downloading, printing and read-only:
+
+```js
+// No downloading or printing in this viewer
+{
+  features: {
+    'documents.download': false,
+    'documents.print': false,
+  },
+}
+
+// Read-only
+{ readOnly: true }
+
+// Read-only, but people fill in the form
+{ readOnly: { except: ['forms.filling'] } }
+```
+
+To stop a user downloading, from your code too, leave `doc.download` out of their
+[scope](#what-a-user-may-do). To put a tool in a bar of your own, take it out of its bar with
+`layout.remove()`, or the whole Measure tab with `layout.removeBar('measure')`, and
+[add it](../customize/layout#add-a-button) to yours.
 
 ## Every feature
 
-| Feature | Its parts | On from the start | Off with `readOnly` |
-| :-- | :-- | :-- | :-- |
-| `annotations` | `.highlight`, `.markup` (underline, strike out, squiggly), `.drawing` (ink and ink highlighter), `.text` (text boxes, callouts, insert and replace text), `.notes`, `.links` | yes | all |
-| `shapes` | | yes | yes |
-| `stamps` | Stamps and images | yes | yes |
-| `comments` | `.writing` (new comments and replies) | yes | `.writing` only, so people still read them |
-| `forms` | `.filling`, `.building` | `.filling` only | both |
-| `signatures` | `.signing`, `.checking` | yes | `.signing` only |
-| `redaction` | | no | yes |
-| `measurement` | | no | yes |
-| `pages` | Rotating, moving, inserting and deleting pages in the thumbnails panel | yes | yes |
-| `attachments` | `.adding` (the attachment tool, and attaching and deleting files in the attachments panel) | yes | `.adding` only, so people still see and save the files |
-| `text` | `.selection`, `.copy` | yes | no |
-| `snapshots` | | no | no |
-| `search` | | yes | no |
-| `thumbnails` | | yes | no |
-| `outline` | `.editing` (adding, renaming, moving and deleting items) | yes | `.editing` only, so people still follow it |
-| `documents` | `.open`, `.download`, `.print`, `.tabs` | yes | no |
+All of them start on, except `forms.building`, `redaction`, `measurement` and `snapshots`. These
+change the document, and `readOnly` turns them off:
+
+| Feature | What it covers |
+| :-- | :-- |
+| `annotations` | `.highlight`, `.markup` (underline, strike out, squiggly), `.drawing` (ink and ink highlighter), `.text` (text boxes, callouts, insert and replace text), `.notes`, `.links` |
+| `shapes` | Squares, circles, lines, arrows, polygons and polylines |
+| `stamps` | Stamps and images |
+| `comments` | `.writing` (new comments and replies). `readOnly` turns off only this part, so people still read comments. |
+| `forms` | `.filling`, `.building` |
+| `signatures` | `.signing`, `.checking`. `readOnly` turns off only `.signing`. |
+| `redaction` | Marking redactions and applying them |
+| `measurement` | Distance, perimeter and area, and calibrating the scale |
+| `pages` | Rotating, moving, inserting and deleting pages in the thumbnails panel |
+| `attachments` | `.adding` (the attachment tool, and attaching and deleting files in the attachments panel). `readOnly` turns off only this part, so people still see and save the files. |
+| `outline` | `.editing` (adding, renaming, moving and deleting items). `readOnly` turns off only this part, so people still follow the outline. |
+
+These don't change the document, and `readOnly` keeps them on:
+
+| Feature | What it covers |
+| :-- | :-- |
+| `text` | `.selection`, `.copy` |
+| `search` | Searching the text |
+| `thumbnails` | The thumbnails panel |
+| `snapshots` | Copying or saving an area of a page as an image |
+| `documents` | `.open`, `.download`, `.print`, `.tabs` |
 
 A feature takes `true` or `false`, and so does each part, by its feature's name and its own:
 `'annotations.highlight'`. The dot makes it a string, so it goes in quotes.
@@ -82,7 +150,12 @@ A feature takes `true` or `false`, and so does each part, by its feature's name 
 When a feature and one of its parts are both there, the part wins, in any order:
 
 ```js
-{ features: { annotations: false, 'annotations.highlight': true } }
+{
+  features: {
+    annotations: false,
+    'annotations.highlight': true,
+  },
+}
 ```
 
 That's highlighting and nothing else. A part added in a later version follows its feature, so here
@@ -119,7 +192,11 @@ nothing can change the document:
 ```js
 {
   readOnly: true,
-  layout: (layout) => layout.add({ custom: 'view-only' }, { to: 'main', before: 'panel:search' }),
+  layout: (layout) =>
+    layout.add(
+      { custom: 'view-only' },
+      { to: 'main', before: 'panel:search' },
+    ),
 }
 ```
 
@@ -130,7 +207,10 @@ else should go:
 ```js
 {
   readOnly: { except: ['forms.filling'] },
-  features: { 'documents.download': false, 'documents.print': false },
+  features: {
+    'documents.download': false,
+    'documents.print': false,
+  },
 }
 ```
 
@@ -153,7 +233,13 @@ your code.
 
 ```js
 {
-  scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'],
+  scope: [
+    'doc.open',
+    'doc.render',
+    'doc.text.select',
+    'doc.text.search',
+    'doc.annotate.read',
+  ],
   identity: { displayName: 'Ada Lovelace' },
 }
 ```
@@ -254,7 +340,11 @@ of every bar and menu and its shortcut too, while its feature stays, turn the co
 commands plugin:
 
 ```js
-{ plugins: { commands: { disabledCommands: ['zoom:in', 'zoom:out'] } } }
+{
+  plugins: {
+    commands: { disabledCommands: ['zoom:in', 'zoom:out'] },
+  },
+}
 ```
 
 ### `disable`, from 3.0
