@@ -445,7 +445,7 @@ export interface PluginContext<State = unknown, PluginSettings extends object = 
    * comes from functions it can't name the inputs of, such as a command's `enabled`: it asks
    * them again only after this moved.
    */
-  changeCount(): number;
+  storeChangeCount(): number;
   /**
    * Run `handler` whenever `select()` answers differently. For reacting to
    * state this plugin does not own (the page registry, a sibling's getter);

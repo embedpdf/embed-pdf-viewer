@@ -166,7 +166,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
    * until then.
    */
   const contextByDocument = memoByKey(
-    (_documentKey: string) => [ctx.changeCount()],
+    (_documentKey: string) => [ctx.storeChangeCount()],
     (documentKey): CommandContext => {
       const context = commandContext(documentKey || undefined);
       const found = new Map<CapabilityToken<unknown>, unknown>();
@@ -321,7 +321,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
    */
   const documentResolution = (documentKey: string) => {
     const answersById = memoByKey(
-      (_id: string) => [ctx.changeCount()],
+      (_id: string) => [ctx.storeChangeCount()],
       (id): Answers => {
         const entry = entryOf(id);
         return entry ? answersOf(entry, contextByDocument(documentKey)) : NOT_REGISTERED;
