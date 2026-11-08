@@ -9,8 +9,12 @@
 /** The inputs as `compute` receives them; inferred from `inputs()` only, never from `compute`. */
 type Computed<Inputs extends readonly unknown[]> = { -readonly [K in keyof Inputs]: NoInfer<Inputs[K]> };
 
-const sameInputs = (left: readonly unknown[], right: readonly unknown[]): boolean =>
-  left.length === right.length && left.every((value, index) => Object.is(value, right[index]));
+// A plain loop: every memoized read runs this on every call, cached or not.
+const sameInputs = (left: readonly unknown[], right: readonly unknown[]): boolean => {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) if (!Object.is(left[i], right[i])) return false;
+  return true;
+};
 
 /**
  * Recompute `compute(...inputs())` only when an input changes (compared with

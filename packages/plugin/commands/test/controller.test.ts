@@ -155,6 +155,43 @@ describe('registry', () => {
   });
 });
 
+describe('asking a command', () => {
+  it('asks its derivations once per store change, however many readers ask', () => {
+    const enabled = vi.fn(() => true);
+    const label = vi.fn(() => ({ count: 2 }));
+    const { ctx, commands } = harness({
+      commands: [{ id: 'acme:send', label: 'Send ({count})', enabled, labelParams: label }],
+    });
+    const resolved = commands.resolveCommand('acme:send');
+    expect(commands.resolveCommand('acme:send')).toBe(resolved);
+    expect(commands.listCommands()).toEqual([resolved]);
+    expect(enabled).toHaveBeenCalledTimes(1);
+    expect(label).toHaveBeenCalledTimes(1);
+
+    ctx.notify();
+    expect(commands.resolveCommand('acme:send')).toBe(resolved); // asked again, answered the same
+    expect(enabled).toHaveBeenCalledTimes(2);
+    expect(label).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs by what the command answers at that moment, not as of the last store change', async () => {
+    // The app's own state, changed in place: the viewer hears nothing of it.
+    let ready = false;
+    const run = vi.fn();
+    const { commands } = harness({
+      commands: [{ id: 'acme:send', label: 'Send', enabled: () => ready, run }],
+    });
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(false);
+    ready = true;
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(false);
+    expect(commands.canExecute('acme:send')).toBe(true);
+    await expect(commands.execute('acme:send')).resolves.toEqual({ status: 'executed' });
+    expect(run).toHaveBeenCalledTimes(1);
+    // The run woke the readers, so they ask again.
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(true);
+  });
+});
+
 describe('execution', () => {
   it('runs a command, reports it, and refuses hidden, disabled and unknown ones', async () => {
     const run = vi.fn();
@@ -423,12 +460,11 @@ describe('turning single commands off', () => {
 describe('locked settings', () => {
   /** The controller with an i18n stand-in that knows `strings`. */
   function harnessWith(config: CommandsConfig, strings: Record<string, string> = {}) {
-    const i18n = {
-      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
-        const text = strings[key] ?? options?.fallback ?? key;
-        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
-      },
+    const t = (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+      const text = strings[key] ?? options?.fallback ?? key;
+      return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
     };
+    const i18n = { t, getTranslator: () => t };
     const ctx = createTestContext({
       id: 'commands',
       settings: { defaults: COMMANDS_DEFAULTS, registered: config },
@@ -540,12 +576,11 @@ describe('permissions', () => {
     security: ReturnType<typeof securityWithout> | null,
     strings: Record<string, string> = {},
   ) {
-    const i18n = {
-      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
-        const text = strings[key] ?? options?.fallback ?? key;
-        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
-      },
+    const t = (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+      const text = strings[key] ?? options?.fallback ?? key;
+      return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
     };
+    const i18n = { t, getTranslator: () => t };
     const ctx = createTestContext({
       id: 'commands',
       settings: { defaults: COMMANDS_DEFAULTS, registered: config },
@@ -845,13 +880,14 @@ describe('settings', () => {
 
 describe('labels', () => {
   /** An i18n stand-in that knows the keys it's given, in one language. */
-  const i18nWith = (strings: Record<string, string>) => ({
-    t: (key: string, options?: { fallbackKey?: string; fallback?: string }) =>
+  const i18nWith = (strings: Record<string, string>) => {
+    const t = (key: string, options?: { fallbackKey?: string; fallback?: string }) =>
       strings[key] ??
       (options?.fallbackKey === undefined ? undefined : strings[options.fallbackKey]) ??
       options?.fallback ??
-      key,
-  });
+      key;
+    return { t, getTranslator: () => t };
+  };
 
   it('shows the string under the id, then the translated label, then the plain label, then the id', async () => {
     const { createKernel, definePlugin } = await import('@embedpdf/core');

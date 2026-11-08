@@ -426,6 +426,15 @@ describe('omittedCommandsOf', () => {
     ]);
   });
 
+  it("asks only whether a command shows when it's told which menu each button opens", () => {
+    const openers: Readonly<Record<string, string>> = { 'menu:document': 'document' };
+    const asked: string[] = [];
+    const shows = (id: string) => (asked.push(id), { visible: everything.includes(id) });
+    expect(omittedCommandsOf(data, shows, (id) => ({ menu: openers[id] }))).toEqual([]);
+    // Each mode's bars stop at their first command that shows, and the menu at its first item.
+    expect(asked).toEqual(['tool:highlight', 'tool:square', 'document:download']);
+  });
+
   it('keeps a mode whose only item is your own component without a command', () => {
     const custom: LayoutData = {
       bars: { notes: { place: { with: 'main' }, mode: 'notes', center: [[{ custom: 'pad' }]] } },

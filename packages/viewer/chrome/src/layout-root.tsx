@@ -188,7 +188,12 @@ export function LayoutRoot({
   const commands = useCommands();
   const documentId = useDocumentId() ?? undefined;
   const omitted = useKernelValue(
-    () => omittedCommandsOf(data, (id) => commands.resolveCommand(id, documentId)),
+    () =>
+      omittedCommandsOf(
+        data,
+        (id) => commands.resolveCommand(id, documentId),
+        (id) => commands.getCommand(id),
+      ),
     sameStrings,
   );
 

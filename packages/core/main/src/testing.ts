@@ -390,6 +390,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       return settings;
     },
     notify: store.notify,
+    storeChangeCount: store.changeCount,
     watch: (select, handler, isEqual = Object.is) => {
       let previous = select();
       const off = store.subscribe(() => {

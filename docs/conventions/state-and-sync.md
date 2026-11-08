@@ -12,6 +12,7 @@ API below is a member of the `PluginContext` a plugin's `create(ctx)` receives
 | Mirror          | `ctx.mirror(spec)`, `ctx.pageMirror(spec)`                                  |
 | Pending changes | `ctx.changes` (`stage`, `hold`, `group`), a mirror's `predict` and `view()` |
 | Resource        | closures, `ctx.notify()`, `ctx.cleanup`, `ctx.acquire`                      |
+| Any of them     | `ctx.storeChangeCount()`, for a read that can't name its inputs             |
 
 ## Session state: `ctx.state`
 
@@ -73,6 +74,28 @@ It is a no-op once the instance closed.
 // packages/plugin/commands/src/controller.ts: definitions hold functions,
 // so the registry is a closure map; every change wakes the readers.
 ctx.notify();
+```
+
+## `ctx.storeChangeCount()`
+
+How many times the store changed: a state or mirror write anywhere, a
+`ctx.notify()`. It moves when the change happens, also while the change stream
+is held. It is the input of a read whose answer comes from functions it can't
+name the inputs of, so the read asks them once per store change, however many
+readers ask. Every other read names its inputs instead.
+
+```ts
+// packages/plugin/commands/src/controller.ts: a command's `enabled` and
+// `visible` are the app's functions, asked again only after the store changed.
+const answersById = memoByKey(
+  (_id: string) => [ctx.storeChangeCount()],
+  (id): Answers => {
+    const entry = entryOf(id);
+    return entry
+      ? answersOf(entry, contextByDocument(documentKey))
+      : NOT_REGISTERED;
+  },
+);
 ```
 
 ## `ctx.watch(select, handler, isEqual?)`

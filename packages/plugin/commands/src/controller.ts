@@ -1,10 +1,10 @@
 /**
  * The commands controller: the commands (from the settings, added while the
  * app runs, and from families), resolution for a document (derivations over
- * live state, safe to throw), the one way to run a command, turning commands
- * off (by category and one by one), what the session may run (the scope's
- * `requires`, the plugins' checks in `allowed`), and the host-only keystroke
- * matcher.
+ * live state, safe to throw, asked once per store change), the one way to run
+ * a command, turning commands off (by category and one by one), what the
+ * session may run (the scope's `requires`, the plugins' checks in `allowed`),
+ * and the host-only keystroke matcher.
  *
  * Definitions hold functions, so the commands added while the app runs are a
  * map outside state; every change to it calls `ctx.notify()` so readers read
@@ -48,8 +48,11 @@ import {
 import {
   createAvailability,
   labelOf,
+  labelParamsOf,
   lockedMessage,
   notAllowedMessage,
+  translateOf,
+  type Translate,
 } from './services/availability';
 import { createTurningOff } from './write/turning-off';
 
@@ -70,30 +73,37 @@ const pressableOf = (definition: CommandDefinition): boolean =>
   !definition.menu && (definition.active !== undefined || definition.panel !== undefined);
 
 /**
- * One command's live derivations for a document, as values a memo can
- * compare: the entry, label, accent colors, the enabled/active/visible flags,
- * and why it's disabled when the scope doesn't allow it.
+ * What one command's derivations answer for a document, as values a memo can compare: the
+ * entry, the translate function and its label's `labelParams` (as JSON, so equal values compare
+ * equal), the accent colors, the enabled/active/visible flags, and the keys of the sentences that
+ * say why it's disabled: the scope doesn't allow it (when it shows disabled for that), or a lock
+ * holds its setting. The label and the sentences are translated from these, only when one of them
+ * changes.
  */
-type Derivations = readonly [
+type Answers = readonly [
   entry: RegisteredCommand | null,
-  label: string,
+  translate: Translate | null,
+  labelParams: string | undefined,
   accentPrimary: string | undefined,
   accentSecondary: string | undefined,
   enabled: boolean,
   active: boolean,
   visible: boolean,
-  disabledReason: string | undefined,
+  notAllowedKey: string | null,
+  lockedKey: string | null,
 ];
 
-const NOT_REGISTERED: Derivations = [
+const NOT_REGISTERED: Answers = [
   null,
-  '',
+  null,
+  undefined,
   undefined,
   undefined,
   false,
   false,
   false,
-  undefined,
+  null,
+  null,
 ];
 const NO_NAMES: readonly string[] = [];
 
@@ -104,10 +114,6 @@ const accentOf = (primary?: string, secondary?: string): IconAccent | undefined 
         ...(primary !== undefined ? { primary } : {}),
         ...(secondary !== undefined ? { secondary } : {}),
       };
-
-/** The memo key of a resolution: the command id and the document named, if any. */
-const resolutionKey = (id: string, documentId: string | undefined): string =>
-  JSON.stringify([id, documentId ?? null]);
 
 export function createCommandsController(ctx: PluginContext<void, CommandsSettings>) {
   const settings = ctx.settings();
@@ -153,6 +159,24 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       },
     };
   };
+
+  /**
+   * The context a document's derivations read (`''` is the active document): the same object
+   * until the store changes. It keeps the capabilities it finds, which stay the same objects
+   * until then.
+   */
+  const contextByDocument = memoByKey(
+    (_documentKey: string) => [ctx.storeChangeCount()],
+    (documentKey): CommandContext => {
+      const context = commandContext(documentKey || undefined);
+      const found = new Map<CapabilityToken<unknown>, unknown>();
+      const tryGet = <T>(token: CapabilityToken<T>): T | null => {
+        if (!found.has(token)) found.set(token, context.tryGet(token));
+        return found.get(token) as T | null;
+      };
+      return { ...context, tryGet, get: (token) => tryGet(token) ?? context.get(token) };
+    },
+  );
 
   /** A family's command for one name, made once so it keeps its identity. */
   const familyCommands = new WeakMap<CommandFamily, Map<string, RegisteredCommand>>();
@@ -226,90 +250,128 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     }
   };
 
-  const { isTurnedOff, notAllowedKeyOf, lockOf, refusalOf } = createAvailability(ctx, settings);
+  const { isTurnedOff, notAllowedKeyOf, lockedKeyOf, refusalOf } = createAvailability(
+    ctx,
+    settings,
+  );
 
-  const derivationsOf = (entry: RegisteredCommand, documentId?: string): Derivations => {
-    const { definition } = entry;
-    const context = commandContext(documentId);
-    const label = labelOf(definition, context);
-    // Turned off hides it; not allowed hides it, or disables it with the reason; a lock on the
-    // setting it changes disables it with the lock's reason, whatever `notAllowed` says.
+  /** Whether a command shows as pressed: its `active`, else while what it opens is open. */
+  const activeOf = (definition: CommandDefinition, context: CommandContext): boolean => {
+    if (definition.active) return derive(definition.active, context, false);
+    const shell = context.tryGet(ShellToken);
+    if (!shell) return false;
+    const panel = panelTarget(definition);
+    return definition.menu
+      ? shell.isMenuOpen(definition.menu)
+      : panel
+        ? shell.isOpen(panel.id)
+        : definition.modal
+          ? shell.isOpen(definition.modal)
+          : false;
+  };
+
+  /**
+   * Whether a command can run and whether it shows, as its derivations answer now, with the keys
+   * of the sentences that say why it's disabled. Turned off hides it; not allowed hides it, or
+   * disables it with the reason; a lock on the setting it changes disables it with the lock's
+   * reason, whatever `notAllowed` says.
+   */
+  const availabilityOf = (definition: CommandDefinition, context: CommandContext) => {
     const turnedOff = isTurnedOff(definition);
     const notAllowed = turnedOff ? null : notAllowedKeyOf(definition, context);
     const shownWhenNotAllowed = settings.get().notAllowed === 'disable';
-    const lock = turnedOff || notAllowed !== null ? null : lockOf(definition, context);
-    const ruledOut = turnedOff || notAllowed !== null || lock !== null;
-    // A command that opens something is active while it's open, unless it says otherwise.
-    let active: boolean;
-    if (definition.active) {
-      active = derive(definition.active, context, false);
-    } else {
-      const shell = context.tryGet(ShellToken);
-      const panel = panelTarget(definition);
-      active = shell
-        ? definition.menu
-          ? shell.isMenuOpen(definition.menu)
-          : panel
-            ? shell.isOpen(panel.id)
-            : definition.modal
-              ? shell.isOpen(definition.modal)
-              : false
-        : false;
-    }
+    const lockedKey = turnedOff || notAllowed !== null ? null : lockedKeyOf(definition, context);
+    const ruledOut = turnedOff || notAllowed !== null || lockedKey !== null;
+    return {
+      enabled: !ruledOut && derive(definition.enabled, context, true),
+      visible:
+        !turnedOff &&
+        (notAllowed === null || shownWhenNotAllowed) &&
+        derive(definition.visible, context, true),
+      notAllowedKey: shownWhenNotAllowed ? notAllowed : null,
+      lockedKey,
+    };
+  };
+
+  /** What a command's derivations answer for a document now. */
+  const answersOf = (entry: RegisteredCommand, context: CommandContext): Answers => {
+    const { definition } = entry;
+    const { enabled, visible, notAllowedKey, lockedKey } = availabilityOf(definition, context);
+    const labelParams = labelParamsOf(definition, context);
     const accent = deriveAccent(definition.iconAccent, context);
     return [
       entry,
-      label,
+      translateOf(context),
+      labelParams === undefined ? undefined : JSON.stringify(labelParams),
       accent?.primary,
       accent?.secondary,
-      !ruledOut && derive(definition.enabled, context, true),
-      active,
-      !turnedOff &&
-        (notAllowed === null || shownWhenNotAllowed) &&
-        derive(definition.visible, context, true),
-      notAllowed !== null && shownWhenNotAllowed
-        ? notAllowedMessage(notAllowed, label, context)
-        : lock !== null
-          ? lockedMessage(lock, label, context)
-          : undefined,
+      enabled,
+      activeOf(definition, context),
+      visible,
+      notAllowedKey,
+      lockedKey,
     ];
   };
 
-  /** A resolved command, the same object until one of its derivations or its entry changes. */
-  const resolvedByKey = memoByKey(
-    (key: string): Derivations => {
-      const [id, documentId] = JSON.parse(key) as [string, string | null];
-      const entry = entryOf(id);
-      return entry ? derivationsOf(entry, documentId ?? undefined) : NOT_REGISTERED;
-    },
-    (
-      _key,
-      entry,
-      label,
-      accentPrimary,
-      accentSecondary,
-      enabled,
-      active,
-      visible,
-      disabledReason,
-    ): ResolvedCommand | null =>
-      entry && {
-        id: entry.definition.id,
-        label,
-        icon: entry.definition.icon,
-        iconAccent: accentOf(accentPrimary, accentSecondary),
-        shortcuts: entry.shortcuts,
-        menu: entry.definition.menu,
+  /**
+   * One document's commands as buttons show them, by id (`''` is the active document). A
+   * command's derivations are asked at most once per store change, however many readers ask for
+   * it; its resolved object is built again, label and sentences translated, only when one of their
+   * answers changed.
+   */
+  const documentResolution = (documentKey: string) => {
+    const answersById = memoByKey(
+      (_id: string) => [ctx.storeChangeCount()],
+      (id): Answers => {
+        const entry = entryOf(id);
+        return entry ? answersOf(entry, contextByDocument(documentKey)) : NOT_REGISTERED;
+      },
+    );
+    return memoByKey(
+      (id: string): Answers => answersById(id),
+      (
+        _id,
+        entry,
+        translate,
+        labelParams,
+        accentPrimary,
+        accentSecondary,
         enabled,
         active,
-        pressable: pressableOf(entry.definition),
         visible,
-        categories: entry.definition.categories ?? [],
-        ...(disabledReason === undefined ? {} : { disabledReason }),
+        notAllowedKey,
+        lockedKey,
+      ): ResolvedCommand | null => {
+        if (!entry) return null;
+        const params = labelParams === undefined ? undefined : JSON.parse(labelParams);
+        const label = labelOf(entry.definition, params, translate);
+        const disabledReason =
+          notAllowedKey !== null
+            ? notAllowedMessage(notAllowedKey, label, translate)
+            : lockedKey !== null
+              ? lockedMessage(lockedKey, label, translate)
+              : undefined;
+        return {
+          id: entry.definition.id,
+          label,
+          icon: entry.definition.icon,
+          iconAccent: accentOf(accentPrimary, accentSecondary),
+          shortcuts: entry.shortcuts,
+          menu: entry.definition.menu,
+          enabled,
+          active,
+          pressable: pressableOf(entry.definition),
+          visible,
+          categories: entry.definition.categories ?? [],
+          ...(disabledReason === undefined ? {} : { disabledReason }),
+        };
       },
-  );
+    );
+  };
+  /** Each document's resolution, made the first time the document is asked about. */
+  const resolutionByDocument = memoByKey((_documentKey: string) => [], documentResolution);
   const resolveCommand = (id: string, documentId?: string): ResolvedCommand | null =>
-    entryOf(id) ? resolvedByKey(resolutionKey(id, documentId)) : null;
+    resolutionByDocument(documentId ?? '')(id);
 
   /**
    * Every command's id for a document (`''` is the active one): the defined ones in the order
@@ -318,7 +380,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
   const idsByDocument = memoByKey(
     (documentKey: string): readonly unknown[] => {
       const config = configured();
-      const context = commandContext(documentKey || undefined);
+      const context = contextByDocument(documentKey);
       return [
         definedCommands(),
         config,
@@ -385,9 +447,11 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     }
     const entry = entryOf(id);
     if (!entry) return { status: 'rejected', reason: 'not-found' };
-    const resolved = resolveCommand(id, documentId);
-    if (!resolved?.visible) return { status: 'rejected', reason: 'hidden' };
-    if (!resolved.enabled) return { status: 'rejected', reason: 'disabled' };
+    // Asked at this moment, not as of the last store change: a run goes by what the command
+    // answers now, also when something outside the viewer changed it since.
+    const now = availabilityOf(entry.definition, contextByDocument(documentId ?? ''));
+    if (!now.visible) return { status: 'rejected', reason: 'hidden' };
+    if (!now.enabled) return { status: 'rejected', reason: 'disabled' };
     const context = commandContext(documentId, { args, signal });
     try {
       await ctx.cancellable(signal, runCommand(entry.definition, context));
@@ -460,12 +524,14 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     listShortcuts,
     execute,
     canExecute: (id, documentId) => {
-      const resolved = resolveCommand(id, documentId);
-      return !!resolved && resolved.enabled && resolved.visible;
+      const entry = entryOf(id);
+      if (!entry) return false;
+      const now = availabilityOf(entry.definition, contextByDocument(documentId ?? ''));
+      return now.enabled && now.visible;
     },
     getRefusal: (id, documentId) => {
       const entry = entryOf(id);
-      return entry ? refusalOf(entry.definition, commandContext(documentId)) : null;
+      return entry ? refusalOf(entry.definition, contextByDocument(documentId ?? '')) : null;
     },
     ...turningOff,
     onExecuted: executed.on,
@@ -477,7 +543,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       for (const entry of definedCommands()) {
         if (options.inTextField && !entry.definition.shortcutInTextFields) continue;
         if (!entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) continue;
-        const context = commandContext();
+        const context = contextByDocument('');
         const refusal = refusalOf(entry.definition, context);
         const visible = derive(entry.definition.visible, context, true);
         if (!refusal) {
