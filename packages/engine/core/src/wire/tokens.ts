@@ -121,12 +121,30 @@ export const decodeContentToken = (raw: string): { contentVersion: number; pin: 
   };
 };
 
-export const encodeLayoutToken = (layoutVersion: number, pin: TokenPin): string =>
-  encodeToken(LayoutTokenSchema, { layoutVersion, ...pinFields(pin) });
-export const decodeLayoutToken = (raw: string): { layoutVersion: number; pin: TokenPin } => {
+/**
+ * What a layout leaf is: the layout's pin and, from a server that keeps it,
+ * the pages' scales' pin (`viewportsVersion`). A token without it asks for
+ * the layout without the pages' viewports, which a scale change doesn't move.
+ */
+export interface LayoutToken {
+  layoutVersion: number;
+  viewportsVersion?: number;
+  pin: TokenPin;
+}
+
+export const encodeLayoutToken = (token: LayoutToken): string =>
+  encodeToken(LayoutTokenSchema, {
+    ...pinFields(token.pin),
+    layoutVersion: token.layoutVersion,
+    viewportsVersion: token.viewportsVersion,
+  });
+export const decodeLayoutToken = (raw: string): LayoutToken => {
   const t = decodeToken(LayoutTokenSchema, raw);
   return {
     layoutVersion: decodePositiveInteger(t.layoutVersion, 'layoutVersion'),
+    ...(t.viewportsVersion === undefined
+      ? {}
+      : { viewportsVersion: decodePositiveInteger(t.viewportsVersion, 'viewportsVersion') }),
     pin: decodePin(t),
   };
 };

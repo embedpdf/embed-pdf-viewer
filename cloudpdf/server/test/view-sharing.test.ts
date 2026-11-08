@@ -101,7 +101,7 @@ describe('plane-scoped view sharing', () => {
     }
 
     const sharedReads = [
-      `/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+      `/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1,viewportsVersion=1`,
       `/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
       `/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`,
       `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
@@ -246,7 +246,7 @@ describe('plane-scoped view sharing', () => {
     expect(
       (
         await fetch(
-          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1,viewportsVersion=1`,
           {
             headers: aliceAuth,
           },
@@ -256,7 +256,7 @@ describe('plane-scoped view sharing', () => {
     expect(
       (
         await fetch(
-          `${fx.baseUrl}/v1/docs/${docId}/layers/alice/layout@engine=${ENGINE.layout},layoutVersion=2,shape=1`,
+          `${fx.baseUrl}/v1/docs/${docId}/layers/alice/layout@engine=${ENGINE.layout},layoutVersion=2,shape=1,viewportsVersion=1`,
           {
             headers: aliceAuth,
           },
@@ -267,7 +267,7 @@ describe('plane-scoped view sharing', () => {
     expect(
       (
         await fetch(
-          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1,viewportsVersion=1`,
           {
             headers: auth(docToken(tenantId, docId, 'bob')),
           },

@@ -20,6 +20,7 @@ import {
   FontWireComponents,
   FormWireComponents,
   OutlineWireComponents,
+  PageWireComponents,
   PdfActionWireComponents,
   SignatureWireComponents,
 } from '@embedpdf/engine-core/wire';
@@ -83,6 +84,7 @@ export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   AnnotationWireComponents,
   FormWireComponents,
   OutlineWireComponents,
+  PageWireComponents,
   AttachmentWireComponents,
   ChangeWireComponents,
   FontWireComponents,

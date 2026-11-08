@@ -39,6 +39,8 @@ export interface CacheDelta {
   metadataVersion?: number;
   attachmentsVersion?: number;
   outlineVersion?: number;
+  /** The pages' scales' pin (`DocumentManifest.viewportsVersion`), when the write set a page's scale. */
+  viewportsVersion?: number;
   /** The fonts list's pin, when the write changed the fonts the list shows. */
   fontsVersion?: number;
   /** The contents pin, when the write moved a page's content or the page set. */

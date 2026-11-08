@@ -133,6 +133,7 @@ export class LayerStateService {
         outlineVersion: row.outlineVersion,
         fontsVersion: row.fontsVersion,
         contentsVersion: row.contentsVersion,
+        viewportsVersion: row.viewportsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -202,6 +203,7 @@ export class LayerStateService {
       | 'annotationsVersion'
       | 'formsVersion'
       | 'outlineVersion'
+      | 'viewportsVersion'
       | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
@@ -216,6 +218,7 @@ export class LayerStateService {
       | 'annotationsVersion'
       | 'formsVersion'
       | 'outlineVersion'
+      | 'viewportsVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
@@ -254,7 +257,12 @@ export class LayerStateService {
       // Doc-level planes compare against the base version's pointers (law
       // 9c): a layer seeded over a published version whose metadata sits
       // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
-      layout: layer.layoutVersion === base.layoutVersion ? 'base' : 'layer',
+      // The layout carries the pages' scales: a layer that set one reads its own.
+      layout:
+        layer.layoutVersion === base.layoutVersion &&
+        layer.viewportsVersion === base.viewportsVersion
+          ? 'base'
+          : 'layer',
       attachments: layer.attachmentsVersion === base.attachmentsVersion ? 'base' : 'layer',
       metadata: layer.metadataVersion === base.metadataVersion ? 'base' : 'layer',
       actions: 'base',
@@ -301,6 +309,7 @@ export class LayerStateService {
       outlineVersion: version.outlineVersion,
       fontsVersion: version.fontsVersion,
       contentsVersion: version.contentsVersion,
+      viewportsVersion: version.viewportsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -331,6 +340,7 @@ export class LayerStateService {
       | 'outlineVersion'
       | 'fontsVersion'
       | 'contentsVersion'
+      | 'viewportsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -354,6 +364,7 @@ export class LayerStateService {
       outlineVersion: layer.outlineVersion,
       fontsVersion: layer.fontsVersion,
       contentsVersion: layer.contentsVersion,
+      viewportsVersion: layer.viewportsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -387,6 +398,8 @@ export class LayerStateService {
     fontsVersion?: number;
     /** The contents pin, when the write moved a page's content or the page set. */
     contentsVersion?: number;
+    /** The pages' scales pin, when the write set a page's scale. */
+    viewportsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -398,6 +411,7 @@ export class LayerStateService {
       ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
       ...(input.fontsVersion !== undefined ? { fontsVersion: input.fontsVersion } : {}),
       ...(input.contentsVersion !== undefined ? { contentsVersion: input.contentsVersion } : {}),
+      ...(input.viewportsVersion !== undefined ? { viewportsVersion: input.viewportsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).

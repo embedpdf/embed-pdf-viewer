@@ -76,6 +76,8 @@ test('calibration persists an artifact and audit payload without bumping page ca
     expect(after.current_version).toBe(Number(before.current_version) + 1);
     expect(after.current_artifact_key).not.toBe(before.current_artifact_key);
     expect(after.layout_version).toBe(before.layout_version);
+    // The layout carries the scales: their own pin moves, and only it.
+    expect(after.viewports_version).toBe(Number(before.viewports_version) + 1);
     expect(after.annotations_version).toBe(before.annotations_version);
     expect(
       await fx.db.selectFrom('layer_pages').selectAll().where('layer_id', '=', before.id).execute(),
@@ -85,35 +87,60 @@ test('calibration persists an artifact and audit payload without bumping page ca
     expect((await page.measure!.listViewports()).viewports.find((v) => v.owned)).toMatchObject({
       measure: { x: [{ conversion: Math.fround(0.06) }] },
     });
+    // A scale is a change: its row tells another session the scale and the new layout.
     const row = await fx.db
       .selectFrom('audit_log')
       .selectAll()
-      .where('kind', '=', 'measure.setScale')
+      .where('kind', '=', 'change')
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
-    const payload = JSON.parse(row.payload_json);
-    expect(payload).toMatchObject({
+    const [event] = auditRowToEvents(
+      {
+        id: Number(row.id),
+        ts: row.ts,
+        sub: row.sub,
+        kind: row.kind,
+        pageObjectNumber: null,
+        affectedPages: [],
+        originSessionId: null,
+        payload: JSON.parse(row.payload_json),
+      },
+      'another-session',
+    );
+    expect(event).toMatchObject({
+      type: 'pages.scaleSet',
       page: ref,
+      pages: [ref],
+      measure: { x: [{ conversion: Math.fround(0.06) }] },
       meta: { affectedPages: [] },
     });
-    expect(
-      auditRowToEvents(
-        {
-          id: Number(row.id),
-          ts: row.ts,
-          sub: row.sub,
-          kind: row.kind,
-          pageObjectNumber: null,
-          affectedPages: [],
-          originSessionId: null,
-          payload,
-        },
-        'another-session',
-      ),
-    ).toMatchObject([{ type: 'pages.scaleSet', ...payload }]);
+    expect(event?.type === 'pages.scaleSet' && event.layout.pages[0].viewports).toEqual(
+      (await page.measure!.listViewports()).viewports,
+    );
   } finally {
     await doc.close();
     await engine.destroy();
+  }
+});
+
+test('a scale reaches every client through the layout, at its new pin', async () => {
+  const engine = makeEngine(),
+    doc = await engine.open({ kind: 'id', id });
+  const other = await makeEngine().open({ kind: 'id', id });
+  try {
+    const ref = (await doc.pages.list()).pages[0].ref;
+    const { layout } = await doc.pages.setScale(
+      [ref],
+      measureFromKnownLength(72, { value: 5, unit: 'm' }),
+    );
+    const own = layout.pages[0].viewports?.find((viewport) => viewport.owned);
+    expect(own?.measure).toMatchObject({ subtype: 'rectilinear' });
+    expect((await doc.pages.list()).pages[0].viewports).toEqual(layout.pages[0].viewports);
+    // Another session reads the layout at the manifest's new scales pin.
+    expect((await other.pages.list()).pages[0].viewports).toEqual(layout.pages[0].viewports);
+  } finally {
+    await other.close();
+    await doc.close();
   }
 });
 

@@ -8,6 +8,7 @@ import {
   EngineError,
   EngineErrorCode,
   type DocumentManifest,
+  type PageListSnapshot,
   type PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -19,6 +20,7 @@ import {
   SHAPES,
   wirePaths,
   type CachedReadKind,
+  type LayoutToken,
   type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import {
@@ -103,6 +105,51 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       read: input.read,
       token: { kind: input.kind, pin: input.pin },
     });
+  /**
+   * The layout at its pins. A token with `viewportsVersion` asks for the
+   * pages' viewports too, and is answered only at both current pins; one
+   * without it (an older client) gets the layout without them, which a
+   * scale change doesn't move.
+   */
+  const layoutAt = (input: {
+    reply: FastifyReply;
+    ctx: OpenContext;
+    docId: string;
+    layerName: string | undefined;
+    requested: LayoutToken;
+    read: () => Promise<PageListSnapshot>;
+  }): Promise<PageListSnapshot> =>
+    readAtPins({
+      documentService: service,
+      reply: input.reply,
+      docId: input.docId,
+      layerName: input.layerName,
+      assertCurrent: async () => {
+        const manifest =
+          input.layerName === undefined
+            ? await service.getManifest(input.ctx, input.docId)
+            : await service.getLayerManifest(input.ctx, input.docId, input.layerName);
+        const { layoutVersion, viewportsVersion } = input.requested;
+        if (
+          layoutVersion === manifest.layoutVersion &&
+          (viewportsVersion === undefined || viewportsVersion === manifest.viewportsVersion)
+        ) {
+          return;
+        }
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `layout ${layoutVersion}/${viewportsVersion ?? '-'} no longer current ` +
+            `(current=${manifest.layoutVersion}/${manifest.viewportsVersion})`,
+        );
+      },
+      read: async () => {
+        const snapshot = await input.read();
+        return input.requested.viewportsVersion === undefined
+          ? { ...snapshot, pages: snapshot.pages.map(({ viewports: _gone, ...page }) => page) }
+          : snapshot;
+      },
+      token: { kind: 'layout', pin: input.requested.pin },
+    });
 
   app.get('/v1/docs/:docId/head', async (req, reply) => {
     const { docId } = req.params as { docId: string };
@@ -162,16 +209,12 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'layout', ['layout']);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const snapshot = await atVersion({
+    const snapshot = await layoutAt({
       reply,
       ctx,
       docId,
       layerName: undefined,
-      kind: 'layout',
-      label: 'layout',
-      requested: requested.layoutVersion,
-      pin: requested.pin,
-      current: (manifest) => manifest.layoutVersion,
+      requested,
       read: () => service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply)),
     });
     setImmutableCache(reply);
@@ -261,16 +304,12 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const snapshot = await atVersion({
+    const snapshot = await layoutAt({
       reply,
       ctx,
       docId,
-      layerName: layerName,
-      kind: 'layout',
-      label: 'layout',
-      requested: requested.layoutVersion,
-      pin: requested.pin,
-      current: (manifest) => manifest.layoutVersion,
+      layerName,
+      requested,
       read: () => service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply)),
     });
     setImmutableCache(reply);

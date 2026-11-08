@@ -31,7 +31,8 @@ type Input = keyof typeof RULES | 'fonts';
  */
 const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   manifest: 1,
-  layout: 1,
+  // 2: a page's viewports (3.1).
+  layout: 2,
   text: 1,
   geometry: 1,
   render: 1,

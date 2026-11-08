@@ -119,9 +119,17 @@ export class CloudDocumentPagesService implements Omit<DocumentPagesService, Pag
   private async layoutPath(signal: AbortSignal): Promise<string> {
     const manifest = await this.manifest.get(signal);
     const pin = tokenPinOf('layout', manifest.engine);
+    // A server that keeps the scales' pin carries the pages' viewports in the layout.
+    const token = {
+      layoutVersion: manifest.layoutVersion,
+      ...(manifest.viewportsVersion === undefined
+        ? {}
+        : { viewportsVersion: manifest.viewportsVersion }),
+      pin,
+    };
     return planesInherited(manifest, ['layout'])
-      ? wirePaths.docLayout(this.docId, manifest.layoutVersion, pin)
-      : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion, pin);
+      ? wirePaths.docLayout(this.docId, token)
+      : wirePaths.layerLayout(this.docId, this.layerName, token);
   }
 
   private fetchLayout(signal: AbortSignal): Promise<PageListSnapshot> {

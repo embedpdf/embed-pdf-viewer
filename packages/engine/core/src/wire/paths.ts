@@ -93,6 +93,7 @@ import {
   encodeTokenText,
   encodeWidgetAppearancesRenderToken,
   type DownloadToken,
+  type LayoutToken,
   type TokenInput,
 } from './tokens';
 
@@ -167,16 +168,16 @@ export const wirePaths = {
    * transparent retry walks `/head` -> `/manifest@docVersion=N` to learn
    * the new `layoutVersion`.
    */
-  layerLayout: (docId: string, layerName: string, layoutVersion: number, pin: TokenPin) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion, pin)}`,
+  layerLayout: (docId: string, layerName: string, token: LayoutToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(token)}`,
 
   /**
    * Immutable base page-geometry list (plane-scope model): the shared-URL
    * variant a layout-inheriting layer resolves at — every visitor's page
    * list is one CDN object served from the base worker session.
    */
-  docLayout: (docId: string, layoutVersion: number, pin: TokenPin) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(layoutVersion, pin)}`,
+  docLayout: (docId: string, token: LayoutToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(token)}`,
 
   layerLayoutCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout`,
