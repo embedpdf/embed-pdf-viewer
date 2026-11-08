@@ -6,7 +6,6 @@ import {
   DOCS_LANDING,
   LANDING_DEPLOYMENTS,
   LANDING_PRODUCT_PATHS,
-  LANDING_QUICK_STARTS,
 } from './docs-landing';
 import {
   docsEntryHref,
@@ -23,20 +22,7 @@ const { heading, link, list, listItem, paragraph, strong, text } = mdast;
  * content source and cannot drift.
  */
 export function projectDocsLanding(absoluteContentUrl: (url: string) => string): AstNode[] {
-  const nodes: AstNode[] = [
-    paragraph([text(DOCS_LANDING.intro)]),
-    heading(2, DOCS_LANDING.quickStartsLabel),
-    list(
-      LANDING_QUICK_STARTS.map((quickStart) =>
-        listItem([
-          paragraph([
-            link(absoluteContentUrl(quickStart.href), quickStart.title),
-            text(`: ${quickStart.desc} (${quickStart.time})`),
-          ]),
-        ]),
-      ),
-    ),
-  ];
+  const nodes: AstNode[] = [paragraph([text(DOCS_LANDING.intro)])];
 
   for (const path of LANDING_PRODUCT_PATHS) {
     nodes.push(
