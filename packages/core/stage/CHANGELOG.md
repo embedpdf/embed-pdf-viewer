@@ -1,5 +1,11 @@
 # @embedpdf/core-stage
 
+## 3.1.0
+
+### Patch Changes
+
+- [#882](https://github.com/embedpdf/embed-pdf-viewer/pull/882) by [@chahore](https://github.com/chahore) – `itemOfPage()` finds the item holding a page when the layout's groups aren't in page order, as with a reordered set or a subset of a document's pages, in both `linearLayout` and `gridLayout`.
+
 ## 3.0.0
 
 ### Major Changes

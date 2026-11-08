@@ -1,5 +1,16 @@
 # @embedpdf/viewer
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1033](https://github.com/embedpdf/embed-pdf-viewer/pull/1033) by [@bobsingor](https://github.com/bobsingor) – A door can keep a document open under a new `src`: `DoorEngine.follows(opened, next)` says whether `next` names the same document as the one that is open, and the element then keeps it instead of opening it again.
+
+- [#1027](https://github.com/embedpdf/embed-pdf-viewer/pull/1027) by [@bobsingor](https://github.com/bobsingor) – `<embedpdf-viewer>` takes `features`, in its config or as its own property (`element.features`),
+  and follows it while the viewer runs. Measuring, redaction, building forms and snapshots now start
+  off: `features: { measurement: true, redaction: true, 'forms.building': true, snapshots: true }`
+  turns them on. `disable` and `element.disable` are deprecated and go in 4.0.
+
 ## 3.0.0
 
 ### Major Changes

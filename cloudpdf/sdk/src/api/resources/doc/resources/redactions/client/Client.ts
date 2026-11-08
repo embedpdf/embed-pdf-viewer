@@ -63,7 +63,7 @@ export class RedactionsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.0",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
             }),
             requestOptions?.headers,
         );

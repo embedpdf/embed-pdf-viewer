@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1030](https://github.com/embedpdf/embed-pdf-viewer/pull/1030) by [@bobsingor](https://github.com/bobsingor) – `doc.pages.setScale(pages, measure)` sets the scale of many pages in one change, and `page.measure.setScale()` is a one-page change, so a scale change can be undone. `pages.list()` returns each page's measurement viewports, read without loading any page.
+
 ## 3.0.0
 
 ### Major Changes
