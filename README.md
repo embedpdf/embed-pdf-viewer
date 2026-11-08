@@ -27,9 +27,10 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
 
 <!--
   Each card is its own table floated left, so the cards sit side by side on
-  wide screens and stack on phones. The image width (236) sets the card width:
-  keep every text line shorter than it, or the three cards no longer fit in one
-  row at 1280px.
+  wide screens and stack on phones. Between cards, a transparent 1px image
+  floated left makes the gap: GitHub pads img[align=left] 20px on the right. The
+  image width (230) sets the card width: keep every text line shorter than it,
+  or the three cards no longer fit in one row at 1280px.
 -->
 
 <table align="left">
@@ -38,7 +39,7 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
       <a href="https://www.embedpdf.com/docs/viewer/vanilla/quick-start">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/viewer-dark.png">
-          <img alt="The complete viewer: toolbar, thumbnails and a comment on a highlight" src=".github/assets/readme/viewer-light.png" width="236">
+          <img alt="The complete viewer: toolbar, thumbnails and a comment on a highlight" src=".github/assets/readme/viewer-light.png" width="230">
         </picture>
       </a>
       <h3>Viewer</h3>
@@ -48,13 +49,15 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
   </tr>
 </table>
 
+<img align="left" width="1" height="1" alt="" src=".github/assets/readme/gap.png">
+
 <table align="left">
   <tr>
     <td valign="top">
       <a href="https://www.embedpdf.com/docs/headless/react">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/headless-dark.png">
-          <img alt="Your own toolbar, pager and zoom control around a PDF page" src=".github/assets/readme/headless-light.png" width="236">
+          <img alt="Your own toolbar, pager and zoom control around a PDF page" src=".github/assets/readme/headless-light.png" width="230">
         </picture>
       </a>
       <h3>Headless components</h3>
@@ -64,13 +67,15 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
   </tr>
 </table>
 
+<img align="left" width="1" height="1" alt="" src=".github/assets/readme/gap.png">
+
 <table align="left">
   <tr>
     <td valign="top">
       <a href="https://www.embedpdf.com/docs/engine/quick-start">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/engine-dark.png">
-          <img alt="Engine code that opens a PDF, reads its text and renders a page, in the browser or Node.js" src=".github/assets/readme/engine-light.png" width="236">
+          <img alt="Engine code that opens a PDF, reads its text and renders a page, in the browser or Node.js" src=".github/assets/readme/engine-light.png" width="230">
         </picture>
       </a>
       <h3>Engine</h3>
