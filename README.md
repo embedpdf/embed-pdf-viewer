@@ -25,11 +25,72 @@ on PDFium that runs as WebAssembly. Apache-2.0 licensed.
 
 ## Three ways to use it
 
-|                         | What it is                                                                                 | Start here                                                              |
-| :---------------------- | :----------------------------------------------------------------------------------------- | :---------------------------------------------------------------------- |
-| **Viewer**              | A complete viewer, toolbar and panels included: one tag, made yours with plain config      | [Quick start](https://www.embedpdf.com/docs/viewer/vanilla/quick-start) |
-| **Headless components** | The same plugins without the UI, to build your own viewer in React, Vue, Svelte or Angular | [Headless](https://www.embedpdf.com/docs/headless/react)                |
-| **Engine**              | Open, read, change and render PDFs from your own code, in the browser or in Node           | [Engine](https://www.embedpdf.com/docs/engine/quick-start)              |
+<!--
+  Each card is its own table floated left, so the cards sit side by side on
+  wide screens and stack on phones. Between cards, a transparent 1px image
+  floated left makes the gap: GitHub pads img[align=left] 20px on the right. The
+  image width (230) sets the card width: keep every text line shorter than it,
+  or the three cards no longer fit in one row at 1280px. The empty <p> after
+  each link keeps space under it: GitHub drops the margin of a cell's last
+  element.
+-->
+
+<table align="left">
+  <tr>
+    <td valign="top">
+      <a href="https://www.embedpdf.com/docs/viewer/vanilla/quick-start">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/viewer-dark.png">
+          <img alt="The complete viewer: toolbar, thumbnails and a comment on a highlight" src=".github/assets/readme/viewer-light.png" width="230">
+        </picture>
+      </a>
+      <h3>Viewer</h3>
+      <p>A complete viewer, toolbar<br>and panels included: one tag,<br>made yours with plain config.</p>
+      <p><a href="https://www.embedpdf.com/docs/viewer/vanilla/quick-start"><b>Viewer docs →</b></a></p>
+      <p></p>
+    </td>
+  </tr>
+</table>
+
+<img align="left" width="1" height="1" alt="" src=".github/assets/readme/gap.png">
+
+<table align="left">
+  <tr>
+    <td valign="top">
+      <a href="https://www.embedpdf.com/docs/headless/react">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/headless-dark.png">
+          <img alt="Your own toolbar, pager and zoom control around a PDF page" src=".github/assets/readme/headless-light.png" width="230">
+        </picture>
+      </a>
+      <h3>Headless components</h3>
+      <p>The same plugins without the<br>UI, to build your own viewer in<br>React, Vue, Svelte or Angular.</p>
+      <p><a href="https://www.embedpdf.com/docs/headless/react"><b>Headless docs →</b></a></p>
+      <p></p>
+    </td>
+  </tr>
+</table>
+
+<img align="left" width="1" height="1" alt="" src=".github/assets/readme/gap.png">
+
+<table align="left">
+  <tr>
+    <td valign="top">
+      <a href="https://www.embedpdf.com/docs/engine/quick-start">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/engine-dark.png">
+          <img alt="Engine code that opens a PDF, reads its text and renders a page, in the browser or Node.js" src=".github/assets/readme/engine-light.png" width="230">
+        </picture>
+      </a>
+      <h3>Engine</h3>
+      <p>Open, read, change and render<br>PDFs from your own code, in<br>the browser or in Node.</p>
+      <p><a href="https://www.embedpdf.com/docs/engine/quick-start"><b>Engine docs →</b></a></p>
+      <p></p>
+    </td>
+  </tr>
+</table>
+
+<br clear="all">
 
 ## Quick start
 
