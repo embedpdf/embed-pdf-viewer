@@ -109,6 +109,8 @@ export interface ChangeFacts {
   readonly attachments: boolean;
   /** The page order, the pages' rotations, or the page set (`layout_version`). */
   readonly layout: boolean;
+  /** A page's scale, which the layout carries (`viewports_version`). */
+  readonly viewports: boolean;
   /** How the page set changed, in the order the items did it: the commit replays it on `layer_pages`. */
   readonly pageSet: readonly PageSetStep[];
 }
@@ -135,6 +137,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
   let outline = false;
   let attachments = false;
   let layout = false;
+  let viewports = false;
   const pageSetChanged = (
     kind: PageSetStep['kind'],
     pages: readonly { objectNumber: number }[],
@@ -158,6 +161,8 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
       outline = true;
     } else if (item.type.startsWith('attachments.')) {
       attachments = true;
+    } else if (item.type === 'pages.setScale') {
+      viewports = true;
     } else if (item.type.startsWith('pages.')) {
       layout = true;
       if (item.type === 'pages.delete') pageSetChanged('remove', item.pages);
@@ -179,6 +184,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
     outline,
     attachments,
     layout,
+    viewports,
     pageSet,
   };
 }

@@ -76,11 +76,14 @@ export interface ScaleChangeOptions extends OperationOptions {
 export interface PageScale {
   readonly measure: PdfMeasurement | null;
   readonly source: 'owned' | 'foreign' | 'default';
-  /** The page's viewports are known. */
+  /** The page's viewports are known: always, for a page of an open document (its layout carries them). */
   readonly ready: boolean;
   /** The engine can persist a scale into the document. */
   readonly persistent: boolean;
-  /** Why the last read of the page's viewports failed; the last known viewports stay in effect. */
+  /**
+   * Not set: a page's viewports come with its layout, so there is no read of
+   * them to fail. Kept so code written for 3.0 still compiles.
+   */
   readonly error?: SerializedEngineError;
 }
 
@@ -171,13 +174,17 @@ export interface MeasurementCapability extends SettingsApi<MeasurementSettings> 
   // ── twins ──
   /** May write a page scale and calibrate (`doc.annotate.modify`). */
   canCalibrate(): boolean;
-  /** May measure on the page: `annotations:create`, and the page's scale has loaded. */
+  /** May measure on the page: `annotations:create`, and the page is there. */
   canMeasure(page: PageRef | number): boolean;
 
   // ── reading ──
   /** The resolved scale, its source and readiness. Reference-stable while unchanged. */
   getPageScale(page: PageRef | number): PageScale;
-  /** Load the page's viewports. Resolves at once when already known. Rejects `not-found`. */
+  /**
+   * Resolves at once for a page that is there: its layout carries its
+   * viewports. Rejects `not-found` for one that isn't. Kept from 3.0, when
+   * a page's viewports were read on their own.
+   */
   ensureLoaded(page: PageRef | number, options?: OperationOptions): Promise<void>;
   /** A scale change is in flight. */
   isBusy(): boolean;

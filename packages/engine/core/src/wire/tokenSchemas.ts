@@ -9,7 +9,7 @@ export const ContentTokenSchema = {
 } as const satisfies TokenSchema;
 
 export const LayoutTokenSchema = {
-  fields: ['engine', 'layoutVersion', 'shape'],
+  fields: ['engine', 'layoutVersion', 'shape', 'viewportsVersion'],
 } as const satisfies TokenSchema;
 
 export const MetadataTokenSchema = {

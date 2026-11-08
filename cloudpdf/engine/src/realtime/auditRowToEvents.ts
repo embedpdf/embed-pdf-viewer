@@ -32,7 +32,6 @@ import {
   type CustomMetadataUpdateResult,
   type PageFlattenResult,
   type PageReorderResult,
-  type PageScaleResult,
   type RedactionApplyResult,
   type FormFieldRef,
   type SignatureCompleteResult,
@@ -174,8 +173,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
 
   switch (row.kind) {
-    case 'measure.setScale':
-      return { type: 'pages.scaleSet', origin, ...(row.payload as PageScaleResult) };
+    case 'measure.setScale': {
+      const result = row.payload as Extract<DocumentEvent, { type: 'pages.scaleSet' }>;
+      // A row written before a scale carried the layout has nothing to fold.
+      if (!result.layout) return null;
+      return { ...result, type: 'pages.scaleSet', origin };
+    }
     case 'annot.create':
       return {
         type: 'annotations.created',

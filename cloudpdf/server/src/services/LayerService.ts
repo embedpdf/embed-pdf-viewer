@@ -408,6 +408,7 @@ export class LayerService {
             outlineVersion: base.outlineVersion,
             fontsVersion: base.fontsVersion,
             contentsVersion: base.contentsVersion,
+            viewportsVersion: base.viewportsVersion,
           }
         : {}),
     });
@@ -571,11 +572,7 @@ export class LayerService {
     );
   }
 
-  /**
-   * Register/rename a `/Names /Pages` entry. Named pages are layout, so this
-   * persists exactly like a page move: a new layer artifact, doc_version +
-   * layout_version advance, `layer_pages` rows untouched.
-   */
+  /** A page's scale (`PUT …/pages/:pageKey/scale`). */
   async setPageScale(
     ctx: LayerWriteContext,
     input: {
@@ -586,39 +583,27 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageScaleResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.runLayerWrite(
-          input.docId,
-          (jobId: WorkerJobId) =>
-            wirePack({
-              kind: 'measure.setScale' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              page: toPageRef(input.pageObjectNumber),
-              measure: input.measure,
-              artifactPath,
-            }),
-          signal,
-        );
-        if (payload.tag !== 'measure.setScale')
-          throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
-        // The artifact/docVersion advances. Calibration changes no pixels or annotation indices.
-        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
-          auditKind: 'measure.setScale',
-          touchedPages: [],
-          result: payload.result,
-          artifact: requireLayerArtifact(payload),
-        });
-      });
-    });
+    // A one-page `pages.setScale` change, as every scale write is: the
+    // layout's scales pin moves with it, and its opId undoes it.
+    return this.applySingleOp<PageScaleResult>(
+      ctx,
+      input,
+      {
+        type: 'pages.setScale',
+        pages: [toPageRef(input.pageObjectNumber)],
+        measure: input.measure,
+      },
+      checkedAuthority(),
+      'measure.setScale',
+      signal,
+    );
   }
 
+  /**
+   * Register/rename a `/Names /Pages` entry. Named pages are layout, so this
+   * persists exactly like a page move: a new layer artifact, doc_version +
+   * layout_version advance, `layer_pages` rows untouched.
+   */
   async setPageName(
     ctx: LayerWriteContext,
     input: {
@@ -1434,7 +1419,7 @@ export class LayerService {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
-        // A form write moves the form's pins; a calibration its pages' annotations.
+        // A form write moves the form's pins.
         const formWrite = input.kind.startsWith('form.');
         const nextPages: DurablePageRow[] = [];
         for (const pageObjectNumber of input.touchedPages) {
@@ -1913,6 +1898,9 @@ export class LayerService {
           if (bumped.versions.layout_version !== undefined) {
             cacheDelta = { ...cacheDelta, layoutVersion: bumped.versions.layout_version };
           }
+          if (bumped.versions.viewports_version !== undefined) {
+            cacheDelta = { ...cacheDelta, viewportsVersion: bumped.versions.viewports_version };
+          }
           const artifactFields = {
             layer,
             nextVersion,
@@ -2058,6 +2046,7 @@ export class LayerService {
       layout_version?: number;
       fonts_version?: number;
       contents_version?: number;
+      viewports_version?: number;
     };
     pages: DurablePageRow[];
   }> {
@@ -2073,6 +2062,7 @@ export class LayerService {
         'layout_version',
         'fonts_version',
         'contents_version',
+        'viewports_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
@@ -2120,6 +2110,9 @@ export class LayerService {
           ? { attachments_version: Number(current.attachments_version) + 1 }
           : {}),
         ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
+        ...(facts.viewports
+          ? { viewports_version: Number(current.viewports_version ?? 1) + 1 }
+          : {}),
         ...(written.fonts ? { fonts_version: Number(current.fonts_version ?? 1) + 1 } : {}),
         // A page that came or went changes the document's contents.
         ...(facts.pageSet.some((step) => step.pages.length > 0)
@@ -3816,6 +3809,7 @@ export class LayerService {
           // A signature's appearance may draw with a font of its own.
           fontsVersion: layer.fontsVersion + 1,
           contentsVersion: layer.contentsVersion,
+          viewportsVersion: layer.viewportsVersion,
           createdAt: now,
         });
 
@@ -3941,6 +3935,7 @@ export class LayerService {
       outline_version?: number;
       fonts_version?: number;
       contents_version?: number;
+      viewports_version?: number;
     },
     lastAuditId: number,
     now: number,

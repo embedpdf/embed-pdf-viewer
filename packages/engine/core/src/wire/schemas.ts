@@ -66,7 +66,7 @@ import {
   WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
-import { PdfMeasurementSchema } from '../dto/Measure.schema';
+import { PageMeasurementViewportSchema, PdfMeasurementSchema } from '../dto/Measure.schema';
 import {
   PageBoxSchema,
   PageQuadSchema,
@@ -598,6 +598,8 @@ export const DocumentManifestSchema = z.object({
   annotationsVersion: z.number().int().positive().default(1),
   formsVersion: z.number().int().positive().default(1),
   outlineVersion: z.number().int().positive().default(1),
+  // Absent from a server without it: its layout has no viewports (see DocumentManifest).
+  viewportsVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().default(1),
   contentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
@@ -1096,6 +1098,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   metadataVersion: z.number().int().positive().optional(),
   attachmentsVersion: z.number().int().positive().optional(),
   outlineVersion: z.number().int().positive().optional(),
+  viewportsVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().optional(),
   contentsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
@@ -1448,6 +1451,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   boxes: PageBoxesSchema,
   pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
+  viewports: z.array(PageMeasurementViewportSchema).optional(),
 });
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
@@ -1673,6 +1677,15 @@ export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
   labels: z.array(PageLabelSectionSchema),
   namedPages: z.array(NamedPageEntrySchema),
 });
+
+/**
+ * The page list and the viewport, named once: every page op's answer, a
+ * scale's and a page name's carry the whole list, like `OutlineWireComponents`.
+ */
+export const PageWireComponents = {
+  PageListSnapshot: PageListSnapshotSchema,
+  PageMeasurementViewport: PageMeasurementViewportSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /** `pages.setName` input — see `PageNameInput`. */
 export const PageNameInputSchema: z.ZodType<PageNameInput> = z.object({
@@ -2321,5 +2334,6 @@ export { DigestAlgorithmSchema, ModificationLevelSchema };
 
 export const PageScaleResultSchema = z.object({
   page: PageRefSchema,
+  layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
 });

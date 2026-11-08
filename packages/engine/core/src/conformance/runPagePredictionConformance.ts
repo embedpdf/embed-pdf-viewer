@@ -4,6 +4,7 @@ import type { PageLayout } from '../dto/PageLayout';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { toPageRef, type PageRef } from '../identity/PageRef';
+import { measureFromKnownLength } from '../measure/calibrate';
 import {
   pagesAfter,
   pagesAfterRestore,
@@ -11,6 +12,7 @@ import {
   reorderBackOf,
   restoredPagesOf,
   rotateBackOf,
+  scaleBackOf,
   type PageList,
   type PredictablePageOp,
 } from '../pages/predict';
@@ -59,6 +61,18 @@ const CASES: readonly PredictionCase[] = [
   {
     name: 'rotate a page to the turn it has',
     op: (pages) => ({ type: 'pages.rotate', pages: at(pages, 0), rotation: pages[0]!.rotation }),
+  },
+  {
+    name: 'set the scale of two pages',
+    op: (pages) => ({
+      type: 'pages.setScale',
+      pages: at(pages, 1, 2),
+      measure: measureFromKnownLength(72, { value: 2, unit: 'm' }),
+    }),
+  },
+  {
+    name: 'remove the scale of a page without one',
+    op: (pages) => ({ type: 'pages.setScale', pages: at(pages, 0), measure: null }),
   },
   {
     name: 'move pages after a neighbour, in the order given',
@@ -260,6 +274,8 @@ function undoneOf(before: PageList, after: PageList, op: PredictablePageOp): Pag
   switch (op.type) {
     case 'pages.rotate':
       return rotateBackOf(before.pages, op.pages).reduce<PageList>(pagesAfter, after);
+    case 'pages.setScale':
+      return scaleBackOf(before.pages, op.pages).reduce<PageList>(pagesAfter, after);
     case 'pages.reorder':
       return pagesRelabelled(
         reorderBackOf(before.pages, op.pages).reduce<PageList>(pagesAfter, after),

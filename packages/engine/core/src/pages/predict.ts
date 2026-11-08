@@ -13,11 +13,13 @@
  * `./labels`, and each page's label is read from them (`labelAt`).
  */
 import type { PageLabelSection } from '../dto/PageLabelSection';
+import type { PdfMeasure } from '../dto/Measure';
 import type { PageLayout } from '../dto/PageLayout';
 import type { PdfRotation } from '../geometry/primitives';
 import { encodePageKey, toPageRef, type PageRef } from '../identity/PageRef';
 import type { ChangeOp } from '../mutation/Change';
 import { positionIndex, reorderedList, type PagePosition } from '../mutation/ListPosition';
+import { viewportsWithScale } from '../measure/viewport';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import {
   labelAt,
@@ -41,7 +43,12 @@ export interface PageList {
  * when they name their pages (`objectNumbers`).
  */
 export type PredictablePageOp = PageOp<
-  'pages.rotate' | 'pages.reorder' | 'pages.delete' | 'pages.insertBlank' | 'pages.copy'
+  | 'pages.rotate'
+  | 'pages.setScale'
+  | 'pages.reorder'
+  | 'pages.delete'
+  | 'pages.insertBlank'
+  | 'pages.copy'
 >;
 
 /** A page a delete took, as undoing the delete brings it back. */
@@ -62,6 +69,8 @@ export function pagesAfter(list: PageList, op: PredictablePageOp): PageList {
   switch (op.type) {
     case 'pages.rotate':
       return pagesAfterRotate(list, op.pages, op.rotation);
+    case 'pages.setScale':
+      return pagesAfterScale(list, op.pages, op.measure);
     case 'pages.reorder':
       return pagesAfterReorder(list, op.pages, op.position);
     case 'pages.delete':
@@ -154,6 +163,38 @@ export function rotateBackOf(
   }));
 }
 
+/**
+ * The ops that put each of `refs` back to its own scale in `pages` (the
+ * measure of the last viewport the engine owns, or none): what undoes a
+ * scale change. Pages with the same scale go together.
+ */
+export function scaleBackOf(
+  pages: readonly PageLayout[],
+  refs: readonly PageRef[],
+): PageOp<'pages.setScale'>[] {
+  const scales = new Map(pages.map((page) => [keyOf(page), ownScaleOf(page)]));
+  const groups = new Map<string, { measure: PdfMeasure | null; pages: PageRef[] }>();
+  for (const ref of refs) {
+    const measure = scales.get(encodePageKey(ref));
+    if (measure === undefined) continue;
+    const key = JSON.stringify(measure);
+    const group = groups.get(key) ?? { measure, pages: [] };
+    group.pages.push(ref);
+    groups.set(key, group);
+  }
+  return [...groups.values()].map(({ measure, pages: group }) => ({
+    type: 'pages.setScale',
+    pages: group,
+    measure,
+  }));
+}
+
+/** The scale of the last viewport the engine owns on `page`, or `null`. */
+function ownScaleOf(page: PageLayout): PdfMeasure | null {
+  const own = (page.viewports ?? []).filter((viewport) => viewport.owned).pop();
+  return own?.measure?.subtype === 'rectilinear' ? own.measure : null;
+}
+
 /* ── the ops ────────────────────────────────────────────────────────────── */
 
 function pagesAfterRotate(
@@ -170,6 +211,23 @@ function pagesAfterRotate(
     return { ...page, rotation };
   });
   return changed ? { pages, labels: list.labels } : list;
+}
+
+function pagesAfterScale(
+  list: PageList,
+  refs: readonly PageRef[],
+  measure: PdfMeasure | null,
+): PageList {
+  if (!namesPagesOnce(list.pages, refs)) return list;
+  const scaling = new Set(refs.map(encodePageKey));
+  const pages = list.pages.map((page) => {
+    if (!scaling.has(keyOf(page))) return page;
+    const { viewports: before, ...rest } = page;
+    const viewports = viewportsWithScale(before ?? [], page.size, measure);
+    // As the layout reads: a page without viewports leaves them out.
+    return viewports.length ? { ...rest, viewports } : rest;
+  });
+  return { pages, labels: list.labels };
 }
 
 function pagesAfterReorder(

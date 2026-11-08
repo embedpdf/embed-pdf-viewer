@@ -423,6 +423,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       (signal) => this.pageReads.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
       () => this.cloudSecurity.pagePictureRights(),
+      (pages, measure, options) => this.pages.setScale(pages, measure, options),
     );
   }
 
@@ -590,6 +591,9 @@ export class CloudDocumentHandle implements DocumentHandle {
       ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
       ...(delta?.fontsVersion !== undefined ? { fontsVersion: delta.fontsVersion } : {}),
       ...(delta?.contentsVersion !== undefined ? { contentsVersion: delta.contentsVersion } : {}),
+      ...(delta?.viewportsVersion !== undefined
+        ? { viewportsVersion: delta.viewportsVersion }
+        : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),
@@ -825,7 +829,8 @@ export class CloudDocumentHandle implements DocumentHandle {
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
       case 'pages.scaleSet':
-        this.absorbMutation(event.meta, []);
+        // The layout carries the pages' scales.
+        this.absorbMutation(event.meta, ['layout']);
         return;
       case 'annotations.created':
       case 'annotations.updated':

@@ -46,6 +46,7 @@ import type { PageInsertResult } from './PageInsertResult';
 import type { PageReorderResult } from './PageReorderResult';
 import type { PageRestoreResult } from './PageRestoreResult';
 import type { PageRotateResult } from './PageRotateResult';
+import type { PageScaleResult } from './PageScaleResult';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationActor } from '../auth/scope/types';
@@ -60,6 +61,7 @@ import {
 import type { AttachmentFileBase, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { OutlineItemDraft, OutlineItemPatch } from '../dto/DocumentOutline';
+import type { PdfMeasure } from '../dto/Measure';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
@@ -268,6 +270,17 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly type: 'pages.rotate';
       readonly pages: readonly PageRef[];
       readonly rotation: PdfRotation;
+    }
+  | {
+      /**
+       * Every page gets `measure` as its own scale: the one viewport the
+       * engine writes, over the visible page. `null` removes it. Other
+       * viewports stay as they are. `measure` is in page space (its origin):
+       * each page takes it on its own visible box.
+       */
+      readonly type: 'pages.setScale';
+      readonly pages: readonly PageRef[];
+      readonly measure: PdfMeasure | null;
     }
   | {
       /** The pages go together, in the order given, to `position`. */
@@ -493,6 +506,12 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
       pages: PageRef[];
       rotation: PdfRotation;
     } & PageRotateResult<C>)
+  | ({
+      type: 'pages.setScale';
+      /** The pages, and the scale each has now. */
+      pages: PageRef[];
+      measure: PdfMeasure | null;
+    } & PageScaleResult<C>)
   | ({ type: 'pages.reorder' } & PageReorderResult<C>)
   | ({
       type: 'pages.delete';

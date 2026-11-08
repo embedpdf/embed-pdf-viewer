@@ -41,6 +41,7 @@ import {
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { ActionReadBudgetTracker, readActionModel } from '../actions/ActionModelReader';
+import { readViewports } from '../measure/internal/readViewports';
 import { readLabelSections } from './internal/pageLabels';
 
 // EPDF_PAGE_BOX_TYPE (public/fpdfview.h).
@@ -52,8 +53,9 @@ const BOX_ART = 4;
 
 /**
  * Runtime-agnostic page geometry reader. Produces the `pages.list()`
- * snapshot from the lightweight `...ByIndex` PDFium bindings, none of which
- * load or parse a page (no `pagePtr`), so listing stays cheap. Shared
+ * snapshot from the lightweight `...ByIndex` PDFium bindings and the raw
+ * viewport ones, none of which load or parse a page (no `pagePtr`), so
+ * listing stays cheap. Shared
  * verbatim by the local WASM worker and the server native worker, so a
  * given PDF yields an identical `PageListSnapshot` on both engines.
  */
@@ -80,6 +82,7 @@ export class PagesReader {
           throwIfAborted(signal);
           const index = record.pageIndex;
           const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
+          const viewports = readViewports(fn, mem, docPtr, index);
           const boxes = readBoxes(fn, mem, docPtr, index, rectPtr);
           return {
             index,
@@ -92,6 +95,7 @@ export class PagesReader {
             boxes,
             pdfCropBox: boxes.crop,
             ...(actions ? { actions } : {}),
+            ...(viewports.length ? { viewports } : {}),
           };
         });
         return {

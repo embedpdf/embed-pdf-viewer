@@ -11,6 +11,7 @@ export interface CacheDelta {
     metadataVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
     outlineVersion?: number | undefined;
+    viewportsVersion?: number | undefined;
     fontsVersion?: number | undefined;
     contentsVersion?: number | undefined;
     layerVersion?: number | undefined;

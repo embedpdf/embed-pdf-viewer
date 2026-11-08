@@ -1275,7 +1275,7 @@ describe('distance authoring and recalibration', () => {
     harness.capability.createPointer('calibrate', 'down', PAGE, { x: 20, y: 20 });
     expect(harness.model().draft).toBeNull();
   });
-  it('reports locked, foreign, unauthorized and failed annotations independently', async () => {
+  it('stages the updates it can make and reports what it leaves alone, and why', async () => {
     const harness = createHarness();
     const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
     const scale = measureFromKnownLength(100, { value: 2, unit: 'm' });
@@ -1302,18 +1302,16 @@ describe('distance authoring and recalibration', () => {
     harness.allowsAnnotationMutation.mockImplementation(
       (_action, target) => target.userId !== 'other',
     );
-    harness.update.mockImplementation(async (ref: AnnotationRef) => {
-      if (ref.kind === 'objectNumber' && ref.objectNumber === 84) throw new Error('write failed');
-      return { annotation: dtos[0], appearance: { changed: true } };
-    });
-    const report = await harness.capability.remeasurePage(PAGE, scale);
-    expect(report.updated).toEqual([ref(80)]);
+    await harness.capability.whenRemeasurable();
+    // Staged at once, so a calibration's group takes the updates into its one change.
+    const report = harness.capability.stageRemeasure(PAGE, scale);
+    expect(report.updated).toEqual([ref(80), ref(84)]);
     expect(report.skipped).toEqual([
       { ref: ref(81), reason: 'locked' },
       { ref: ref(82), reason: 'foreign-measure' },
       { ref: ref(83), reason: 'no-authority' },
     ]);
-    expect(report.failed).toMatchObject([{ ref: ref(84), error: { message: 'write failed' } }]);
+    expect(report.failed).toEqual([]);
   });
 });
 

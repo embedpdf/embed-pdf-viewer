@@ -85,11 +85,6 @@ export function MeasurementSection() {
         <span className="text-fg-muted">{t('measurement.scale')}: </span>
         <strong>{rectilinear?.ratio ?? t('measurement.unavailable')}</strong>
       </div>
-      {scale?.error && (
-        <p role="alert" className="text-red-600">
-          {scale.error.message}
-        </p>
-      )}
       {scale && !scale.persistent && scale.ready && (
         <p className="text-fg-muted">{t('measurement.sessionOnly')}</p>
       )}

@@ -1881,7 +1881,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
   | ({
       tag: 'measure.setScale';
-      result: PageScaleResult;
+      result: PageScaleResult<C>;
     } & WritePayloadFacts)
   | { tag: 'pieceInfo.read'; snapshot: PieceInfoSnapshot | null }
   | ({

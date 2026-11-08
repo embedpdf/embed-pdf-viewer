@@ -11,6 +11,32 @@ describe("PagesClient", () => {
         const rawRequestBody = {};
         const rawResponseBody = {
             page: { kind: "objectNumber", objectNumber: 1 },
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1,
+                        userUnit: 1.1,
+                        tabOrder: null,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                labels: [{ firstPage: 1, style: null, firstNumber: 1, prefix: "prefix" }],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
@@ -22,6 +48,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
                     contentsVersion: 1,
                     layerVersion: 1,
@@ -184,6 +211,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
                     contentsVersion: 1,
                     layerVersion: 1,
@@ -318,6 +346,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
                     contentsVersion: 1,
                     layerVersion: 1,
@@ -452,6 +481,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
                     contentsVersion: 1,
                     layerVersion: 1,

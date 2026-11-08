@@ -282,6 +282,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       this.doc.imageEncoder,
       this.guard,
       this.doc.publisher,
+      (pages, measure, options) => this.pages.setScale(pages, measure, options),
       this.doc.renderPolicy,
     );
   }

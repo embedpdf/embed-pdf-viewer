@@ -221,6 +221,29 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       await doc.close();
     }
   });
+  test('the layout carries the viewports listViewports reads, and none for a page without', async () => {
+    const plain = await open();
+    try {
+      expect((await plain.pages.list()).pages[0]).not.toHaveProperty('viewports');
+    } finally {
+      await plain.close();
+    }
+    const doc = await open(
+      pdf(
+        '/VP [<< /Type /Viewport /Name (Foreign) /BBox [0 0 10 10] /Measure << /Subtype /GEO >> >>]',
+      ),
+    );
+    try {
+      const page = doc.page(toPageRef(3));
+      await page.measure.setScale(scale);
+      const { viewports } = await page.measure.listViewports();
+      expect(viewports).toHaveLength(2);
+      expect((await doc.pages.list()).pages[0].viewports).toEqual(viewports);
+    } finally {
+      await doc.close();
+    }
+  });
+
   test('float32 preview matches commit, reopen and style-only update', async () => {
     let doc = await open();
     try {

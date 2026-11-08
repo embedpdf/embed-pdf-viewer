@@ -86,7 +86,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
   const render = createRenderReads(ctx, services, ghost, stamps);
   const icons = createIcons(ctx, services, stamps);
   const selection = createSelectionWrites(ctx, services, annotations, properties, chrome, text);
-  const measurement = createMeasurement(ctx, services, crud);
+  const measurement = createMeasurement(ctx, services);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(ctx, services, annotations);
   const markup = createMarkupWrites(ctx, services, annotations);

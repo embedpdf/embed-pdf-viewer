@@ -1,23 +1,17 @@
 /**
- * The pages' viewports: a page mirror re-read whenever a confirmed
- * `pages.scaleSet` names a loaded page, from this session or another
- * (stream gaps and version moves re-read every loaded page). Its `onChanged`
- * callback tells the annotation plugin a page's viewports, and a new
- * `defaultScale` setting tells it again. `connect` loads every page in the
- * registry, including pages inserted later.
+ * The pages' viewports. Each page's layout carries them
+ * (`PageLayout.viewports`), and the page list keeps them current: a scale
+ * change's own prediction, its event from this session or another, a page
+ * insert or delete. Where the engine can't keep a scale, the session keeps
+ * its own (`localViewports`). `connect` hands the annotation plugin each
+ * page's viewports, again whenever a page's viewports change, and for every page on a
+ * new `defaultScale` setting.
  */
-import {
-  PluginError,
-  memoByKey,
-  toPageRef,
-  type OperationOptions,
-  type PageInfo,
-} from '@embedpdf/core';
-import { serializeError } from '@embedpdf/engine-core/runtime';
+import { PluginError, memoByKey, toPageRef, type PageInfo } from '@embedpdf/core';
 import type { PageMeasurementViewport, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { PageScale } from '../contract';
-import { clearLoadError, pageScaleOf, recordLoadError } from '../model';
+import { selectPageScale } from '../model';
 import { defaultMeasure } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
 
@@ -29,6 +23,8 @@ const NO_PAGE: PageScale = Object.freeze({
   persistent: false,
 });
 
+const NO_VIEWPORTS: readonly PageMeasurementViewport[] = Object.freeze([]);
+
 export function createViewportSync(
   ctx: MeasurementContext,
   { siblings }: Pick<MeasurementServices, 'siblings'>,
@@ -36,61 +32,31 @@ export function createViewportSync(
   const { annotation } = siblings;
   const settings = ctx.settings();
   /** The scale of a page without one: the `defaultScale` setting, in the page's user unit. */
-  const fallbackOf = (layout: PageInfo | null) =>
-    defaultMeasure(settings.get().defaultScale, layout?.userUnit ?? 1);
-
-  const viewports = ctx.pageMirror<readonly PageMeasurementViewport[]>({
-    name: 'viewports',
-    load: async (doc, page, signal) => {
-      ctx.assertPageRef(page);
-      const service = doc.page(page).measure;
-      // Without a page measure service, scales live for the session only.
-      if (!service) return ctx.state.get().localViewports[page.objectNumber] ?? [];
-      try {
-        return (await service.listViewports()).viewports;
-      } catch (error) {
-        // A read the closing document cut short is no page's error, and there's no state left.
-        if (!signal.aborted) {
-          ctx.state.update(recordLoadError, page.objectNumber, serializeError(error));
-        }
-        throw error;
-      }
-    },
-    affected: (event) => (event.type === 'pages.scaleSet' ? [event.page] : null),
-    onChanged: ({ page, cause, next }) => {
-      if (cause === 'drop' || next === undefined) return;
-      ctx.state.update(clearLoadError, page.objectNumber);
-      const layout = ctx.getPage(page);
-      if (layout) annotation.setPageViewports(page, [...next], fallbackOf(layout));
-    },
-  });
+  const fallbackOf = (layout: PageInfo) =>
+    defaultMeasure(settings.get().defaultScale, layout.userUnit);
 
   /** The engine can persist a scale into the document. */
   const isPersistent = (page: PageRef): boolean => ctx.doc.page(page).measure !== undefined;
 
-  /** The page's public scale, the same object until its viewports, read state or layout change. */
+  /** A page's viewports: its layout's, or the session's own where the engine keeps none. */
+  const viewportsOf = (layout: PageInfo): readonly PageMeasurementViewport[] =>
+    isPersistent(layout.ref)
+      ? (layout.viewports ?? NO_VIEWPORTS)
+      : (ctx.state.get().localViewports[layout.ref.objectNumber] ?? NO_VIEWPORTS);
+
+  /** The page's public scale, the same object until its layout, viewports or the default change. */
   const scaleOfPage = memoByKey(
     (pageObjectNumber: number) => {
-      const page = toPageRef(pageObjectNumber);
-      const layout = ctx.getPage(page);
+      const layout = ctx.getPage(toPageRef(pageObjectNumber));
       return [
-        viewports.get(page),
-        viewports.getStatus(page),
-        ctx.state.get().loadErrors[pageObjectNumber],
         layout,
-        layout ? isPersistent(page) : false,
+        layout ? viewportsOf(layout) : NO_VIEWPORTS,
+        layout ? isPersistent(layout.ref) : false,
         settings.get().defaultScale,
       ] as const;
     },
-    (_pageObjectNumber, pageViewports, status, error, layout, persistent): PageScale =>
-      pageScaleOf({
-        viewports: pageViewports,
-        status,
-        error,
-        size: layout?.size,
-        fallback: fallbackOf(layout),
-        persistent,
-      }),
+    (_pageObjectNumber, layout, viewports, persistent): PageScale =>
+      layout ? selectPageScale(viewports, layout.size, fallbackOf(layout), persistent) : NO_PAGE,
   );
   /** A page's scale, by ref or index; a page that isn't there has none, and isn't ready. */
   const scaleOf = (page: PageRef | number): PageScale => {
@@ -99,42 +65,35 @@ export function createViewportSync(
     return layout ? scaleOfPage(layout.ref.objectNumber) : NO_PAGE;
   };
 
-  const ensureLoaded = (page: PageRef | number, options?: OperationOptions): Promise<void> => {
-    const layout = ctx.getPage(page);
-    if (!layout) {
-      return Promise.reject(new PluginError('not-found', 'measurement', 'no such page'));
-    }
-    return ctx.cancellable(options?.signal, viewports.ensureLoaded(layout.ref));
-  };
+  /** A page's scale is known as soon as the page is: its layout carries it. */
+  const ensureLoaded = (page: PageRef | number): Promise<void> =>
+    ctx.getPage(page)
+      ? Promise.resolve()
+      : Promise.reject(new PluginError('not-found', 'measurement', 'no such page'));
 
   const connect = (): void => {
-    const hydrate = (layouts: readonly PageInfo[] | undefined) => {
-      for (const layout of layouts ?? []) {
-        if (viewports.getStatus(layout.ref) !== 'idle') continue;
-        void viewports.ensureLoaded(layout.ref).catch(() => {
-          /* reported through getPageScale(page).error */
-        });
-      }
+    /** What the annotation plugin was last told, by page: the same array isn't told again. */
+    const told = new Map<number, readonly PageMeasurementViewport[]>();
+    const tell = (layout: PageInfo, always = false) => {
+      const viewports = viewportsOf(layout);
+      if (!always && told.get(layout.ref.objectNumber) === viewports) return;
+      told.set(layout.ref.objectNumber, viewports);
+      annotation.setPageViewports(layout.ref, [...viewports], fallbackOf(layout));
     };
-    hydrate(ctx.document()?.pages);
-    ctx.watch(() => ctx.document()?.pages, hydrate);
+    const tellChanged = () => {
+      for (const layout of ctx.document()?.pages ?? []) tell(layout);
+    };
+    tellChanged();
+    ctx.watch(() => ctx.document()?.pages, tellChanged);
+    ctx.watch(() => ctx.state.get().localViewports, tellChanged);
     // A new default scale reaches the pages without one: the annotation
     // plugin measures new drawings on them with it.
     ctx.listen(settings.api.onSettingsChanged, ({ changedKeys }) => {
       if (!changedKeys.includes('defaultScale')) return;
-      for (const layout of ctx.document()?.pages ?? []) {
-        const known = viewports.get(layout.ref);
-        if (known) annotation.setPageViewports(layout.ref, [...known], fallbackOf(layout));
-      }
+      for (const layout of ctx.document()?.pages ?? []) tell(layout, true);
     });
   };
 
-  return {
-    ensureLoaded,
-    scaleOf,
-    /** Re-read one page; for session-only scales, which no engine event announces. */
-    refresh: (page: PageRef) => viewports.refresh(page),
-    connect,
-  };
+  return { ensureLoaded, scaleOf, isPersistent, connect };
 }
 export type MeasurementViewportSync = ReturnType<typeof createViewportSync>;

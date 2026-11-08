@@ -1,5 +1,6 @@
 import type { PageCoordinates, PdfCoordinates } from './coordinates';
 import { mapPageActions, pageDestinationOf, type VisibleBoxOf } from './destinations';
+import { pageViewportsOf } from './measure';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import { EngineError } from '../errors/EngineError';
@@ -24,13 +25,14 @@ export function pageSpaceBoxesOf(boxes: PageBoxes<PdfCoordinates>): PageBoxes<Pa
 
 /**
  * A page's layout in page space. Its actions may go to other pages, so each
- * destination is measured with `boxOf`, the box of the page it goes to.
+ * destination is measured with `boxOf`, the box of the page it goes to; its
+ * viewports are on the page itself.
  */
 export function pageLayoutOf(
   layout: PageLayout<PdfCoordinates>,
   boxOf: VisibleBoxOf,
 ): PageLayout<PageCoordinates> {
-  const { actions, ...rest } = layout;
+  const { actions, viewports, ...rest } = layout;
   return {
     ...rest,
     boxes: pageSpaceBoxesOf(layout.boxes),
@@ -39,6 +41,7 @@ export function pageLayoutOf(
           actions: mapPageActions(actions, (destination) => pageDestinationOf(destination, boxOf)),
         }
       : {}),
+    ...(viewports ? { viewports: pageViewportsOf(viewports, layout.boxes.crop) } : {}),
   };
 }
 

@@ -331,6 +331,7 @@ describe("DocClient", () => {
             annotationsVersion: 1,
             formsVersion: 1,
             outlineVersion: 1,
+            viewportsVersion: 1,
             fontsVersion: 1,
             contentsVersion: 1,
             auditHead: 1,

@@ -5,8 +5,15 @@ import type { Change, ChangeItem, ChangeOp, ChangeResult } from '../mutation/Cha
 import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
-/** The verbs of `doc.pages` that change the page structure: each one op of a change. */
-export type PageStructureVerb = 'reorder' | 'rotate' | 'delete' | 'insert' | 'insertBlank' | 'copy';
+/** The verbs of `doc.pages` that are each one op of a change. */
+export type PageStructureVerb =
+  | 'reorder'
+  | 'rotate'
+  | 'setScale'
+  | 'delete'
+  | 'insert'
+  | 'insertBlank'
+  | 'copy';
 
 /** The ops the structure verbs make. */
 type PageOpType = Extract<ChangeOp['type'], `pages.${string}`>;
@@ -54,6 +61,12 @@ export function pageVerbs(
       })),
     rotate: (pages, rotation, options) =>
       one({ type: 'pages.rotate', pages, rotation }, options, (item) => ({
+        layout: item.layout,
+        meta: item.meta,
+      })),
+    setScale: (pages, measure, options) =>
+      one({ type: 'pages.setScale', pages, measure }, options, (item) => ({
+        page: item.page,
         layout: item.layout,
         meta: item.meta,
       })),
