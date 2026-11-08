@@ -19,7 +19,7 @@ const { token } = await cloudpdf.tokens.issue({
   sub: user.id,
   identity: { displayName: user.name },
   scope: permissions.comment,
-  expiresIn: 3600,
+  expiresInSeconds: 3600,
 });
 ```
 
@@ -33,7 +33,7 @@ on. [Add PDFs to your app](/docs/platform/quick-start/app) puts this in a route 
 | `docId` | Which document | Required |
 | `sub` | Who the user is in your app: their id | Required |
 | `scope` | What they can do: a [level](/docs/platform/grants/permissions), plus Download, Print or Copy text | Required |
-| `expiresIn` | How long the token works, in seconds: a minute to 90 days | Required |
+| `expiresInSeconds` | How long the token works: a minute to 90 days | Required |
 | `identity` | Their name and details, below | |
 | `origins` | The websites the token works on, such as `['https://app.fernquill.example']` | |
 | `layerName` | Which copy of the document their changes go into, below | |
@@ -67,7 +67,7 @@ const { token } = await cloudpdf.tokens.issue({
   identity: { displayName: user.name },
   scope: permissions.fillAndSign,
   layerName: `applicant-${user.id}`,
-  expiresIn: 3600,
+  expiresInSeconds: 3600,
 });
 ```
 
@@ -76,7 +76,7 @@ or one to each team.
 
 ## When it runs out
 
-A token works for `expiresIn` seconds. Give the viewer a function instead of a string, and it asks
+A token works for `expiresInSeconds`. Give the viewer a function instead of a string, and it asks
 your server for a new token before the old one runs out, so nobody notices:
 
 ```tsx

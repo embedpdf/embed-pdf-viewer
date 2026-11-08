@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     sub: user.id,
     identity: { displayName: user.name },
     scope: permissions.comment,
-    expiresIn: 3600,
+    expiresInSeconds: 3600,
   });
   return new Response(token);
 }
@@ -167,7 +167,7 @@ pdfToken.get('/api/pdf-token', async (req, res) => {
     sub: req.user.id,
     identity: { displayName: req.user.name },
     scope: permissions.comment,
-    expiresIn: 3600,
+    expiresInSeconds: 3600,
   });
   res.type('text/plain').send(token);
 });
@@ -182,7 +182,7 @@ pdfToken.get('/api/pdf-token', async (req, res) => {
 | `sub` | Who the user is, in your app: their id |
 | `identity.displayName` | Their name, shown on what they add, such as a comment |
 | `scope` | What they can do |
-| `expiresIn` | How long the token works, in seconds. The viewer asks for a new one when it runs out |
+| `expiresInSeconds` | How long the token works. The viewer asks for a new one when it runs out |
 
 `scope` takes the same levels as a grant in the dashboard: `permissions.read`,
 `permissions.comment`, `permissions.fillAndSign` and `permissions.edit`. Add what else they may

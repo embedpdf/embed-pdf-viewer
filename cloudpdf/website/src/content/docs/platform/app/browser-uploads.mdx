@@ -32,7 +32,7 @@ const { token } = await cloudpdf.tokens.issue({
   sub: user.id,
   folderId: contractsFolderId,
   metadata: { contractId: contract.id },
-  expiresIn: 600,
+  expiresInSeconds: 600,
 });
 ```
 
@@ -47,7 +47,7 @@ $result = $cloudpdf->tokens->issue(new IssueTokensRequest([
     'sub' => $user->id,
     'folderId' => $contractsFolderId,
     'metadata' => ['contractId' => $contract->id],
-    'expiresIn' => 600,
+    'expiresInSeconds' => 600,
 ]));
 
 $token = $result->token;
@@ -62,7 +62,7 @@ result = cloudpdf.tokens.issue(
     sub=user.id,
     folder_id=contracts_folder_id,
     metadata={"contractId": contract.id},
-    expires_in=600,
+    expires_in_seconds=600,
 )
 
 token = result.token
@@ -78,7 +78,7 @@ what it carries. Whatever the browser sends, CloudPDF uses the token's folder an
 | :-- | :-- | :-- |
 | `kind` | `'upload'` | Required |
 | `sub` | Who is uploading: their id in your app | Required |
-| `expiresIn` | How long the token works, in seconds. Ten minutes is plenty | Required |
+| `expiresInSeconds` | How long the token works. Ten minutes is plenty | Required |
 | `folderId` | The folder the files go into. Without it, the top level | |
 | `metadata` | Your own data, put on every document uploaded with the token, such as `{ contractId: 'c_381' }` | |
 | `maxFiles` | How many PDFs the token uploads. Without it, one | |

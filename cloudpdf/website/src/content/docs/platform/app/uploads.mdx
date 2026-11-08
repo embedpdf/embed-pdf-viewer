@@ -53,12 +53,12 @@ Every upload makes a new document, even of a file you uploaded before. To get th
 back instead, say so:
 
 ```ts
-const { tag, document } = await cloudpdf.uploads.create({
+const { status, document } = await cloudpdf.uploads.create({
   source: file,
   dedupMode: 'reuse-existing',
 });
 
-tag; // 'deduped' when CloudPDF already had this file, 'created' when it's new
+status; // 'deduped' when CloudPDF already had this file, 'created' when it's new
 ```
 
 For retries, give the upload an `idempotencyKey`: the same key twice makes one document, so a

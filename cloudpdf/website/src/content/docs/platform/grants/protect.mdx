@@ -66,7 +66,7 @@ await cloudpdf.grants.create({
   name: 'Client review',
   scope: permissions.comment,
   passphrase: 'quill-review-2026',
-  expiresAt: Date.parse('2026-12-31T23:59:59+01:00'),
+  expiresAt: '2026-12-31T23:59:59+01:00',
   visitorIdentity: {
     fields: { displayName: 'required', email: 'required', organization: 'optional' },
     ask: 'on-open',
@@ -76,8 +76,8 @@ await cloudpdf.grants.create({
 });
 ```
 
-`ask` is `'on-open'` or `'before-first-change'`. `expiresAt` is a time in milliseconds, and `null`
-removes it.
+`ask` is `'on-open'` or `'before-first-change'`. `expiresAt` is a date and time with its offset, and
+`null` removes it.
 
 <Cards>
   <Card
