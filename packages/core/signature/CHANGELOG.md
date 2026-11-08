@@ -1,5 +1,7 @@
 # @embedpdf/core-signature
 
+## 3.1.0
+
 ## 3.0.0
 
 ### Minor Changes

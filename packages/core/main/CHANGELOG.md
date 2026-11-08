@@ -1,5 +1,26 @@
 # @embedpdf/core
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1029](https://github.com/embedpdf/embed-pdf-viewer/pull/1029) by [@bobsingor](https://github.com/bobsingor) – `ctx.storeChangeCount()` says how many times the store changed: a state or mirror write anywhere, or a
+  `ctx.notify()`, counted when the change happens, also while the change stream is held. Give it to
+  `memo` or `memoByKey` as the input of a read whose answer comes from functions you can't name the
+  inputs of, so the read asks them once per store change, however many readers ask. Test contexts
+  from `@embedpdf/core/testing` have it too.
+
+  `memo` and `memoByKey` compare their inputs with a plain loop, which makes every cached read a
+  little cheaper.
+
+### Patch Changes
+
+- [#1030](https://github.com/embedpdf/embed-pdf-viewer/pull/1030) by [@bobsingor](https://github.com/bobsingor) – The page list takes a page scale change's new layout from its event, and shows a pending one at once. The test context's pages can carry viewports, and a document event that moves them wakes the store's readers, as in the kernel.
+
+- [#1028](https://github.com/embedpdf/embed-pdf-viewer/pull/1028) by [@bobsingor](https://github.com/bobsingor) – A page mirror's write costs the same however many pages it holds. Each page load copied every
+  loaded page's entry, so loading every page of a 1,000-page document took about 2,000 writes and
+  1.5 million copies.
+
 ## 3.0.0
 
 ### Major Changes

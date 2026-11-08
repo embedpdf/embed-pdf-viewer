@@ -1,5 +1,11 @@
 # @embedpdf/engine-runtime
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1030](https://github.com/embedpdf/embed-pdf-viewer/pull/1030) by [@bobsingor](https://github.com/bobsingor) – Adds the raw viewport functions: `EPDFPage_CountViewportsRaw`, `EPDFPage_GetViewportRaw`, `EPDFPage_AddViewportRaw`, `EPDFPage_RemoveViewportRaw` and `EPDFViewport_Close`, which read and write a page's `/VP` without parsing the page.
+
 ## 3.0.0
 
 ### Major Changes

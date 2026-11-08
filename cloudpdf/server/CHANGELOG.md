@@ -1,5 +1,11 @@
 # @cloudpdf/server
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1030](https://github.com/embedpdf/embed-pdf-viewer/pull/1030) by [@bobsingor](https://github.com/bobsingor) – Layers and versions keep `viewports_version` (migration 053), raised by a scale change and by nothing else, so the outline, search and export caches stay warm across one. The layout's cached URL carries it; a token without it gets the layout without viewports. `PUT …/pages/:pageKey/scale` is a one-op change, so its opId undoes it. The changes endpoint applies `pages.setScale`.
+
 ## 3.0.0
 
 ### Major Changes

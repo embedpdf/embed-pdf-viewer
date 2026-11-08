@@ -1,5 +1,14 @@
 # @embedpdf/core-ui
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1029](https://github.com/embedpdf/embed-pdf-viewer/pull/1029) by [@bobsingor](https://github.com/bobsingor) – `omittedCommandsOf(data, resolve, menuTarget)` takes which menu each button opens as its own
+  argument, as `layoutToolbar` does (the commands' `getMenuTarget`, or `getCommand`), so `resolve` is
+  asked only whether a command shows, and only for the commands that decide it. Without
+  `menuTarget`, `resolve` says which menu a button opens, as before.
+
 ## 3.0.0
 
 ### Major Changes

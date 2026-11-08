@@ -1,5 +1,11 @@
 # @cloudpdf/viewer
 
+## 3.1.0
+
+### Minor Changes
+
+- [#1033](https://github.com/embedpdf/embed-pdf-viewer/pull/1033) by [@bobsingor](https://github.com/bobsingor) – `src: { id, token }` keeps the document open when `src` changes but its `id` doesn't, and takes the next token from the new `src`. A token function written inline in a component, made again on every render, no longer reopens the document.
+
 ## 3.0.0
 
 ### Major Changes

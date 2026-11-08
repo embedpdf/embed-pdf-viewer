@@ -1,5 +1,12 @@
 # @embedpdf/svelte
 
+## 3.1.0
+
+### Patch Changes
+
+- [#1034](https://github.com/embedpdf/embed-pdf-viewer/pull/1034) by [@bobsingor](https://github.com/bobsingor) – `<RenderLayer>` no longer shows Chrome's broken-image icon in the page's corner while the first
+  picture renders: the page's base image stays hidden until it has a source.
+
 ## 3.0.0
 
 ### Minor Changes
