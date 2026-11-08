@@ -177,7 +177,18 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     viewports: PageMeasurementViewport[] | undefined,
     fallback: PdfMeasure,
   ): void;
-  remeasurePage(page: PageRef, scale: PdfMeasure): Promise<RecalibrationReport>;
+  /**
+   * Resolves once the document's measurements can be re-measured: the
+   * annotations loaded (a failed load retried) and every pending load settled.
+   */
+  whenRemeasurable(): Promise<void>;
+  /**
+   * Stage the update of every measurement on `page` to `scale`, at once, so a
+   * group (`ctx.changes.group`) takes it into its change. What it staged is
+   * `updated`; a refused change refuses all of it. `error` is set, and
+   * nothing staged, when the annotations aren't loaded.
+   */
+  stageRemeasure(page: PageRef, scale: PdfMeasure): RecalibrationReport;
   /** A distance draft was captured (the measurement plugin turns it into a calibration). */
   readonly onDraftCaptured: EventHook<CapturedAnnotationDraft>;
   getDistanceCreationPage(): PageRef | null;

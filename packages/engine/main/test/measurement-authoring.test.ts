@@ -95,13 +95,16 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       const newScale = measureFromKnownLength(100, { value: 8, unit: 'ft' });
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(newScale);
-      const report = await annotation.remeasurePage(page.ref, newScale);
-      expect(report.failed).toEqual([]);
+      await annotation.whenRemeasurable();
+      const report = annotation.stageRemeasure(page.ref, newScale);
       expect(report.error).toBeUndefined();
-      expect(annotation.get(created.ref)).toMatchObject({
-        contents: '16.00 ft',
-        captionOffset: { along: 15, perpendicular: 25 },
-      });
+      expect(report.updated).toEqual([created.ref]);
+      await vi.waitFor(() =>
+        expect(annotation.get(created.ref)).toMatchObject({
+          contents: '16.00 ft',
+          captionOffset: { along: 15, perpendicular: 25 },
+        }),
+      );
       expectVector();
 
       // A turn pivots about the middle of the line, as the engine turns it,

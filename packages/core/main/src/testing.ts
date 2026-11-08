@@ -79,6 +79,8 @@ export interface TestPage {
   readonly label?: string | null;
   /** The order its annotations take keyboard focus in (`/Tabs`); default none. */
   readonly tabOrder?: PageLayout['tabOrder'];
+  /** Its measurement viewports (`/VP`); none when left out. */
+  readonly viewports?: PageLayout['viewports'];
 }
 
 export interface TestContextOptions<S, T extends object = NoSettings> {
@@ -163,6 +165,7 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
       art: { ...visible },
     },
     pdfCropBox: crop,
+    ...(page.viewports ? { viewports: page.viewports } : {}),
   };
 };
 
@@ -312,9 +315,9 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     hasUnsavedChanges: false,
   };
   /** The pages as they show now: the document's events and the queue's changes move them. */
-  function showPages(): void {
+  function showPages(): boolean {
     const view = pageView.refresh();
-    if (!view) return;
+    if (!view) return false;
     const moved = view.pages !== meta.pages;
     meta = {
       ...meta,
@@ -324,6 +327,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       pendingPages: view.pending,
       pagesSequence: moved ? meta.pagesSequence + 1 : meta.pagesSequence,
     };
+    return true;
   }
   if (doc) {
     cleanups.push(
@@ -331,7 +335,8 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         const layout = layoutFromEvent(event);
         if (layout) pageView.setEnginePages(layout);
         pageView.fold(event);
-        showPages();
+        // As the kernel's page registry does: new pages wake the store's readers.
+        if (showPages()) store.notify();
       }),
     );
   }

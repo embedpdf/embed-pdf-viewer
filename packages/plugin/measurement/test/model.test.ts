@@ -4,11 +4,8 @@ import type { PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 
 import {
   beginScaleChange,
-  clearLoadError,
   endScaleChange,
   initialMeasurementModel,
-  pageScaleOf,
-  recordLoadError,
   selectPageScale,
   setCalibration,
   setLocalViewports,
@@ -20,7 +17,6 @@ const PAGE_BOX = { x: 0, y: 0, ...SIZE };
 const FALLBACK = measureFromRatio(1, 1, 'm');
 const OWNED = measureFromRatio(1, 100, 'm');
 const FOREIGN = measureFromRatio(1, 50, 'm');
-const ERROR = { code: 'Unknown', message: 'read failed' } as never;
 
 const viewport = (owned: boolean, measure = owned ? OWNED : FOREIGN): PageMeasurementViewport =>
   ({
@@ -54,14 +50,6 @@ describe('measurement transitions', () => {
     expect(setReports(idle, reports).reports).toBe(reports);
   });
 
-  it('records and clears a page load error', () => {
-    const idle = initialMeasurementModel();
-    const failed = recordLoadError(idle, 3, ERROR);
-    expect(failed.loadErrors[3]).toBe(ERROR);
-    expect(clearLoadError(failed, 3).loadErrors).toEqual({});
-    expect(clearLoadError(idle, 3)).toBe(idle);
-  });
-
   it('keeps session-only viewports per page', () => {
     const local = setLocalViewports(initialMeasurementModel(), 3, [viewport(true)]);
     expect(local.localViewports[3]).toEqual([viewport(true)]);
@@ -83,47 +71,5 @@ describe('page scale projection', () => {
       ready: true,
       persistent: false,
     });
-  });
-
-  it('is not ready before the first read and reports a failed read', () => {
-    const inputs = {
-      viewports: undefined,
-      status: 'loading' as const,
-      error: undefined,
-      size: SIZE,
-      fallback: FALLBACK,
-      persistent: true,
-    };
-    expect(pageScaleOf(inputs)).toEqual({
-      measure: null,
-      source: 'default',
-      ready: false,
-      persistent: true,
-    });
-    expect(pageScaleOf({ ...inputs, status: 'error', error: ERROR }).error).toBe(ERROR);
-  });
-
-  it('keeps the last viewports in effect after a failed re-read, with its error', () => {
-    const scale = pageScaleOf({
-      viewports: [viewport(true)],
-      status: 'error',
-      error: ERROR,
-      size: SIZE,
-      fallback: FALLBACK,
-      persistent: true,
-    });
-    expect(scale).toMatchObject({ source: 'owned', ready: true, error: ERROR });
-  });
-
-  it('shows an error only while the page read has failed', () => {
-    const scale = pageScaleOf({
-      viewports: [],
-      status: 'ready',
-      error: ERROR,
-      size: SIZE,
-      fallback: FALLBACK,
-      persistent: true,
-    });
-    expect(scale.error).toBeUndefined();
   });
 });
