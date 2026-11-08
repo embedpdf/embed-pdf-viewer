@@ -66,7 +66,7 @@ export const LANDING_DEPLOYMENTS: readonly LandingDeployment[] = [
   {
     id: 'saas',
     title: 'Managed SaaS',
-    href: '/docs/engine/quick-start',
+    href: '/docs/platform',
     landing: {
       lead: 'We host and manage everything.',
       sub: 'Get secure, scalable infrastructure so you can focus on your product.',

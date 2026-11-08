@@ -52,7 +52,7 @@ const PATHS = [
     labelClass: 'bg-cp-blue/10 text-cp-blue',
     title: 'Managed SaaS + ready-made viewer',
     desc: 'No infrastructure to run, no UI to build. A working viewer in your app in under 10 minutes.',
-    href: '/docs/engine/quick-start',
+    href: '/docs/platform',
     cta: 'Start here',
   },
   {

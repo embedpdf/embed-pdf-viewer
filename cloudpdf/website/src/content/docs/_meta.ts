@@ -1,5 +1,6 @@
 export default {
   index: { title: 'Introduction', type: 'page' },
+  platform: { title: 'Platform', type: 'page' },
   server: { title: 'Server', type: 'page' },
   'api-reference': { title: 'API reference', type: 'page' },
   engine: { title: 'Engine', type: 'page' },

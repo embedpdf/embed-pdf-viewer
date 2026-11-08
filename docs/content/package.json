@@ -12,7 +12,8 @@
     "samples": "node scripts/samples.mjs",
     "pdfs": "tsx pdfs/build.mjs",
     "pdfs:cloud": "node pdfs/cloud.mjs",
-    "screenshots": "node screenshots/build.mjs"
+    "screenshots": "node screenshots/build.mjs",
+    "screenshots:platform": "node screenshots/capture.mjs"
   },
   "devDependencies": {
     "@cloudpdf/sdk": "workspace:*",
