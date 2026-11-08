@@ -33,6 +33,7 @@ import {
   panelOf,
   sectionsOfMenu,
 } from './layout';
+import type { ResolveMenuTarget } from './projection';
 import type {
   BarChild,
   BarGroup,
@@ -395,12 +396,15 @@ function reachOf(data: LayoutData): LayoutReach {
  * The commands the bars leave out because what they lead to shows nothing: the tab of a mode
  * whose bars have nothing visible ({@link hasVisibleUnits}: dependent groups alone don't count),
  * and a button whose menu has nothing visible (or that the layout has no menu for). Sorted, so
- * two equal results compare equal; pass it to {@link compileBar} as `omit`. Cheap to call on every change: what it reads of the layout is
- * read once per layout data.
+ * two equal results compare equal; pass it to {@link compileBar} as `omit`. Cheap to call on
+ * every change: what it reads of the layout is read once per layout data, and `menuTarget` (the
+ * commands' `getMenuTarget`, as {@link layoutToolbar} takes it) says which menu each button opens,
+ * so `resolve` is asked only whether a command shows. Without `menuTarget`, `resolve` says that too.
  */
 export function omittedCommandsOf(
   data: LayoutData,
   resolve: (id: string) => OmissionCommand | null,
+  menuTarget: ResolveMenuTarget = resolve,
 ): string[] {
   const reach = reachOf(data);
   const isVisible = (id: string) => resolve(id)?.visible === true;
@@ -415,7 +419,7 @@ export function omittedCommandsOf(
     if (!shows) omitted.push(modeCommandOf(mode));
   }
   for (const button of reach.buttons) {
-    const menu = resolve(button)?.menu;
+    const menu = menuTarget(button)?.menu;
     if (menu !== undefined && !(reach.menus.get(menu) ?? []).some(isVisible)) omitted.push(button);
   }
   return omitted.sort();

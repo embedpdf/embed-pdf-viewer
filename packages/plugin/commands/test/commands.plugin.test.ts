@@ -128,13 +128,13 @@ describe('a label with values', () => {
   });
 
   it('fills `label` without the i18n plugin, and shows the slots when labelParams throws', async () => {
-    let selected = 2;
     const kernel = createKernel({
       engine,
       plugins: [
-        commandsPlugin({
+        commandsPlugin<Outbox>({
+          appState: { recipients: ['ana', 'bo'] },
           commands: [
-            { ...send, labelKey: undefined, labelParams: () => ({ count: selected }) },
+            { ...send, labelKey: undefined },
             {
               id: 'acme:broken',
               label: 'Broken ({count})',
@@ -149,7 +149,7 @@ describe('a label with values', () => {
     await kernel.start();
     const commands = kernel.capability(CommandsToken);
     expect(commands.resolveCommand('acme:send')?.label).toBe('Send (2)');
-    selected = 5;
+    commands.updateSettings({ appState: { recipients: ['ana', 'bo', 'cy', 'di', 'ed'] } });
     expect(commands.resolveCommand('acme:send')?.label).toBe('Send (5)');
     expect(commands.resolveCommand('acme:broken')?.label).toBe('Broken ({count})');
     await kernel.destroy();

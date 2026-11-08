@@ -440,6 +440,13 @@ export interface PluginContext<State = unknown, PluginSettings extends object = 
    */
   notify(): void;
   /**
+   * How many times the store changed (a state write anywhere, a `notify()`), counted when the
+   * change happens, also while the change stream is held. The input of a read whose answer
+   * comes from functions it can't name the inputs of, such as a command's `enabled`: it asks
+   * them again only after this moved.
+   */
+  changeCount(): number;
+  /**
    * Run `handler` whenever `select()` answers differently. For reacting to
    * state this plugin does not own (the page registry, a sibling's getter);
    * this plugin's own changes are observed with `state.onChange`.

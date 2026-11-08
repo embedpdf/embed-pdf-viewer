@@ -45,6 +45,11 @@ export interface Store {
   /** Wake every subscriber without a state change: a resource read through a capability changed. */
   notify(): void;
   /**
+   * How many times the store changed: a slice written or revoked, the core patched, a
+   * `notify()`. It moves with the change itself, also while the change stream is held.
+   */
+  changeCount(): number;
+  /**
    * Hold the change stream until the returned release is called: state still
    * changes at once, and subscribers hear of everything held in one pass at
    * the last release. One change's events land as one update this way.
@@ -75,6 +80,7 @@ export function createStore(report: (error: unknown) => void = console.error): S
     }
   };
 
+  let changes = 0;
   let emitting = false;
   let pending = false;
   let holds = 0;
@@ -97,6 +103,11 @@ export function createStore(report: (error: unknown) => void = console.error): S
     } finally {
       emitting = false;
     }
+  };
+  /** A change: counted at once, and told to the subscribers (after the last release, while held). */
+  const change = () => {
+    changes += 1;
+    emitChange();
   };
 
   function lease<S>(
@@ -121,7 +132,7 @@ export function createStore(report: (error: unknown) => void = console.error): S
         const previous = cell.state;
         cell.state = next;
         states[key] = next;
-        emitChange();
+        change();
         changed.emit({ next, previous });
         return true;
       },
@@ -133,7 +144,7 @@ export function createStore(report: (error: unknown) => void = console.error): S
         if (leases.get(key) === (handle as SliceLease<unknown>)) {
           leases.delete(key);
           delete states[key];
-          emitChange();
+          change();
         }
       },
     };
@@ -147,9 +158,10 @@ export function createStore(report: (error: unknown) => void = console.error): S
     getState: () => ({ core, plugins: states }),
     setCore(patch) {
       core = { ...core, ...patch };
-      emitChange();
+      change();
     },
-    notify: () => emitChange(),
+    notify: change,
+    changeCount: () => changes,
     hold() {
       holds += 1;
       let released = false;
@@ -168,6 +180,7 @@ export function createStore(report: (error: unknown) => void = console.error): S
     },
     destroy() {
       core = { documents: {}, pending: {}, order: [], activeId: null };
+      changes += 1;
       for (const held of [...leases.values()]) held.revoke();
       for (const key of Object.keys(states)) delete states[key];
       changeListeners.clear();

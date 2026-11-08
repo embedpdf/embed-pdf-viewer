@@ -309,6 +309,7 @@ export function createPluginContext(
     notify: () => {
       if (lease.live) store.notify();
     },
+    changeCount: store.changeCount,
     watch: (select, handler, isEqual = Object.is) => {
       let previous = select();
       const unsubscribe = store.subscribe(() => {

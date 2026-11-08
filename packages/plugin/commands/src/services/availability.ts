@@ -13,7 +13,7 @@ import type {
   SettingLock,
   Settings,
 } from '@embedpdf/core';
-import { I18nToken, interpolate } from '@embedpdf/plugin-i18n/contract';
+import { I18nToken, interpolate, type TranslateOptions } from '@embedpdf/plugin-i18n/contract';
 
 import type {
   CommandContext,
@@ -29,8 +29,15 @@ import type {
 export const isCategoryOff = (category: string, disabled: readonly string[]): boolean =>
   disabled.some((off) => category === off || category.startsWith(`${off}.`));
 
+/** How a command's sentences are translated: the i18n plugin's `t`, or `null` without the plugin. */
+export type Translate = (key: string, options?: TranslateOptions) => string;
+
+/** The translate function for a command's document: a new one only when its strings may differ. */
+export const translateOf = (context: CommandContext): Translate | null =>
+  context.tryGet(I18nToken)?.getTranslator() ?? null;
+
 /** The values for a label's slots, from `labelParams`; none without it, or when it throws. */
-const labelParamsOf = (
+export const labelParamsOf = (
   definition: CommandDefinition,
   context: CommandContext,
 ): Readonly<Record<string, string | number>> | undefined => {
@@ -48,18 +55,20 @@ const labelParamsOf = (
  * So a string for `'document:download'` relabels that one command, whichever key its label is
  * under.
  */
-export const labelOf = (definition: CommandDefinition, context: CommandContext): string => {
-  const params = labelParamsOf(definition, context);
-  const i18n = context.tryGet(I18nToken);
-  if (!i18n) return interpolate(definition.label ?? definition.labelKey ?? definition.id, params);
+export const labelOf = (
+  definition: CommandDefinition,
+  params: Readonly<Record<string, string | number>> | undefined,
+  t: Translate | null,
+): string => {
+  if (!t) return interpolate(definition.label ?? definition.labelKey ?? definition.id, params);
   const options = {
     ...(definition.labelKey ? { fallbackKey: definition.labelKey } : {}),
     ...(params ? { params } : {}),
   };
   // A command with a key and no label of its own warns once when no language has the key.
   return definition.label === undefined && definition.labelKey
-    ? i18n.t(definition.id, options)
-    : i18n.t(definition.id, { ...options, fallback: definition.label ?? definition.id });
+    ? t(definition.id, options)
+    : t(definition.id, { ...options, fallback: definition.label ?? definition.id });
 };
 
 /**
@@ -80,43 +89,29 @@ const permissionKeyOf = (permission: Permission): string =>
 const DEFAULT_NOT_ALLOWED_KEY = 'commands.notAllowed.default';
 
 /** The sentence for a command the session may not run, under `key`, else the general one. */
-export const notAllowedMessage = (key: string, label: string, context: CommandContext): string => {
+export const notAllowedMessage = (key: string, label: string, t: Translate | null): string => {
   const fallback = `${label} isn't allowed`;
-  const i18n = context.tryGet(I18nToken);
-  if (!i18n) return fallback;
+  if (!t) return fallback;
   const params = { label };
-  return i18n.t(key, {
-    params,
-    fallback: i18n.t(DEFAULT_NOT_ALLOWED_KEY, { params, fallback }),
-  });
+  return t(key, { params, fallback: t(DEFAULT_NOT_ALLOWED_KEY, { params, fallback }) });
 };
 
 /** The general locked sentence's key: `{label} can't be changed in this document`. */
 const DEFAULT_LOCKED_KEY = 'commands.locked.default';
 
-/** The sentence for a command whose setting a lock holds: its `reasonKey`, else the general one. */
-export const lockedMessage = (
-  lock: SettingLock,
-  label: string,
-  context: CommandContext,
-): string => {
+/** The sentence for a command whose setting a lock holds, under `key`, else the general one. */
+export const lockedMessage = (key: string, label: string, t: Translate | null): string => {
   const fallback = `${label} can't be changed in this document`;
-  const i18n = context.tryGet(I18nToken);
-  if (!i18n) return fallback;
+  if (!t) return fallback;
   const params = { label };
-  const general = i18n.t(DEFAULT_LOCKED_KEY, { params, fallback });
-  return lock.reasonKey === undefined
-    ? general
-    : i18n.t(lock.reasonKey, { params, fallback: general });
+  return t(key, { params, fallback: t(DEFAULT_LOCKED_KEY, { params, fallback }) });
 };
 
 /** The sentence for a command that's turned off. */
-const turnedOffMessage = (label: string, context: CommandContext): string => {
-  const i18n = context.tryGet(I18nToken);
-  return i18n
-    ? i18n.t('commands.turnedOff', { params: { label }, fallback: "{label} isn't available" })
+const turnedOffMessage = (label: string, t: Translate | null): string =>
+  t
+    ? t('commands.turnedOff', { params: { label }, fallback: "{label} isn't available" })
     : `${label} isn't available`;
-};
 
 export function createAvailability(
   ctx: PluginContext<void, CommandsSettings>,
@@ -141,14 +136,20 @@ export function createAvailability(
     }
   };
 
-  /** The lock on the setting a command changes, or `null`; a `locked` that throws is no lock. */
-  const lockOf = (definition: CommandDefinition, context: CommandContext): SettingLock | null => {
+  /**
+   * Why a lock holds the setting a command changes, as the key of the sentence that says so (the
+   * lock's `reasonKey`, else `commands.locked.default`), or `null` while nothing holds it; a
+   * `locked` that throws is no lock.
+   */
+  const lockedKeyOf = (definition: CommandDefinition, context: CommandContext): string | null => {
     if (!definition.locked) return null;
+    let lock: SettingLock | null;
     try {
-      return definition.locked(context);
+      lock = definition.locked(context);
     } catch {
       return null;
     }
+    return lock === null ? null : (lock.reasonKey ?? DEFAULT_LOCKED_KEY);
   };
 
   /**
@@ -178,24 +179,20 @@ export function createAvailability(
     definition: CommandDefinition,
     context: CommandContext,
   ): CommandRefusal | null => {
+    const t = translateOf(context);
+    const label = () => labelOf(definition, labelParamsOf(definition, context), t);
     if (isTurnedOff(definition)) {
-      return {
-        reason: 'turned-off',
-        message: turnedOffMessage(labelOf(definition, context), context),
-      };
+      return { reason: 'turned-off', message: turnedOffMessage(label(), t) };
     }
     const notAllowed = notAllowedKeyOf(definition, context);
     if (notAllowed !== null) {
-      return {
-        reason: 'not-allowed',
-        message: notAllowedMessage(notAllowed, labelOf(definition, context), context),
-      };
+      return { reason: 'not-allowed', message: notAllowedMessage(notAllowed, label(), t) };
     }
-    const lock = lockOf(definition, context);
-    return lock === null
+    const locked = lockedKeyOf(definition, context);
+    return locked === null
       ? null
-      : { reason: 'locked', message: lockedMessage(lock, labelOf(definition, context), context) };
+      : { reason: 'locked', message: lockedMessage(locked, label(), t) };
   };
 
-  return { isTurnedOff, notAllowedKeyOf, lockOf, refusalOf };
+  return { isTurnedOff, notAllowedKeyOf, lockedKeyOf, refusalOf };
 }

@@ -3,9 +3,10 @@
  * shortcuts and a command palette all show and run.
  *
  * A command's state is read from live state: `resolveCommand` asks the other
- * capabilities when it's called, so every reader follows the kernel's one
- * change stream, with no events. Definitions hold functions, so they live in
- * the settings and the plugin's registry, never in state.
+ * capabilities again after each store change (once, however many readers
+ * ask), so every reader follows the kernel's one change stream, with no
+ * events. Definitions hold functions, so they live in the settings and the
+ * plugin's registry, never in state.
  */
 import type {
   CapabilityToken,
