@@ -1,7 +1,7 @@
 /**
  * The config a running `<embedpdf-viewer>` follows, and the `viewer` it hands out.
  *
- * `src`, `theme`, `locale`, `disable`, `readOnly` and `appState` change in place, from their
+ * `src`, `theme`, `locale`, `features`, `disable`, `readOnly` and `appState` change in place, from their
  * properties, from `.config` and (for `src`, `theme` and `locale`) from the attributes: the viewer,
  * and the kernel inside it, stay the same objects. Any other change builds a new viewer. `scope` and `identity`
  * from the config reach the documents, and a read-only viewer still lets the app's code call
@@ -43,6 +43,9 @@ ${body}
 </script>
 </body></html>`;
 
+/** What the commands plugin has off while the app says nothing: the features that start off. */
+const START_OFF = ['forms.building', 'redaction', 'measurement', 'snapshots'];
+
 const PAGES = {
   '/init.html': shell(
     '<div id="viewer"></div>',
@@ -58,7 +61,7 @@ const PAGES = {
     `window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf' });
     queueMicrotask(() => {
       window.element.locale = 'es';
-      window.element.disable = ['search'];
+      window.element.features = { search: false };
     });`,
   ),
   // Approve reads the app's state: enabled once all four checks are done, pressed once approved.
@@ -208,25 +211,37 @@ describe('a running viewer follows its live config', () => {
     expect(await sameViewer(tab)).toBe(true);
   });
 
-  it('turns features and single commands off and on again in place', async () => {
+  it('turns features on and off again in place, and single commands from disable', async () => {
     const settings = () =>
       tab.evaluate(() => {
         const { disabledCategories, disabledCommands } =
           window.element.viewer.commands.getSettings();
         return { disabledCategories, disabledCommands };
       });
-    await tab.evaluate(() => (window.element.disable = ['search', 'tool:highlight']));
-    expect(await settings()).toEqual({
-      disabledCategories: ['search'],
-      disabledCommands: ['tool:highlight'],
-    });
-    const searchShows = () =>
-      tab.evaluate(() => window.element.viewer.commands.resolveCommand('panel:search')?.visible);
-    expect(await searchShows()).toBe(false);
+    const shows = (id: string) =>
+      tab.evaluate((id) => window.element.viewer.commands.resolveCommand(id)?.visible, id);
+    expect(await settings()).toEqual({ disabledCategories: START_OFF, disabledCommands: [] });
+    expect(await shows('mode:measure')).toBe(false);
 
-    await tab.evaluate(() => (window.element.disable = []));
-    expect(await settings()).toEqual({ disabledCategories: [], disabledCommands: [] });
-    expect(await searchShows()).toBe(true);
+    await tab.evaluate(() => (window.element.features = { search: false, measurement: true }));
+    expect(await settings()).toEqual({
+      disabledCategories: ['forms.building', 'redaction', 'snapshots', 'search'],
+      disabledCommands: [],
+    });
+    expect(await shows('panel:search')).toBe(false);
+    expect(await shows('mode:measure')).toBe(true);
+
+    // `disable`, from 3.0, still turns a single command off.
+    await tab.evaluate(() => (window.element.disable = ['tool:highlight']));
+    expect((await settings()).disabledCommands).toEqual(['tool:highlight']);
+
+    await tab.evaluate(() => {
+      window.element.features = {};
+      window.element.disable = [];
+    });
+    expect(await settings()).toEqual({ disabledCategories: START_OFF, disabledCommands: [] });
+    expect(await shows('panel:search')).toBe(true);
+    expect(await shows('mode:measure')).toBe(false);
     expect(await sameViewer(tab)).toBe(true);
   });
 
@@ -250,7 +265,7 @@ describe('a running viewer follows its live config', () => {
     expect(kept).not.toContain('forms');
 
     await tab.evaluate(() => (window.element.readOnly = false));
-    expect(await categories()).toEqual([]);
+    expect(await categories()).toEqual(START_OFF);
     expect(await sameViewer(tab)).toBe(true);
   });
 
@@ -591,7 +606,7 @@ describe('a change before the viewer is ready', () => {
     const disabled = await tab.evaluate(
       () => window.element.viewer.commands.getSettings().disabledCategories,
     );
-    expect(disabled).toEqual(['search']);
+    expect(disabled).toEqual([...START_OFF, 'search']);
     expect(await sameViewer(tab)).toBe(true);
   });
 });

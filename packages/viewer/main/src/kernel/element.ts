@@ -8,12 +8,12 @@
  * `footer`, `tabs`, `empty`); the viewer's own components among them
  * (`<epdf-button>`, `<epdf-menu>`) are drawn by the viewer (./components).
  *
- * Seven keys follow their value while the viewer runs, from `.config`, their
- * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`,
- * `.fetch`, `.appState`) or the attributes: `src` opens the new document in
- * place of the old one, `theme` swaps the token sheet and the mode, `locale`,
- * `disable` and `readOnly` reach their plugins, the next download uses the new
- * `fetch`, and the commands read the new `appState`.
+ * Eight keys follow their value while the viewer runs, from `.config`, their
+ * own properties (`.src`, `.theme`, `.locale`, `.features`, `.disable`,
+ * `.readOnly`, `.fetch`, `.appState`) or the attributes: `src` opens the new
+ * document in place of the old one, `theme` swaps the token sheet and the mode,
+ * `locale`, `features`, `disable` and `readOnly` reach their plugins, the next
+ * download uses the new `fetch`, and the commands read the new `appState`.
  * Changing any other key re-creates the viewer from scratch — documents and
  * all — which is the honest semantic for a workspace-owning embed.
  */
@@ -170,6 +170,7 @@ const PROPERTIES = [
   'src',
   'theme',
   'locale',
+  'features',
   'disable',
   'readOnly',
   'fetch',
@@ -268,7 +269,18 @@ export class EmbedPdfViewerElement extends ElementBase {
     return this.config.locale;
   }
 
-  /** The features and commands this viewer doesn't have. */
+  /** What people can do in this viewer: features and their parts, on or off. */
+  set features(features: ElementConfig['features']) {
+    this.#change({ features });
+  }
+  get features(): ElementConfig['features'] {
+    return this.config.features;
+  }
+
+  /**
+   * The features and commands this viewer doesn't have.
+   * @deprecated Use `features`; goes in 4.0.
+   */
   set disable(disable: ElementConfig['disable']) {
     this.#change({ disable });
   }
@@ -361,8 +373,8 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (changed.includes('theme')) this.#adoptSheets(next.theme);
     // `src` opens below, and `#fetch` reads the new `fetch` at the next download.
     if (changed.some((key) => key !== 'src' && key !== 'fetch')) {
-      const { theme, locale, disable, readOnly, appState } = next;
-      this.#props = { ...this.#props!, theme, locale, disable, readOnly, appState };
+      const { theme, locale, features, disable, readOnly, appState } = next;
+      this.#props = { ...this.#props!, theme, locale, features, disable, readOnly, appState };
       this.#root.render(createElement(FullViewer, this.#props));
     }
     if (changed.includes('src')) this.#showSrc();

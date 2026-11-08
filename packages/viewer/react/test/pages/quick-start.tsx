@@ -1,8 +1,8 @@
 /**
- * Quick start's steps 3 and 4 in <PDFViewer>: its config (your color, two features left out, and
- * a command of yours, `acme:send`, in the main bar's `end` section) and your own component in the
- * toolbar with `ToolbarItem`, after a control of the app's own. `quick-start.test.ts` drives it
- * from the keyboard.
+ * Quick start's steps 3 and 4 in <PDFViewer>: its config (your color, measuring on and forms
+ * left out, a command of yours, `acme:send`, in the main bar's `end` section) and your own
+ * component in the toolbar with `ToolbarItem`, after a control of the app's own.
+ * `quick-start.test.ts` drives it from the keyboard.
  */
 import { createRoot } from 'react-dom/client';
 import { PDFViewer, ToolbarItem } from '@embedpdf/viewer-react';
@@ -21,7 +21,7 @@ const record = checkRecord<QuickStartRecord>({ viewer: null, sent: [] });
 /** Quick start's `viewer-config.js`, its command saying it ran in place of the request. */
 const config = {
   theme: { accent: '#7c3aed' },
-  disable: ['forms', 'redaction'],
+  features: { measurement: true, forms: false },
   icons: {
     send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
   },

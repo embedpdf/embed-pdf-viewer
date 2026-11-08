@@ -28,7 +28,7 @@ Or declaratively — it's a real custom element:
 ```
 
 `init` accepts the whole customization contract (`commands`, `icons`,
-`strings`, `layout`, `disable`, `readOnly`, `scope`, `identity`, `notAllowed`,
+`strings`, `layout`, `features`, `readOnly`, `scope`, `identity`, `notAllowed`,
 `locale`, `theme`) — see
 `@embedpdf/viewer-chrome`'s README for the ladder. `layout` takes a function
 of the default layout and the viewer's env, so changing the toolbar needs no
@@ -50,7 +50,7 @@ module for a layout written from scratch.
 
 Set `.config` (or the attributes) and the element builds the viewer. Six keys
 follow their value while it runs, from `.config`, their own properties
-(`element.src = file`, `.theme`, `.locale`, `.disable`, `.readOnly`, `.fetch`)
+(`element.src = file`, `.theme`, `.locale`, `.features`, `.readOnly`, `.fetch`)
 or the `src`, `theme` and `locale` attributes: `src` opens the new document (a
 URL, a `File` or bytes) in place of the old one, `fetch` downloads the next
 document at a URL, and the others change the look, the language and the tools.

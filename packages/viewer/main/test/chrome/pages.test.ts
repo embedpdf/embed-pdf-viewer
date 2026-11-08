@@ -23,7 +23,7 @@ vi.mock('@embedpdf/web', async (importOriginal) => ({
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
 import { defaultCommands } from '../../../chrome/src/config/commands';
 import { PAGE_MENU, pageCommands } from '../../../chrome/src/config/page-commands';
-import { disabledSettingsOf } from '../../../chrome/src/features';
+import { disabledSettingsOf, type Features } from '../../../chrome/src/features';
 
 let engine: Engine;
 beforeAll(async () => {
@@ -38,12 +38,9 @@ const FIRST = toPageRef(3);
 const SECOND = toPageRef(4);
 
 async function viewerWith(
-  options: { disable?: string[]; readOnly?: boolean; scope?: readonly string[] } = {},
+  options: { features?: Features; readOnly?: boolean; scope?: readonly string[] } = {},
 ) {
-  const { disabledCategories, disabledCommands } = disabledSettingsOf(
-    options.disable,
-    options.readOnly,
-  );
+  const { disabledCategories, disabledCommands } = disabledSettingsOf(options);
   const kernel = createKernel({
     engine,
     plugins: [
@@ -162,8 +159,8 @@ describe('the page commands', () => {
 describe('turning page editing off', () => {
   const editing = pageCommands.map((command) => command.id).filter((id) => id !== 'page:extract');
 
-  it("disable: ['pages'] hides every page command but extract", async () => {
-    const { kernel, commands } = await viewerWith({ disable: ['pages'] });
+  it('pages: false hides every page command but extract', async () => {
+    const { kernel, commands } = await viewerWith({ features: { pages: false } });
     expect(editing.filter((id) => commands.resolveCommand(id)?.visible)).toEqual([]);
     expect(commands.resolveCommand('page:extract')?.visible).toBe(true);
     await kernel.destroy();

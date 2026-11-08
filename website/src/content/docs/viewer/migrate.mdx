@@ -48,7 +48,7 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 - **The viewer is one element, `<embedpdf-viewer>`.** 2.x's framework packages put an
   `<embedpdf-container>` inside a `<div>` of their own. Now there's no `<div>`: your class and style
   go on the viewer itself.
-- **Six keys follow their prop:** `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch`.
+- **Six keys follow their prop:** `src`, `theme`, `locale`, `features`, `readOnly` and `fetch`.
   2.x's framework packages read the config once. Every other key is still read once: see
   [Change the config later](setup#change-the-config-later).
 - **Server-side rendering needs no wrapper.** Every framework package is safe to import on the
@@ -74,7 +74,7 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 | `icons` | `icons`, as path data: see [Buttons and the toolbar](#buttons-and-the-toolbar) |
 | `commands.commands` | `commands`, a list |
 | `ui.schema` | `layout` |
-| `disabledCategories` | `disable`, with new names: see [Turn features off](#turn-features-off) |
+| `disabledCategories` | `features`, with new names: see [Turn features on and off](#turn-features-on-and-off) |
 | `permissions` | `scope`: see [Permissions](#permissions) |
 | `i18n.defaultLocale` | `locale` |
 | `i18n.locales` | `strings`: words by language code, with a button's label under its command's id, or a function that loads them: see [Translations](customize/translations) |
@@ -266,10 +266,10 @@ The ids changed:
 Every 3.0 id is on [Layout](customize/layout#every-built-in-id) and
 [Buttons & commands](customize/commands#every-built-in-command).
 
-## Turn features off
+## Turn features on and off
 
-`disabledCategories` is `disable`. It takes 3.0's [features](features/turning-off), with their parts
-after a dot, and single commands by their id:
+`disabledCategories` is `features`, with each name set to `false`. It takes 3.0's
+[features](features/turning-off), with their parts after a dot:
 
 | 2.x | 3.0 |
 | :-- | :-- |
@@ -286,7 +286,14 @@ after a dot, and single commands by their id:
 | `selection-copy` | `text.copy` |
 | `capture`, `capture-screenshot` | `snapshots` |
 | `document-open`, `document-export`, `document-print` | `documents.open`, `documents.download`, `documents.print` |
-| `zoom`, `rotate`, `spread`, `scroll`, `pan` | No feature: [remove](customize/layout#remove-buttons) their buttons, or disable each command, such as `'zoom:in'` |
+| `zoom`, `rotate`, `spread`, `scroll`, `pan` | No feature: [remove](customize/layout#remove-buttons) their buttons, or turn each command off [everywhere](features/turning-off#one-button-everywhere), such as `'zoom:in'` |
+
+In 2.x everything was on. Now measuring, redaction, building forms and snapshots start off, so turn
+on what your 2.x viewer showed:
+
+```js
+{ features: { measurement: true, redaction: true, 'forms.building': true, snapshots: true } }
+```
 
 New in 3.0, `readOnly: true` turns off everything that changes the document.
 
@@ -300,7 +307,7 @@ New in 3.0, `readOnly: true` turns off everything that changes the document.
 | No `permissions`: the PDF's own restrictions count | No `scope`: the same |
 | `enforceDocumentPermissions: false` | `scope: ['*']`: the user may do everything |
 | `overrides: { print: true }` | `'doc.print'` added to the default scope, which [Permissions](/docs/headless/concepts/permissions) lists |
-| `overrides: { print: false }` | A scope that leaves out both `'doc.print'` and `'pdf.permissions'`, or, for the button only, `disable: ['documents.print']` |
+| `overrides: { print: false }` | A scope that leaves out both `'doc.print'` and `'pdf.permissions'`, or, for the button only, `features: { 'documents.print': false }` |
 
 2.x's `print` is `doc.print` in a scope, `printHighQuality` is `doc.print.high`, `copyContents` is
 `doc.text.copy` and `doc.content.copy`, `modifyAnnotations` is `doc.annotate.modify`, `fillForms` is `doc.forms.fill` and

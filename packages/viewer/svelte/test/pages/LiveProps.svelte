@@ -9,6 +9,7 @@
     src: '/sample.pdf',
     theme: 'light',
     locale: 'en',
+    features: {},
     disable: [],
     readOnly: false,
     appState: { approved: false },

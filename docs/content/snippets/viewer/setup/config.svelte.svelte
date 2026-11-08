@@ -7,7 +7,7 @@
 <PDFViewer
   src="https://www.embedpdf.com/pdfs/welcome.pdf"
   theme="system"
-  disable={['forms']}
+  features={{ forms: false }}
   {onready}
   style="height: 100vh"
 />

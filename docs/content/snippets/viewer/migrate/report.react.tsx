@@ -23,7 +23,7 @@ export function Report() {
     <PDFViewer
       src="https://www.embedpdf.com/pdfs/welcome.pdf"
       theme="dark"
-      disable={['redaction', 'documents.print']}
+      features={{ 'documents.print': false }}
       onReady={(viewer) => console.log('ready', viewer)}
       style={{ height: '100vh' }}
     />

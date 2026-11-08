@@ -1,5 +1,5 @@
 /**
- * The live props: `src`, `theme`, `locale`, `disable` and `readOnly` change on a running viewer
+ * The live props: `src`, `theme`, `locale`, `features`, `disable` and `readOnly` change on a running viewer
  * without mounting a new one, an event calls the handler of the latest render, and a changed prop
  * of any other key is ignored with one warning in development (`LivePropsApp.vue`).
  * `live-props.test.ts` drives it.
@@ -14,6 +14,7 @@ export interface LiveProps {
   src: DocumentSrc | null;
   theme: ThemePreference;
   locale: string;
+  features: Record<string, boolean>;
   disable: string[];
   readOnly: boolean;
 }

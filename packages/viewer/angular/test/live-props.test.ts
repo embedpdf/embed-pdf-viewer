@@ -1,5 +1,5 @@
 /**
- * `<epdf-pdf-viewer>`'s live inputs (`pages/live-props.ts`): `theme`, `locale`, `disable`,
+ * `<epdf-pdf-viewer>`'s live inputs (`pages/live-props.ts`): `theme`, `locale`, `features`, `disable`,
  * `readOnly` and `src` change the running viewer in place, the same viewer and kernel
  * throughout; `(panelResize)` runs the handler as the template has it now; and a changed
  * read-once input is ignored with one warning naming it.
@@ -84,32 +84,32 @@ describe('<epdf-pdf-viewer> live inputs', () => {
     expect(await sameViewer()).toBe(true);
   });
 
-  it('follows disable and readOnly', async () => {
+  it('follows features, disable and readOnly', async () => {
+    const settings = () =>
+      page.evaluate(() => {
+        const { disabledCategories, disabledCommands } = (
+          window.__viewerCheck as LivePropsRecord
+        ).viewers[0]!.commands.getSettings();
+        return { disabledCategories, disabledCommands };
+      });
     await page.evaluate(() =>
-      (window.__viewerCheck as LivePropsRecord).set({ disable: ['search', 'tool:highlight'] }),
+      (window.__viewerCheck as LivePropsRecord).set({
+        features: { search: false, measurement: true },
+        disable: ['tool:highlight'],
+      }),
     );
     await page.waitForTimeout(100);
-    const disabled = await page.evaluate(() => {
-      const { disabledCategories, disabledCommands } = (
-        window.__viewerCheck as LivePropsRecord
-      ).viewers[0]!.commands.getSettings();
-      return { disabledCategories, disabledCommands };
-    });
-    expect(disabled).toEqual({
-      disabledCategories: ['search'],
+    expect(await settings()).toEqual({
+      disabledCategories: ['forms.building', 'redaction', 'snapshots', 'search'],
       disabledCommands: ['tool:highlight'],
     });
 
     await page.evaluate(() =>
-      (window.__viewerCheck as LivePropsRecord).set({ disable: [], readOnly: true }),
+      (window.__viewerCheck as LivePropsRecord).set({ features: {}, disable: [], readOnly: true }),
     );
     await page.waitForTimeout(100);
-    const readOnly = await page.evaluate(
-      () =>
-        (window.__viewerCheck as LivePropsRecord).viewers[0]!.commands.getSettings()
-          .disabledCategories,
-    );
-    expect(readOnly).toEqual(expect.arrayContaining(['annotations', 'forms']));
+    const { disabledCategories } = await settings();
+    expect(disabledCategories).toEqual(expect.arrayContaining(['annotations', 'forms']));
     expect(await sameViewer()).toBe(true);
   });
 

@@ -32,7 +32,7 @@ and nothing else changes. Every change returns a new layout, so changes chain:
 | Bar | Where | What's in it |
 | :-- | :-- | :-- |
 | `main` | `top` | The document menu, thumbnails, view menu, zoom and tools; the mode tabs in the middle; search and comments at the end |
-| `annotate`, `shapes`, `insert`, `form`, `redact`, `measure` | Along `main`, one at a time | The tools of the mode whose tab is selected |
+| `annotate`, `shapes`, `insert`, `form`, `redact`, `measure` | Along `main`, one at a time | The tools of the mode whose tab is selected. Form, Redact and Measure have a tab once their [features](../features/turning-off) are on. |
 | `pager` | Floating at the bottom | The page number between the previous and next page buttons; nothing for a document of one page |
 | `selection` | Over selected text | Copy, highlight, underline, strike out |
 | `annotation` | Over selected annotations | Comment, style, delete |
@@ -194,9 +194,9 @@ layout.remove('view:fullscreen', { from: 'document' });
 ```
 
 The command itself stays: it can sit in another bar, its shortcut works, and your code can run it.
-To leave something out everywhere at once, every button, menu row, tab and shortcut, use
-[`disable`](../features/turning-off) instead: the layout says where things go, `disable` says
-whether the viewer has them.
+To leave a feature out everywhere at once, every button, menu row, tab and shortcut, turn it off in
+[`features`](../features/turning-off) instead: the layout says where buttons go, `features` says
+what people can do.
 
 `removeBar(id)` removes a whole bar, with the bars that ride along it. Removing a mode's bar removes
 its tab, while its tools stay available for a bar of your own. It takes a list too:

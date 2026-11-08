@@ -15,7 +15,7 @@
  * inside the next one. On the server it renders the empty element, and the viewer starts in the
  * browser: nothing here, or in the viewer it imports, touches the DOM when imported.
  *
- * `src`, `theme`, `locale`, `disable`, `readOnly`, `fetch` and `appState` follow their inputs: the element
+ * `src`, `theme`, `locale`, `features`, `disable`, `readOnly`, `fetch` and `appState` follow their inputs: the element
  * changes them in place. Every other key is read once, when the viewer starts; a later change is ignored
  * (development warns once), and a new `@if` branch mounts a new viewer with it.
  */
@@ -68,6 +68,7 @@ const LIVE_KEYS: readonly LiveConfigKey[] = [
   'src',
   'theme',
   'locale',
+  'features',
   'disable',
   'readOnly',
   'fetch',
@@ -162,7 +163,12 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   readonly theme: ConfigInput<'theme'> = input<ElementConfig['theme']>();
   /** `'auto'` or a language code. Follows its input. */
   readonly locale: ConfigInput<'locale'> = input<ElementConfig['locale']>();
-  /** The features and commands this viewer doesn't have. Follows its input. */
+  /** What people can do in this viewer: features and their parts, on or off. Follows its input. */
+  readonly features: ConfigInput<'features'> = input<ElementConfig['features']>();
+  /**
+   * The features and commands this viewer doesn't have. Follows its input.
+   * @deprecated Use `features`; goes in 4.0.
+   */
   readonly disable: ConfigInput<'disable'> = input<ElementConfig['disable']>();
   /** Every feature that changes the document off, or all but `except`. Follows its input. */
   readonly readOnly: ConfigInput<'readOnly'> = input<ElementConfig['readOnly']>();
@@ -226,6 +232,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
     definedOf({
       theme: this.theme(),
       locale: this.locale(),
+      features: this.features(),
       disable: this.disable(),
       readOnly: this.readOnly(),
       layout: this.layout(),
@@ -299,6 +306,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
     element.src = config.src;
     element.theme = config.theme;
     element.locale = config.locale;
+    element.features = config.features;
     element.disable = config.disable;
     element.readOnly = config.readOnly;
     element.fetch = config.fetch;

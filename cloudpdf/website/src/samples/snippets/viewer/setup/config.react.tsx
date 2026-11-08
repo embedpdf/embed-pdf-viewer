@@ -5,7 +5,7 @@ export function Report() {
     <PDFViewer
       src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
       theme="system"
-      disable={['forms']}
+      features={{ forms: false }}
       onReady={(viewer) => console.log('ready', viewer)}
       style={{ height: '100vh' }}
     />

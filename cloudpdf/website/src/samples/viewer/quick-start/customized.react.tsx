@@ -4,7 +4,7 @@ const welcome = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const config: ViewerConfig = {
   theme: { accent: '#7c3aed' },
-  disable: ['forms', 'redaction'],
+  features: { measurement: true, forms: false },
   icons: {
     send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
   },

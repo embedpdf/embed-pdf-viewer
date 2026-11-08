@@ -16,6 +16,7 @@ export interface LiveConfig {
   src: DocumentSrc | null;
   theme: ThemePreference;
   locale: string;
+  features: Record<string, boolean>;
   disable: string[];
   readOnly: boolean;
   appState: { approved: boolean };

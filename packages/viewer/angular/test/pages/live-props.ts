@@ -1,5 +1,5 @@
 /**
- * The live inputs: `src`, `theme`, `locale`, `disable` and `readOnly` change on a running viewer
+ * The live inputs: `src`, `theme`, `locale`, `features`, `disable` and `readOnly` change on a running viewer
  * without mounting a new one, `(panelResize)` runs the handler as the template has it now, and a
  * changed input of any other key is ignored with one warning in development.
  * `live-props.test.ts` drives it.
@@ -22,6 +22,7 @@ export interface LiveProps {
   src: DocumentSrc | null;
   theme: ThemePreference;
   locale: string;
+  features: Record<string, boolean>;
   disable: string[];
   readOnly: boolean;
 }
@@ -59,6 +60,7 @@ const hello = (): CommandDefinition[] => [{ id: 'acme:hello', label: 'Hello', ru
       [src]="props().src"
       [theme]="props().theme"
       [locale]="props().locale"
+      [features]="props().features"
       [disable]="props().disable"
       [readOnly]="props().readOnly"
       [commands]="commands()"
@@ -73,6 +75,7 @@ export class App {
     src: '/sample.pdf',
     theme: 'light',
     locale: 'en',
+    features: {},
     disable: [],
     readOnly: false,
   });

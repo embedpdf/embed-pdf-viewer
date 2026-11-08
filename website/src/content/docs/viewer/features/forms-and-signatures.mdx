@@ -51,7 +51,14 @@ See [Move between fields](/docs/headless/forms#move-between-fields).
 
 ## Build a form
 
-The **Form** mode opens for filling in and looking. Its **Form design** button switches design on:
+Building forms starts off: people fill in a form but can't change its fields. Turn it on, and the
+**Form** mode joins the tabs:
+
+```js
+{ features: { 'forms.building': true } }
+```
+
+The Form mode opens for filling in and looking. Its **Form design** button switches design on:
 then fields can be selected, moved, resized and deleted, and the form design sidebar opens. Picking
 one of the field tools switches design on too: drag a box where the text field, checkbox, radio
 button, dropdown, list or signature field goes. Press **Form design** again, or leave the Form mode,
@@ -65,13 +72,6 @@ the last if they stand in a column or beside it if in a row, at the same size an
 it's selected so you can drag it. A radio group's new button is a new choice; a checkbox's new box
 checks together with the others. How a field looks, its border, background and font, is in the
 **Style** sidebar, the toolbar's other button.
-
-To let people fill in a form but not change its fields, turn off building, and the Form mode is
-gone:
-
-```js
-{ disable: ['forms.building'] }
-```
 
 For a form people fill in and can't otherwise change, use
 `{ readOnly: { except: ['forms.filling'] } }`: see [Read-only](turning-off#read-only).

@@ -8,7 +8,7 @@ import { EpdfPdfViewer, type Viewer } from '@cloudpdf/viewer-angular';
     <epdf-pdf-viewer
       [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
       theme="system"
-      [disable]="['forms']"
+      [features]="{ forms: false }"
       style="height: 100vh"
       (ready)="onReady($event)"
     />

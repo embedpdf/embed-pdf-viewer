@@ -113,7 +113,13 @@ The stamp plugin's own settings go in the same place: see [Stamps](/docs/headles
 
 ## Redaction
 
-In the **Redact** mode, people mark text or areas, check them in the redaction panel, then apply
+Redaction starts off. Turn it on, and the **Redact** mode joins the tabs:
+
+```js
+{ features: { redaction: true } }
+```
+
+In it, people mark text or areas, check them in the redaction panel, then apply
 them all from the panel, or select marks and apply just those from the bar under them. Either way
 the viewer asks first, and warns when other annotations under a mark would go too. Applying removes what's under
 each mark from the file for good: the text, the images and the drawing, not just what shows. The
@@ -131,7 +137,13 @@ See [Redaction](/docs/headless/annotations/redaction#settings).
 
 ## Measurements
 
-In the **Measure** mode, people measure distances, perimeters and areas. A drawing's scale comes
+Measuring starts off. Turn it on, and the **Measure** mode joins the tabs:
+
+```js
+{ features: { measurement: true } }
+```
+
+In it, people measure distances, perimeters and areas. A drawing's scale comes
 from the PDF when it has one; otherwise they set it once with **Calibrate**, by drawing a line of a
 known length. A page with no scale uses the default:
 

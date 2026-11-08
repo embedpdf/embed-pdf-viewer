@@ -24,6 +24,7 @@ import type { TranslationDictionary } from '@embedpdf/plugin-i18n';
 import { en } from '../../chrome/src/locales/en';
 import {
   dist,
+  EVERY_FEATURE,
   frames,
   launchChromium,
   serveViewer,
@@ -57,6 +58,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
     target: '#viewer',
     src: '/sample.pdf',
     theme: 'light',
+    features: ${EVERY_FEATURE},
     locale: '${PSEUDO}',
     strings: { '${PSEUDO}': ${JSON.stringify(wrapped(en.translations))} },
   });

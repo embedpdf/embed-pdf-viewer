@@ -36,16 +36,18 @@ Two kinds of surface, two deliberate semantics:
   or write your own. It is never merged — the edits are the layout's own
   methods, and the layout is plain data small enough to read.
 
-### Remove features
+### Turn features on and off
 
 ```tsx
-<FullViewer engine={engine} disable={['forms', 'redaction', 'tool:highlight']} />
+<FullViewer engine={engine} features={{ measurement: true, forms: false }} />
 <FullViewer engine={engine} readOnly={{ except: ['forms.filling'] }} />
 ```
 
-`disable` takes features (`annotations`, or a part such as
-`annotations.highlight`) and single commands (a name with a colon) in one list;
-`readOnly` turns off every feature that changes the document, minus `except`.
+`features` turns a feature (`annotations`) or a part (`'annotations.highlight'`)
+on or off by its name; one left out keeps its default, and measuring, redaction,
+building forms and snapshots start off. A part wins over its feature.
+`readOnly` turns off every feature that changes the document, minus `except`,
+after `features`. `disable`, from 3.0, is deprecated.
 What's off vanishes everywhere at once — toolbar, menus, overflow, shortcuts —
 because every surface is a projection of the same command registry. Both follow
 their props while the viewer runs, and both are only the interface: the
@@ -114,7 +116,7 @@ layout={(layout, env) =>
 - `add(item, { to, section, group, before, after })` — `to` is a bar or a menu;
   without a position the item starts a new group at the end of `end`.
 - `remove(ids, { from })` — always one place; to leave something out
-  everywhere, use `disable`. A group with nothing left disappears.
+  everywhere, turn its feature off in `features`. A group with nothing left disappears.
 - `replace(id, item)` — swaps an item in place, in every bar and menu.
 - `addMenu(id, sections)`, `addPanel(id, panel)`, `panel(id, changes)`,
   `removePanel(id)`, `tabs('always' | 'multiple' | 'never')`, and `toJSON()`

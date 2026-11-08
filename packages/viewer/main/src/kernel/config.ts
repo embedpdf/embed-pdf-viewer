@@ -81,6 +81,7 @@ export type LiveConfigKey =
   | 'src'
   | 'theme'
   | 'locale'
+  | 'features'
   | 'disable'
   | 'readOnly'
   | 'fetch'
@@ -90,6 +91,7 @@ const LIVE_CONFIG_KEYS: ReadonlySet<string> = new Set<LiveConfigKey>([
   'src',
   'theme',
   'locale',
+  'features',
   'disable',
   'readOnly',
   'fetch',
@@ -106,7 +108,7 @@ const isPlainObject = (value: unknown): value is Readonly<Record<string, unknown
 
 /**
  * Whether two config values are the same: arrays and plain objects by their entries, so an
- * inline `disable={['forms']}` is no change; everything else (functions, files, bytes, engines)
+ * inline `features={{ forms: false }}` is no change; everything else (functions, files, bytes, engines)
  * by identity. A missing key and `undefined` are the same.
  */
 export function sameConfigValue(left: unknown, right: unknown): boolean {

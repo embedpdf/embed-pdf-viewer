@@ -11,6 +11,7 @@ const props = shallowRef<LiveProps>({
   src: '/sample.pdf',
   theme: 'light',
   locale: 'en',
+  features: {},
   disable: [],
   readOnly: false,
 });

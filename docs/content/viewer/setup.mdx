@@ -68,11 +68,11 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
 | `locale` | `'auto'` or a language code | [Translations](customize/translations) |
 | `strings` | Your own words, and other languages | [Translations](customize/translations) |
-| `disable` | Features, or single buttons, to leave out | [Turn features off](features/turning-off) |
-| `readOnly` | Every feature that changes the document off | [Turn features off](features/turning-off#read-only) |
-| `scope` | What the user may do, checked by the engine | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `features` | What people can do: features on or off | [Turn features on and off](features/turning-off) |
+| `readOnly` | Every feature that changes the document off | [Turn features on and off](features/turning-off#read-only) |
+| `scope` | What the user may do, checked by the engine | [Turn features on and off](features/turning-off#what-a-user-may-do) |
 | `identity` | Who the user is: the author of their annotations | [All features](features#who-the-user-is) |
-| `notAllowed` | `'hide'` (default) or `'disable'` what the scope doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `notAllowed` | `'hide'` (default) or `'disable'` what the scope doesn't allow | [Turn features on and off](features/turning-off#what-a-user-may-do) |
 | `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
 | `fonts` | Your fonts, beyond the standard PDF fonts, for the text people write | [Fonts](features/fonts) |
 | `warnBeforeLeaving` | `true` (default), or `false` to leave the page without asking, unsaved changes or not | [Documents](documents#warn-before-changes-are-lost) |
@@ -98,9 +98,9 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
 | `locale` | `'auto'` or a language code | [Translations](customize/translations) |
 | `strings` | Your own words, and other languages | [Translations](customize/translations) |
-| `disable` | Features, or single buttons, to leave out | [Turn features off](features/turning-off) |
-| `readOnly` | Every feature that changes the document off | [Turn features off](features/turning-off#read-only) |
-| `notAllowed` | `'hide'` (default) or `'disable'` what the user's token doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `features` | What people can do: features on or off | [Turn features on and off](features/turning-off) |
+| `readOnly` | Every feature that changes the document off | [Turn features on and off](features/turning-off#read-only) |
+| `notAllowed` | `'hide'` (default) or `'disable'` what the user's token doesn't allow | [Turn features on and off](features/turning-off#what-a-user-may-do) |
 | `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
 | `fonts` | Ignored on the cloud: your server's fonts are the ones offered | [Fonts](features/fonts) |
 | `engine` | Your own CloudPDF server (`baseUrl`), the engine's own `token`, or another engine | [Self-hosting](self-hosting) |
@@ -166,7 +166,7 @@ carries.
 ## Change the config later
 
 Six keys follow their prop while the viewer runs: `src` opens the new document in place of the
-old one; `theme` and `locale` switch the look and the language; `disable` and `readOnly` take tools
+old one; `theme` and `locale` switch the look and the language; `features` and `readOnly` take tools
 away or bring them back; `appState` gives [your commands](customize/commands#your-apps-state) your
 app's state as it is now.
 

@@ -1,17 +1,19 @@
 /**
- * The viewer's features, and what `disable` and `readOnly` turn off.
+ * The viewer's features, and what `features`, `disable` and `readOnly` turn on and off.
  *
  * A feature is a command category: `annotations`, or one of its parts, `annotations.highlight`.
  * Turning a feature off turns off everything under it (the commands plugin matches whole dotted
- * segments). `disable` lists features and single commands in one list, told apart by the colon
- * every command id has; `readOnly` adds the features that change the document. A feature that's
- * off also stops people changing by hand what it made: the annotations and fields already in the
- * document (the annotation plugin's `editable` and the form plugin's `fillable` settings).
+ * segments). `features` says on or off by name, over the defaults (`START_OFF_FEATURES` start
+ * off); a part wins over its feature. `disable`, from 3.0, lists features and single commands in
+ * one list, told apart by the colon every command id has; `readOnly` turns off the features that
+ * change the document, last. A feature that's off also stops people changing by hand what it made:
+ * the annotations and fields already in the document (the annotation plugin's `editable` and the
+ * form plugin's `fillable` settings).
  */
 import type { EditableKind, EditableKinds } from '@embedpdf/react/annotation';
 import type { FillableFields, FormFieldKind } from '@embedpdf/react/form';
 
-/** Every built-in feature and its parts: the names `disable` takes, as All features lists them. */
+/** Every built-in feature and its parts: the names `features` takes, as All features lists them. */
 export const FEATURE_PARTS = {
   annotations: ['highlight', 'markup', 'drawing', 'text', 'notes', 'links'],
   shapes: [],
@@ -37,6 +39,24 @@ type FeatureParts = typeof FEATURE_PARTS;
 export type Feature = {
   [Name in keyof FeatureParts]: Name | `${Name}.${FeatureParts[Name][number]}`;
 }[keyof FeatureParts];
+
+/**
+ * Whether people can do each feature, or part, in this viewer: `true` or `false` by its name.
+ * One left out keeps its default. A part wins over its feature, so
+ * `{ annotations: false, 'annotations.highlight': true }` is highlighting and nothing else.
+ */
+export type Features = { readonly [Name in Feature]?: boolean } & {
+  /** Your own features, by your commands' `categories`. */
+  readonly [yours: string]: boolean | undefined;
+};
+
+/** The features and parts that start off: on once `features` turns them on. */
+export const START_OFF_FEATURES: readonly Feature[] = [
+  'forms.building',
+  'redaction',
+  'measurement',
+  'snapshots',
+];
 
 /** What `readOnly` keeps on: every feature it would turn off, minus these. */
 export interface ReadOnlyExceptions {
@@ -132,13 +152,110 @@ function readOnlyFeaturesOf(readOnly: boolean | ReadOnlyExceptions | undefined):
   return off;
 }
 
-/** The features `disable` and `readOnly` turn off: the names without a colon, and `readOnly`'s. */
+/** What the app says about features: `features`, `disable` (from 3.0) and `readOnly`. */
+export interface FeatureChoices {
+  readonly features?: Features | undefined;
+  readonly disable?: readonly string[] | undefined;
+  readonly readOnly?: boolean | ReadOnlyExceptions | undefined;
+}
+
+/** A name's feature, and its part after the first dot: `['annotations', 'highlight']`. */
+const featureAndPart = (name: string): readonly [feature: string, part: string | undefined] => {
+  const dot = name.indexOf('.');
+  return dot < 0 ? [name, undefined] : [name.slice(0, dot), name.slice(dot + 1)];
+};
+
+/** Every feature and its parts: the built-in ones, and those your commands' categories name. */
+function featureTreeOf(yours: readonly string[]): ReadonlyMap<string, readonly string[]> {
+  const tree = new Map<string, string[]>(
+    Object.entries(FEATURE_PARTS).map(([feature, parts]) => [feature, [...parts]]),
+  );
+  for (const category of yours) {
+    const [feature, part] = featureAndPart(category);
+    const parts = tree.get(feature) ?? [];
+    if (part !== undefined && !parts.includes(part)) parts.push(part);
+    tree.set(feature, parts);
+  }
+  return tree;
+}
+
+/** A feature while the choices are read: on or off, and each of its parts. */
+interface FeatureState {
+  on: boolean;
+  readonly parts: Map<string, boolean>;
+}
+
+/**
+ * The features that are off, read layer over layer: the defaults, `disable`, `features`, then
+ * `readOnly`. In each layer a feature comes before its parts, so a part wins; a feature covers
+ * every part it has. A feature is off whole only while none of its parts is on, so
+ * `{ annotations: false, 'annotations.highlight': true }` keeps the Annotate tab, for
+ * highlighting. `yours` are your commands' categories, whose parts a feature covers too.
+ */
 function featuresOffOf(
-  disable: readonly string[] | undefined,
-  readOnly: boolean | ReadOnlyExceptions | undefined,
+  { features, disable, readOnly }: FeatureChoices,
+  yours: readonly string[],
 ): string[] {
-  const features = (disable ?? []).filter((name) => !name.includes(':'));
-  return [...new Set([...features, ...readOnlyFeaturesOf(readOnly)])];
+  const tree = featureTreeOf(yours);
+  const states = new Map<string, FeatureState>();
+  const stateOf = (feature: string): FeatureState => {
+    let state = states.get(feature);
+    if (!state) {
+      const parts = tree.get(feature) ?? [];
+      state = { on: true, parts: new Map(parts.map((part) => [part, true])) };
+      states.set(feature, state);
+    }
+    return state;
+  };
+  const read = (layer: readonly (readonly [name: string, on: boolean])[]): void => {
+    const featuresFirst = [...layer].sort(
+      ([left], [right]) => Number(left.includes('.')) - Number(right.includes('.')),
+    );
+    for (const [name, on] of featuresFirst) {
+      const [feature, part] = featureAndPart(name);
+      const state = stateOf(feature);
+      if (part !== undefined) {
+        state.parts.set(part, on);
+        continue;
+      }
+      state.on = on;
+      for (const each of state.parts.keys()) state.parts.set(each, on);
+    }
+  };
+  const off = (names: readonly string[]) => names.map((name) => [name, false] as const);
+  read(off(START_OFF_FEATURES));
+  read(off((disable ?? []).filter((name) => !name.includes(':'))));
+  read(
+    Object.entries(features ?? {}).filter(
+      (entry): entry is [string, boolean] => typeof entry[1] === 'boolean',
+    ),
+  );
+  read(off(readOnlyFeaturesOf(readOnly)));
+  // In the tree's order, the built-in features first.
+  return [...tree.keys(), ...states.keys()]
+    .filter((feature, index, all) => all.indexOf(feature) === index && states.has(feature))
+    .flatMap((feature) => {
+      const { on, parts } = states.get(feature)!;
+      const offParts = [...parts].filter(([, partOn]) => !partOn);
+      if (!on && offParts.length === parts.size) return [feature];
+      return offParts.map(([part]) => `${feature}.${part}`);
+    });
+}
+
+/**
+ * The names in `features` that are no feature or part, built in or one of your commands'
+ * categories: a typo, which TypeScript can't catch for the names your commands may add.
+ */
+export function unknownFeaturesOf(
+  features: Features | undefined,
+  yours: readonly string[],
+): string[] {
+  const tree = featureTreeOf(yours);
+  return Object.keys(features ?? {}).filter((name) => {
+    const [feature, part] = featureAndPart(name);
+    const parts = tree.get(feature);
+    return !parts || (part !== undefined && !parts.includes(part));
+  });
 }
 
 /** What the commands plugin turns off: its `disabledCategories` and `disabledCommands` settings. */
@@ -148,15 +265,18 @@ export interface DisabledSettings {
 }
 
 /**
- * The commands plugin's settings for a `disable` list and a `readOnly` value: the names with a
- * colon are command ids, the rest features, and `readOnly` adds its own features.
+ * The commands plugin's settings for the app's choices: the features that are off, and the
+ * single commands `disable` names (the names with a colon). `yours` are your commands' categories.
  */
 export function disabledSettingsOf(
-  disable: readonly string[] | undefined,
-  readOnly: boolean | ReadOnlyExceptions | undefined,
+  choices: FeatureChoices,
+  yours: readonly string[] = [],
 ): DisabledSettings {
-  const commands = new Set((disable ?? []).filter((name) => name.includes(':')));
-  return { disabledCategories: featuresOffOf(disable, readOnly), disabledCommands: [...commands] };
+  const commands = new Set((choices.disable ?? []).filter((name) => name.includes(':')));
+  return {
+    disabledCategories: featuresOffOf(choices, yours),
+    disabledCommands: [...commands],
+  };
 }
 
 /** What people may change by hand: the annotation plugin's `editable` and the form plugin's `fillable`. */
@@ -166,14 +286,14 @@ export interface ByHandSettings {
 }
 
 /**
- * What people may still change by hand for a `disable` list and a `readOnly` value: the
- * annotations and fields of the features left on. A single command turned off leaves them.
+ * What people may still change by hand for the app's choices: the annotations and fields of the
+ * features left on. A single command turned off leaves them.
  */
 export function byHandSettingsOf(
-  disable: readonly string[] | undefined,
-  readOnly: boolean | ReadOnlyExceptions | undefined,
+  choices: FeatureChoices,
+  yours: readonly string[] = [],
 ): ByHandSettings {
-  const off = featuresOffOf(disable, readOnly);
+  const off = featuresOffOf(choices, yours);
   return { editable: stillOn(FEATURE_ANNOTATIONS, off), fillable: stillOn(FEATURE_FIELDS, off) };
 }
 

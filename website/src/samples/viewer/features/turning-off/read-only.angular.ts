@@ -12,6 +12,6 @@ export class App {
   readonly report = report;
   readonly config: ViewerConfig = {
     readOnly: true,
-    disable: ['documents.download', 'documents.print'],
+    features: { 'documents.download': false, 'documents.print': false },
   };
 }

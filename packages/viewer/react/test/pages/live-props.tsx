@@ -1,5 +1,5 @@
 /**
- * The live props: `src`, `theme`, `locale`, `disable`, `readOnly` and `appState` change on a running viewer
+ * The live props: `src`, `theme`, `locale`, `features`, `disable`, `readOnly` and `appState` change on a running viewer
  * without mounting a new one, a callback prop calls its latest function, and a changed prop of any
  * other key is ignored with one warning in development. `live-props.test.ts` drives it.
  */
@@ -14,6 +14,7 @@ export interface LiveProps {
   src: DocumentSrc | null;
   theme: ThemePreference;
   locale: string;
+  features: Record<string, boolean>;
   disable: string[];
   readOnly: boolean;
   appState: { approved: boolean };
@@ -46,6 +47,7 @@ function App() {
     src: '/sample.pdf',
     theme: 'light',
     locale: 'en',
+    features: {},
     disable: [],
     readOnly: false,
     appState: { approved: false },

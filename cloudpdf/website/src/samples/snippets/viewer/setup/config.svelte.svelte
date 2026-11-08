@@ -7,7 +7,7 @@
 <PDFViewer
   src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
   theme="system"
-  disable={['forms']}
+  features={{ forms: false }}
   {onready}
   style="height: 100vh"
 />

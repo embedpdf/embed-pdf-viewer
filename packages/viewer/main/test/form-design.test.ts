@@ -34,7 +34,12 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <div id="viewer"></div>
 <script type="module">
   import EmbedPDF from '/embedpdf.js';
-  window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf', theme: 'light' });
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    theme: 'light',
+    features: { 'forms.building': true },
+  });
 </script>
 </body></html>`;
 
