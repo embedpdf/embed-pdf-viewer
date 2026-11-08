@@ -16,6 +16,7 @@ import type {
   PageRef,
   PdfCoordinates,
   PdfDestination,
+  PdfMeasure,
   PdfRotation,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -50,6 +51,7 @@ export type ReverseStep =
   | OutlineMoveStep
   | OutlineReopenStep
   | PageRotateStep
+  | PageScaleStep
   | PageReorderStep
   | PageRestoreStep
   | PageRemoveStep
@@ -326,6 +328,21 @@ export interface PageRotateStep {
   readonly pages: readonly number[];
   readonly rotation: PdfRotation;
   readonly left: PdfRotation;
+}
+
+/**
+ * Gives pages `measure` as their own scale (`null`: none): the reverse of a
+ * scale change, and, the other way round, its redo. Each page changes only
+ * while it still has the scale the change left it with (`left`). Both are in
+ * the file's coordinates. A change that found several scales, or pages of
+ * several sizes, has one step for each.
+ */
+export interface PageScaleStep {
+  readonly kind: 'pages.setScale';
+  /** The pages, by object number. */
+  readonly pages: readonly number[];
+  readonly measure: PdfMeasure | null;
+  readonly left: PdfMeasure | null;
 }
 
 /**

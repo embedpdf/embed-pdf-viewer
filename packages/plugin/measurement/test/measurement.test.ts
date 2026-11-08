@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEventHook, type PageInfo } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
-import { measureFromRatio, toPageRef } from '@embedpdf/engine-core/runtime';
-import type { PageMeasurementViewport, PdfMeasure } from '@embedpdf/engine-core/runtime';
+import { measureFromRatio, toPageRef, viewportsWithScale } from '@embedpdf/engine-core/runtime';
+import type { ChangeOp, PageMeasurementViewport, PdfMeasure } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationToken,
   type CapturedAnnotationDraft,
@@ -15,7 +15,8 @@ import { initialMeasurementModel } from '../src/model';
 import { measurementState } from '../src/state';
 
 const PAGE = toPageRef(1);
-const PAGE_BOX = { x: 0, y: 0, width: 600, height: 800 };
+const PAGE_SIZE = { width: 600, height: 800 };
+const PAGE_BOX = { x: 0, y: 0, ...PAGE_SIZE };
 const LOCAL_ORIGIN = {
   kind: 'local',
   sessionId: 'session-a',
@@ -41,8 +42,9 @@ const owned = (measure: PdfMeasure): PageMeasurementViewport => ({
 
 /**
  * A controller over one 600 × 800 page. With `engine: true` the page has a
- * measure service whose `setScale` publishes `pages.scaleSet` before
- * resolving, like the real engines; without it scales are session-only.
+ * measure service, and the engine applies a change's `pages.setScale` ops
+ * and publishes `pages.scaleSet` with the new layout before it answers, like
+ * the real engines; without it scales are session-only.
  */
 function harness(
   options: {
@@ -50,14 +52,16 @@ function harness(
     canCreate?: boolean;
     engine?: boolean;
     viewports?: PageMeasurementViewport[];
-    failReads?: boolean;
+    /** The engine refuses every change. */
+    refuse?: boolean;
     config?: MeasurementConfig;
   } = {},
 ) {
   const draftCaptured = createEventHook<CapturedAnnotationDraft>();
   const annotation = {
     setPageViewports: vi.fn(),
-    remeasurePage: vi.fn(async (page: unknown, scale: unknown) => ({
+    whenRemeasurable: vi.fn(async () => {}),
+    stageRemeasure: vi.fn((page: unknown, scale: unknown) => ({
       page,
       scale,
       updated: [],
@@ -84,18 +88,33 @@ function harness(
   };
   const interaction = { activateTool: vi.fn() };
   let engineViewports: PageMeasurementViewport[] = options.viewports ?? [];
-  let failing = options.failReads ?? false;
-  const service = {
-    listViewports: vi.fn(async () => {
-      if (failing) throw new Error('viewport read failed');
-      return { viewports: engineViewports };
-    }),
-    setScale: vi.fn(async (measure: PdfMeasure | null) => {
-      engineViewports = measure ? [owned(measure)] : [];
-      const result = { page: PAGE, meta: { affectedPages: [], cacheDelta: null } };
-      ctx.emitDocumentEvent({ type: 'pages.scaleSet', ...result, origin: LOCAL_ORIGIN } as never);
-      return result;
-    }),
+  const apply = vi.fn(async (change: { ops: readonly ChangeOp[] }) => {
+    if (options.refuse) throw new Error('scale refused');
+    const items = change.ops.flatMap((op) => {
+      if (op.type !== 'pages.setScale') return [];
+      engineViewports = viewportsWithScale(engineViewports, PAGE_SIZE, op.measure);
+      const item = {
+        page: op.pages[0],
+        pages: [...op.pages],
+        measure: op.measure,
+        layout: layoutWith(engineViewports),
+        meta: { affectedPages: [], cacheDelta: null, opId: 'scale', undoable: true },
+      };
+      // Published before the answer, as the engines do.
+      ctx.emitDocumentEvent({ type: 'pages.scaleSet', ...item, origin: LOCAL_ORIGIN } as never);
+      return [{ type: 'pages.setScale', ...item }];
+    });
+    return { items, meta: { opId: 'scale', undoable: true } } as never;
+  });
+  /** The engine's page list: the one page, with these viewports. */
+  const layoutWith = (viewports: readonly PageMeasurementViewport[]) => {
+    const { viewports: _shown, ...page } = ctx.document()!.pages[0]!;
+    return {
+      pageCount: 1,
+      pages: [viewports.length ? { ...page, viewports: [...viewports] } : page],
+      labels: [],
+      namedPages: [],
+    };
   };
   const ctx = createTestContext({
     id: 'measurement',
@@ -105,7 +124,13 @@ function harness(
       registered: options.config,
       whole: ['defaultScale'],
     },
-    pages: [{ ref: PAGE, size: { width: 600, height: 800 } }],
+    pages: [
+      {
+        ref: PAGE,
+        size: PAGE_SIZE,
+        ...(options.engine && options.viewports ? { viewports: options.viewports } : {}),
+      },
+    ],
     capabilities: [
       [AnnotationToken, annotation],
       [InteractionToken, interaction],
@@ -115,24 +140,12 @@ function harness(
         allows: () => options.allowed ?? true,
         allowsAnnotation: (action: string) => action !== 'create' || (options.canCreate ?? true),
       },
-      page: () => ({ measure: options.engine ? service : undefined }),
+      page: () => ({ measure: options.engine ? {} : undefined }),
+      apply,
     } as never,
   });
   const measurement = ctx.connect(createMeasurementController(ctx));
-  return {
-    ctx,
-    measurement,
-    annotation,
-    interaction,
-    service,
-    draftCaptured,
-    setEngineViewports: (next: PageMeasurementViewport[]) => {
-      engineViewports = next;
-    },
-    failReads: (fail: boolean) => {
-      failing = fail;
-    },
-  };
+  return { ctx, measurement, annotation, interaction, apply, draftCaptured, layoutWith };
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -189,7 +202,7 @@ describe('measurement', () => {
     });
     expect(reports).toHaveLength(1);
     expect(measurement.listLastReports()).toBe(reports);
-    expect(annotation.remeasurePage).toHaveBeenCalledOnce();
+    expect(annotation.stageRemeasure).toHaveBeenCalledOnce();
     expect(changes).toEqual([PAGE]);
     expect(completed).toEqual([PAGE]);
     expect(measurement.getPageScale(PAGE).source).toBe('owned');
@@ -298,15 +311,12 @@ describe('measurement', () => {
   });
 });
 
-describe('page viewports from the engine', () => {
-  it('loads every page on connect and hands the viewports to the annotation plugin', async () => {
-    const { measurement, annotation, service } = harness({
+describe('page viewports on the layout', () => {
+  it("has every page's scale at connect, and hands its viewports to the annotation plugin", () => {
+    const { measurement, annotation, apply } = harness({
       engine: true,
       viewports: [owned(ONE_TO_HUNDRED)],
     });
-    expect(measurement.getPageScale(PAGE).ready).toBe(false);
-    await settle();
-    expect(service.listViewports).toHaveBeenCalledOnce();
     expect(measurement.getPageScale(PAGE)).toMatchObject({
       source: 'owned',
       ready: true,
@@ -318,42 +328,44 @@ describe('page viewports from the engine', () => {
       [owned(ONE_TO_HUNDRED)],
       expect.objectContaining({ subtype: 'rectilinear' }),
     );
+    expect(apply).not.toHaveBeenCalled();
   });
 
-  it('reads the viewports exactly once for its own scale change, and returns with the new scale', async () => {
-    const { measurement, annotation, service } = harness({ engine: true });
-    await settle();
-    expect(service.listViewports).toHaveBeenCalledTimes(1);
+  it('sets a scale and re-measures in one change, and has the scale the engine answers', async () => {
+    const { measurement, annotation, apply } = harness({ engine: true });
 
-    await measurement.setScale(PAGE, ONE_TO_HUNDRED);
+    const [report] = await measurement.setScale(PAGE, ONE_TO_HUNDRED);
 
-    expect(service.setScale).toHaveBeenCalledWith(ONE_TO_HUNDRED);
-    expect(service.listViewports).toHaveBeenCalledTimes(2);
+    expect(apply).toHaveBeenCalledOnce();
+    expect(apply.mock.calls[0]![0].ops).toEqual([
+      { type: 'pages.setScale', pages: [PAGE], measure: ONE_TO_HUNDRED },
+    ]);
+    expect(annotation.stageRemeasure).toHaveBeenCalledWith(PAGE, ONE_TO_HUNDRED);
+    expect(report).toMatchObject({ page: PAGE, scale: ONE_TO_HUNDRED });
     expect(measurement.getPageScale(PAGE)).toMatchObject({ source: 'owned', ready: true });
     expect(annotation.setPageViewports).toHaveBeenLastCalledWith(
       PAGE,
       [owned(ONE_TO_HUNDRED)],
       expect.anything(),
     );
-    await settle();
-    expect(service.listViewports).toHaveBeenCalledTimes(2);
   });
 
   it('follows a scale change made in another session', async () => {
-    const { ctx, measurement, annotation, setEngineViewports } = harness({ engine: true });
-    await settle();
+    const { ctx, measurement, annotation, layoutWith } = harness({ engine: true });
     expect(measurement.getPageScale(PAGE).source).toBe('default');
 
-    setEngineViewports([owned(ONE_TO_HUNDRED)]);
     ctx.emitDocumentEvent({
       type: 'pages.scaleSet',
       page: PAGE,
+      pages: [PAGE],
+      measure: ONE_TO_HUNDRED,
+      layout: layoutWith([owned(ONE_TO_HUNDRED)]),
       meta: { affectedPages: [], cacheDelta: null },
       origin: REMOTE_ORIGIN,
     } as never);
-    await settle();
 
     expect(measurement.getPageScale(PAGE).source).toBe('owned');
+    await settle();
     expect(annotation.setPageViewports).toHaveBeenLastCalledWith(
       PAGE,
       [owned(ONE_TO_HUNDRED)],
@@ -361,54 +373,24 @@ describe('page viewports from the engine', () => {
     );
   });
 
-  it('reports a failed read on the page scale and clears it once a read succeeds', async () => {
-    const { measurement, annotation, failReads } = harness({ engine: true, failReads: true });
-    await settle();
-    const failed = measurement.getPageScale(PAGE);
-    expect(failed.ready).toBe(false);
-    expect(failed.error?.message).toContain('viewport read failed');
-    expect(measurement.canMeasure(PAGE)).toBe(false);
-    expect(annotation.setPageViewports).not.toHaveBeenCalled();
-
-    failReads(false);
-    await measurement.ensureLoaded(PAGE);
-    expect(measurement.getPageScale(PAGE)).toMatchObject({ ready: true, source: 'default' });
-    expect(measurement.getPageScale(PAGE).error).toBeUndefined();
-  });
-
-  it('drops a read the closing document cut short, writing nothing once it closed', async () => {
-    const { ctx, service } = harness({ engine: true });
-    await settle();
-    let fail: (error: Error) => void = () => {};
-    service.listViewports.mockImplementationOnce(
-      () => new Promise((_resolve, reject) => (fail = reject)),
-    );
-    ctx.emitDocumentEvent({
-      type: 'pages.scaleSet',
-      page: PAGE,
-      meta: { affectedPages: [], cacheDelta: null },
-      origin: REMOTE_ORIGIN,
-    } as never);
-    await settle();
-    await ctx.destroy();
-    // The kernel reports a write into a closed instance (`instance-closed`); none may come.
-    const written = vi.spyOn(ctx.state, 'update');
-    fail(new Error('document closed'));
-    await settle();
-    expect(written).not.toHaveBeenCalled();
+  it('fails every page of a refused change, and keeps the scale the page had', async () => {
+    const { measurement } = harness({ engine: true, refuse: true });
+    await expect(measurement.setScale(PAGE, ONE_TO_HUNDRED)).rejects.toThrow('scale refused');
+    const [report] = await measurement.setScale('all', ONE_TO_HUNDRED);
+    expect(report?.scaleError?.message).toContain('scale refused');
+    expect(measurement.getPageScale(PAGE).source).toBe('default');
   });
 
   it('rejects loading a page that is not in the document', async () => {
     const { measurement } = harness({ engine: true });
+    await expect(measurement.ensureLoaded(PAGE)).resolves.toBeUndefined();
     await expect(measurement.ensureLoaded(toPageRef(99))).rejects.toMatchObject({
       code: 'not-found',
     });
   });
 
-  it('loads pages inserted after connect', async () => {
-    const { ctx, measurement, service } = harness({ engine: true });
-    await settle();
-    expect(service.listViewports).toHaveBeenCalledTimes(1);
+  it('tells the annotation plugin about pages inserted after connect', () => {
+    const { ctx, measurement, annotation } = harness({ engine: true });
 
     // Grow the test document's page registry, then wake the registry readers.
     const inserted = toPageRef(2);
@@ -416,9 +398,8 @@ describe('page viewports from the engine', () => {
     pages.push({ ...pages[0]!, index: 1, ref: inserted });
     (ctx.document() as { pages: readonly PageInfo[] }).pages = [...pages];
     ctx.notify();
-    await settle();
 
-    expect(service.listViewports).toHaveBeenCalledTimes(2);
+    expect(annotation.setPageViewports).toHaveBeenLastCalledWith(inserted, [], expect.anything());
     expect(measurement.getPageScale(inserted).ready).toBe(true);
   });
 
@@ -432,20 +413,19 @@ describe('page viewports from the engine', () => {
   });
 
   it('takes a page as a ref or an index, and refuses one that is not there', async () => {
-    const { measurement, service } = harness({ engine: true });
-    await settle();
+    const { measurement, apply } = harness({ engine: true });
     expect(measurement.getPageScale(0)).toBe(measurement.getPageScale(PAGE));
     expect(measurement.getPageScale(5)).toMatchObject({ ready: false, measure: null });
     expect(measurement.canMeasure(0)).toBe(true);
     expect(measurement.canMeasure(5)).toBe(false);
 
     await measurement.setPreset(0, 'metric-100');
-    expect(service.setScale).toHaveBeenCalledTimes(1);
+    expect(apply).toHaveBeenCalledTimes(1);
     await expect(measurement.setPreset([0, 5], 'metric-100')).rejects.toMatchObject({
       code: 'not-found',
     });
     // Nothing was written for the page that was there either.
-    expect(service.setScale).toHaveBeenCalledTimes(1);
+    expect(apply).toHaveBeenCalledTimes(1);
   });
 
   it('has the state the page lists, the same arrays while nothing changed', async () => {
@@ -493,14 +473,13 @@ describe('page viewports from the engine', () => {
   });
 
   it('a cancelled scale change rejects operation-cancelled and writes nothing', async () => {
-    const { measurement, service } = harness({ engine: true });
-    await settle();
+    const { measurement, apply } = harness({ engine: true });
     const cancel = new AbortController();
     cancel.abort();
     await expect(
       measurement.setPreset(PAGE, 'metric-100', { signal: cancel.signal }),
     ).rejects.toMatchObject({ code: 'operation-cancelled' });
-    expect(service.setScale).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
     expect(measurement.isBusy()).toBe(false);
   });
 });

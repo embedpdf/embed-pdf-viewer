@@ -4,5 +4,6 @@ import type * as CloudPDF from "../index.js";
 
 export interface DocPagesSetScaleResponse {
     page: CloudPDF.PageRef;
+    layout: CloudPDF.PageListSnapshot;
     meta: CloudPDF.MutationMeta;
 }

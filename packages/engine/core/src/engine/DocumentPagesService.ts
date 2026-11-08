@@ -1,3 +1,4 @@
+import type { PdfMeasure } from '../dto/Measure';
 import type { PageExtractOptions } from '../dto/PageExtract';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PdfRotation } from '../geometry/primitives';
@@ -10,6 +11,7 @@ import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { PageFlattenResult } from '../mutation/PageFlattenResult';
 import type {
   FlattenWriteOptions,
@@ -68,6 +70,19 @@ export interface DocumentPagesService {
     rotation: PdfRotation,
     options?: WriteOptions,
   ): AbortablePromise<PageRotateResult>;
+
+  /**
+   * Give every page `measure` as its own scale: the one viewport the engine
+   * writes, over the visible page (`null` removes it). The pages' other
+   * viewports stay. The measurements already on the pages keep theirs;
+   * update them in the same change (`doc.apply`) to re-measure them. Needs
+   * `doc.annotate.modify`.
+   */
+  setScale(
+    pages: PageRef[],
+    measure: PdfMeasure | null,
+    options?: WriteOptions,
+  ): AbortablePromise<PageScaleResult>;
 
   /**
    * Delete pages. Deleting every page is rejected (`InvalidArg`) — a

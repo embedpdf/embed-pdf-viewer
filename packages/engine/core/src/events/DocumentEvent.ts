@@ -1,3 +1,4 @@
+import type { PdfMeasure } from '../dto/Measure';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -121,7 +122,13 @@ export interface EventOrigin {
  * provenance-aware features (undo, attribution toasts, camera etiquette).
  */
 export type DocumentEvent =
-  | ({ type: 'pages.scaleSet'; origin: EventOrigin } & PageScaleResult)
+  | ({
+      type: 'pages.scaleSet';
+      origin: EventOrigin;
+      /** The pages, and the scale each has now. */
+      pages: PageRef[];
+      measure: PdfMeasure | null;
+    } & PageScaleResult)
   | ({
       type: 'annotations.created';
       page: PageRef;

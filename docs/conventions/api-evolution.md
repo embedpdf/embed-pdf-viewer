@@ -189,7 +189,8 @@ The manifest's counters, named by scope:
   counters.
 - **The whole document:** `contentsVersion`, `annotationsVersion`,
   `formsVersion`, `metadataVersion`, `outlineVersion`, `attachmentsVersion`,
-  `actionsVersion`, `fontsVersion`, and `docVersion` for anything at all. A read
+  `actionsVersion`, `fontsVersion`, `viewportsVersion` (the pages' scales,
+  which the layout carries), and `docVersion` for anything at all. A read
   across every page pins the document-wide counter, the plural of the page one:
   `contentsVersion` moves when any page's `contentVersion` moves or a page is
   inserted or deleted.
@@ -358,7 +359,7 @@ parameter, not a shape.
 | Kind                    | Route                                                                  | Versions                                                            | Request                                     |
 | :---------------------- | :--------------------------------------------------------------------- | :------------------------------------------------------------------ | :------------------------------------------ |
 | `manifest`              | `/manifest@`                                                           | `docVersion`                                                        |                                             |
-| `layout`                | `/layout@`                                                             | `layoutVersion`                                                     |                                             |
+| `layout`                | `/layout@`                                                             | `layoutVersion`, `viewportsVersion`                                 |                                             |
 | `text`                  | `/text/pages/:page/data@`                                              | `contentVersion`                                                    |                                             |
 | `geometry`              | `/geometry/pages/:page/data@`                                          | `contentVersion`                                                    |                                             |
 | `render`                | `/render/{pages,annotations/pages,fields/pages,all/pages}/:page/data@` | `contentVersion` (+ `annotationVersion`, `widgetVersion` by family) | size, crop, rotation, image format, quality |

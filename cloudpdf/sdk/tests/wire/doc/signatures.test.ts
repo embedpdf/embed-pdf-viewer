@@ -207,6 +207,7 @@ describe("SignaturesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
                     contentsVersion: 1,
                     layerVersion: 1,

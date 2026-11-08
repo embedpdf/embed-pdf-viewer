@@ -13,7 +13,7 @@ import {
 
 import type { RecalibrationReport } from '../host-contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import type { Crud } from './crud';
+import type { StoreChange } from '../services/store';
 
 /**
  * The measurement seam: the per-page viewports (scale regions) the
@@ -23,7 +23,6 @@ import type { Crud } from './crud';
 export function createMeasurement(
   ctx: Pick<AnnotationContext, 'cleanup'>,
   { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
-  crud: Pick<Crud, 'update'>,
 ) {
   const pageViewports = new Map<
     number,
@@ -44,14 +43,13 @@ export function createMeasurement(
     ) => {
       pageViewports.set(page.objectNumber, { viewports, fallback });
     },
-    remeasurePage: async (page: PageRef, scale: PdfMeasure) => {
-      const pageObjectNumber = page.objectNumber;
-      // Recalibration needs every dimension on the page: retry a failed load,
-      // and wait for any load or page reload still running.
+    whenRemeasurable: async () => {
       if (records.getStatus() !== 'ready') {
         await records.refresh().catch(() => {});
       }
       await records.settled();
+    },
+    stageRemeasure: (page: PageRef, scale: PdfMeasure): RecalibrationReport => {
       const report: RecalibrationReport = { page, scale, updated: [], skipped: [], failed: [] };
       if (records.getStatus() !== 'ready') {
         report.error = serializeError(new Error('the annotations of this document are not loaded'));
@@ -62,10 +60,11 @@ export function createMeasurement(
       const model = store.model();
       const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
         const record = model.byId[annotationKey(dto.ref)];
-        return record && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
+        return record && dto.page.objectNumber === page.objectNumber && isDimension(dto)
           ? [{ dto, annotation: record }]
           : [];
       });
+      const updates: StoreChange[] = [];
       for (const { dto, annotation } of candidates) {
         const ref = dto.ref;
         const reason =
@@ -82,13 +81,14 @@ export function createMeasurement(
           report.skipped.push({ ref, reason });
           continue;
         }
-        try {
-          await crud.update(ref, { subtype: dto.subtype, measure: scale } as AnnotationPatch);
-          report.updated.push(ref);
-        } catch (error) {
-          report.failed.push({ ref, error: serializeError(error) });
-        }
+        updates.push({
+          type: 'update',
+          ref,
+          patch: { subtype: dto.subtype, measure: scale } as AnnotationPatch,
+        });
+        report.updated.push(ref);
       }
+      if (updates.length > 0) store.apply(updates);
       return report;
     },
   };

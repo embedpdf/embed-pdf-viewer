@@ -1,4 +1,5 @@
 import type {
+  DocumentPagesService,
   PageHandle,
   PageLayerRights,
   PagePictureRights,
@@ -41,17 +42,9 @@ export class CloudPageHandle implements PageHandle {
     layout: (signal: AbortSignal) => Promise<PageLayout>,
     layerRights: () => PageLayerRights | null,
     pictureRights: () => PagePictureRights | null,
+    setScale: DocumentPagesService['setScale'],
   ) {
-    this.measure = new CloudPageMeasureService(
-      http,
-      docId,
-      layerName,
-      ref,
-      isClosed,
-      manifest,
-      publisher,
-      writes,
-    );
+    this.measure = new CloudPageMeasureService(http, docId, layerName, ref, isClosed, setScale);
     this.annotations = new CloudPageAnnotationsService(
       http,
       docId,

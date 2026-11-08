@@ -147,6 +147,10 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       const { type: _type, ...result } = item;
       return [{ type: 'pages.rotated', ...result }];
     }
+    case 'pages.setScale': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.scaleSet', ...result }];
+    }
     case 'pages.reorder': {
       const { type: _type, ...result } = item;
       return [{ type: 'pages.reordered', ...result }];

@@ -191,6 +191,12 @@ export interface LayersTable {
    * `content_version`, inserts a page or deletes one.
    */
   contents_version: number;
+  /**
+   * The pages' scales pointer epoch, carried by the layout's URL beside
+   * `layout_version` (migration 053): bumps with every write that sets a
+   * page's scale, and nothing else.
+   */
+  viewports_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -641,6 +647,7 @@ export interface BaseVersionsTable {
   outline_version: number;
   fonts_version: number;
   contents_version: number;
+  viewports_version: number;
   created_at: number;
 }
 

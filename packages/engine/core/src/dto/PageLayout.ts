@@ -1,3 +1,4 @@
+import type { PageMeasurementViewport } from './Measure';
 import type { PdfPageActions } from './PdfAction';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
@@ -68,4 +69,10 @@ export interface PageLayout<C extends Coordinates = PageCoordinates> {
   pdfCropBox: PdfRect;
   /** Page-owned `/AA` actions; absent for the usual script-less page. */
   actions?: PdfPageActions<C['destination']>;
+  /**
+   * The page's measurement viewports (`/VP`): regions with a scale of their
+   * own, in drawing order, as `page.measure.listViewports()` reads them.
+   * Absent for a page without any.
+   */
+  viewports?: PageMeasurementViewport<C>[];
 }

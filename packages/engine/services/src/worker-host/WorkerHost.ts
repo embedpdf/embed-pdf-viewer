@@ -1783,10 +1783,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    const viewports = await new MeasureReader(this.runtime, session).viewports(
+    const viewports = new MeasureReader(this.runtime, session).viewports(
       session.resolvePageRef(req.page).pageObjectNumber,
       signal,
-      this.slices,
     );
     return wirePack({ tag: 'measure.viewports', page: req.page, viewports });
   }
@@ -1806,6 +1805,7 @@ export class WorkerHost {
         tag: 'measure.setScale',
         result: {
           page: req.page,
+          layout: new PagesReader(this.runtime, session).read(signal),
           meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
         },
       },

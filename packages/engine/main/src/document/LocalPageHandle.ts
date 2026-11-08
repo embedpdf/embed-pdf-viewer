@@ -5,6 +5,7 @@ import {
   type LocalPageHandle as LocalPageHandleContract,
   type PageObjectNumber,
   type PageRef,
+  type DocumentPagesService,
   type SessionEventPublisher,
 } from '@embedpdf/engine-core/runtime';
 
@@ -44,6 +45,7 @@ export class LocalPageHandle implements LocalPageHandleContract {
     imageEncoder: LocalImageEncoder,
     guard: ScopeGuard,
     publisher: SessionEventPublisher,
+    setScale: DocumentPagesService['setScale'],
     renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {
     this.annotations = new LocalPageAnnotationsService(
@@ -76,6 +78,6 @@ export class LocalPageHandle implements LocalPageHandleContract {
       renderPolicy,
     );
     this.pieceInfo = new LocalPieceInfoService(docId, queue, view, guard, ref);
-    this.measure = new LocalPageMeasureService(docId, ref, queue, view, guard, publisher);
+    this.measure = new LocalPageMeasureService(docId, ref, queue, view, guard, setScale);
   }
 }

@@ -48,6 +48,7 @@ export {
   OutlineDeleteResultSchema,
   OutlineRestoreResultSchema,
   OutlineWireComponents,
+  PageWireComponents,
   FontListSchema,
   FontProgramInfoSchema,
   FontResolveRequestSchema,
@@ -477,6 +478,7 @@ export type {
   AnnotationsExportToken,
   FontsToken,
   FormExportToken,
+  LayoutToken,
   OutlineToken,
 } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';

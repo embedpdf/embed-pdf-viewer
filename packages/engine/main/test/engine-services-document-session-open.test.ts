@@ -132,6 +132,8 @@ function createFakeRuntime(): PdfRuntimeModule & {
       EPDFDoc_GetPageLabelSectionCount: () => 0,
       // No page-level actions in this ownership/routing fixture.
       EPDFDoc_GetPageActionModel: () => ptr(0),
+      // No measurement viewports: `pages.list` counts each page's /VP.
+      EPDFPage_CountViewportsRaw: () => 0,
       // No named pages either: `pages.list` reads both catalog name trees.
       EPDFDoc_GetNamedPageCount: () => 0,
       EPDFDoc_GetNamedPageAt: () => 0,

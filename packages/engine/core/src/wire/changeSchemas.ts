@@ -42,7 +42,9 @@ import {
   PageReorderResultSchema,
   PageRestoreResultSchema,
   PageRotateResultSchema,
+  PageScaleResultSchema,
 } from './schemas';
+import { PdfMeasureSchema, PdfMeasureWriteSchema } from '../dto/Measure.schema';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
   AnnotationDraftSchema,
@@ -228,6 +230,11 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     rotation: PdfRotationSchema,
   }),
   z.object({
+    type: z.literal('pages.setScale'),
+    pages: z.array(PageRefSchema).min(1),
+    measure: PdfMeasureWriteSchema.nullable(),
+  }),
+  z.object({
     type: z.literal('pages.reorder'),
     pages: z.array(PageRefSchema).min(1),
     position: PagePositionSchema,
@@ -379,6 +386,10 @@ export const ChangeItemSchema = closed(
     itemOf('pages.rotate', PageRotateResultSchema, {
       pages: z.array(PageRefSchema),
       rotation: PdfRotationSchema,
+    }),
+    itemOf('pages.setScale', PageScaleResultSchema, {
+      pages: z.array(PageRefSchema),
+      measure: PdfMeasureSchema.nullable(),
     }),
     itemOf('pages.reorder', PageReorderResultSchema),
     itemOf('pages.delete', PageDeleteResultSchema, { pages: z.array(PageRefSchema) }),

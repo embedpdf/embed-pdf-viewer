@@ -69,6 +69,14 @@ export interface DocumentManifest {
    */
   outlineVersion: number;
   /**
+   * Doc-level pin for the pages' scales (their `/VP` viewports), which the
+   * layout carries: `/layout@{layoutVersion, viewportsVersion}`. Bumps on a
+   * scale change only, so the outline, search and exports, which pin
+   * `layoutVersion`, stay warm. Absent from a server without it (before
+   * 3.1): its layout carries no viewports.
+   */
+  viewportsVersion?: number;
+  /**
    * Doc-level pin for the fonts that can be named in the document
    * (`/fonts@{fontsVersion}`). Bumps on a write that changes the fonts the
    * list shows: one that embeds a font, or removes the last use of one.
