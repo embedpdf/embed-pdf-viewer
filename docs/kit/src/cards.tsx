@@ -1,20 +1,28 @@
 import {
   Attachment01Icon,
   Comment01Icon,
+  ComponentIcon,
   CpuIcon,
   HighlighterIcon,
   Image02Icon,
   Layout01Icon,
+  LayoutTopIcon,
   Link01Icon,
+  Menu01Icon,
+  PaintBoardIcon,
   PuzzleIcon,
   RulerIcon,
   Search01Icon,
   ServerStack01Icon,
   Shapes01Icon,
+  SidebarLeftIcon,
+  SourceCodeIcon,
+  SquareMousePointerIcon,
   StampIcon,
   TaskEdit01Icon,
   TextSelectionIcon,
   TextSquareIcon,
+  ToggleOnIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Link from 'next/link';
@@ -84,6 +92,14 @@ const GRID_CARD_ICONS = {
   engine: CpuIcon,
   server: ServerStack01Icon,
   plugin: PuzzleIcon,
+  theme: PaintBoardIcon,
+  toggle: ToggleOnIcon,
+  toolbar: LayoutTopIcon,
+  button: SquareMousePointerIcon,
+  menu: Menu01Icon,
+  panel: SidebarLeftIcon,
+  component: ComponentIcon,
+  code: SourceCodeIcon,
 } as const;
 
 export type GridCardIcon = keyof typeof GRID_CARD_ICONS;
@@ -130,27 +146,31 @@ export function GridCard({
 }) {
   const glyph = GRID_CARD_ICONS[icon] ?? GRID_CARD_ICONS.plugin;
 
+  // One column on a phone: the icon sits beside the text, as in <Card>, so a
+  // stack of tiles doesn't spend a screen on icons. Tiles from `sm` up.
   return (
     <Link
       href={href}
-      className="group flex flex-col rounded-[14px] border border-[var(--dk-border)] bg-white p-[18px] no-underline transition-all hover:-translate-y-0.5 hover:border-[#CFE0FF] hover:shadow-[0_16px_32px_-22px_rgba(22,119,255,0.45)]"
+      className="group flex items-start gap-3.5 rounded-[14px] border border-[var(--dk-border)] bg-white p-[18px] no-underline transition-all hover:-translate-y-0.5 hover:border-[#CFE0FF] hover:shadow-[0_16px_32px_-22px_rgba(22,119,255,0.45)] sm:flex-col sm:gap-0"
     >
       <span className="inline-flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[11px] bg-[var(--dk-accent-surface)] text-[var(--dk-accent)]">
         <HugeiconsIcon icon={glyph} size={21} strokeWidth={2} />
       </span>
-      <span className="font-display mt-3.5 flex items-center gap-1.5 text-base font-extrabold leading-[1.2] tracking-[-0.01em] text-[var(--dk-heading)]">
-        {title}
-        <ArrowRight
-          width={15}
-          height={15}
-          className="text-[var(--dk-accent)] opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
-        />
-      </span>
-      {description ? (
-        <span className="mt-1.5 block font-sans text-[13.5px] leading-[1.45] text-[var(--dk-muted)]">
-          {description}
+      <span className="min-w-0">
+        <span className="font-display flex items-center gap-1.5 text-base font-extrabold leading-[1.2] tracking-[-0.01em] text-[var(--dk-heading)] sm:mt-3.5">
+          {title}
+          <ArrowRight
+            width={15}
+            height={15}
+            className="text-[var(--dk-accent)] opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
+          />
         </span>
-      ) : null}
+        {description ? (
+          <span className="mt-1.5 block font-sans text-[13.5px] leading-[1.45] text-[var(--dk-muted)]">
+            {description}
+          </span>
+        ) : null}
+      </span>
     </Link>
   );
 }

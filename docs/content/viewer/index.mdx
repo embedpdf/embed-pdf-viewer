@@ -3,7 +3,7 @@ title: Viewer
 description: A complete PDF viewer you add with one tag, then make your own with a few lines of config, in plain HTML, React, Vue, Svelte or Angular.
 ---
 
-import { Cards, Card } from '@/components/docs/cards';
+import { Cards, Card, CardGrid, GridCard } from '@/components/docs/cards';
 
 {/* Served at `…/viewer/<framework>` with NO trailing slash: a relative href
     resolves against `…/viewer/`, so pages are `quick-start`,
@@ -24,16 +24,56 @@ That's the whole integration. The rest of these docs are about making it yours.
 Everything you change is a few lines of config, the same in every framework. Start at the top and
 stop when it's enough:
 
-| You want to | Change | Page |
-| :-- | :-- | :-- |
-| Match your brand | Your accent color, fonts, light or dark | [Theming](customize/theming) |
-| Turn features on or off, or make it read-only | `features: { comments: false, measurement: true }`, `readOnly: true` | [Turn features on and off](features/turning-off) |
-| Move or remove buttons | One line per change | [Layout](customize/layout) |
-| Put a toolbar at the bottom, on the side, or several | Where each bar goes | [Layout](customize/layout) |
-| Add your own button | A command: a label, an icon, what it does | [Buttons & commands](customize/commands) |
-| Add your own menu or panel | A list of items, or your component | [Menus](customize/menus), [Panels](customize/panels) |
-| Put your own component in the toolbar | Your React, Vue, Svelte or Angular component | [Your own components](customize/components) |
-| Control the viewer from your app | The `viewer` object | [The viewer in code](code/viewer) |
+<CardGrid columns={2}>
+  <GridCard
+    icon="theme"
+    title="Match your brand"
+    description="Your accent color, fonts, and light or dark."
+    href="customize/theming"
+  />
+  <GridCard
+    icon="toggle"
+    title="Turn features on and off"
+    description="Hide comments, add measurement, or make it read-only."
+    href="features/turning-off"
+  />
+  <GridCard
+    icon="toolbar"
+    title="Arrange the toolbars"
+    description="Move or remove buttons, and put toolbars on any edge."
+    href="customize/layout"
+  />
+  <GridCard
+    icon="button"
+    title="Add your own button"
+    description="A command: a label, an icon, and what it does."
+    href="customize/commands"
+  />
+  <GridCard
+    icon="menu"
+    title="Add a menu"
+    description="A list of items that opens from a button."
+    href="customize/menus"
+  />
+  <GridCard
+    icon="panel"
+    title="Add a panel"
+    description="Your own list or component next to the pages."
+    href="customize/panels"
+  />
+  <GridCard
+    icon="component"
+    title="Use your own components"
+    description="Your React, Vue, Svelte or Angular component in the toolbar."
+    href="customize/components"
+  />
+  <GridCard
+    icon="code"
+    title="Control it from your app"
+    description="Open documents, run commands, and follow what happens."
+    href="code/viewer"
+  />
+</CardGrid>
 
 You never write layout code for phones, menus that open the right way, or keyboard focus. You say
 what goes where, and the viewer takes care of how it behaves. A menu in a bottom toolbar opens
