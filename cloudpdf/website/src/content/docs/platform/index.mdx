@@ -14,7 +14,7 @@ request against what you allowed.
 <Cards>
   <Card
     title="Put a PDF on your website"
-    description="About 5 minutes: upload, make a grant, paste two lines. No server needed."
+    description="About 5 minutes: upload, make a grant, paste the embed code. No server needed."
     href="/docs/platform/quick-start/website"
   />
   <Card
@@ -31,16 +31,16 @@ Who opens the document decides how they get in:
 | | A grant | A token |
 | :-- | :-- | :-- |
 | Who opens it | Anyone with the link, or on your website | Your own signed-in users |
-| Made in | The dashboard | Your server, with an API key |
-| Knows who they are | No: they're visitors | Yes: your user's id and name |
-| Works until | You pause or end it | It runs out, after minutes or hours |
+| Made in | The dashboard, or your server | Your server, with an API key |
+| Knows who they are | Only what visitors tell it | Yes: your user's id and name |
+| Works until | You pause or end it, or it expires | The time your server sets |
 
-Both end the same way: the viewer gets a short-lived pass for one document, with the permissions
-you chose, and every page, search and comment is checked against it.
+Both end the same way: the viewer holds a pass for one document, with the permissions you chose,
+and every page, search and comment is checked against it.
 
 ## What people can do
 
-A grant and a token say what people can do in the same words:
+Grants and tokens use the same permissions. The dashboard offers them as four levels:
 
 | Level | People can |
 | :-- | :-- |
@@ -56,7 +56,7 @@ only when you say so.
 
 - **The dashboard**, at [app.cloudpdf.com](https://app.cloudpdf.com): your documents and folders,
   grants, API keys, members and billing.
-- **The viewer**: two lines of HTML, or a component for React, Vue, Svelte and Angular. It brings
+- **The viewer**: a few lines of HTML, or a component for React, Vue, Svelte and Angular. It brings
   the toolbar, search, comments, forms and signatures. Or build your own interface with the
   [headless components](/docs/headless/react).
 - **The SDK**, for your server: uploads, tokens and everything in the

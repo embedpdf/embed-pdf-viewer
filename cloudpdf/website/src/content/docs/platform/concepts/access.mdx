@@ -19,7 +19,7 @@ Who opens the document decides how they get in. Ask one question: does your app 
 | Who opens it | Anyone with the link, or on your website | One of your signed-in users |
 | Made by | You, in the dashboard (or your server) | Your server, with an API key, for each user |
 | Says who they are | No: everyone is a visitor, who may answer a few questions | Yes: your user's id and name |
-| Lasts | Until you pause, change or end it | Minutes or hours, then your server makes the next |
+| Lasts | Until you pause or end it, or it expires | As long as your server sets, then it makes the next |
 | You change it by | Editing it: every link and embed follows | Making the next token differently |
 | Needs a server | No | Yes: the route that makes tokens |
 
@@ -31,11 +31,11 @@ search and change against it:
 
 - **With a grant**, the viewer trades the grant for the pass, and trades again before the pass runs
   out. Change the grant, and the next trade follows it.
-- **With a token**, the token is the pass. The viewer asks your server for the next one before it
-  runs out.
+- **With a token**, the token is the pass. Your token function gives the viewer the next one before
+  it runs out.
 
-So permissions read the same everywhere: a grant's **Comment** and a token's `permissions.comment`
-are the same thing.
+So permissions read the same everywhere: a grant's **Comment** and a token with the Comment list in
+its `scope` are the same thing.
 
 ## One document, both ways
 

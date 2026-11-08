@@ -1,6 +1,6 @@
 ---
 title: Folders and search
-description: Keep documents in folders, nested as deep as you like, and find any document by name with one search.
+description: Keep documents in folders, inside each other, and find any document by name with one search.
 ---
 
 import { Cards, Card } from '@/components/docs/cards';
@@ -15,7 +15,7 @@ name it, and drop documents in, or upload straight into it.
   alt="The Clients folder, with its two documents and the path back to Documents above"
 />
 
-The path above the list takes you back up. Folders hold folders too, as deep as you need.
+The path above the list takes you back up. Folders hold folders too, up to 100 levels deep.
 
 Two folders side by side can't have the same name, whatever the capitals. A folder's menu has
 **Rename**, **Move to…** and **Delete**. Deleting a folder with documents in it deletes them too,
@@ -23,8 +23,8 @@ and their grants, so the dashboard asks first.
 
 ## Find a document
 
-**Search all documents** looks through every folder at once, for documents whose name contains
-what you type:
+**Search all documents** looks through every folder at once, for documents and folders whose name
+contains what you type:
 
 <Screenshot
   name="search"
@@ -34,17 +34,28 @@ what you type:
 ## Sort and view
 
 Sort by **Newest first**, **Oldest first**, **Name, A to Z**, **Name, Z to A**, **Largest first**
-or **Smallest first**. Switch between the list and a grid of thumbnails; your browser remembers
-which.
+or **Smallest first**. Switch between the list and a grid of thumbnails. Your browser remembers
+both.
 
 ## In code
 
 ```ts
-const { folder } = await cloudpdf.folders.create({ name: 'Clients', parentId: 'root' });
+const { folder } = await cloudpdf.folders.create({
+  tenantId,
+  name: 'Clients',
+  parentId: 'root',
+});
 
-await cloudpdf.uploads.create({ source: file, folderId: folder.id });
+await cloudpdf.uploads.create({
+  tenantId,
+  source: file,
+  folderId: folder.id,
+});
 
-const { documents } = await cloudpdf.documents.list({ q: 'report' });
+const { documents } = await cloudpdf.documents.list({
+  tenantId,
+  q: 'report',
+});
 ```
 
 <Cards>

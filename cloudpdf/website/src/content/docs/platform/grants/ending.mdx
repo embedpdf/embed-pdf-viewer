@@ -16,8 +16,8 @@ Every grant has a menu with what you can do to it:
 
 | | What happens | Undo |
 | :-- | :-- | :-- |
-| **Pause** | Nobody can open it, through its link or on any website. Anyone who has it open is stopped | **Resume** |
-| **End grant** | The same, for good. It moves to the ended grants, with its visitors | None |
+| **Pause** | Nobody can open it again, through its link or on any website. A viewer already open stops within 10 minutes | **Resume** |
+| **End grant** | The same, for good. One with visitors moves to the ended grants, with them | None |
 | **Settings** | Change anything. Everyone who opens it next gets the new settings | Change it back |
 
 ## Pause
@@ -33,8 +33,9 @@ the same embed code.
 Ending is for good: the link stops, and so does every website that embeds it. To share the
 document again, make a new grant, with a new link.
 
-A grant nobody used is deleted. One with visitors moves to **Show ended grants**, with its visitors
-and their copies, so you can still read their answers and erase them.
+A grant with no visitors is deleted. One with visitors moves to **Show ended grants**, with its
+visitors and their copies, so you can still read their answers and erase them. Changes people made
+to a shared document stay in the document either way.
 
 ## Deleting the document
 
@@ -43,9 +44,13 @@ Deleting a document ends all its grants at once, along with every link and embed
 ## In code
 
 ```ts
-await cloudpdf.grants.update({ grantId, disabled: true }); // pause
-await cloudpdf.grants.update({ grantId, disabled: false }); // resume
-await cloudpdf.grants.archive({ grantId }); // end, and keep its visitors
+// Pause, and resume
+await cloudpdf.grants.update({ tenantId, grantId, disabled: true });
+await cloudpdf.grants.update({ tenantId, grantId, disabled: false });
+
+// End: delete one with no visitors, or archive one with visitors
+await cloudpdf.grants.delete({ tenantId, grantId });
+await cloudpdf.grants.archive({ tenantId, grantId });
 ```
 
 <Cards>

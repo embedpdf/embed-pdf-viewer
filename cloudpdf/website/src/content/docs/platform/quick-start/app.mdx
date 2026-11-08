@@ -23,14 +23,15 @@ This guide takes about 15 minutes, with Next.js. Every server step also has an E
 ## 1. Make an API key
 
 In the [dashboard](https://app.cloudpdf.com), open **API keys** and click **New API key**. Name it
-after your app, choose **Restricted**, and turn on what this guide needs:
+after your app, choose **Restricted**, and set what this guide needs:
 
 - **Documents and folders**: Write, to upload.
+- **Inside documents**: Write, so your tokens can let people comment.
 - **Viewer tokens**: On, to make a token for each user.
 
 <Screenshot
   name="api-key-dialog"
-  alt="The New API key dialog: named Fernquill app, Restricted, with Documents and folders on Write and Viewer tokens on"
+  alt="The New API key dialog: named Fernquill app, Restricted, with Documents and folders on Write, Inside documents on Write and Viewer tokens on"
 />
 
 Click **Create API key**, and copy the key. You see it only once:
@@ -40,10 +41,12 @@ Click **Create API key**, and copy the key. You see it only once:
   alt="The Keys card with the new key Fernquill app, its value shown once, and a button to copy it"
 />
 
-Keep it on your server, as an environment variable:
+Every call also names your workspace, by its **Tenant ID**. Copy it from the **Connect your
+server** card at the top of the same page. Keep both on your server, as environment variables:
 
 ```sh filename=".env.local"
 CLOUDPDF_API_KEY=eyJhbGciOiJIUzI1NiIs…
+CLOUDPDF_TENANT_ID=…
 ```
 
 ## 2. Install
@@ -54,13 +57,20 @@ The SDK runs on your server, and the viewer in your pages:
 npm install @cloudpdf/sdk @cloudpdf/viewer-react
 ```
 
-Make the client once, on the server. The key knows its workspace, so it's all the client needs:
+Make the client once, on the server, next to the Tenant ID:
 
 ```ts filename="lib/cloudpdf.ts"
 import { CloudPDFClient } from '@cloudpdf/sdk';
 
-export const cloudpdf = new CloudPDFClient({ token: process.env.CLOUDPDF_API_KEY });
+export const cloudpdf = new CloudPDFClient({
+  token: process.env.CLOUDPDF_API_KEY,
+});
+
+export const tenantId = process.env.CLOUDPDF_TENANT_ID!;
 ```
+
+Then copy [`lib/permissions.ts`](/docs/platform/grants/permissions#in-code): the dashboard's levels
+as lists, for step 4.
 
 ## 3. Upload a PDF
 
@@ -73,11 +83,15 @@ In this guide, a contract:
 ```ts filename="app/contracts/actions.ts"
 'use server';
 
-import { cloudpdf } from '@/lib/cloudpdf';
+import { cloudpdf, tenantId } from '@/lib/cloudpdf';
 import { db } from '@/lib/db';
 
 export async function uploadContract(contractId: string, file: File) {
-  const { document } = await cloudpdf.uploads.create({ source: file, name: file.name });
+  const { document } = await cloudpdf.uploads.create({
+    tenantId,
+    source: file,
+    name: file.name,
+  });
   await db.contracts.update(contractId, { documentId: document.id });
 }
 ```
@@ -88,7 +102,7 @@ export async function uploadContract(contractId: string, file: File) {
 ```ts filename="routes/contracts.ts"
 import express from 'express';
 
-import { cloudpdf } from '../lib/cloudpdf';
+import { cloudpdf, tenantId } from '../lib/cloudpdf';
 import { db } from '../lib/db';
 
 export const contracts = express.Router();
@@ -97,8 +111,14 @@ contracts.put(
   '/contracts/:id/pdf',
   express.raw({ type: 'application/pdf', limit: '100mb' }),
   async (req, res) => {
-    const { document } = await cloudpdf.uploads.create({ source: req.body, name: 'Contract.pdf' });
-    await db.contracts.update(req.params.id, { documentId: document.id });
+    const { document } = await cloudpdf.uploads.create({
+      tenantId,
+      source: req.body,
+      name: 'Contract.pdf',
+    });
+    await db.contracts.update(req.params.id, {
+      documentId: document.id,
+    });
     res.sendStatus(204);
   },
 );
@@ -120,27 +140,31 @@ then asks CloudPDF for a token that says who they are and what they can do:
 <Tabs.Tab>
 
 ```ts filename="app/api/pdf-token/route.ts"
-import { permissions } from '@cloudpdf/sdk';
-
 import { getUser } from '@/lib/auth';
-import { cloudpdf } from '@/lib/cloudpdf';
+import { cloudpdf, tenantId } from '@/lib/cloudpdf';
 import { db } from '@/lib/db';
+import { permissions } from '@/lib/permissions';
 
 export async function GET(request: Request) {
+  const id = new URL(request.url).searchParams.get('contract');
   const user = await getUser();
-  const contract = await db.contracts.find(new URL(request.url).searchParams.get('contract'));
+  const contract = await db.contracts.find(id);
   if (!user || contract?.ownerId !== user.id) {
     return new Response('Not found', { status: 404 });
   }
 
-  const { token } = await cloudpdf.tokens.issue({
-    docId: contract.documentId,
-    sub: user.id,
-    identity: { displayName: user.name },
-    scope: permissions.comment,
-    expiresInSeconds: 3600,
+  const { token, expiresAt } = await cloudpdf.tokens.issue({
+    tenantId,
+    body: {
+      kind: 'doc',
+      docId: contract.documentId,
+      sub: user.id,
+      identity: { userId: user.id, displayName: user.name },
+      scope: permissions.comment,
+      expiresInSeconds: 3600,
+    },
   });
-  return new Response(token);
+  return Response.json({ token, expiresAt });
 }
 ```
 
@@ -148,11 +172,11 @@ export async function GET(request: Request) {
 <Tabs.Tab>
 
 ```ts filename="routes/pdf-token.ts"
-import { permissions } from '@cloudpdf/sdk';
 import express from 'express';
 
-import { cloudpdf } from '../lib/cloudpdf';
+import { cloudpdf, tenantId } from '../lib/cloudpdf';
 import { db } from '../lib/db';
+import { permissions } from '../lib/permissions';
 
 export const pdfToken = express.Router();
 
@@ -162,14 +186,21 @@ pdfToken.get('/api/pdf-token', async (req, res) => {
     return res.sendStatus(404);
   }
 
-  const { token } = await cloudpdf.tokens.issue({
-    docId: contract.documentId,
-    sub: req.user.id,
-    identity: { displayName: req.user.name },
-    scope: permissions.comment,
-    expiresInSeconds: 3600,
+  const { token, expiresAt } = await cloudpdf.tokens.issue({
+    tenantId,
+    body: {
+      kind: 'doc',
+      docId: contract.documentId,
+      sub: req.user.id,
+      identity: {
+        userId: req.user.id,
+        displayName: req.user.name,
+      },
+      scope: permissions.comment,
+      expiresInSeconds: 3600,
+    },
   });
-  res.type('text/plain').send(token);
+  res.json({ token, expiresAt });
 });
 ```
 
@@ -178,40 +209,77 @@ pdfToken.get('/api/pdf-token', async (req, res) => {
 
 | Field | What it says |
 | :-- | :-- |
+| `kind` | `'doc'`: a token for one document |
 | `docId` | Which document: the id from step 3 |
 | `sub` | Who the user is, in your app: their id |
-| `identity.displayName` | Their name, shown on what they add, such as a comment |
+| `identity.userId` | Their id again: what they add is theirs |
+| `identity.displayName` | Their name, shown on what they add |
 | `scope` | What they can do |
-| `expiresInSeconds` | How long the token works. The viewer asks for a new one when it runs out |
+| `expiresInSeconds` | How long the token works |
 
 `scope` takes the same levels as a grant in the dashboard: `permissions.read`,
 `permissions.comment`, `permissions.fillAndSign` and `permissions.edit`. Add what else they may
 take with them:
 
 ```ts
-scope: [...permissions.comment, ...permissions.download, ...permissions.print],
+scope: [...permissions.comment, ...permissions.download],
 ```
+
+With Comment, people change and delete only what has their `userId` on it. Without a `userId`,
+nothing they add is theirs, so they can't change it afterwards.
 
 The same call in Python, PHP, C#, Go, Java and Ruby is in the API reference:
 [Issue a token](/docs/api-reference/tokens/issue).
 
 ## 5. Open it in your page
 
-Give the viewer a function that fetches a token. It calls it when the document opens, and again
-whenever the token runs out:
+The viewer asks for a token before each request it makes to CloudPDF. Give it a function that
+keeps the token it has, and fetches the next one a minute before it runs out:
+
+```ts filename="lib/pdf-token.ts"
+type Pass = { token: string; expiresAt: string };
+
+export function tokenFor(contractId: string) {
+  let pass: Promise<Pass> | null = null;
+  let renewAt = 0;
+
+  return async () => {
+    if (!pass || Date.now() >= renewAt) {
+      renewAt = Infinity;
+      pass = fetch(`/api/pdf-token?contract=${contractId}`).then(
+        (response) => response.json(),
+      );
+      pass.then(
+        ({ expiresAt }) => {
+          renewAt = Date.parse(expiresAt) - 60_000;
+        },
+        () => {
+          renewAt = 0;
+        },
+      );
+    }
+    return (await pass).token;
+  };
+}
+```
+
+Make it once per contract, with `useMemo`. A new function on every render would make the viewer
+open the document again each time:
 
 ```tsx filename="app/contracts/[id]/contract-viewer.tsx"
 'use client';
 
 import { PDFViewer } from '@cloudpdf/viewer-react';
+import { useMemo } from 'react';
+
+import { tokenFor } from '@/lib/pdf-token';
 
 export function ContractViewer({ contractId }: { contractId: string }) {
-  return (
-    <PDFViewer
-      src={{ token: () => fetch(`/api/pdf-token?contract=${contractId}`).then((r) => r.text()) }}
-      style={{ height: '100vh' }}
-    />
+  const src = useMemo(
+    () => ({ token: tokenFor(contractId) }),
+    [contractId],
   );
+  return <PDFViewer src={src} style={{ height: '100vh' }} />;
 }
 ```
 

@@ -38,7 +38,7 @@ export const LANDING_QUICK_STARTS: readonly LandingQuickStart[] = [
     id: 'website',
     title: 'Put a PDF on your website',
     time: 'About 5 minutes',
-    desc: 'Upload a PDF, make a grant, and paste two lines into your page. No server needed.',
+    desc: 'Upload a PDF, make a grant, and paste the embed code into your page. No server needed.',
     href: '/docs/platform/quick-start/website',
     screenshot: 'grant-dialog',
     screenshotAlt: 'Making a grant in the CloudPDF dashboard',

@@ -39,7 +39,7 @@ usual one.
 ## What it protects
 
 A browser says which website a page is on, and CloudPDF checks it before the document opens. So the
-grant can't be embedded anywhere else, and the viewer refuses to open it there.
+grant can't be embedded anywhere else: CloudPDF refuses to open it there.
 
 It's protection against your document turning up on someone else's site, not against a determined
 person: code outside a browser can claim to be any website. For people who must not see the
@@ -50,10 +50,14 @@ document at all, use a [passphrase](/docs/platform/grants/protect), or your own 
 
 ```ts
 await cloudpdf.grants.create({
+  tenantId,
   docId: manual.documentId,
   name: 'Customer manual',
   scope: permissions.read,
-  origins: ['https://www.fernquill.example', 'https://*.fernquill.example'],
+  origins: [
+    'https://www.fernquill.example',
+    'https://*.fernquill.example',
+  ],
 });
 ```
 

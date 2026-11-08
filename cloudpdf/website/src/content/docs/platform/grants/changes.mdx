@@ -20,9 +20,12 @@ changes go: into one document everyone works on, or into a copy for each visitor
 | **Everyone** | Each other's changes, as they're made | A review: everyone comments on the same document |
 | **Only the person who made them** | Only their own, on top of the document | A form: each visitor fills in their own |
 
-Either way, **you see every change**. With Everyone, the document itself shows them. With Only the
-person who made them, each visitor's copy is listed under the grant's
-[visitors](/docs/platform/grants/visitors), and the document stays as you uploaded it.
+With Everyone, the document itself shows the changes, in the dashboard too. With Only the person
+who made them, the document stays as you uploaded it, and each visitor's copy is listed, with its
+size, under the grant's [visitors](/docs/platform/grants/visitors).
+
+Changing this on a grant in use stops viewers that are already open within 10 minutes. People open
+it again to go on.
 
 The choice appears only when the grant lets people change something. A grant that lets people read
 has nothing to keep.
@@ -48,6 +51,7 @@ Two more options are only in the API, for grants your server makes:
 
 ```ts
 await cloudpdf.grants.create({
+  tenantId,
   docId: form.documentId,
   name: 'Event registration',
   scope: permissions.fillAndSign,

@@ -20,15 +20,17 @@ show the document, and checks everything else on CloudPDF's side.
 ## A short pass for one document
 
 When a document opens, with a grant or a token, the viewer holds a pass that names that one
-document and what the person may do. It runs out within minutes, and the viewer gets the next one
-before it does:
+document and what the person may do. A grant's pass runs out within minutes, and the viewer gets
+the next one before it does. A token lasts as long as your server set:
 
-- **With a grant**, the pass lasts 10 minutes. Pausing or ending the grant stops it at once.
-- **With a token**, the token is the pass, for as long as your server set. Revoking it stops it at
-  once.
+- **With a grant**, the pass lasts 10 minutes, unless your server set another time, from 1 to 60
+  minutes. Pausing or ending the grant stops new passes at once, so a viewer already open stops
+  within that time.
+- **With a token**, the token is the pass, for as long as your server set. Revoking it stops it
+  within a minute.
 
-Copying the pass out of the browser gets someone the same document with the same permissions, for
-a few minutes. Nothing more: not another document, and not a way to make passes.
+Copying the pass out of the browser gets someone the same document with the same permissions, until
+the pass runs out. Nothing more: not another document, and not a way to make passes.
 
 ## An upload token uploads, and nothing else
 

@@ -25,7 +25,7 @@ choose how long it lives: 30, 60 or 90 days.
 
 <Screenshot
   name="api-key-dialog"
-  alt="The New API key dialog: named Fernquill app, Restricted, with Documents and folders on Write and Viewer tokens on"
+  alt="The New API key dialog: named Fernquill app, Restricted, with Documents and folders on Write, Inside documents on Write and Viewer tokens on"
 />
 
 Then choose what it can do:
@@ -37,13 +37,16 @@ Then choose what it can do:
 | :-- | :-- | :-- |
 | **Documents and folders** | List them (Read), and upload, rename and move them, and make [upload tokens](/docs/platform/app/browser-uploads) (Write) | None, Read, Write |
 | **Delete** | Delete documents and folders | Off, On |
-| **Inside documents** | Read and change what's in a document: pages, text, annotations, forms | None, Read, Write |
+| **Inside documents** | Pages, text, annotations, forms and attached files: read them, download and copy text (Read), or also change, print and sign (Write) | None, Read, Write |
 | **Viewer tokens** | Make [tokens](/docs/platform/app/tokens) for your users, and revoke them | Off, On |
 | **Grants** | Make, change and end [grants](/docs/platform/grants) | Off, On |
 
-A key that makes viewer tokens or grants can give anyone any permission inside a document, so
-turning either on sets **Inside documents** to Write. The dialog never shows a key as less than it
-is.
+A key's viewer tokens and grants give only what the key itself may do inside documents. So with
+either one on, **Inside documents** can't be None. Set it to Write for tokens and grants that let
+people comment, fill in forms, sign or print.
+
+When your workspace has an add-on, each of its permissions gets a row too, Off or On. A key keeps
+what it was made with, so an add-on added later needs a new key.
 
 ## Copy it once
 
@@ -57,10 +60,13 @@ The key is shown once, right after it's made:
 Store it as a secret on your server, such as `CLOUDPDF_API_KEY`, and give it to the SDK:
 
 ```ts
-const cloudpdf = new CloudPDFClient({ token: process.env.CLOUDPDF_API_KEY });
+const cloudpdf = new CloudPDFClient({
+  token: process.env.CLOUDPDF_API_KEY,
+});
 ```
 
-The key belongs to the workspace it was made in, so the SDK needs nothing else.
+Every call also names the workspace, as `tenantId`. Copy it from **Tenant ID** on the **Connect
+your server** card, at the top of the page. The key works only for that workspace.
 
 ## When it leaks, or expires
 
@@ -76,7 +82,8 @@ expired keys**.
 - **One key per place.** A key each for production, staging and your scripts means you can revoke
   one without stopping the others.
 - **Give a key only what it needs.** A server that only makes tokens for documents you uploaded in
-  the dashboard needs **Viewer tokens** on, and **Documents and folders** at None.
+  the dashboard needs **Viewer tokens** on, **Inside documents** at what its tokens give, and
+  **Documents and folders** at None.
 
 <Cards>
   <Card

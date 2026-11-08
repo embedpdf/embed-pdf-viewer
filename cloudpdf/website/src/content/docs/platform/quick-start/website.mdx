@@ -1,6 +1,6 @@
 ---
 title: Put a PDF on your website
-description: Upload a PDF, make a grant, and paste two lines into your page. No server, and no code of your own.
+description: Upload a PDF, make a grant, and paste the embed code into your page. No server, and no code of your own.
 ---
 
 import { Cards, Card } from '@/components/docs/cards';
@@ -8,9 +8,9 @@ import { Tabs } from '@/components/docs/tabs';
 
 # Put a PDF on your website
 
-In five minutes, this is on your page: your PDF, in a viewer people can scroll, zoom, search and
-read on any device. You need a CloudPDF account and a page you can edit. No server, and no code of
-your own.
+In five minutes, your PDF is on your page, in a viewer people can scroll, zoom, search and read on
+any device. Below is a sample PDF, opened the way your page will open yours. You need a CloudPDF
+account and a page you can edit. No server, and no code of your own.
 
 <GrantPreview grant="shr_xs-9Y5qwuYrJ2BKtWzuo_2xy" />
 
@@ -37,7 +37,7 @@ grant**:
 />
 
 Give the grant a name you'll recognize, such as "Website". The rest is already right for a public
-page: people can **Read** the document, and it opens **Anywhere**.
+page: people can **Read** the document, its pages show as **Images**, and it opens **Anywhere**.
 
 <Screenshot
   name="grant-dialog"
@@ -52,12 +52,17 @@ Choose **Embed on a website**, and copy the code:
 
 <Screenshot name="grant-embed" alt="The Grant created dialog, with the embed code for HTML" />
 
-It's two lines. Put them where the PDF should appear:
+Put it where the PDF should appear. The script loads the viewer, and its last line opens your
+grant:
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js"></script>
+<embedpdf-viewer id="document" style="height: 640px"></embedpdf-viewer>
 
-<embedpdf-viewer grant="grt_4n0hW2ubtHdYCRnkwu8My8Pb" style="height: 640px"></embedpdf-viewer>
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  document.getElementById('document').src = { grant: 'grt_4n0hW2ubtHdYCRnkwu8My8Pb' };
+</script>
 ```
 
 The viewer fills the box you give it, so give it a height. Open your page, and the PDF is there.
@@ -161,12 +166,14 @@ opens full screen:
 
 ## Change it whenever you like
 
-A grant keeps working until you change it. From its menu on the document's page, you can:
+A grant keeps working until you pause it or end it, or until it expires. From its menu on the
+document's page, you can:
 
 - let people do more: **Comment**, **Download** or **Print**;
 - ask for a passphrase, or let the grant expire on a date;
 - pause it, and resume it;
-- end it, which stops its link and every page that embeds it, at once.
+- end it: its link and every page that embeds it stop opening at once, and a viewer already open
+  stops within 10 minutes.
 
 Every page that embeds the grant follows on its next visit, so you never touch your code again.
 

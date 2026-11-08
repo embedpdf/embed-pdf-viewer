@@ -17,8 +17,8 @@ whenever you like. Every link and every page that embeds the grant follows.
 />
 
 A document can have as many grants as you need: one for your website, one for a client review,
-one for a printed QR code. Each has its own name, its own permissions and its own link, so you can
-end one without touching the others.
+one for a printed QR code. Each has its own permissions and embed code, and a name if you give it
+one, so you can end one without touching the others.
 
 ## Make one
 
@@ -31,6 +31,7 @@ On the document's page, click **New grant**. Each setting has a page of its own:
 | [**Who sees changes**](/docs/platform/grants/changes) | Whether visitors share one document, or each get their own copy |
 | [**Where it opens**](/docs/platform/grants/where) | Anywhere, or only on the websites you list |
 | [**More options**](/docs/platform/grants/protect) | A passphrase, an expiry date, and questions visitors answer first |
+| [**Pages show as**](/docs/platform/grants/permissions#pages-show-as) | Images, or Protected with the Screenshot protection add-on |
 
 [Put a PDF on your website](/docs/platform/quick-start/website) makes one, step by step.
 
@@ -40,35 +41,40 @@ Each grant in the list has two buttons:
 
 - **Copy link** copies its page on cloudpdf.link. Whoever opens the link sees the document full
   screen, with the grant's permissions. Only a grant that opens Anywhere has one.
-- **Embed** shows the code for your website: two lines of HTML, or a component for React, Vue,
+- **Embed** shows the code for your website: a few lines of HTML, or a component for React, Vue,
   Svelte or Angular.
 
-The line under its name says what the grant allows, and how many times it has been opened.
+Under its name, a line says what the grant allows, then its views and the day you made it. Views
+count each pass the viewer gets, so someone who keeps it open counts again about every 10 minutes.
 
 ## In code
 
-Your server can make and change grants too, with an API key that has **Grants** on:
+Your server can make and change grants too, with an API key that has **Grants** on. A grant gives
+only what the key itself may do inside documents: with **Read**, grants that read, download and
+copy text, and with **Write**, any grant.
 
 ```ts
-import { permissions } from '@cloudpdf/sdk';
+import { permissions } from '@/lib/permissions';
 
 const { grant } = await cloudpdf.grants.create({
+  tenantId,
   docId: 'doc_20b05b13f613f795ffd14e57',
   name: 'Website',
   scope: permissions.read,
 });
 ```
 
-`grant.id` is what the embed code opens: `<embedpdf-viewer grant="grt_…">`. A grant made in code
+`grant.id` is what the embed code opens: `src = { grant: 'grt_…' }`. A grant made in code
 appears in the dashboard too, and the other way round.
 
 | Call | What it does |
 | :-- | :-- |
-| `cloudpdf.grants.create({ docId, … })` | Makes a grant |
-| `cloudpdf.grants.list({ docId })` | A document's grants |
-| `cloudpdf.grants.update({ grantId, … })` | Changes any setting |
-| `cloudpdf.grants.update({ grantId, disabled: true })` | Pauses it |
-| `cloudpdf.grants.archive({ grantId })` | Ends it, and keeps what its visitors made |
+| `grants.create({ tenantId, docId, … })` | Makes a grant |
+| `grants.list({ tenantId, docId })` | A document's grants |
+| `grants.update({ tenantId, grantId, … })` | Changes any setting |
+| `grants.update({ …, disabled: true })` | Pauses it |
+| `grants.delete({ tenantId, grantId })` | Deletes one with no visitors |
+| `grants.archive({ tenantId, grantId })` | Ends one, and keeps what its visitors made |
 
 Every setting is in the API reference: [Create a grant](/docs/api-reference/grants/create).
 

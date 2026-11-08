@@ -7,8 +7,8 @@ import { Cards, Card } from '@/components/docs/cards';
 
 # Visitors
 
-A grant's visitors are the people who opened it and left something behind: answers to its
-questions, or changes. Open the grant's menu and choose **Visitors**:
+A grant's visitors are the people who answered its questions, or made changes in a copy of their
+own. Open the grant's menu and choose **Visitors**:
 
 <Screenshot
   name="grant-visitors"
@@ -16,8 +16,8 @@ questions, or changes. Open the grant's menu and choose **Visitors**:
 />
 
 Each visitor shows their answers, when they were last seen, and their own copy, if the grant gives
-them one. Someone who only read the document, and wasn't asked anything, isn't listed: CloudPDF
-remembers nothing about them.
+them one. Someone who wasn't asked anything and has no copy of their own isn't listed, even if they
+commented on a shared document. CloudPDF keeps nothing about them.
 
 **Export CSV** downloads the list, with when each visitor answered.
 
@@ -37,9 +37,16 @@ their own copy again. In another browser, or after clearing this one, they're so
 ## In code
 
 ```ts
-const { visitors } = await cloudpdf.grants.visitors.list({ grantId });
+const { visitors } = await cloudpdf.grants.visitors.list({
+  tenantId,
+  grantId,
+});
 
-await cloudpdf.grants.visitors.delete({ grantId, visitorId: visitors[0].visitorId });
+await cloudpdf.grants.visitors.delete({
+  tenantId,
+  grantId,
+  visitorId: visitors[0].visitorId,
+});
 ```
 
 <Cards>

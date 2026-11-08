@@ -23,13 +23,21 @@ documents stay the same.
 
 ## The full viewer
 
-Two lines on any page, or one component:
+A few lines on any page, or one component:
 
 ```tsx
 import { PDFViewer } from '@cloudpdf/viewer-react';
 
-<PDFViewer src={{ token: () => fetchToken(contractId) }} style={{ height: '100vh' }} />;
+const src = useMemo(
+  () => ({ token: tokenFor(contractId) }),
+  [contractId],
+);
+
+<PDFViewer src={src} style={{ height: '100vh' }} />;
 ```
+
+`tokenFor` is the token function from
+[Add PDFs to your app](/docs/platform/quick-start/app#5-open-it-in-your-page).
 
 People can scroll, zoom, search, comment, fill in forms and sign, as far as their token or grant
 allows. Make it yours with your brand color, the features you want, and buttons of your own.
@@ -52,7 +60,9 @@ export function Contract({ contractId }: { contractId: string }) {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: { kind: 'token', token: () => fetchToken(contractId) } }]}
+      initialDocuments={[
+        { source: { kind: 'token', token: tokenFor(contractId) } },
+      ]}
     >
       <DocumentGate fallback={<p>Opening…</p>}>
         <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
