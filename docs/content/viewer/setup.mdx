@@ -46,6 +46,11 @@ Any height works: a fixed one, `100vh`, or the remaining space of a flex or grid
 (`flex: 1; min-height: 0`). Its width follows the box too, and the viewer adapts to it, not to the
 window: see [Small screens](customize/small-screens).
 
+On a page that scrolls, a wheel over the viewer scrolls the pages, and at their end the next
+scroll goes on to your page. A viewer that fills the window has no page to scroll, so turn that
+off with `plugins: { stage: { scrollChaining: false } }`: see
+[Inside a page that scrolls](/docs/headless/viewing/stage#inside-a-page-that-scrolls).
+
 ## Pass it config
 
 Everything the viewer can do is one config object. In a framework, every key is a prop:

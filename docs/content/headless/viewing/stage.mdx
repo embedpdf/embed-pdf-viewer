@@ -597,6 +597,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
 | `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
 | `turnGestures`   | With `flow: 'paged'`, scrolling or swiping past a page's edge [turns it](#one-page-at-a-time); `false` leaves turning to buttons and keys | `true` |
+| `scrollChaining` | At the end of the pages, the next scroll [scrolls your page](#inside-a-page-that-scrolls); `false` keeps every scroll in the Stage | `true` |
 | `zoomBox`        | The colors of the [zoom tool's box](#zoom-to-a-box): `fill` and `stroke`; `null` follows the accent | `{ fill: null, stroke: null }` |
 | `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
 
@@ -652,6 +653,28 @@ view exactly, and `onMotionEnded` for anything expensive.
 the view exactly, and `stage.motionEnded$` for anything expensive.
 
 </Fw>
+
+### Inside a page that scrolls
+
+A Stage in a longer page, such as a document in the middle of an article, doesn't trap the scroll.
+When the pages can't scroll any further the way you push, the wheel or trackpad scrolls your page
+instead, as it does at the end of any scrolling box:
+
+- **It stops at the end first.** A scroll that reaches the end of the pages stops there, momentum
+  included. The next one scrolls your page.
+- **Sideways too.** A sideways swipe the pages can't follow goes to the browser, which may read it
+  as its back gesture.
+- **Page turns come first.** With `flow: 'paged'`, a push past the edge
+  [turns the page](#one-page-at-a-time) while there is one to turn to.
+- **A finger stays in the Stage.** On a touch screen, a drag that starts on the Stage scrolls the
+  pages and never your page.
+
+In an app where the viewer fills the window there is no page to scroll. Set `scrollChaining` to
+`false` and the Stage keeps every scroll over it:
+
+```ts
+stagePlugin({ scrollChaining: false });
+```
 
 ### When the browser scrolls
 
