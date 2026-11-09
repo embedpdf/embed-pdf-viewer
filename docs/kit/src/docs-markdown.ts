@@ -236,9 +236,7 @@ function createResolver(
 
       if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
         if (node.name === 'Engine') {
-          return engineFlavors(node).includes(site.engine)
-            ? resolveNodes(node.children ?? [])
-            : [];
+          return engineFlavors(node).includes(site.engine) ? resolveNodes(node.children ?? []) : [];
         }
 
         if (node.name === 'Fw') {
@@ -368,6 +366,60 @@ function createResolver(
                   ],
                 },
               ],
+            },
+          ];
+        }
+
+        if (node.name === 'ThemeTokens') {
+          // Projection: the token table the list is drawn from, one row per token.
+          const cell = (children: AstNode[]): AstNode => ({ type: 'tableCell', children });
+          const row = (cells: AstNode[][]): AstNode => ({
+            type: 'tableRow',
+            children: cells.map(cell),
+          });
+          const words = (text: string): AstNode[] =>
+            text
+              .split(/(`[^`]+`)/)
+              .filter(Boolean)
+              .map((part) =>
+                part.startsWith('`')
+                  ? { type: 'inlineCode', value: part.slice(1, -1) }
+                  : { type: 'text', value: part },
+              );
+          const tokens = (node.children ?? []).filter((child) => child.name === 'ThemeToken');
+          const rows = tokens.map((token) => {
+            const attribute = (name: string) => expressionStrings(getAttribute(token, name))[0];
+            const value = attribute('value');
+            const inWords = attribute('default');
+            const shown = (css: string | undefined): AstNode[] =>
+              css !== undefined
+                ? [{ type: 'inlineCode', value: css }]
+                : value !== undefined
+                  ? [{ type: 'inlineCode', value }]
+                  : words(inWords ?? '');
+            // A table cell is one line: a description wrapped in the source joins up.
+            const oneLine = (child: AstNode): AstNode =>
+              child.type === 'text' && typeof child.value === 'string'
+                ? { ...child, value: child.value.replace(/\s*\n\s*/g, ' ') }
+                : { ...child, children: child.children?.map(oneLine) };
+            const description = resolveNodes(token.children ?? [])
+              .flatMap((child) => (child.type === 'paragraph' ? (child.children ?? []) : [child]))
+              .map(oneLine);
+            return row([
+              [{ type: 'inlineCode', value: stringAttribute(token, 'name') }],
+              description,
+              shown(attribute('light')),
+              shown(attribute('dark')),
+            ]);
+          });
+          const heading = ['Token', 'What it colors', 'Light', 'Dark'].map((text) => [
+            { type: 'text', value: text },
+          ]);
+          return [
+            {
+              type: 'table',
+              align: ['left', 'left', 'left', 'left'],
+              children: [row(heading), ...rows],
             },
           ];
         }

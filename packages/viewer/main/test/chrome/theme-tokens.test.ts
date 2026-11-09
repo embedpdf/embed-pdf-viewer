@@ -39,24 +39,25 @@ const SAME_IN_BOTH_MODES: readonly ThemeToken[] = [
   'font',
 ];
 
-/** The Theming page's token table: each row's token, and its light and dark defaults when they're code. */
+/**
+ * The Theming page's token list: each `<ThemeToken>`'s name, and its light and dark defaults
+ * when they're CSS (`value` is both; a default in words has neither).
+ */
 function tokenTable() {
   const section = themingPage.slice(
     themingPage.indexOf('## Every color'),
     themingPage.indexOf('## From CSS'),
   );
-  const code = (cell: string | undefined) =>
-    cell && /^`[^`]+`$/.test(cell) ? cell.slice(1, -1) : null;
-  return section
-    .split('\n')
-    .filter((line) => line.startsWith('| `'))
-    .map((line) => {
-      const [token, , light, dark] = line
-        .split('|')
-        .slice(1, -1)
-        .map((cell) => cell.trim());
-      return { name: code(token), light: code(light), dark: code(dark) };
-    });
+  return [...section.matchAll(/<ThemeToken\s([^>]*)>/g)].map(([, attributes]) => {
+    const attribute = (name: string) =>
+      new RegExp(`(?:^|\\s)${name}="([^"]*)"`).exec(attributes)?.[1] ?? null;
+    const value = attribute('value');
+    return {
+      name: attribute('name'),
+      light: attribute('light') ?? value,
+      dark: attribute('dark') ?? value,
+    };
+  });
 }
 
 describe("the chrome's stylesheet", () => {
