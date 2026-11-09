@@ -18,9 +18,9 @@ let opened = 0;
 runChangeConformance(runner, {
   label: 'engine-local (inline transport, wasm runtime)',
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
-  open: (engine) =>
+  open: (engine, pdf = CHANGE_FIXTURE_PDF) =>
     engine.open(
-      { kind: 'bytes', id: `changes-${opened++}`, bytes: CHANGE_FIXTURE_PDF.slice() },
+      { kind: 'bytes', id: `changes-${opened++}`, bytes: pdf.slice() },
       { scope: ['*'], identity: { userId: 'ann', displayName: 'Ann' } },
     ),
 });

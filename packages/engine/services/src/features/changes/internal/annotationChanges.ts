@@ -46,6 +46,10 @@ import {
 } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from '../../annotations/internal/mutations/annotationMutationMeta';
 import {
+  annotationIndexByName,
+  nameTakenError,
+} from '../../annotations/internal/read/annotationIndexByName';
+import {
   applyReorder,
   familyOrder,
   planReorder,
@@ -228,7 +232,26 @@ export function updateAnnotation(
   }
   authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
   assertExpected(opIndex, current, op.expect);
+  assertNewNameFree(ctx, current, op.patch.nm);
   return writeUpdate(ctx, op.ref, op.patch, 'annotations.update', op.resources);
+}
+
+/**
+ * A new name must be free on the annotation's page (ISO 32000-2 §12.5.2),
+ * checked against the page as the change's earlier ops left it. Only an op
+ * checks it: an undo puts back the name an annotation had, as the undo of a
+ * delete brings back the deleted one's.
+ */
+export function assertNewNameFree(
+  ctx: ChangeContext,
+  current: Annotation<PdfCoordinates>,
+  nm: string | null | undefined,
+): void {
+  if (!nm || nm === current.nm) return;
+  const record = ctx.session.resolvePageRef(current.ref.page);
+  if (annotationIndexByName(ctx.runtime, ctx.session.requireDocPtr(), record.pageIndex, nm) >= 0) {
+    throw nameTakenError(nm, record.pageObjectNumber);
+  }
 }
 
 /** `annotations.delete`; its reverse brings back everything it removed. */

@@ -1,9 +1,11 @@
+import { EngineError, EngineErrorCode, type PageObjectNumber } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 /**
  * Where the annotation named `nm` is in a page's `/Annots`, or -1. Read from
  * the page's dictionaries, so no page is loaded. A name is unique on its
- * page (ISO 32000-2 §12.5.2): `create` and `import` both check it here.
+ * page (ISO 32000-2 §12.5.2): a create, an import and an update's new name
+ * are checked here.
  */
 export function annotationIndexByName(
   runtime: PdfRuntimeModule,
@@ -18,4 +20,13 @@ export function annotationIndexByName(
   } finally {
     mem.free(namePtr);
   }
+}
+
+/** The refusal of a name another annotation on the page has. */
+export function nameTakenError(nm: string, pageObjectNumber: PageObjectNumber): EngineError {
+  return new EngineError(
+    EngineErrorCode.InvalidArg,
+    `nm '${nm}' is already used on page ${pageObjectNumber}`,
+    { details: { field: 'nm' } },
+  );
 }

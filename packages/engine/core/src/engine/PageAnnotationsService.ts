@@ -79,7 +79,9 @@ export interface PageAnnotationsService {
   ): AbortablePromise<AnnotationCreateResult>;
   /**
    * Change the fields `patch` names; the others stay. A resource replaces
-   * what it is for: a stamp's drawing, an attached file's bytes.
+   * what it is for: a stamp's drawing, an attached file's bytes. A new `nm`
+   * renames the annotation in place, refused with `InvalidArg` when another
+   * annotation on the page has it; `nm: null` removes its name.
    */
   update(
     ref: AnnotationRef,

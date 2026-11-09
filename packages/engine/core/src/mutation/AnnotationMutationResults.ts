@@ -14,16 +14,7 @@ export interface AnnotationCreateResult<C extends Coordinates = PageCoordinates>
 }
 
 export interface AnnotationUpdateResult<C extends Coordinates = PageCoordinates> {
-  /**
-   * The updated annotation, fully materialised after the patch, under the
-   * name it had: an update never renames an annotation, and never writes
-   * its /NM.
-   *
-   * The /NM value is data to the engine. Callers that keep their own id
-   * in it set `draft.nm` at creation (a create refuses a name its page
-   * already has) and find the annotation by it in a read. There is no
-   * `patch.nm`.
-   */
+  /** The updated annotation, fully materialised after the patch. */
   annotation: Annotation<C>;
   /**
    * The engine's appearance verdict for this update (see

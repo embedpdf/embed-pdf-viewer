@@ -54,7 +54,10 @@ save a change. A deleted annotation's ref is never given to another annotation.
 
 An annotation's `nm` (its name in the PDF) is data you can read and set, like its contents. It's
 not how the engine finds the annotation. An annotation the engine creates without one gets a fresh
-UUIDv7 name, and a copy made by an import with `attribution: 'stamp'` gets a new one.
+UUIDv7 name, and a copy made by an import with `attribution: 'stamp'` gets a new one. An update
+renames the annotation in place, or removes its name with `nm: null`: its ref, its replies and its
+look stay as they are. That's how you name an annotation another tool left without a name, or with
+one it shares.
 
 To use a ref as a key in a `Map` or an object, turn it into a string with `annotationKey(ref)`.
 
@@ -125,5 +128,5 @@ and opened again. A ref to an annotation that no longer exists fails with `NotFo
   deleted. A `baseIndex` is the position in the file you uploaded, which never changes, so it
   can't end up pointing at a different annotation.
 - **Why not the name?** Names are optional in PDF, and other tools don't always keep them unique.
-  The engine refuses to create an annotation whose `nm` is already used on its page, so names it
-  writes stay unique, but it never relies on them to find an annotation.
+  The engine refuses a create or an update that gives a name another annotation on its page has,
+  so names it writes stay unique, but it never relies on them to find an annotation.

@@ -47,9 +47,9 @@ function fixture(): DbSeededFixture {
 runChangeConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => cloudEngine({ baseUrl: fixture().baseUrl }),
-  open: async (engine) => {
+  open: async (engine, pdf = CHANGE_FIXTURE_PDF) => {
     const docId = `changes-${++docs}`;
-    await seedDocument(fixture(), TENANT_ID, docId, CHANGE_FIXTURE_PDF);
+    await seedDocument(fixture(), TENANT_ID, docId, pdf);
     // A token of its own, as each viewer has: the object-number budget is per token.
     return engine.open({
       kind: 'token',

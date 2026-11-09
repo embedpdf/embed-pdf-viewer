@@ -35,6 +35,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import {
+  assertNewNameFree,
   objectNumberOf,
   readAnnotation,
   reordered,
@@ -395,6 +396,7 @@ export function updateWidget(
     );
   }
   assertExpected(opIndex, current, op.expect);
+  assertNewNameFree(ctx, current, op.patch.nm);
   return writeAnnotationUpdate(
     ctx,
     op.widget,
