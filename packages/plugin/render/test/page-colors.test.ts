@@ -1,32 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { toPageRef } from '@embedpdf/core';
 import { boot, image } from './harness';
-import { colorsKeyOf } from '../src/model';
 
 /** The page colors through the real kernel: what each door asks the engine for,
  *  what a change of the setting makes stale, and what a picture's key says. */
 
 const deep = { desiredDeviceWidth: 612 * 8, visibleRect: { x: 0, y: 0, width: 80, height: 80 } };
 const DARK = { background: '#1e1e1e', text: '#e8e6e3' } as const;
-
-describe('colorsKeyOf', () => {
-  it('says nothing for the page as the file has it', () => {
-    expect(colorsKeyOf(undefined)).toBe('');
-    expect(colorsKeyOf('normal')).toBe('');
-  });
-
-  it('names a preset, and lists the fields of a custom scheme in name order', () => {
-    expect(colorsKeyOf('dark')).toBe('|cdark');
-    expect(colorsKeyOf('sepia')).not.toBe(colorsKeyOf('dark'));
-    expect(colorsKeyOf({ text: '#AAAAAA', background: '#000000' })).toBe(
-      '|c{background:#000000,text:#aaaaaa}',
-    );
-    expect(colorsKeyOf({ background: '#000000', text: '#aaaaaa' })).toBe(
-      colorsKeyOf({ text: '#AAAAAA', background: '#000000' }),
-    );
-    expect(colorsKeyOf({ text: '#aaaaaa', pathFill: undefined })).toBe('|c{text:#aaaaaa}');
-  });
-});
 
 describe('the pageColors setting', () => {
   it('is normal by default, and asks the engine for no colors', async () => {
@@ -37,7 +17,7 @@ describe('the pageColors setting', () => {
     void fixture.render.renderThumbnail(toPageRef(11)).catch(() => {});
     expect(fixture.imageCalls).toHaveLength(3);
     for (const call of fixture.imageCalls) expect(call.options).not.toHaveProperty('pageColors');
-    // And a key is what it was before there were page colors.
+    // A key for pages as the file has them carries no colors.
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1f1|e0');
     await fixture.kernel.destroy();
   });

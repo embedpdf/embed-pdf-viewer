@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { initialRenderState, invalidatePages, renderEpochOf } from '../src/model';
+import { colorsKeyOf, initialRenderState, invalidatePages, renderEpochOf } from '../src/model';
 
 const PAGE = { includeAnnotations: false, includeFormFields: false };
 const ANNOTATIONS = { includeAnnotations: true, includeFormFields: false };
@@ -35,5 +35,24 @@ describe('model', () => {
     expect(renderEpochOf(state, 11, FIELDS)).toBe(4);
     expect(renderEpochOf(state, 11, ALL)).toBe(6);
     expect(renderEpochOf(state, 22, ALL)).toBe(0);
+  });
+});
+
+describe('colorsKeyOf', () => {
+  it('says nothing for the page as the file has it', () => {
+    expect(colorsKeyOf(undefined)).toBe('');
+    expect(colorsKeyOf('normal')).toBe('');
+  });
+
+  it('names a preset, and lists the fields of a custom scheme in name order', () => {
+    expect(colorsKeyOf('dark')).toBe('|cdark');
+    expect(colorsKeyOf('sepia')).not.toBe(colorsKeyOf('dark'));
+    expect(colorsKeyOf({ text: '#AAAAAA', background: '#000000' })).toBe(
+      '|c{background:#000000,text:#aaaaaa}',
+    );
+    expect(colorsKeyOf({ background: '#000000', text: '#aaaaaa' })).toBe(
+      colorsKeyOf({ text: '#AAAAAA', background: '#000000' }),
+    );
+    expect(colorsKeyOf({ text: '#aaaaaa', pathFill: undefined })).toBe('|c{text:#aaaaaa}');
   });
 });

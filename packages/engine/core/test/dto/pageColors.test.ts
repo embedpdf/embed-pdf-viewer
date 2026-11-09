@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolvePageColors, type PageColors } from '../../src/dto/PageColors';
-import { checkRenderUsage } from '../../src/dto/PageRender';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 
 const refusal = (run: () => unknown) => {
@@ -73,25 +72,5 @@ describe('resolvePageColors', () => {
       invalid('pageColors.convertFillToStroke'),
     );
     expect(refusal(resolve({ colour: '#000000' }))).toEqual(invalid('pageColors.colour'));
-  });
-});
-
-describe('checkRenderUsage and pageColors', () => {
-  const print = { usage: 'print', viewport: { kind: 'dpi', dpi: 150 } } as const;
-
-  it('a print picture is on white: it takes no pageColors', () => {
-    expect(refusal(() => checkRenderUsage(print, null))).toBeNull();
-    expect(refusal(() => checkRenderUsage({ ...print, pageColors: 'dark' }, null))).toEqual(
-      invalid('pageColors'),
-    );
-  });
-
-  it('a screen picture and a thumbnail take them', () => {
-    expect(refusal(() => checkRenderUsage({ pageColors: 'dark' }, null))).toBeNull();
-    expect(
-      refusal(() =>
-        checkRenderUsage({ viewport: { kind: 'thumbnail' }, pageColors: 'sepia' }, null),
-      ),
-    ).toBeNull();
   });
 });

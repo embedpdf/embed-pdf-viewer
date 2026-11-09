@@ -64,9 +64,9 @@ function counting(runtime: PdfRuntimeModule) {
   });
   const mem = Object.create(runtime.mem, {
     alloc: {
-      value: (bytes: number) => {
+      value: (byteCount: number) => {
         counts.allocations++;
-        return runtime.mem.alloc(bytes);
+        return runtime.mem.alloc(byteCount);
       },
     },
     free: {

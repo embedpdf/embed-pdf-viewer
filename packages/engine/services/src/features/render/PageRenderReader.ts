@@ -17,7 +17,7 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
-import { colorSchemeDraw, type PageDraw } from './internal/colorSchemeDraw';
+import { createColorSchemeDraw, type PageDraw } from './internal/createColorSchemeDraw';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { Slices } from '../../shared/slices';
@@ -92,7 +92,7 @@ export class PageRenderReader {
         draw: async (bitmapPtr, matrixPtr, clipPtr) => {
           throwIfAborted(signal);
           const render: PageDraw = colors
-            ? colorSchemeDraw(this.runtime, {
+            ? createColorSchemeDraw(this.runtime, {
                 bitmapPtr,
                 pagePtr,
                 matrixPtr,

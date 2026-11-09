@@ -172,7 +172,7 @@ function allocateRaster(
       return null;
     }
 
-    fn.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, paperFill(background, paper));
+    fn.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, fillColorOf(background, paper));
 
     matrixPtr = mem.alloc(6 * 4);
     // The page's display matrix already turned PDF space into page space (the
@@ -215,7 +215,7 @@ function allocateRaster(
  * created BGRA and rendered with {@link FPDF_REVERSE_BYTE_ORDER}, so the
  * fill's red and blue are swapped to land as RGBA.
  */
-function paperFill(background: PageRenderBackground, paper: Color | undefined): number {
+function fillColorOf(background: PageRenderBackground, paper: Color | undefined): number {
   if (background === 'transparent') return 0x00000000;
   if (paper === undefined) return 0xffffffff;
   const rgb = Number.parseInt(paper.slice(1), 16);

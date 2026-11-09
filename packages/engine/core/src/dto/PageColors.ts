@@ -48,7 +48,7 @@ export interface PageColorScheme {
   readonly convertFillToStroke: boolean;
 }
 
-const SCHEME_FIELDS: readonly (keyof CustomPageColors)[] = [
+const CUSTOM_FIELDS: readonly (keyof CustomPageColors)[] = [
   'background',
   'text',
   'pathFill',
@@ -80,7 +80,8 @@ function invalid(field: string, message: string): never {
   throw new EngineError(EngineErrorCode.InvalidArg, message, { details: { field } });
 }
 
-function checkedColor(value: unknown, field: string, fallback: Color): Color {
+/** `value` as a lowercase `#rrggbb`, or `fallback` when it is left out; anything else is `InvalidArg`. */
+function checkColor(value: unknown, field: string, fallback: Color): Color {
   if (value === undefined) return fallback;
   if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) {
     invalid(`pageColors.${field}`, `pageColors.${field} must be a color as '#rrggbb'`);
@@ -102,7 +103,7 @@ export function resolvePageColors(pageColors: PageColors | undefined): PageColor
     invalid('pageColors', "pageColors must be 'normal', 'dark', 'sepia' or an object of colors");
   }
   for (const key of Object.keys(pageColors)) {
-    if (!SCHEME_FIELDS.includes(key as keyof CustomPageColors)) {
+    if (!CUSTOM_FIELDS.includes(key as keyof CustomPageColors)) {
       invalid(`pageColors.${key}`, `pageColors has no ${key}`);
     }
   }
@@ -110,13 +111,13 @@ export function resolvePageColors(pageColors: PageColors | undefined): PageColor
   if (convertFillToStroke !== undefined && typeof convertFillToStroke !== 'boolean') {
     invalid('pageColors.convertFillToStroke', 'pageColors.convertFillToStroke must be a boolean');
   }
-  const text = checkedColor(pageColors.text, 'text', '#000000');
+  const text = checkColor(pageColors.text, 'text', '#000000');
   return {
-    background: checkedColor(pageColors.background, 'background', '#ffffff'),
-    pathFill: checkedColor(pageColors.pathFill, 'pathFill', text),
-    pathStroke: checkedColor(pageColors.pathStroke, 'pathStroke', text),
-    textFill: checkedColor(pageColors.textFill, 'textFill', text),
-    textStroke: checkedColor(pageColors.textStroke, 'textStroke', text),
+    background: checkColor(pageColors.background, 'background', '#ffffff'),
+    pathFill: checkColor(pageColors.pathFill, 'pathFill', text),
+    pathStroke: checkColor(pageColors.pathStroke, 'pathStroke', text),
+    textFill: checkColor(pageColors.textFill, 'textFill', text),
+    textStroke: checkColor(pageColors.textStroke, 'textStroke', text),
     convertFillToStroke: convertFillToStroke ?? false,
   };
 }

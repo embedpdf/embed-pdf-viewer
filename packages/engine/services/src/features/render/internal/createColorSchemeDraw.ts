@@ -1,6 +1,8 @@
 import type { PageColorScheme } from '@embedpdf/engine-core/runtime';
 import type { Callback, PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { readMatrixF, type MatrixF } from '../../../runtime/memory/structs';
+
 /** `FPDF_CONVERT_FILL_TO_STROKE`: filled shapes are drawn as outlines. */
 const FPDF_CONVERT_FILL_TO_STROKE = 0x20;
 
@@ -10,7 +12,7 @@ const FPDF_CONVERT_FILL_TO_STROKE = 0x20;
  * is an `unsigned long`: 4 bytes in wasm32 and on Windows, 8 in the other
  * native runtimes, where the color is the low word.
  */
-function schemeColorBytes(runtime: PdfRuntimeModule): 4 | 8 {
+function colorBytesOf(runtime: PdfRuntimeModule): 4 | 8 {
   return runtime.kind === 'wasm' || runtime.platform.startsWith('win32') ? 4 : 8;
 }
 
@@ -60,30 +62,29 @@ function argbOf(color: string): number {
  * corners, and PDFium clips to the bitmap.
  */
 function placementOf(runtime: PdfRuntimeModule, pagePtr: Ptr, matrixPtr: Ptr) {
-  const { fn, mem } = runtime;
-  const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0] = [0, 1, 2, 3, 4, 5].map((at) =>
-    Number(mem.peek(matrixPtr, 'f32', at * 4)),
-  );
-  const width = fn.FPDF_GetPageWidthF(pagePtr);
-  const height = fn.FPDF_GetPageHeightF(pagePtr);
-  const xs = [e, e + a * width, e + c * height, e + a * width + c * height];
-  const ys = [f, f + b * width, f + d * height, f + b * width + d * height];
-  const left = Math.min(...xs);
-  const top = Math.min(...ys);
+  const matrix = readMatrixF(runtime.mem, matrixPtr);
+  const width = runtime.fn.FPDF_GetPageWidthF(pagePtr);
+  const height = runtime.fn.FPDF_GetPageHeightF(pagePtr);
+  const across = { x: matrix.a * width, y: matrix.b * width };
+  const down = { x: matrix.c * height, y: matrix.d * height };
+  const cornerXs = [0, across.x, down.x, across.x + down.x].map((x) => matrix.e + x);
+  const cornerYs = [0, across.y, down.y, across.y + down.y].map((y) => matrix.f + y);
+  const left = Math.min(...cornerXs);
+  const top = Math.min(...cornerYs);
   return {
     startX: Math.round(left),
     startY: Math.round(top),
-    sizeX: Math.round(Math.max(...xs) - left),
-    sizeY: Math.round(Math.max(...ys) - top),
-    rotate: quarterTurnsOf(a, b),
+    sizeX: Math.round(Math.max(...cornerXs) - left),
+    sizeY: Math.round(Math.max(...cornerYs) - top),
+    rotate: quarterTurnsOf(matrix),
   };
 }
 
 /** The clockwise quarter turns of a render matrix of 0, 90, 180 or 270 degrees. */
-function quarterTurnsOf(a: number, b: number): number {
-  if (b > 0) return 1;
-  if (b < 0) return 3;
-  return a < 0 ? 2 : 0;
+function quarterTurnsOf(matrix: MatrixF): number {
+  if (matrix.b > 0) return 1;
+  if (matrix.b < 0) return 3;
+  return matrix.a < 0 ? 2 : 0;
 }
 
 /**
@@ -97,28 +98,31 @@ function quarterTurnsOf(a: number, b: number): number {
  * between slices hears an abort. A native runtime has no callbacks: the draw
  * runs to its end in `start`.
  */
-export function colorSchemeDraw(runtime: PdfRuntimeModule, input: ColorSchemeDrawInput): PageDraw {
-  const { mem, cb, fn } = runtime;
+export function createColorSchemeDraw(
+  runtime: PdfRuntimeModule,
+  input: ColorSchemeDrawInput,
+): PageDraw {
+  const { mem, fn } = runtime;
   const { bitmapPtr, pagePtr, matrixPtr, flags, scheme, budgetMs } = input;
   let schemePtr: Ptr | null = null;
   let pausePtr: Ptr | null = null;
   let needToPauseNow: Callback | null = null;
-  let deadline = 0;
+  let deadlineMs = 0;
 
   const free = () => {
-    if (needToPauseNow !== null) cb.dispose(needToPauseNow);
+    if (needToPauseNow !== null) runtime.cb.dispose(needToPauseNow);
     if (pausePtr !== null) mem.free(pausePtr);
     if (schemePtr !== null) mem.free(schemePtr);
     needToPauseNow = pausePtr = schemePtr = null;
   };
   const startSlice = () => {
-    deadline = performance.now() + budgetMs;
+    deadlineMs = performance.now() + budgetMs;
   };
 
   return {
     start() {
       try {
-        const colorBytes = schemeColorBytes(runtime);
+        const colorBytes = colorBytesOf(runtime);
         const colors = (schemePtr = mem.alloc(4 * colorBytes));
         for (let at = 0; at < 4 * colorBytes; at += 4) mem.poke(colors, 'i32', 0, at);
         [scheme.pathFill, scheme.pathStroke, scheme.textFill, scheme.textStroke].forEach(
@@ -128,7 +132,9 @@ export function colorSchemeDraw(runtime: PdfRuntimeModule, input: ColorSchemeDra
         for (let at = 0; at < PAUSE_BYTES; at += 4) mem.poke(pause, 'i32', 0, at);
         mem.poke(pause, 'i32', PAUSE_VERSION, 0);
         if (runtime.kind === 'wasm') {
-          needToPauseNow = cb.register('ii', () => (performance.now() >= deadline ? 1 : 0));
+          needToPauseNow = runtime.cb.register('ii', () =>
+            performance.now() >= deadlineMs ? 1 : 0,
+          );
           mem.poke(pause, 'i32', Number(needToPauseNow), PAUSE_NEED_TO_PAUSE_NOW_WASM32);
         }
         startSlice();
@@ -156,8 +162,11 @@ export function colorSchemeDraw(runtime: PdfRuntimeModule, input: ColorSchemeDra
       return fn.FPDF_RenderPage_Continue(pagePtr, pausePtr!);
     },
     close() {
-      fn.FPDF_RenderPage_Close(pagePtr);
-      free();
+      try {
+        fn.FPDF_RenderPage_Close(pagePtr);
+      } finally {
+        free();
+      }
     },
   };
 }
