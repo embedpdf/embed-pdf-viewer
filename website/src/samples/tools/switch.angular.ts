@@ -8,7 +8,7 @@ import {
 import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
-import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfRenderLayer, EpdfSnapshotLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { localEngine } from '@embedpdf/engine';
@@ -18,16 +18,30 @@ const welcome = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-const LABELS: Record<string, string> = { pointer: 'Select', pan: 'Hand' };
+const LABELS: Record<string, string> = {
+  pointer: 'Select',
+  pan: 'Hand',
+  zoom: 'Zoom',
+  snapshot: 'Snapshot',
+};
 const HINTS: Record<string, string> = {
   pointer: 'A drag selects text',
   pan: 'A drag scrolls the pages',
+  zoom: 'A drag zooms to the box, a click zooms in',
+  snapshot: 'A drag takes part of a page as an image',
 };
 
 // A button for every tool you can switch to, the active one pressed.
 @Component({
   selector: 'demo-root',
-  imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfSelectionLayer],
+  imports: [
+    EpdfDocumentGate,
+    EpdfStage,
+    EpdfPageTemplate,
+    EpdfRenderLayer,
+    EpdfSelectionLayer,
+    EpdfSnapshotLayer,
+  ],
   providers: [
     provideEmbedPdf(
       { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
@@ -62,6 +76,7 @@ const HINTS: Record<string, string> = {
         <ng-template epdfPage>
           <epdf-render-layer />
           <epdf-selection-layer />
+          <epdf-snapshot-layer />
         </ng-template>
       </epdf-stage>
     </ng-container>
