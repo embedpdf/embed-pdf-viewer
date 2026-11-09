@@ -75,4 +75,32 @@ describe('pageColors on the cloud engine', () => {
       await engine.destroy();
     }
   });
+
+  test('raw pixels inside the server are refused in other colors too, before the server is asked', async () => {
+    if (!fx) throw new Error('fixture not initialised');
+    const asked: unknown[] = [];
+    const engine = cloudEngine({
+      baseUrl: fx.baseUrl,
+      token: tenantToken(fx, TENANT_ID),
+      renderRaw: (_page, options) => {
+        asked.push(options);
+        return Promise.reject(new Error('not drawn in this test'));
+      },
+    });
+    try {
+      const doc = await engine.open({ kind: 'id', id: DOC_ID });
+      const { pages } = await doc.pages.list();
+      const page = doc.page(pages[0]!.ref);
+      await expect(page.render.raw({ pageColors: 'dark' })).rejects.toMatchObject({
+        code: 'NotImplemented',
+      });
+      expect(asked).toEqual([]);
+      await expect(page.render.raw({ pageColors: 'normal' })).rejects.toThrow(
+        'not drawn in this test',
+      );
+      expect(asked).toHaveLength(1);
+    } finally {
+      await engine.destroy();
+    }
+  });
 });
