@@ -5,6 +5,7 @@
  */
 export { Callout } from './callout';
 export { Cards, Card, CardGrid, GridCard, type GridCardIcon } from './cards';
+export { ThemeTokens, ThemeToken } from './theme-tokens';
 export {
   Feedback,
   POSITIVE_FEEDBACK_REASONS,
