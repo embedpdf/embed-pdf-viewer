@@ -1,7 +1,7 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
-import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/react/render';
 import {
   interactionPlugin,
   useInteraction,
@@ -28,10 +28,17 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-const LABELS: Record<string, string> = { pointer: 'Select', pan: 'Hand' };
+const LABELS: Record<string, string> = {
+  pointer: 'Select',
+  pan: 'Hand',
+  zoom: 'Zoom',
+  snapshot: 'Snapshot',
+};
 const HINTS: Record<string, string> = {
   pointer: 'A drag selects text',
   pan: 'A drag scrolls the pages',
+  zoom: 'A drag zooms to the box, a click zooms in',
+  snapshot: 'A drag takes part of a page as an image',
 };
 
 // A button for every tool you can switch to, the active one pressed.
@@ -69,6 +76,7 @@ export default function App() {
             <>
               <RenderLayer />
               <SelectionLayer />
+              <SnapshotLayer />
             </>
           )}
         </Stage>

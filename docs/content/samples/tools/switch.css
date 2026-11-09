@@ -23,6 +23,7 @@
 
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
   background: var(--surface);
@@ -32,7 +33,7 @@
 }
 
 .segment {
-  min-width: 72px;
+  min-width: 64px;
   font: inherit;
   font-size: 13px;
   font-weight: 550;

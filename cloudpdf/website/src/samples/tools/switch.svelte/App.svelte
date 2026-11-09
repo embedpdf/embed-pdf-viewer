@@ -1,6 +1,6 @@
 <script lang="ts" module>
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
-  import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
@@ -30,6 +30,7 @@
     <Stage class="stage">
       <RenderLayer />
       <SelectionLayer />
+      <SnapshotLayer />
     </Stage>
   </DocumentGate>
 </Viewer>
