@@ -1,3 +1,9 @@
+import {
+  HttpRangeCache,
+  RangeUnavailable,
+  parseContentRangeTotal,
+  rangeValidator,
+} from './http-range';
 import { pdfFunctionSignatures } from '../core/pdf-functions.generated';
 import type {
   PdfFunctionAbiSlot,
@@ -133,56 +139,124 @@ function createWasmCallbacks(module: EmscriptenModule): PdfRuntimeCallbacks {
   };
 }
 
+interface SyncRangeResponse {
+  status: number;
+  bytes: Uint8Array;
+  contentRange: string | null;
+  etag: string | null;
+  lastModified: string | null;
+}
+
+/** `GetBlock` is synchronous, so the worker reads with a synchronous XHR. */
+function syncHttpRange(
+  url: string,
+  start: number,
+  end: number,
+  validator: string | null,
+): SyncRangeResponse {
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', url, false);
+  xhr.responseType = 'arraybuffer';
+  xhr.setRequestHeader('Range', `bytes=${start}-${end}`);
+  if (validator) xhr.setRequestHeader('If-Range', validator);
+  try {
+    xhr.withCredentials = new URL(url).origin === globalThis.location?.origin;
+  } catch {
+    xhr.withCredentials = false;
+  }
+  xhr.send();
+  return {
+    status: xhr.status,
+    bytes: new Uint8Array(xhr.response ?? new ArrayBuffer(0)),
+    contentRange: xhr.getResponseHeader('Content-Range'),
+    etag: xhr.getResponseHeader('ETag'),
+    lastModified: xhr.getResponseHeader('Last-Modified'),
+  };
+}
+
+function createBlockAccess(
+  mem: PdfRuntimeMemory,
+  callbacks: PdfRuntimeCallbacks,
+  size: number,
+  read: (begin: number, length: number) => Uint8Array,
+) {
+  if (size > 0xffffffff) {
+    throw new RangeError('FPDF_FILEACCESS on wasm supports files up to 4 GiB');
+  }
+  const structPtr = mem.alloc(12);
+  let callback: Callback | null = null;
+  let closed = false;
+  try {
+    callback = callbacks.register('iiiii', (_param, position, outPtr, length) => {
+      const begin = Number(position);
+      const count = Number(length);
+      if (
+        !Number.isSafeInteger(begin) ||
+        !Number.isSafeInteger(count) ||
+        begin < 0 ||
+        count < 0 ||
+        begin + count > size
+      ) {
+        return 0;
+      }
+      try {
+        const bytes = read(begin, count);
+        if (bytes.byteLength !== count) return 0;
+        mem.writeBytes(toPtr(outPtr as number), bytes);
+        return 1;
+      } catch {
+        return 0;
+      }
+    });
+    mem.poke(structPtr, 'i32', size, 0);
+    mem.poke(structPtr, 'i32', toNumber(callback), 4);
+    mem.poke(structPtr, 'i32', 0, 8);
+    return {
+      ptr: structPtr,
+      close() {
+        if (closed) return;
+        closed = true;
+        callbacks.dispose(callback as Callback);
+        mem.free(structPtr);
+      },
+    };
+  } catch (error) {
+    if (callback) callbacks.dispose(callback);
+    mem.free(structPtr);
+    throw error;
+  }
+}
+
 function createWasmFileAccess(
   mem: PdfRuntimeMemory,
   callbacks: PdfRuntimeCallbacks,
 ): PdfRuntimeFileAccess {
   return {
+    fromHttpRange(url) {
+      if (typeof XMLHttpRequest === 'undefined') {
+        throw new RangeUnavailable('HTTP range loading needs XMLHttpRequest');
+      }
+      const probe = syncHttpRange(url, 0, 0, null);
+      const size = parseContentRangeTotal(probe.contentRange, 0, 0);
+      if (probe.status !== 206 || size === null) {
+        throw new RangeUnavailable(
+          `HTTP range loading is unavailable for ${url} (HTTP ${probe.status})`,
+        );
+      }
+      const cache = new HttpRangeCache(
+        {
+          read: (start, end, validator) => syncHttpRange(url, start, end, validator),
+        },
+        size,
+        rangeValidator(probe.etag, probe.lastModified),
+      );
+      return createBlockAccess(mem, callbacks, size, (begin, length) => cache.read(begin, length));
+    },
     fromMemory(input) {
       const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-      if (bytes.byteLength > 0xffffffff) {
-        throw new RangeError('FPDF_FILEACCESS on wasm supports files up to 4 GiB');
-      }
-
-      const structPtr = mem.alloc(12);
-      let callback: Callback | null = null;
-      let closed = false;
-
-      try {
-        callback = callbacks.register('iiiii', (_param, position, outPtr, size) => {
-          const begin = Number(position);
-          const length = Number(size);
-          if (
-            !Number.isSafeInteger(begin) ||
-            !Number.isSafeInteger(length) ||
-            begin < 0 ||
-            length < 0 ||
-            begin + length > bytes.byteLength
-          ) {
-            return 0;
-          }
-          mem.writeBytes(toPtr(outPtr as number), bytes.subarray(begin, begin + length));
-          return 1;
-        });
-
-        mem.poke(structPtr, 'i32', bytes.byteLength, 0);
-        mem.poke(structPtr, 'i32', toNumber(callback), 4);
-        mem.poke(structPtr, 'i32', 0, 8);
-
-        return {
-          ptr: structPtr,
-          close() {
-            if (closed) return;
-            closed = true;
-            callbacks.dispose(callback as Callback);
-            mem.free(structPtr);
-          },
-        };
-      } catch (error) {
-        if (callback) callbacks.dispose(callback);
-        mem.free(structPtr);
-        throw error;
-      }
+      return createBlockAccess(mem, callbacks, bytes.byteLength, (begin, length) =>
+        bytes.subarray(begin, begin + length),
+      );
     },
     fromNodeFile() {
       throw new Error('fromNodeFile() is only available on the native Node runtime');

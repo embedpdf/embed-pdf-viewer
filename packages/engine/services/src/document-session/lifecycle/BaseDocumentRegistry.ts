@@ -77,6 +77,44 @@ export class BaseDocumentRegistry {
     }
   }
 
+  /**
+   * A base PDFium range-reads over HTTP. Wasm only: `fromHttpRange` throws
+   * on the native runtime, and the caller downloads the file instead.
+   */
+  acquireHttpBase(opts: {
+    key: string;
+    url: string;
+    password?: string | null;
+  }): AcquiredBaseDocument {
+    const existing = this.retain(opts.key);
+    if (existing) return existing;
+
+    const { fn } = this.runtime;
+    const stack = new CloseStack();
+    let access: PdfFileAccessHandle | null = null;
+
+    try {
+      access = this.runtime.fileAccess.fromHttpRange(opts.url);
+      stack.push(() => access?.close());
+      const basePtr = fn.EPDF_LoadBaseDocument(access.ptr, opts.password ?? '');
+      if (!basePtr) {
+        throw baseOpenError(this.runtime, opts.password);
+      }
+      setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
+      stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
+      return this.insert({
+        key: opts.key,
+        kind: 'memory',
+        basePtr,
+        refs: 1,
+        close: () => stack.close(),
+      });
+    } catch (error) {
+      stack.close();
+      throw error;
+    }
+  }
+
   acquireFileBase(opts: {
     key: string;
     path: string;

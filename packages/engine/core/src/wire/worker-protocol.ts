@@ -156,6 +156,21 @@ export interface WriteJobFields {
   objectNumberFloor?: number;
 }
 
+export interface OpenHttpRangeWorkerRequest {
+  kind: 'open.httpRange';
+  effect: 'open';
+  jobId: WorkerJobId;
+  docId: string;
+  /** Absolute URL. PDFium range-reads it; the bytes are not on this message. */
+  url: string;
+  password: string | null;
+  /** Default `protect`. */
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  objectNumbers?: 'session' | 'caller';
+  /** Object numbers to hand this session as it opens (`'session'` only); the result has them. */
+  reserveObjectNumbers?: number;
+}
+
 export interface OpenFatMemoryWorkerRequest {
   kind: 'open.fatMem';
   effect: 'open';
@@ -247,6 +262,7 @@ export interface OpenLayerFileBaseWorkerRequest {
 }
 
 export type OpenWorkerRequest =
+  | OpenHttpRangeWorkerRequest
   | OpenFatMemoryWorkerRequest
   | OpenLayerMemoryBaseWorkerRequest
   | OpenLayerFileBaseWorkerRequest;
