@@ -50,3 +50,29 @@ runPageRenderConformance(runner, {
   },
   open: (engine) => engine.open({ kind: 'id', id: DOC_ID }),
 });
+
+describe('pageColors on the cloud engine', () => {
+  test('a page in other colors is refused: the server draws pages as the file has them', async () => {
+    if (!fx) throw new Error('fixture not initialised');
+    const engine = cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    try {
+      const doc = await engine.open({ kind: 'id', id: DOC_ID });
+      const { pages } = await doc.pages.list();
+      const page = doc.page(pages[0]!.ref);
+      for (const pageColors of ['dark', 'sepia', { background: '#000000' }] as const) {
+        await expect(page.render.image({ pageColors })).rejects.toMatchObject({
+          code: 'NotImplemented',
+        });
+      }
+      // A color that is not one is the caller's mistake, as on the local engine.
+      await expect(page.render.image({ pageColors: { text: 'red' } })).rejects.toMatchObject({
+        code: 'InvalidArg',
+      });
+      // The page as the file has it is what the server draws.
+      const image = await page.render.image({ pageColors: 'normal', format: 'png' });
+      expect(image.width).toBeGreaterThan(0);
+    } finally {
+      await engine.destroy();
+    }
+  });
+});

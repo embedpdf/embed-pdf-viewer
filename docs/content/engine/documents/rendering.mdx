@@ -167,6 +167,58 @@ fields when they may read the form (`doc.forms.read`). So someone who may fill a
 its comments gets a picture without the comments. Asking for annotations or fields the user may
 not read fails with `Forbidden`, naming the option.
 
+## Page colors
+
+<Engine local>
+
+`pageColors` draws the page in other colors: a preset, `'dark'` or `'sepia'`, or colors of your own.
+`'normal'`, the default, is the page as the file has it:
+
+```ts
+await page.render.image({ pageColors: 'dark' });
+
+await page.render.image({
+  pageColors: { background: '#0b1d2a', text: '#cfe8ff', convertFillToStroke: true },
+});
+```
+
+The engine draws the page with PDFium's color scheme: the paper is filled with `background`, and all
+text and all shapes take one color each, whatever the file gave them. A custom object takes
+`'#rrggbb'` colors, all optional:
+
+| Field                 | What it colors                                                          | Default     |
+| :-------------------- | :---------------------------------------------------------------------- | :---------- |
+| `background`          | The paper                                                               | `'#ffffff'` |
+| `text`                | Whatever of the four below you leave out                                | `'#000000'` |
+| `pathFill`            | The fill of shapes                                                      | `text`      |
+| `pathStroke`          | The outline of shapes, and lines                                        | `text`      |
+| `textFill`            | The fill of text                                                        | `text`      |
+| `textStroke`          | The outline of text, where the font has one                             | `text`      |
+| `convertFillToStroke` | Draw filled shapes as outlines, so a shape doesn't cover the text on it | `false`     |
+
+`'dark'` is `#e8e6e3` on `#1e1e1e`, and `'sepia'` is `#5b4636` on `#f4ecd8`, both with
+`convertFillToStroke`. `background: 'transparent'` leaves the paper out and still recolors the text
+and shapes. Anything that isn't a preset or an object of `'#rrggbb'` colors fails with `InvalidArg`,
+naming the field, and a [print picture](#print-pictures) takes none.
+
+Embedded images, scanned pages and shadings are drawn as the file has them, so a scanned page looks
+the same in every preset. With one color for every fill, a text label on a filled box would be the
+color of the box, which is what `convertFillToStroke` is for. A page and a tile are placed on whole
+pixels, so a tile of a page in other colors can sit up to a pixel from the page it cuts at a
+fractional scale.
+
+A native runtime in Node cannot give PDFium a function to call between slices, so a page in other
+colors is drawn in one go there: an abort is heard when it is done, not between slices.
+
+</Engine>
+
+<Engine cloud>
+
+The server draws pages as the file has them, on white. `pageColors` of anything but `'normal'` fails
+with `NotImplemented`.
+
+</Engine>
+
 ## Print pictures
 
 A picture for paper follows the print rules instead of the screen's. Pass `usage: 'print'`, and
@@ -194,7 +246,7 @@ it needs shrunk to fit the paper, since the printer would throw the rest away: a
 300 DPI is 2482 × 3508 pixels, not 9933 × 14043.
 
 A print picture is always the whole page, upright, on white. It takes only a `dpi` viewport, and
-no `target`, `rotation` or `background`; a `dpi` viewport is only for print pictures. Anything else
+no `target`, `rotation`, `background` or `pageColors`; a `dpi` viewport is only for print pictures. Anything else
 fails with `InvalidArg`. `includeAnnotations` and `includeFormFields` work as for any picture.
 
 `pageTransform()` gives a print picture's size and transform without rendering:
@@ -377,6 +429,7 @@ milliseconds, so the renders waiting behind it start right away. See
 | `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality))                                                                                                     | see above                                                                |
 | `quality`            | WebP quality, from `0` to `1`                                                                                                                                           | encoder default                                                          |
 | `background`         | `'white'` or `'transparent'`                                                                                                                                            | `'white'`                                                                |
+| `pageColors`         | `'normal'`, `'dark'`, `'sepia'`, or your own colors (see [Page colors](#page-colors))                                                                                   | `'normal'`                                                               |
 | `includeAnnotations` | Draw the page's annotations                                                                                                                                             | `true` when the user may read them                                       |
 | `includeFormFields`  | Draw the form fields too                                                                                                                                                | `false` without annotations; else `true` when the user may read the form |
 | `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area                                                                                                            | the whole page                                                           |

@@ -20,6 +20,7 @@ import {
   renderTargetArea,
   checkImageQuality,
   checkRenderUsage,
+  resolvePageColors,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -89,6 +90,13 @@ export class CloudPageRenderService implements PageRenderService {
       // caller's rights (a tenant or API token), it asks for everything and
       // the server decides.
       checkRenderUsage(options, this.pictureRights());
+      // The server draws the page as the file has it, on white (`renderPolicy.background`).
+      if (resolvePageColors(options.pageColors) !== null) {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          'the cloud engine draws pages as the file has them: pageColors is for the local engine',
+        );
+      }
       const layers = resolvePageLayers(
         options,
         this.layerRights() ?? { annotations: true, formFields: true },

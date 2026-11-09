@@ -84,6 +84,13 @@ describe('the page render token', () => {
     expect(() => queryOf('pages', 'contentVersion=2,format=webp')).toThrow();
   });
 
+  test('says nothing of the page colors: the server draws pages as the file has them', () => {
+    const versions = { contentVersion: 2, pin: { engine: 'f0', shape: 1 } };
+    expect(renderImageOptionsToToken({ format: 'webp', pageColors: 'normal' }, versions)).toBe(
+      renderImageOptionsToToken({ format: 'webp' }, versions),
+    );
+  });
+
   test("each family's token carries exactly its own pins", () => {
     const pins = { contentVersion: 2, annotationVersion: 5, widgetVersion: 7 };
     for (const spec of Object.values(PAGE_RENDER_FAMILIES)) {

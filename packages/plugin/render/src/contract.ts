@@ -14,6 +14,7 @@ import {
   type EventHook,
   type EventOrigin,
   type OperationOptions,
+  type PageColors,
   type PageImageHandle,
   type PageImageOptions,
   type PageRef,
@@ -63,6 +64,14 @@ export interface RenderSettings {
   readonly debug: boolean;
   /** The `snapshot` tool: how big its pictures are, and how its box looks. */
   readonly snapshot: SnapshotSettings;
+  /**
+   * The colors the pages are drawn in: `'normal'` (as the file has them),
+   * `'dark'`, `'sepia'`, or colors of your own ({@link PageColors}). A change
+   * redraws every page. It is one value: a change replaces it whole.
+   * The local engine draws them; the cloud engine refuses a page in other
+   * colors (`unsupported`).
+   */
+  readonly pageColors: PageColors;
 }
 
 /** The snapshot tool's settings: see {@link RenderSettings.snapshot}. */
@@ -108,6 +117,7 @@ export const RENDER_DEFAULTS: RenderSettings = {
   slowAfterMs: 400,
   debug: false,
   snapshot: { scale: 2, box: { fill: null, stroke: null } },
+  pageColors: 'normal',
 };
 
 /** What `renderPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -132,13 +142,22 @@ export interface PageLayerOptions {
 }
 
 /**
+ * The colors one picture is drawn in. Left out, a picture follows the
+ * `pageColors` setting; `'normal'` draws it as the file has it whatever the
+ * setting says.
+ */
+export interface PageColorOptions {
+  pageColors?: PageColors;
+}
+
+/**
  * An encoded page image: `source` is bytes or a URL, `format`/`mimeType`
  * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */
 export type PageImage = PageImageHandle;
 
-export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
+export interface RenderPageOptions extends OperationOptions, PageLayerOptions, PageColorOptions {
   /** Exact output width in device pixels (height keeps the aspect of what is drawn). */
   width?: number;
   /** Device pixels per PDF point; ignored when `width` is given. Default 1. */
@@ -156,7 +175,8 @@ export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
   quality?: number;
 }
 
-export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptions {
+export interface RenderThumbnailOptions
+  extends OperationOptions, PageLayerOptions, PageColorOptions {
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;

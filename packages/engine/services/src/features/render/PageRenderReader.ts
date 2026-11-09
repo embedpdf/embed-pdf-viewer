@@ -11,11 +11,13 @@ import {
   EngineErrorCode,
   checkRenderUsage,
   normalizePdfRect,
+  resolvePageColors,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
+import { colorSchemeDraw, type PageDraw } from './internal/colorSchemeDraw';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { Slices } from '../../shared/slices';
@@ -70,6 +72,7 @@ export class PageRenderReader {
       const rotation = options.rotation ?? 0;
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
+      const colors = resolvePageColors(options.pageColors);
       const layers = resolvePageLayers(options, { annotations: true, formFields: true });
       let flags = FPDF_REVERSE_BYTE_ORDER;
       if (layers.includeAnnotations) flags |= FPDF_RENDER_ANNOT;
@@ -85,26 +88,42 @@ export class PageRenderReader {
           ? { maxOutputPixels: options.maxOutputPixels }
           : {}),
         background: options.background === 'transparent' ? 'transparent' : 'white',
+        ...(colors ? { paper: colors.background } : {}),
         draw: async (bitmapPtr, matrixPtr, clipPtr) => {
           throwIfAborted(signal);
-          let status = fn.EPDF_RenderPageBitmapWithMatrix_Start(
-            bitmapPtr,
-            pagePtr,
-            matrixPtr,
-            clipPtr,
-            flags,
-            slices.budgetMs,
-          );
+          const render: PageDraw = colors
+            ? colorSchemeDraw(this.runtime, {
+                bitmapPtr,
+                pagePtr,
+                matrixPtr,
+                flags,
+                scheme: colors,
+                budgetMs: slices.budgetMs,
+              })
+            : {
+                start: () =>
+                  fn.EPDF_RenderPageBitmapWithMatrix_Start(
+                    bitmapPtr,
+                    pagePtr,
+                    matrixPtr,
+                    clipPtr,
+                    flags,
+                    slices.budgetMs,
+                  ),
+                continue: () => fn.EPDF_RenderPage_Continue(pagePtr, slices.budgetMs),
+                close: () => fn.FPDF_RenderPage_Close(pagePtr),
+              };
+          let status = render.start();
           try {
             while (status === FPDF_RENDER_TOBECONTINUED) {
               await slices.between();
               throwIfAborted(signal);
-              status = fn.EPDF_RenderPage_Continue(pagePtr, slices.budgetMs);
+              status = render.continue();
             }
           } finally {
             // Before the bitmap is freed and the page released: the render
             // draws into the bitmap until it is closed.
-            fn.FPDF_RenderPage_Close(pagePtr);
+            render.close();
           }
           return status === FPDF_RENDER_DONE;
         },
