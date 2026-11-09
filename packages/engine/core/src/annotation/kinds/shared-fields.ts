@@ -74,9 +74,10 @@ export const annotationBaseFields = {
   /**
    * `/NM`, the name that tells the annotation apart on its page for other PDF
    * apps; not its identity (that's `ref`). A create left without it gets a
-   * fresh UUIDv7; `null` is no name. A page's names are unique.
+   * fresh UUIDv7; `null` is no name, and an update's `null` removes it. A
+   * name a create or an update gives must be free on its page.
    */
-  nm: field.data(z.string()).nullable().optional().createOnly(),
+  nm: field.data(z.string()).nullable().optional(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),
   subject: field.data(z.string()).nullable().optional(),

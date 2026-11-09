@@ -96,6 +96,8 @@ const CASES: PredictionCase[] = [
     patch: { box: { ...BOX, x: BOX.x + 30 } },
   },
   { name: 'square: turned', draft: { subtype: 'square', box: BOX }, patch: { rotation: 30 } },
+  { name: 'square: renamed', draft: { subtype: 'square', box: BOX }, patch: { nm: 'renamed' } },
+  { name: 'square: its name removed', draft: { subtype: 'square', box: BOX }, patch: { nm: null } },
   {
     name: 'square: straightened',
     draft: { subtype: 'square', box: BOX, rotation: 30 },
@@ -314,6 +316,7 @@ const CASES: PredictionCase[] = [
  */
 const WIDGET_CASES: { name: string; patch: WidgetPatch }[] = [
   { name: 'hidden and locked', patch: { hidden: true, locked: true } },
+  { name: 'renamed', patch: { nm: 'renamed-widget' } },
   {
     name: 'moved and restyled',
     patch: { rect: { ...BOX, x: 300 }, color: '#1f6feb', strokeWidth: 2 },

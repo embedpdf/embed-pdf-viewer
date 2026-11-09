@@ -79,8 +79,8 @@ function kindAfter(
 /**
  * The patch as the kind it leaves the annotation (`kindAfter`): its subtype
  * filled in, which a caller may leave out. A subtype the annotation can't
- * become, a changed name, a field the kind doesn't declare, or any change to
- * an annotation of a type the engine doesn't model is refused.
+ * become, a field the kind doesn't declare, or any change to an annotation of
+ * a type the engine doesn't model is refused.
  */
 function annotationPatchForTarget(
   current: Annotation<PdfCoordinates>,
@@ -93,12 +93,6 @@ function annotationPatchForTarget(
       "an annotation of a type the engine doesn't model can't be updated",
     );
   }
-  if (patch.nm !== undefined && patch.nm !== current.nm) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      "an annotation's nm can't change after create",
-    );
-  }
   assertDeclaredFields(subtype, patch);
   return { ...patch, subtype } as AnnotationPatch<PdfCoordinates>;
 }
@@ -108,8 +102,7 @@ function annotationPatchForTarget(
  * coordinates, the same on the page and in the engine:
  *
  * - its subtype filled in from `current`, or a sibling kind it names (any
- *   other is refused, as is a field the kind doesn't declare and a changed
- *   `nm`);
+ *   other is refused, as is a field the kind doesn't declare);
  * - a drawn kind's `rect`: the rect it reads, sent back, dropped; another one
  *   the shape fields that put the drawing there (`pdfResolveRectCommand`);
  * - a color sent back as it reads dropped, so the file keeps it as it has it;
@@ -171,8 +164,8 @@ export function pdfDeriveAnnotationPatch(
  * refused when the update reaches it.
  *
  * Throws `InvalidArg` for what preparation and derivation refuse: a field the
- * kind doesn't declare, a subtype the annotation can't become, a changed name,
- * a rect with a new shape or that isn't finite, and where nothing can follow.
+ * kind doesn't declare, a subtype the annotation can't become, a rect with a
+ * new shape or that isn't finite, and where nothing can follow.
  */
 export function pdfPredictAnnotationPatch(
   current: Annotation<PdfCoordinates>,
