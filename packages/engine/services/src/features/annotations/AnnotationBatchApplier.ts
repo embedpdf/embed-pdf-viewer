@@ -27,7 +27,7 @@ import { readContextFor } from './internal/read/annotationReadContext';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyDraft } from './internal/write/annotationWriterRegistry';
+import { applyDraft, drawAppearanceResource } from './internal/write/annotationWriterRegistry';
 import { generateAppearance } from './internal/write/generateAppearance';
 import {
   restoreAttribution,
