@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  FreeTextAlignWriteSchema,
   RichTextAlignSchema,
   RichTextDocumentInputSchema,
   RichTextDocumentSchema,
@@ -31,8 +32,12 @@ export const FreeTextDeclaration = defineKind('free-text', {
   fontFamily: field.data(FontNameSchema).optional(),
   /** The body's size in points: 12 when a create leaves it out. */
   fontSize: field.data(z.number().positive()).optional(),
-  /** The body's alignment: left when a create leaves it out. */
-  textAlign: field.data(RichTextAlignSchema).optional(),
+  /**
+   * The body's alignment: left when a create leaves it out. A write may say
+   * `'auto'`: right-aligned right-to-left when the text's first strong
+   * character is right-to-left (Hebrew, Arabic...), else left-aligned.
+   */
+  textAlign: field.data(RichTextAlignSchema).writes(FreeTextAlignWriteSchema).optional(),
   /** Where the lines sit in the box: top when a create leaves it out. */
   verticalAlign: field.data(VerticalAlignmentSchema).optional(),
   richText: field

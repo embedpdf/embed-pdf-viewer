@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type {
+  FreeTextAlignInput,
   RichTextAlign,
   RichTextDocument,
   RichTextDocumentInput,
@@ -14,6 +15,15 @@ import { closed } from '../wire/reading';
 export const RichTextAlignSchema: z.ZodType<RichTextAlign> = closed(
   z.enum(['left', 'center', 'right', 'justify']),
 );
+
+/** A free text's `textAlign` as a write states it: an alignment, or `'auto'`. */
+export const FreeTextAlignWriteSchema: z.ZodType<FreeTextAlignInput> = z.enum([
+  'left',
+  'center',
+  'right',
+  'justify',
+  'auto',
+]);
 
 const RichTextRunStyleShape = {
   family: z.string().min(1),
