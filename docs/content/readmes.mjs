@@ -64,7 +64,7 @@ export const READMES = {
   '@embedpdf/viewer-vue': viewer('vue'),
   '@embedpdf/viewer-svelte': viewer('svelte'),
   '@embedpdf/viewer-angular': viewer('angular'),
-  '@embedpdf/viewer-chrome': BY_HAND,
+  '@embedpdf/viewer-chrome': { near: 'viewer/index' },
 
   // ── packages/engine, and the font and stamp packages ──
   '@embedpdf/engine': INSTALLED_BY_HAND,

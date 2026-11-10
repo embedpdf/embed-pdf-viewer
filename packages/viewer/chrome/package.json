@@ -2,7 +2,7 @@
   "name": "@embedpdf/viewer-chrome",
   "version": "3.1.0",
   "private": false,
-  "description": "The full viewer's chrome - the one React implementation of the snippet UI (structure-only chrome schema, measured toolbar, Tailwind pixels). Published as an implementation dependency of @embedpdf/viewer; it is not a documented user-facing entry point for now.",
+  "description": "The interface of the EmbedPDF viewer as one React component: its toolbars, panels, document tabs and theme.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
