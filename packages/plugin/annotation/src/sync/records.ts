@@ -247,24 +247,28 @@ export function annotationOfCreate(draft: AnnotationDraft, ref: AnnotationRef): 
 
 type CopyOp = Extract<ChangeOp, { type: 'annotations.copy' }>;
 
-/**
- * The annotations a copy makes, as the engine reads them back, each with the
- * annotation it copies: the engine's own rule (`planAnnotationCopies`) over
- * the records, and each copy read as a create of the same data is
- * (`annotationOfCreate`). None for a copy the engine numbers itself, which
- * has no keys to show its copies by, and none when the engine would refuse
- * it (an annotation it names is gone). A copy that can't be read that way
- * is left out: it shows when the engine answers.
- */
-export function copiesOf(
-  records: AnnotationRecords,
-  op: CopyOp,
-): {
-  readonly copy: Annotation;
+/** One copy an `annotations.copy` op makes. */
+export interface CopyOf {
+  /** The ref it has: the page it goes on, and the object number the op gives it. */
+  readonly ref: AnnotationRef;
+  /**
+   * The copy as the engine reads it back; `null` for one that can't be read
+   * as a create is, which shows when the engine answers.
+   */
+  readonly copy: Annotation | null;
   /** The annotation it copies, and that one's place among the op's refs. */
   readonly of: AnnotationRef;
   readonly source: number;
-}[] {
+}
+
+/**
+ * The copies a copy makes, each with the annotation it copies: the engine's
+ * own rule (`planAnnotationCopies`) over the records, and each copy read as
+ * a create of the same data is (`annotationOfCreate`). None for a copy the
+ * engine numbers itself, which has no keys to show its copies by, and none
+ * when the engine would refuse it (an annotation it names is gone).
+ */
+export function copiesOf(records: AnnotationRecords, op: CopyOp): CopyOf[] {
   const { objectNumbers } = op;
   if (!objectNumbers || objectNumbers.length !== op.refs.length) return [];
   const sources: Annotation[] = [];
@@ -284,23 +288,19 @@ export function copiesOf(
       objectNumber: objectNumbers[copy.source]!,
     }),
   );
-  return copies.flatMap((copy, at) => {
+  return copies.map((copy, at): CopyOf => {
     const draft = {
       ...copy.data,
       ...(copy.replyTo ? { reply: { to: refs[copy.replyTo.copy]!, type: copy.replyTo.type } } : {}),
       ...(copy.parent !== undefined ? { parent: refs[copy.parent]! } : {}),
     } as AnnotationDraft;
+    let read: Annotation | null;
     try {
-      return [
-        {
-          copy: annotationOfCreate(draft, refs[at]!),
-          of: sources[copy.source]!.ref,
-          source: copy.source,
-        },
-      ];
+      read = annotationOfCreate(draft, refs[at]!);
     } catch {
-      return [];
+      read = null;
     }
+    return { ref: refs[at]!, copy: read, of: sources[copy.source]!.ref, source: copy.source };
   });
 }
 
@@ -392,8 +392,8 @@ export function predictRecords(records: AnnotationRecords, op: PredictedOp): Ann
     case 'annotations.copy': {
       // Each copy shows under the object number it was given, after the
       // annotations there are.
-      const made = copiesOf(records, op).filter(
-        ({ copy }) => !(annotationKey(copy.ref) in records.byKey),
+      const made = copiesOf(records, op).flatMap(({ copy, of }) =>
+        copy && !(annotationKey(copy.ref) in records.byKey) ? [{ copy, of }] : [],
       );
       if (!made.length) return records;
       const byKey = { ...records.byKey };
@@ -462,10 +462,7 @@ function undoOfOp(records: AnnotationRecords, op: ChangeOp): PredictedOp[] {
     }
     case 'annotations.copy':
       // The copies go: a reply or a popup among them goes with its parent.
-      return copiesOf(records, op).map(({ copy }) => ({
-        type: 'annotations.delete',
-        ref: copy.ref,
-      }));
+      return copiesOf(records, op).map(({ ref }) => ({ type: 'annotations.delete', ref }));
     case 'annotations.reorder':
       // The page's whole order as it was.
       return [

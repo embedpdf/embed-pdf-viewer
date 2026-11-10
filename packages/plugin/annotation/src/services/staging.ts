@@ -205,9 +205,10 @@ export const numbersFor = (changes: readonly StoreChange[]): number =>
 /**
  * A stated copy as its op, with an object number for each annotation it
  * copies, so the copies show at once under them. `ids`: the copies of the
- * annotations it names, in their order (one the engine leaves out has none);
- * `live`: the copies that draw live from now on. Throws for an annotation
- * the view doesn't have.
+ * annotations it names, in their order (one the engine leaves out has none),
+ * each by the object number it gets, whether it shows before the engine
+ * answers or not; `live`: the copies that draw live from now on. Throws for
+ * an annotation the view doesn't have.
  */
 export function checkedCopyOf(
   change: Copy,
@@ -229,11 +230,11 @@ export function checkedCopyOf(
   return {
     ids: copies
       .filter(({ source }) => source < change.refs.length)
-      .map(({ copy }) => annotationKey(copy.ref)),
+      .map(({ ref }) => annotationKey(ref)),
     op,
-    live: copies
-      .filter(({ copy }) => sourceOfNew(copy) === 'vector')
-      .map(({ copy }) => annotationKey(copy.ref)),
+    live: copies.flatMap(({ copy }) =>
+      copy && sourceOfNew(copy) === 'vector' ? [annotationKey(copy.ref)] : [],
+    ),
   };
 }
 

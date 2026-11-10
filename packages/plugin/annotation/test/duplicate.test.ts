@@ -87,6 +87,25 @@ const linkOn = (objectNumber: number, parent: number) => {
   } as unknown as FileAnnotation;
 };
 
+/** A dimension line, with the measure given. */
+const line = (objectNumber: number, measure: unknown, extra: Record<string, unknown> = {}) => {
+  const {
+    box: _box,
+    interiorColor: _interiorColor,
+    ...base
+  } = square(objectNumber) as unknown as Record<string, unknown>;
+  return {
+    ...base,
+    subtype: 'line',
+    borderStyle: 'solid',
+    intent: 'line-dimension',
+    measure,
+    captionEnabled: false,
+    linePoints: { start: { x: 100, y: 670 }, end: { x: 200, y: 670 } },
+    ...extra,
+  } as unknown as FileAnnotation;
+};
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -266,6 +285,79 @@ describe('duplicate', () => {
       ops: [{ objectNumbers: [expect.any(Number), Number(id!.slice('obj:'.length))] }],
     });
     expect(annotationKey(result.annotations[0]!.ref)).toBe(id);
+  });
+
+  it('shows the copy without a field the engine leaves out of it', async () => {
+    const harness = annotationHarness();
+    // A measure no write can make: the engine copies the line without it, and says so.
+    await harness.load([line(30, { subtype: 'geospatial' })]);
+    const dropped = [{ ref: refOf(30), field: 'measure', reason: 'geospatial' }];
+    const answer = deferred<{ annotations: FileAnnotation[]; dropped: typeof dropped }>();
+    harness.copy.mockReturnValueOnce(answer.promise);
+
+    const pending = harness.capability.duplicate([refOf(30)], { select: true });
+
+    // At once: the line without its measure, selected.
+    const [, id] = harness.model().order;
+    expect(id).toBeDefined();
+    expect(dataOf(harness.model().byId[id!]!.annotation)).toMatchObject({
+      subtype: 'line',
+      measure: null,
+    });
+    expect(harness.model().selected).toEqual([id]);
+
+    answer.resolve({ annotations: [line(0, null)], dropped });
+    const result = await pending;
+    expect(result.dropped).toEqual(dropped);
+    expect(result.annotations.map((copy) => annotationKey(copy.ref))).toEqual([id]);
+    expect(harness.model().selected).toEqual([id]);
+  });
+
+  it('resolves and selects a copy that shows only when the engine answers', async () => {
+    const harness = annotationHarness();
+    // A measure no read gives: it stands in for a copy the view can't read as a create.
+    await harness.load([line(30, { subtype: 'other' })]);
+    const { selection } = harness.capability;
+    selection.select([refOf(30)]);
+    const answer = deferred<{ annotations: FileAnnotation[]; dropped: never[] }>();
+    harness.copy.mockReturnValueOnce(answer.promise);
+
+    const pending = selection.duplicate();
+
+    // Nothing to show yet, so the selection stays where it was.
+    expect(harness.model().order).toEqual(['obj:30']);
+    expect(harness.model().selected).toEqual(['obj:30']);
+    // Undoing it takes the copy away all the same.
+    const { ops } = harness.applied[0]!.change as unknown as {
+      ops: { objectNumbers: number[] }[];
+    };
+    const [number] = ops[0]!.objectNumbers;
+    expect(harness.pending()[0]!.undo).toEqual([
+      { type: 'annotations.delete', ref: refOf(number!) },
+    ]);
+
+    answer.resolve({ annotations: [line(0, null)], dropped: [] });
+    const { annotations } = await pending;
+    expect(annotations.map((copy) => annotationKey(copy.ref))).toEqual([`obj:${number}`]);
+    expect(harness.model().order).toEqual(['obj:30', `obj:${number}`]);
+    expect(harness.model().selected).toEqual([`obj:${number}`]);
+  });
+
+  it('leaves the selection alone when it moved on before such a copy shows', async () => {
+    const harness = annotationHarness();
+    await harness.load([line(30, { subtype: 'other' }), square(31, 300)]);
+    const { selection } = harness.capability;
+    selection.select([refOf(30)]);
+    const answer = deferred<{ annotations: FileAnnotation[]; dropped: never[] }>();
+    harness.copy.mockReturnValueOnce(answer.promise);
+
+    const pending = selection.duplicate();
+    selection.select([refOf(31)]);
+    answer.resolve({ annotations: [line(0, null)], dropped: [] });
+
+    expect((await pending).annotations).toHaveLength(1);
+    expect(harness.model().order).toHaveLength(3);
+    expect(harness.model().selected).toEqual(['obj:31']);
   });
 
   it('a refused copy takes the copies away, rejects, and names the originals', async () => {
@@ -458,5 +550,47 @@ describe('a copied stamp', () => {
     answer.resolve({ annotations: [stamp(0, { rect: moved, box: moved })], dropped: [] });
     await pending;
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`obj:30@0|${id}@1`);
+  });
+
+  it('a copy of a copy shows that picture too, before the engine wrote either', async () => {
+    const harness = annotationHarness();
+    await harness.load([stamp(30)]);
+    const picture = {
+      ref: refOf(30),
+      mode: 'normal',
+      state: null,
+      rect: { x: 100, y: 140, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    await harness.capability.renderAppearances(PAGE, 1);
+    harness.copy.mockReturnValue(new Promise(() => {}));
+
+    // Ctrl/Cmd+D twice: the second copies the first copy, which is on its way.
+    const { selection } = harness.capability;
+    selection.select([refOf(30)]);
+    void selection.duplicate();
+    void selection.duplicate();
+
+    const [, first, second] = harness.model().order;
+    expect(harness.model().selected).toEqual([second]);
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(
+      `obj:30@0|${first}@kept|${second}@kept`,
+    );
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+      {
+        ...picture,
+        ref: harness.model().byId[first!]!.annotation.ref,
+        rect: { x: 110, y: 150, width: 100, height: 60 },
+        version: 0,
+      },
+      {
+        ...picture,
+        ref: harness.model().byId[second!]!.annotation.ref,
+        rect: { x: 120, y: 160, width: 100, height: 60 },
+        version: 0,
+      },
+    ]);
   });
 });

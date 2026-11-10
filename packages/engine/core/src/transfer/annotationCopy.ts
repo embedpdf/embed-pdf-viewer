@@ -5,7 +5,11 @@
  * can't make) it passes in as `unwritable` (`planAnnotationCopy`, in
  * `@embedpdf/engine-core/validation`).
  */
-import type { AnnotationDropReason, AnnotationImportDrop } from './annotationImport';
+import {
+  fieldMarkersOf,
+  type AnnotationDropReason,
+  type AnnotationImportDrop,
+} from './annotationImport';
 import { translatedAnnotation } from '../annotation/appearance';
 import type { Annotation } from '../annotation/kinds';
 import type { AnnotationReplyType } from '../annotation/primitives';
@@ -59,8 +63,9 @@ export interface PlannedAnnotationCopy {
   /**
    * What the copy holds: the source's data, moved. Its name, its group and
    * its links are left out: the engine gives it a name and the session's
-   * group, and its links are the two fields below. Its `ref` is still the
-   * source's.
+   * group, and its links are the two fields below. So is a field that marks
+   * something the engine can't write (`fieldMarkersOf`). Its `ref` is still
+   * the source's.
    */
   readonly data: Annotation;
   /** The copy it replies to or is grouped with, by its place in `copies`. */
@@ -85,6 +90,8 @@ export interface AnnotationCopyPlan {
  *   so a copied group is a group of its own. A reply to any other annotation
  *   stands alone.
  * - A popup comes with the annotation it shows, or not at all.
+ * - A field that marks something the engine can't write (a geospatial
+ *   measure, an action no write makes) is left out of its copy.
  * - A kind the engine doesn't know, a widget, and a source `unwritable` says
  *   a write can't make, are left out.
  *
@@ -150,6 +157,9 @@ export function planAnnotationCopies(
       popup: _popup,
       ...data
     } = source as Annotation & { groupId?: unknown };
+    for (const { field } of fieldMarkersOf(source)) {
+      delete (data as Record<string, unknown>)[field];
+    }
     return {
       source: index,
       page: pageOf(index),

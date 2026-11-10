@@ -10,8 +10,12 @@ import {
   type AnnotationCopyPlacement,
   type PlannedAnnotationCopy,
 } from './annotationCopy';
-import type { AnnotationDropReason, AnnotationImportDrop } from './annotationImport';
-import { draftOf, fieldMarkersOf, unwritableValuesOf } from './planAnnotationImport';
+import {
+  fieldMarkersOf,
+  type AnnotationDropReason,
+  type AnnotationImportDrop,
+} from './annotationImport';
+import { draftOf, unwritableValuesOf } from './planAnnotationImport';
 import type { Annotation, AnnotationDraft } from '../annotation/kinds';
 
 /** One annotation a copy creates. */
@@ -32,9 +36,10 @@ export interface AnnotationCopyCreates {
  * Nothing here touches a document, so a copy refuses before its first write:
  * `InvalidArg` when a source's data isn't valid for its kind.
  *
- * Beyond what {@link planAnnotationCopies} leaves out, a source with a value
- * every create of its kind needs and no write can make is left out, and a
- * field that marks something the engine can't write is left out of its copy.
+ * {@link planAnnotationCopies} leaves a field that marks something the engine
+ * can't write out of its copy, and each one is reported here. Beyond that, a
+ * source with a value every create of its kind needs and no write can make
+ * is left out, and any other field with such a value is left out of its copy.
  */
 export function planAnnotationCopy(
   sources: readonly Annotation[],

@@ -452,9 +452,12 @@ The annotation plugin is the reference: one change per message
 records are named by the object numbers they take, and typing is a hold
 (`write/text-editing.ts`). Copies the engine makes (`annotations.copy`) are
 predicted by the engine's own rule (`planAnnotationCopies`), each under the
-object number the op gives it. A copied stamp has no live drawing, so it
-shows its original's picture until the engine has drawn the copy
-(`read/render.ts`).
+object number the op gives it. That number names the copy whether the view
+could show it before the engine answered or not, so what `duplicate()`
+resolves and selects never depends on the prediction. A copied stamp has no
+live drawing, so it shows its original's picture until the engine has drawn
+the copy; a copy of a copy shows the picture of the first annotation behind
+it that has one (`read/render.ts`).
 
 ### The page list
 

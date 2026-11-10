@@ -43,6 +43,28 @@ const PNG_1X1 = Uint8Array.from(
 
 const box = (x: number, y: number, width = 60, height = 40) => ({ x, y, width, height });
 
+/** A one-page file with the annotation given, as another app wrote it. */
+function pdfWith(annotation: string): Uint8Array {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Annots [4 0 R] >>',
+    annotation,
+  ];
+  let text = '%PDF-1.7\n';
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(text.length);
+    text += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const start = text.length;
+  text +=
+    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
+    offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  text += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
+  return new TextEncoder().encode(text);
+}
+
 /**
  * The engine, with a gate in front of `doc.apply`: while it is held, every change waits, in
  * the order it came, and the engine answers them once it is let go.
@@ -124,13 +146,14 @@ afterAll(async () => {
   await engine.destroy();
 });
 
-async function boot(): Promise<Booted> {
+/** `document`: the file to open; the one-page fixture when left out. */
+async function boot(document?: Uint8Array): Promise<Booted> {
   const gate = gated(engine);
   const kernel = createKernel({
     engine: gate.engine,
     plugins: [interactionPlugin(), annotationPlugin(), historyPlugin()],
   });
-  const bytes = new Uint8Array(await readFile(fixture));
+  const bytes = document ?? new Uint8Array(await readFile(fixture));
   await kernel.documents.open({ kind: 'bytes', id: `history-${Math.random()}`, bytes });
   const annotation = kernel.capability(AnnotationToken);
   const history = kernel.capability(HistoryToken);
@@ -544,6 +567,41 @@ describe('duplicate', () => {
       expect(annotations).toHaveLength(1);
       expect(annotations[0]).toMatchObject({ subtype: 'square', locked: true });
       expect((annotations[0] as { box: unknown }).box).toEqual(box(110, 110));
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('shows a copy without the measure the engine can’t write, selected, and resolves it', async () => {
+    // A dimension line another app made, with a geospatial measure: the engine
+    // reads it as a marker and copies the line without it.
+    const line =
+      '<< /Type /Annot /Subtype /Line /IT /LineDimension /Rect [100 300 300 320] ' +
+      '/L [100 310 300 310] /C [1 0 0] /Contents (imported) ' +
+      '/Measure << /Subtype /GEO /Vendor (preserve) >> >>';
+    const booted = await boot(pdfWith(line));
+    try {
+      const { annotation, gate } = booted;
+      const [source] = annotation.list();
+      expect(source).toMatchObject({ subtype: 'line', measure: { subtype: 'geospatial' } });
+      annotation.selection.select([source!.ref]);
+      expect(annotation.selection.canDuplicate()).toBe(true);
+
+      gate.hold();
+      const duplicated = annotation.selection.duplicate();
+      const shown = booted.view(true);
+      const copies = annotation.selection.getSelected();
+      expect(copies).toHaveLength(1);
+      expect(copies[0]).toMatchObject({ subtype: 'line', measure: null });
+      expect(annotation.isPending(copies[0]!.ref)).toBe(true);
+      gate.release();
+
+      const { annotations, dropped } = await duplicated;
+      await booted.caughtUp();
+      expect(dropped).toEqual([{ ref: source!.ref, field: 'measure', reason: 'geospatial' }]);
+      expect(annotations.map((copy) => copy.ref)).toEqual([copies[0]!.ref]);
+      expect(withoutStamps(booted.view(true))).toEqual(withoutStamps(shown));
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual([copies[0]!.ref]);
     } finally {
       await booted.destroy();
     }

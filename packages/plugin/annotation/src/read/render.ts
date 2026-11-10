@@ -256,9 +256,9 @@ export function createRenderReads(
    * annotations the engine draws on it, each at its picture version
    * (`pictureVersion`, which advances when the engine confirms a re-bake).
    * `placed`: the stamps this session placed that the engine hasn't written
-   * yet, which show the preview they were placed with, and the records an
-   * undo brought back or a copy made, which show the pictures kept of them
-   * or of their original (`keptOf`). Position,
+   * yet, which show the preview they were placed with (`previewOf`), and
+   * the records an undo brought back or a copy made, which show the pictures
+   * kept of them or of their original (`keptOf`). Position,
    * rotation and the state shown are absent: the blit translates (`apBox`)
    * and turns (`apRot`) the same pixels, and every state is held, so a move,
    * a spin or a switch costs no new picture. `lent`: the lender's epoch for
@@ -282,7 +282,7 @@ export function createRenderReads(
       // status change must not churn the page's raster cache key.
       if (isSubstrateOnly(record)) continue;
       if (record.unconfirmed) {
-        if (stamps.lookOf(record)) placed.push(`${id}@placed`);
+        if (previewOf(record)) placed.push(`${id}@placed`);
         else if (keptOf(record).length) placed.push(`${id}@kept`);
         continue;
       }
@@ -336,6 +336,40 @@ export function createRenderReads(
   const familyOf = (id: string): AppearanceFamily => (lending.owns(id) ? 'widgets' : 'annotations');
 
   /**
+   * The annotations a copy the engine hasn't written stands in for, nearest
+   * first: the one it copies, then, while that one is such a copy too, the
+   * one behind it. A copy of a copy finds its look this way.
+   */
+  const originalsOf = (id: string): AnnotationRef[] => {
+    const { byKey } = records.view();
+    const originals: AnnotationRef[] = [];
+    const seen = new Set([id]);
+    let next = byKey[id]?.copyOf;
+    while (next && !seen.has(annotationKey(next))) {
+      seen.add(annotationKey(next));
+      originals.push(next);
+      next = byKey[annotationKey(next)]?.copyOf;
+    }
+    return originals;
+  };
+
+  /**
+   * The preview a record the engine hasn't written shows: the one it was
+   * placed with (a stamp this session placed), or, for a copy of a stamp
+   * that is still being placed, that stamp's.
+   */
+  const previewOf = (record: ModelAnnotation): ReturnType<Stamps['lookOf']> => {
+    const own = stamps.lookOf(record);
+    if (own || !record.unconfirmed) return own;
+    for (const original of originalsOf(record.id)) {
+      const placed = pageModel(original.page.objectNumber).byId[annotationKey(original)];
+      const look = placed ? stamps.lookOf(placed) : null;
+      if (look) return look;
+    }
+    return null;
+  };
+
+  /**
    * The pictures a record the engine hasn't written shows when it has no
    * live drawing: the engine's last pictures of it, kept a while after it
    * left its page (an undo brings it back), or, for a copy, the ones of the
@@ -346,11 +380,14 @@ export function createRenderReads(
     if (!render) return [];
     const { ref } = record.annotation;
     const own = render.getKeptAppearances(familyOf(record.id), ref);
-    const original = own.length ? undefined : records.view().byKey[record.id]?.copyOf;
-    if (!original) return own;
-    return render
-      .getKeptAppearances('annotations', original)
-      .map((kept) => ({ ...kept, ref, rect: record.apBox ?? kept.rect }));
+    if (own.length) return own;
+    for (const original of originalsOf(record.id)) {
+      const kept = render.getKeptAppearances('annotations', original);
+      if (kept.length) {
+        return kept.map((each) => ({ ...each, ref, rect: record.apBox ?? each.rect }));
+      }
+    }
+    return [];
   };
 
   /**
@@ -368,7 +405,7 @@ export function createRenderReads(
       const record = model.byId[id]!;
       if (!record.unconfirmed) return [];
       const version = record.pictureVersion ?? 0;
-      const look = stamps.lookOf(record);
+      const look = previewOf(record);
       // Brought back as it was: the pictures kept of it are its look.
       if (!look) return keptOf(record).map((kept) => ({ ...kept, version }));
       const rect = record.apBox;

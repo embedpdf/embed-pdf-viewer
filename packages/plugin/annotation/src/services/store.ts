@@ -211,7 +211,8 @@ export interface AnnotationStore {
    * without its schemas (`resolveAnnotationPatch`), a record the view doesn't
    * have, or, when the document's pool is
    * out of object numbers, a create or a copy (`applyWhenNumbered` waits for
-   * them). `select`: the records it names are selected as they show.
+   * them). `select`: the records it names are selected as they show: at
+   * once, or, for one that shows only when the engine answers, then.
    */
   apply(changes: readonly StoreChange[], options?: ApplyOptions): Applied;
   /** `apply`, once the object numbers its creates and copies take are there: at once, in this call, when they are. */
@@ -496,7 +497,19 @@ export function createStore(
     const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown, lent);
     selections.remember(change.opId, selected, options.select ? ids : selected);
     if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
-    if (options.select) commit({ type: 'select', ids });
+    if (options.select) {
+      commit({ type: 'select', ids });
+      // A record that only shows once the engine answered (a copy the view
+      // can't read beforehand) is selected then, with the others, unless
+      // the selection moved on meanwhile.
+      if (ids.some((id) => !(id in model().byId))) {
+        const staged = model().selected;
+        const selectLate = (): void => {
+          if (sameIds(model().selected, staged)) commit({ type: 'select', ids });
+        };
+        void change.result.then(selectLate, () => {});
+      }
+    }
     const written = writtenOf(change, idsOf([...ops, ...lent])).then(
       (outcome): AppliedOutcome => ({
         ...outcome,
