@@ -41,6 +41,7 @@ import type {
   SignatureSnapshot,
 } from '../signature/types';
 import type { PageGeometryRun, PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
+import type { PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
 import { charMapViolation } from '../text/charmap';
 import type { PageLabelSection } from '../dto/PageLabelSection';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
@@ -686,6 +687,70 @@ export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = closed(
 export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.object({
   runs: z.array(PageGeometryRunSchema),
 });
+
+const PageTextGlyphSchema = z.object({
+  index: z.number().int().nonnegative(),
+  unicode: z.string(),
+  origin: z.object({ x: z.number(), y: z.number() }),
+  advance: z.number(),
+  space: closed(z.literal(true)).optional(),
+  stacked: closed(z.literal(true)).optional(),
+});
+
+const markIndexes = z.array(z.number().int().nonnegative());
+
+const PageTextObjectSchema = z.object({
+  kind: z.literal('text'),
+  marks: markIndexes,
+  font: z.number().int().nonnegative(),
+  fontSize: z.number(),
+  matrix: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]),
+  reversed: closed(z.literal(true)).optional(),
+  glyphs: z.array(PageTextGlyphSchema),
+});
+
+const PageOtherObjectSchema = z.object({
+  kind: z.enum(['path', 'image', 'shading', 'unknown']),
+  marks: markIndexes,
+});
+
+/**
+ * Wire shape of the `pages.textObjects` worker result. Mark and font indexes
+ * must point into the snapshot's own tables.
+ */
+export const PageTextObjectsSnapshotSchema: z.ZodType<PageTextObjectsSnapshot> = z
+  .object({
+    objects: z.array(z.union([PageTextObjectSchema, PageOtherObjectSchema])),
+    marks: z.array(z.object({ tag: z.string(), mcid: z.number().int().optional() })),
+    fonts: z.array(
+      z.object({
+        baseName: z.string(),
+        flags: z.number().int(),
+        ascent: z.number(),
+        descent: z.number(),
+        monospace: z.boolean(),
+        serif: z.boolean(),
+      }),
+    ),
+  })
+  .superRefine((snapshot, ctx) => {
+    snapshot.objects.forEach((object, i) => {
+      if (object.marks.some((m) => m >= snapshot.marks.length)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['objects', i, 'marks'],
+          message: 'mark index out of range',
+        });
+      }
+      if (object.kind === 'text' && object.font >= snapshot.fonts.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['objects', i, 'font'],
+          message: 'font index out of range',
+        });
+      }
+    });
+  });
 
 /**
  * Search wire shapes: the request body of the layer search route and the

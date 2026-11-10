@@ -378,6 +378,9 @@ PRINT_PAPER [VariableDeclaration] (from packages/engine/core/src/geometry/printS
 PROTECTABLE_CAPABILITIES [VariableDeclaration] (from packages/engine/core/src/signature/protection.ts): PROTECTABLE_CAPABILITIES = [ 'doc.download.flattened', 'doc.pages.modify', 'doc.pages.assemble', 'doc.redact', 'doc.attachments.modify', 'doc.outline.modify', 'doc.forms.modify', 'doc.forms.script', 'doc.annotate.modify', 'doc.annotate.import', 'doc.forms.fill', 'doc.forms.import', ] as const satisfies readonly DocCapability[]
 PageBox [InterfaceDeclaration] (from packages/engine/core/src/geometry/pageSpace.ts): export interface PageBox{ x: number; y: number; width: number; height: number; }
 PageBoxes [InterfaceDeclaration] (from packages/engine/core/src/dto/PageLayout.ts): export interface PageBoxes<C extends Coordinates = PageCoordinates>{ media: C['box']; crop: C['box']; bleed: C['box']; trim: C['box']; art: C['box']; }
+PageContentMark [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageContentMark{ tag: string; mcid?: number; }
+PageContentObject [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export type PageContentObject = PageTextObject | PageOtherObject;
+PageContentObjectKind [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export type PageContentObjectKind = 'text' | 'path' | 'image' | 'shading' | 'unknown';
 PageCoordinates [InterfaceDeclaration] (from packages/engine/core/src/pageSpace/coordinates.ts): export interface PageCoordinates extends Coordinates{ point: PagePoint; box: PageBox; quad: PageQuad; destination: PageDestination; }
 PageDeleteInput [InterfaceDeclaration] (from packages/engine/core/src/mutation/PageDeleteInput.ts): export interface PageDeleteInput{ pages: PageRef[]; }
 PageDeleteResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/PageDeleteResult.ts): export interface PageDeleteResult<C extends Coordinates = PageCoordinates>{ layout: PageListSnapshot<C>; meta: MutationMeta; }
@@ -415,6 +418,7 @@ PageNameInput [InterfaceDeclaration] (from packages/engine/core/src/mutation/Pag
 PageNameResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/PageNameResult.ts): export interface PageNameResult<C extends Coordinates = PageCoordinates>{ layout: PageListSnapshot<C>; meta: MutationMeta; }
 PageNetworkRenderFormat [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export type PageNetworkRenderFormat = 'png' | 'webp';
 PageObjectNumber [TypeAliasDeclaration] (from packages/engine/core/src/identity/PageObjectNumber.ts): export type PageObjectNumber = number;
+PageOtherObject [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageOtherObject{ kind: Exclude<PageContentObjectKind, 'text'>; marks: number[]; }
 PagePictureRights [InterfaceDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export interface PagePictureRights{ readonly render: boolean; readonly thumbnail: boolean; readonly print: boolean; readonly printHigh: boolean; }
 PagePoint [InterfaceDeclaration] (from packages/engine/core/src/geometry/pageSpace.ts): export interface PagePoint{ x: number; y: number; }
 PagePointTurn [InterfaceDeclaration] (from packages/engine/core/src/pageSpace/helpers.ts): export interface PagePointTurn{ degrees: number; center: PagePoint; }
@@ -443,6 +447,10 @@ PageRotateResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/
 PageScaleResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/PageScaleResult.ts): export interface PageScaleResult<C extends Coordinates = PageCoordinates>{ page: PageRef; layout: PageListSnapshot<C>; meta: MutationMeta; }
 PageScreenViewport [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export type PageScreenViewport = |{ kind: 'scale'; scale?: number; } |{ kind: 'width'; width: number; } ;
 PageTabOrder [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageLayout.ts): export type PageTabOrder = 'rows' | 'columns' | 'structure' | 'annotations' | 'widgets';
+PageTextFont [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageTextFont{ baseName: string; flags: number; ascent: number; descent: number; monospace: boolean; serif: boolean; }
+PageTextGlyph [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageTextGlyph{ index: number; unicode: string; origin:{ x: number; y: number} ; advance: number; space?: true; stacked?: true; }
+PageTextObject [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageTextObject{ kind: 'text'; marks: number[]; font: number; fontSize: number; matrix: [number, number, number, number, number, number]; reversed?: true; glyphs: PageTextGlyph[]; }
+PageTextObjectsSnapshot [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextObjectsSnapshot.ts): export interface PageTextObjectsSnapshot{ objects: PageContentObject[]; marks: PageContentMark[]; fonts: PageTextFont[]; }
 PageTextRange [InterfaceDeclaration] (from packages/engine/core/src/text/TextRange.ts): export interface PageTextRange extends TextRange{ page: PageRef; }
 PageTextSnapshot [InterfaceDeclaration] (from packages/engine/core/src/dto/PageTextSnapshot.ts): export interface PageTextSnapshot{ text: string; charCount: number; charMap?: ReadonlyArray<CharMapAnchor>; }
 PageTransformOptions [InterfaceDeclaration] (from packages/engine/core/src/geometry/pageTransform.ts): export interface PageTransformOptions{ viewport?: PageRenderViewport; rotation?: PdfRotation; target?: PageRenderTarget; }

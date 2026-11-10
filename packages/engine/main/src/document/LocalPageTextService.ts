@@ -6,6 +6,7 @@ import {
   sliceText,
   wirePack,
   type PageTextService,
+  type PageTextObjectsSnapshot,
   type PageTextSnapshot,
   type PageRef,
   type TextLayout,
@@ -77,6 +78,36 @@ export class LocalPageTextService implements PageTextService {
     return AbortablePromise.run(async (signal) =>
       sliceText(await this.get().abortWith(signal), range),
     );
+  }
+
+  objects(): AbortablePromise<PageTextObjectsSnapshot> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    // What the page says, object by object: the same capability as `get()`.
+    try {
+      this.guard.assertCapability('doc.text.copy');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const ref = this.ref;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'pages.textObjects', effect: 'read', jobId, docId, page: ref }),
+    });
+    return AbortablePromise.run<PageTextObjectsSnapshot>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'pages.textObjects') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.snapshot;
+    });
   }
 
   layout(): AbortablePromise<TextLayout> {
