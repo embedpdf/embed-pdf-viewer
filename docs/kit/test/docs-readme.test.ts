@@ -91,6 +91,24 @@ describe('the cut of a page', () => {
     expect(readme(marked, 'Events').cut).toBe('A hit.');
   });
 
+  it('gives a section with its heading, at the page’s own levels, when asked for', () => {
+    const whole = (sourceCode: string) =>
+      renderDocsReadmeWith(site, {
+        sourceCode,
+        canonicalPath: page,
+        integration: 'react',
+        section: 'Options',
+        withHeading: true,
+      }).cut;
+
+    expect(whole(source)).toBe(
+      lines('## Options', '', 'Whole words.', '', '### Case', '', 'Match case.'),
+    );
+    expect(whole(source.replace('### Case', '{/* readme: end */}\n\n### Case'))).toBe(
+      lines('## Options', '', 'Whole words.'),
+    );
+  });
+
   it('fails on a section the page does not have', () => {
     expect(() => readme(source, 'Settings')).toThrow('The page has no section "Settings".');
   });

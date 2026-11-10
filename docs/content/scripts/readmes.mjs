@@ -8,7 +8,8 @@
  *
  * A README is a frame (`../readme/installed.md`) filled from two places: the package's own
  * `package.json` (its name, description and license), and the page that documents the package,
- * as the package's site shows it for one framework. The page and its code are read from
+ * as the package's site shows it for one framework, with a section of a second page where the
+ * manifest names one (`also`). The page and its code are read from
  * `docs/content` the way the snippet check reads them (`sync.mjs`), so nothing needs syncing
  * first, and go through the docs kit's Markdown pass (`renderDocsReadmeWith`), which takes the
  * part of the page a README shows. Every sentence of a README is the page's, the package's or
@@ -43,9 +44,9 @@ import { pendingByPage } from './publish-gate.mjs';
 import { fillFrame, linkProblems, proseOf, sizeOf, wordingProblems } from './readme-text.mjs';
 import { sitePages, siteSamples } from './sync.mjs';
 
-/** The first line of every README this script writes. No reader sees it. */
-const marker = (page) =>
-  `<!-- Generated from ${page} by docs/content/scripts/readmes.mjs. Edit the page, then run \`pnpm readme:sync\`. -->`;
+/** The first line of every README this script writes, naming the pages it is cut from. No reader sees it. */
+const marker = (pages) =>
+  `<!-- Generated from ${pages.join(' and ')} by docs/content/scripts/readmes.mjs. Edit there, then run \`pnpm readme:sync\`. -->`;
 
 /** The docs sections the corpus holds, with the integrations each one's pages are shown for. */
 const SECTIONS = { headless: FRAMEWORKS, viewer: VIEWER_INTEGRATIONS, engine: [] };
@@ -214,6 +215,32 @@ const frameOf = once((kind) => {
 });
 
 /**
+ * A page a README shows part of, on the package's site and for the README's framework:
+ * `{ id, source, mdx, integration, canonicalPath }`, or the `problem` with what the manifest
+ * names. A page that isn't shown per framework (an engine page) takes none.
+ */
+function pageFor(name, engine, pageName, framework) {
+  const id = pageId(pageName);
+  const page = SECTIONS[id.section] && pagesOf(engine)(id.section).get(id.name);
+  if (!page) {
+    return { problem: `readmes.mjs: ${name} names ${pageName}, which is no page of its site` };
+  }
+  const integrations = SECTIONS[id.section];
+  if (integrations.length && !integrations.includes(framework)) {
+    const shown = `is shown for one \`framework\` of ${integrations.join(', ')}`;
+    return { problem: `readmes.mjs: ${name}: a page under ${id.section}/ ${shown}` };
+  }
+  const integration = integrations.length ? framework : undefined;
+  return {
+    id,
+    source: `docs/content/${page.source}`,
+    mdx: page.mdx,
+    integration,
+    canonicalPath: pagePath(id.section, id.name, integration),
+  };
+}
+
+/**
  * One package's README, and what is wrong with it: `{ file, text, problems }`, or only the
  * problems when there is nothing to write.
  */
@@ -227,63 +254,77 @@ export function readmeOf(name, entry, packages) {
   const file = `${directory}/README.md`;
   const manifestFile = `${directory}/package.json`;
 
-  const id = pageId(entry.page);
-  const page = SECTIONS[id.section] && pagesOf(engine)(id.section).get(id.name);
-  if (!page) {
-    return { problems: [`readmes.mjs: ${name} names ${entry.page}, which is no page of its site`] };
+  const page = pageFor(name, engine, entry.page, entry.framework);
+  const also = entry.also && pageFor(name, engine, entry.also.page, entry.framework);
+  const unknown = [page, also].flatMap((named) => (named?.problem ? [named.problem] : []));
+  if (!page.problem && entry.framework && !page.integration) {
+    unknown.push(
+      `readmes.mjs: ${name}: a page under ${page.id.section}/ is shown for no framework`,
+    );
   }
-  const integrations = SECTIONS[id.section];
-  const known = integrations.length ? integrations.includes(entry.framework) : !entry.framework;
-  if (!known) {
-    const takes = integrations.length
-      ? `is shown for one \`framework\` of ${integrations.join(', ')}`
-      : 'is shown for no framework';
-    return { problems: [`readmes.mjs: ${name}: a page under ${id.section}/ ${takes}`] };
-  }
+  if (unknown.length) return { problems: unknown };
 
-  const source = `docs/content/${page.source}`;
-  const canonicalPath = pagePath(id.section, id.name, entry.framework);
+  /** What the kit reads from one of the two pages; a page it can't read is the README's problem. */
+  const read = ({ source, mdx, integration, canonicalPath }, options) => {
+    try {
+      const site = siteOf(engine);
+      return renderDocsReadmeWith(site, {
+        sourceCode: mdx,
+        canonicalPath,
+        integration,
+        ...options,
+      });
+    } catch (error) {
+      throw new Error(`${source}, as ${name}'s README: ${error.message}`, { cause: error });
+    }
+  };
   let parts;
+  let section;
   try {
-    parts = renderDocsReadmeWith(siteOf(engine), {
-      sourceCode: page.mdx,
-      canonicalPath,
-      integration: entry.framework,
-      section: entry.section,
-    });
+    parts = read(page, { section: entry.section });
+    section = also && read(also, { section: entry.also.section, withHeading: true });
   } catch (error) {
-    return { problems: [`${source}, as ${name}'s README: ${error.message}`] };
+    return { problems: [error.message] };
   }
 
-  const problems = [];
+  // A page that is held back on the site has no part in a README either.
+  const shownOf = (named, cut) => (namesPending(named.id) ? '' : cut);
   const slots = {
     name,
     description: manifest.description?.trim() ?? '',
     license: manifest.license ?? '',
     pageTitle: parts.title ?? '',
     pageDescription: parts.description ?? '',
-    pageUrl: `${DOCUMENT_SITES[engine]}${canonicalPath}`,
-    cut: namesPending(id) ? '' : parts.cut,
+    pageUrl: `${DOCUMENT_SITES[engine]}${page.canonicalPath}`,
+    cut: shownOf(page, parts.cut),
+    also: section ? shownOf(also, section.cut) : '',
     nextSteps: parts.nextSteps,
   };
+
+  const problems = [];
   if (!slots.description) problems.push(`${manifestFile} has no description`);
   if (!slots.license) problems.push(`${manifestFile} has no license`);
-  if (!slots.pageTitle) problems.push(`${source} has no title`);
-  if (!slots.pageDescription) problems.push(`${source} has no description`);
+  if (!slots.pageTitle) problems.push(`${page.source} has no title`);
+  if (!slots.pageDescription) problems.push(`${page.source} has no description`);
   for (const problem of wordingProblems(slots.description)) {
     problems.push(`${manifestFile}: its description ${problem}`);
   }
-
   const frame = frameOf('installed');
   for (const problem of wordingProblems(frame.text)) problems.push(`${frame.file} ${problem}`);
-  const fromPage = [slots.pageTitle, slots.pageDescription, slots.cut, slots.nextSteps].join('\n');
-  for (const problem of wordingProblems(proseOf(fromPage))) {
-    problems.push(`${source} ${problem}, in what ${name}'s README shows of it`);
+  const shown = [
+    [page, [slots.pageTitle, slots.pageDescription, slots.cut, slots.nextSteps].join('\n')],
+    ...(also ? [[also, slots.also]] : []),
+  ];
+  for (const [{ source }, text] of shown) {
+    for (const problem of wordingProblems(proseOf(text))) {
+      problems.push(`${source} ${problem}, in what ${name}'s README shows of it`);
+    }
   }
 
-  const text = `${marker(source)}\n\n${fillFrame(frame.text, slots)}`;
+  const sources = shown.map(([{ source }]) => source);
+  const text = `${marker(sources)}\n\n${fillFrame(frame.text, slots)}`;
   for (const problem of linkProblems(text, docsRoutesAt)) {
-    problems.push(`${file}: ${problem} (${source})`);
+    problems.push(`${file}: ${problem} (${sources.join(', ')})`);
   }
   return { file, text, problems };
 }

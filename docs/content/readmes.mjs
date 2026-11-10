@@ -8,9 +8,16 @@
  * `section` names a `##` section of the page by its heading; the README then shows that section
  * in place of the page's opening.
  *
+ * `also` names a section of a second page, `{ page, section }`, which the README shows after
+ * the cut, under the section's own heading: the list of every plugin, from the overview.
+ *
  * An `@embedpdf/*` package gets embedpdf.com's form of the page and its code, a `@cloudpdf/*`
  * package cloudpdf.com's.
  */
 export const READMES = {
-  '@embedpdf/react': { page: 'headless/quick-start', framework: 'react' },
+  '@embedpdf/react': {
+    page: 'headless/quick-start',
+    framework: 'react',
+    also: { page: 'headless/index', section: 'Every plugin' },
+  },
 };

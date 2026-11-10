@@ -6,6 +6,8 @@
 
 {cut}
 
+{also}
+
 ## Documentation
 
 - [{pageTitle}]({pageUrl}): {pageDescription}

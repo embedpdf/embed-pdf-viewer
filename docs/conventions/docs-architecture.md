@@ -326,6 +326,9 @@ A README is a frame, `docs/content/readme/installed.md`, with its slots filled:
   for a `@cloudpdf/*` one, with that site's code.
 - **`{cut}`** is the part of the page the README shows, and **`{nextSteps}`**
   the cards of the page's "Next steps" section.
+- **`{also}`** is a section of a second page, where the manifest names one
+  (`also`): the section with its own heading, after the cut. A framework
+  package's README shows the overview's "Every plugin" this way.
 
 The frame's words are the only ones in a README that no page has, and the script
 adds none. A slot with nothing to say takes its line with it, and so does a
@@ -354,7 +357,8 @@ five ways, none of which adds a word:
   place on the page gets the page's URL too, as the README holds only part of
   the page.
 - **A card** is its linked title, a colon and its description.
-- **The page's headings go one level down**, under the page's title.
+- **The page's headings go one level down**, under the page's title. A section
+  shown with its own heading (`also`) keeps its levels.
 
 A README describes its own commit: npm shows the release's, GitHub shows main's.
 A page that names something `pending` (`reference.mjs`, `viewer-pending.mjs`)

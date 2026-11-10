@@ -698,23 +698,29 @@ const isSectionHeading = (node: AstNode) => node.type === 'heading' && node.dept
 const isCards = (node: AstNode) =>
   node.type === 'mdxJsxFlowElement' && (node.name === 'Cards' || node.name === 'CardGrid');
 
-/** What is under the `##` heading that reads `heading`, or null when the page has no such section. */
+/**
+ * The `##` section whose heading reads `heading`: the heading, then what is under it. Null when
+ * the page has no such section.
+ */
 function sectionNodes(children: AstNode[], heading: string): AstNode[] | null {
   const at = children.findIndex(
     (node) => isSectionHeading(node) && collectText(node).trim() === heading,
   );
   if (at === -1) return null;
-  const rest = children.slice(at + 1);
-  const end = rest.findIndex(isSectionHeading);
-  return end === -1 ? rest : rest.slice(0, end);
+  const end = children.findIndex((node, index) => index > at && isSectionHeading(node));
+  return children.slice(at, end === -1 ? undefined : end);
 }
 
 /**
  * The part of a page a README shows, as the page's own nodes: the opening, which is everything
  * under the title up to the first `##`; everything up to the end marker, on a page that has one;
- * or the named section, up to the marker when it stands inside.
+ * or the named section, up to the marker when it stands inside, with its heading when asked for.
  */
-function readmeCut(children: AstNode[], section: string | undefined): AstNode[] {
+function readmeCut(
+  children: AstNode[],
+  section: string | undefined,
+  withHeading: boolean,
+): AstNode[] {
   if (children.filter(isReadmeEnd).length > 1 || children.some(holdsReadmeEnd)) {
     throw new Error('`{/* readme: end */}` stands once, at the top level of its page.');
   }
@@ -722,7 +728,7 @@ function readmeCut(children: AstNode[], section: string | undefined): AstNode[] 
     const nodes = sectionNodes(children, section);
     if (!nodes) throw new Error(`The page has no section "${section}".`);
     const end = nodes.findIndex(isReadmeEnd);
-    return end === -1 ? nodes : nodes.slice(0, end);
+    return nodes.slice(withHeading ? 0 : 1, end === -1 ? undefined : end);
   }
   const title = children.findIndex((node) => node.type === 'heading' && node.depth === 1);
   const body = children.slice(title + 1);
@@ -758,13 +764,18 @@ export type DocsReadmeOptions = {
   integration?: string;
   /** The `##` section the README shows, by its heading. Without one, the page's opening. */
   section?: string;
+  /**
+   * The section comes with its heading, at the levels the page has: for a README that shows it
+   * as a section of its own, beside another page's cut, and not under this page's title.
+   */
+  withHeading?: boolean;
 };
 
 export type DocsReadmeParts = {
   /** The page's `title` and `description`, from its frontmatter; null for one it doesn't give. */
   title: string | null;
   description: string | null;
-  /** The cut as Markdown, its headings one level below the page's. */
+  /** The cut as Markdown, its headings one level below the page's unless it has its own. */
   cut: string;
   /** The cards of the page's "Next steps" section as a list of links, or '' when it has none. */
   nextSteps: string;
@@ -780,13 +791,14 @@ export type DocsReadmeParts = {
  * - an install command stays as written, with no package manager or release channel put in;
  * - every link is the full URL of a page, a link to a place on this page (`#zoom`) included;
  * - a card is its linked title, a colon and its description;
- * - the cut's headings are one level down, for a README that gives the page's title its own.
+ * - the cut's headings are one level down, for a README that gives the page's title its own
+ *   (a section that comes with its heading keeps its levels).
  *
  * An unknown component in the cut is fatal, as in the export; outside the cut it is never read.
  */
 export function renderDocsReadmeWith(
   site: DocsMarkdownSite,
-  { sourceCode, canonicalPath, integration, section }: DocsReadmeOptions,
+  { sourceCode, canonicalPath, integration, section, withHeading = false }: DocsReadmeOptions,
 ): DocsReadmeParts {
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
   const children = tree.children ?? [];
@@ -794,8 +806,8 @@ export function renderDocsReadmeWith(
   const names = frameworkNamesOf(tree, integration, canonicalPath);
   const resolve = createResolver(site, integration, names, { canonicalPath }, true);
 
-  const cut = resolve(readmeCut(children, section));
-  cut.forEach(lowerHeadings);
+  const cut = resolve(readmeCut(children, section, withHeading));
+  if (!withHeading) cut.forEach(lowerHeadings);
   const cards = (sectionNodes(children, NEXT_STEPS) ?? []).filter(isCards);
   const { title = null, description = null } = frontmatterText(children);
   return {
