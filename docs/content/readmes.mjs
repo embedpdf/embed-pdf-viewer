@@ -1,24 +1,97 @@
 /**
- * The packages whose README is written from the docs (`scripts/readmes.mjs`;
- * docs/conventions/docs-architecture.md, "Package READMEs").
+ * Who writes each published package's README (`scripts/readmes.mjs`;
+ * docs/conventions/docs-architecture.md, "Package READMEs"). Every published package is here,
+ * but a plugin (`packages/plugin/<name>`), whose pages `reference.mjs` lists for its capability:
+ * a plugin has an entry only to show a `section` of its page in place of the page's opening.
  *
- * Each entry names the page the README is cut from, under `docs/content` and as its sidebar
- * routes it (`headless/quick-start`). `framework` is the framework the page is shown for: one of
- * the four on a headless page, those or `vanilla` on a viewer page, none on an engine page.
- * `section` names a `##` section of the page by its heading; the README then shows that section
- * in place of the page's opening.
+ * - **`page`**: a package the docs tell you to install. Its README is cut from that page, under
+ *   `docs/content` and as its sidebar routes it (`headless/quick-start`). `framework` is the
+ *   framework the page is shown for: one of the four on a headless page, those or `vanilla` on a
+ *   viewer page, none on an engine page. `section` names a `##` section of the page by its
+ *   heading; the README then shows that section in place of the page's opening. `also` names a
+ *   section of a second page, `{ page, section }`, shown after the cut under the section's own
+ *   heading: the list of every plugin, from the overview.
+ * - **`near`**: a package that only comes along with others. Its README says which, and links
+ *   the page nearest to what the package does.
+ * - **`by`**: this script doesn't write the README. `'hand'` is one still written by hand, with
+ *   `installed` when the docs tell you to install the package, so a README can say it brings
+ *   another along. `'api:sync'` is the SDK's, which Fern writes from the API contract.
  *
- * `also` names a section of a second page, `{ page, section }`, which the README shows after
- * the cut, under the section's own heading: the list of every plugin, from the overview.
- *
- * An `@embedpdf/*` package gets embedpdf.com's form of the page and its code, a `@cloudpdf/*`
+ * An `@embedpdf/*` package gets embedpdf.com's form of a page and its code, a `@cloudpdf/*`
  * package cloudpdf.com's.
  */
 const EVERY_PLUGIN = { page: 'headless/index', section: 'Every plugin' };
+const BY_HAND = { by: 'hand' };
+const INSTALLED_BY_HAND = { by: 'hand', installed: true };
 
 export const READMES = {
+  // ── packages/framework ──
   '@embedpdf/react': { page: 'headless/quick-start', framework: 'react', also: EVERY_PLUGIN },
   '@embedpdf/vue': { page: 'headless/quick-start', framework: 'vue', also: EVERY_PLUGIN },
   '@embedpdf/svelte': { page: 'headless/quick-start', framework: 'svelte', also: EVERY_PLUGIN },
   '@embedpdf/angular': { page: 'headless/quick-start', framework: 'angular', also: EVERY_PLUGIN },
+  '@embedpdf/web': { near: 'headless/index' },
+
+  // ── packages/core ──
+  '@embedpdf/core': { near: 'headless/concepts/how-it-works' },
+  '@embedpdf/core-acrojs': { near: 'headless/documents/actions' },
+  '@embedpdf/core-annotation': BY_HAND,
+  '@embedpdf/core-fonts': { near: 'engine/documents/fonts' },
+  '@embedpdf/core-form': { near: 'headless/forms/index' },
+  '@embedpdf/core-geometry': { near: 'headless/concepts/coordinates' },
+  '@embedpdf/core-js-sandbox': { near: 'headless/documents/actions' },
+  '@embedpdf/core-signature': { page: 'engine/forms/signatures' },
+  '@embedpdf/core-stage': { near: 'headless/viewing/stage' },
+  '@embedpdf/core-text': { near: 'headless/documents/fonts' },
+  '@embedpdf/core-ui': { near: 'headless/ui/toolbar' },
+
+  // ── packages/plugin ──
+  // Its page opens on the tabs every viewer has; the plugin is the panes, further down.
+  '@embedpdf/plugin-view-manager': { section: 'Side by side' },
+  '@embedpdf/plugin-annotation': BY_HAND,
+  '@embedpdf/plugin-history': BY_HAND,
+  '@embedpdf/plugin-measurement': BY_HAND,
+  '@embedpdf/plugin-redaction': BY_HAND,
+  '@embedpdf/plugin-signature': BY_HAND,
+  '@embedpdf/plugin-stage': BY_HAND,
+
+  // ── packages/viewer ──
+  '@embedpdf/viewer': INSTALLED_BY_HAND,
+  '@embedpdf/viewer-react': INSTALLED_BY_HAND,
+  '@embedpdf/viewer-vue': INSTALLED_BY_HAND,
+  '@embedpdf/viewer-svelte': INSTALLED_BY_HAND,
+  '@embedpdf/viewer-angular': INSTALLED_BY_HAND,
+  '@embedpdf/viewer-chrome': BY_HAND,
+
+  // ── packages/engine, and the font and stamp packages ──
+  '@embedpdf/engine': INSTALLED_BY_HAND,
+  '@embedpdf/engine-core': BY_HAND,
+  '@embedpdf/engine-services': BY_HAND,
+  '@embedpdf/engine-runtime': BY_HAND,
+  '@embedpdf/engine-runtime-darwin-arm64': BY_HAND,
+  '@embedpdf/engine-runtime-darwin-x64': BY_HAND,
+  '@embedpdf/engine-runtime-linux-arm64': BY_HAND,
+  '@embedpdf/engine-runtime-linux-x64': BY_HAND,
+  '@embedpdf/engine-runtime-linuxmusl-arm64': BY_HAND,
+  '@embedpdf/engine-runtime-linuxmusl-x64': BY_HAND,
+  '@embedpdf/engine-runtime-wasm32': BY_HAND,
+  '@embedpdf/engine-runtime-win32-arm64': BY_HAND,
+  '@embedpdf/engine-runtime-win32-x64': BY_HAND,
+  '@embedpdf/default-fallback-fonts': BY_HAND,
+  '@embedpdf/default-signature-fonts': BY_HAND,
+  '@embedpdf/default-stamps': INSTALLED_BY_HAND,
+
+  // ── cloudpdf ──
+  '@cloudpdf/viewer': INSTALLED_BY_HAND,
+  '@cloudpdf/viewer-react': INSTALLED_BY_HAND,
+  '@cloudpdf/viewer-vue': INSTALLED_BY_HAND,
+  '@cloudpdf/viewer-svelte': INSTALLED_BY_HAND,
+  '@cloudpdf/viewer-angular': INSTALLED_BY_HAND,
+  '@cloudpdf/engine': INSTALLED_BY_HAND,
+  '@cloudpdf/plugin-protected-display': INSTALLED_BY_HAND,
+  '@cloudpdf/web': INSTALLED_BY_HAND,
+  '@cloudpdf/server': INSTALLED_BY_HAND,
+  '@cloudpdf/server-modules': INSTALLED_BY_HAND,
+  '@cloudpdf/contract': BY_HAND,
+  '@cloudpdf/sdk': { by: 'api:sync' },
 };

@@ -40,6 +40,14 @@ export function fillFrame(frame, slots) {
   return `${text.replace(SLOT, (whole, slot) => value(slot))}\n`;
 }
 
+/** A table's rows as Markdown, each column as wide as its widest cell. */
+export function tableRows(rows) {
+  const widths = rows[0].map((_, column) => Math.max(...rows.map((row) => row[column].length)));
+  return rows
+    .map((row) => `| ${row.map((cell, column) => cell.padEnd(widths[column])).join(' | ')} |`)
+    .join('\n');
+}
+
 /** A README's prose: its Markdown without the code, fenced or in a line. */
 export function proseOf(markdown) {
   return markdown

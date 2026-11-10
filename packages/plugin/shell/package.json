@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-shell",
   "version": "3.1.0",
   "private": false,
-  "description": "Document-scoped workbench surface state: named surfaces (panels, modals, overlays) with exclusivity groups, plus the open-menu stack. Pure serializable state — commands drive it, and applications can snapshot and restore it. The app owns the DOM.",
+  "description": "Panels and menus for EmbedPDF: keeps track of which panels, dialogs and menus are open.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

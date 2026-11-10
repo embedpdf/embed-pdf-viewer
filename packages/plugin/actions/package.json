@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-actions",
   "version": "3.1.0",
   "private": false,
-  "description": "The PDF action engine: one dispatcher for extracted /A and /AA action trees (GoTo, URI, Hide, Named, ResetForm, JavaScript chains) with a per-document serialized queue, origin-aware policy, can-twins, and a registry where sibling plugins provide executors and effect sinks. JavaScript is one registered interpreter among many — Hide/ResetForm/navigation work with scripting off.",
+  "description": "PDF actions for EmbedPDF: runs what a document does by itself, such as its buttons, its scripts and printing.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

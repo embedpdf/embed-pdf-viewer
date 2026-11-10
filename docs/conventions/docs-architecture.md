@@ -312,11 +312,32 @@ no page.
 
 A package's `README.md` is the page npm shows for it. It is written from the
 docs page that documents the package, by `docs/content/scripts/readmes.mjs`, and
-committed, so it says nothing the docs don't. `docs/content/readmes.mjs` lists
-the packages, each with the page its README is cut from and the framework the
-page is shown for. Change the page, never the README.
+committed, so it says nothing the docs don't. Change the page, never the README.
 
-A README is a frame, `docs/content/readme/installed.md`, with its slots filled:
+Every published package has a README, of one of three kinds, by how a developer
+gets the package. `docs/content/readmes.mjs` says which, and a new package fails
+the check until it is there:
+
+| Kind      | Which packages                                    | Its README                                                      |
+| --------- | ------------------------------------------------- | --------------------------------------------------------------- |
+| Installed | The docs tell you to install it by name (`page`)  | The part of its page a README shows, then where to go next      |
+| Plugin    | A package under `packages/plugin/`, with no entry | The import path in each framework package, then its page, React |
+| Support   | It only comes along with others (`near`)          | The installed packages that bring it, and the nearest page      |
+
+- **A plugin is never installed by its own name**: it comes with the four
+  framework packages, each with an import path of the plugin's name
+  (`@embedpdf/vue/search`). Its pages are the ones `reference.mjs` lists for its
+  capability: the first is the one its README is cut from, and the others are
+  linked. An entry in the manifest is only for a plugin whose README shows a
+  `section` of its page.
+- **What brings a support package** is read from the workspace: the installed
+  packages that depend on it, directly or through packages that are not
+  installed themselves.
+- **A README someone else writes** is in the manifest too (`by`): one still
+  written by hand, and the SDK's, which Fern writes from the API contract.
+
+A README is a frame, `docs/content/readme/<kind>.md`, with its slots filled. The
+installed frame's:
 
 - **`{name}`, `{description}` and `{license}`** are the package's own, from its
   `package.json`. The description is the README's first line and the sentence
@@ -329,6 +350,10 @@ A README is a frame, `docs/content/readme/installed.md`, with its slots filled:
 - **`{also}`** is a section of a second page, where the manifest names one
   (`also`): the section with its own heading, after the cut. A framework
   package's README shows the overview's "Every plugin" this way.
+
+The plugin frame has `{imports}`, the rows of its table of import paths, and
+`{otherPages}`, its other pages as links. The support frame has `{product}`,
+`{site}` and `{comesWith}`.
 
 The frame's words are the only ones in a README that no page has, and the script
 adds none. A slot with nothing to say takes its line with it, and so does a
@@ -376,7 +401,10 @@ also fail on:
 - a link that isn't a full URL, or a docs link that names no page on either
   site;
 - an entry that names no published package, no page, or a framework the page
-  isn't shown for.
+  isn't shown for;
+- a published package with no README: no entry, and not a plugin with a page;
+- a plugin with no import path in one of the framework packages, or a support
+  package that nothing a reader installs brings along.
 
 Package READMEs are in `.prettierignore`: their code is the compiled file's, and
 the commit hook would reformat it.

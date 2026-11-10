@@ -2,7 +2,7 @@
   "name": "@embedpdf/core-acrojs",
   "version": "3.1.0",
   "private": false,
-  "description": "Pure Acrobat-JavaScript compatibility core: deterministic contracts, security policy, and a self-contained VM prelude.",
+  "description": "The Acrobat JavaScript a PDF's scripts expect, for EmbedPDF: its objects, its security rules and the code a sandbox starts with.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

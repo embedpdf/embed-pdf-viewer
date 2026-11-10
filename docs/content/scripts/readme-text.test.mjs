@@ -7,7 +7,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { fillFrame, linkProblems, proseOf, sizeOf, wordingProblems } from './readme-text.mjs';
+import {
+  fillFrame,
+  linkProblems,
+  proseOf,
+  sizeOf,
+  tableRows,
+  wordingProblems,
+} from './readme-text.mjs';
 
 const lines = (...text) => text.join('\n');
 
@@ -88,6 +95,25 @@ describe('a frame, filled', () => {
     assert.equal(
       fillFrame('## {name}\n\n### Inside\n\n{cut}\n', { name: 'a', cut: 'b' }),
       '## a\n\n### Inside\n\nb\n',
+    );
+  });
+
+  it("takes a table's rows under the header the frame has", () => {
+    const frame = lines('| Framework | Import from |', '| :-- | :-- |', '{imports}', '');
+    const imports = tableRows([
+      ['React', '`@embedpdf/react/search`'],
+      ['Angular', '`@embedpdf/angular/search`'],
+    ]);
+
+    assert.equal(
+      fillFrame(frame, { imports }),
+      lines(
+        '| Framework | Import from |',
+        '| :-- | :-- |',
+        '| React   | `@embedpdf/react/search`   |',
+        '| Angular | `@embedpdf/angular/search` |',
+        '',
+      ),
     );
   });
 

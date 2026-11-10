@@ -2,7 +2,7 @@
   "name": "@embedpdf/core",
   "version": "3.1.0",
   "private": false,
-  "description": "Pure, framework-free runtime for the EmbedPDF v3 viewer: store, typed capabilities, and plugin lifecycle. DOM-free and serializable.",
+  "description": "The kernel of EmbedPDF's headless viewer: plugins, what each one can do, and their state. No DOM, no framework.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
