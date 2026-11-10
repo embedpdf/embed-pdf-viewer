@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { liveSiblings } from './docs-release';
+import { docsSitemapPaths } from './docs-sitemap';
 import { renderLlms } from './llms';
 
 /**
- * The publish gate, per framework (`./docs-release`), on a gate written here: an llms file lists
- * a page only where it's live, and a page's Markdown names only its live siblings.
+ * The publish gate, per framework (`./docs-release`), on a gate written here: an llms file and
+ * the sitemap list a page only where it's live, and a page's Markdown names only its live
+ * siblings.
  */
 
 const GATE = vi.hoisted(() => ({
@@ -59,6 +61,20 @@ describe('the publish gate, per framework', () => {
     expect(renderLlms('vue')).not.toContain('/docs/headless/vue/');
     expect(renderLlms('vue')).not.toContain('## Headless Components');
     expect(renderLlms('vue')).toContain('## EmbedPDF Engine');
+  });
+
+  it('lists a page in the sitemap only where it is live', () => {
+    const paths = docsSitemapPaths();
+
+    expect(paths.filter((path) => path.startsWith('/docs/headless/'))).toEqual([
+      '/docs/headless/react/text/search',
+      '/docs/headless/svelte/text/search',
+    ]);
+    expect(paths.filter((path) => path.startsWith('/docs/viewer/'))).toEqual([
+      '/docs/viewer/vanilla/documents',
+      '/docs/viewer/react/documents',
+    ]);
+    expect(paths).toContain('/docs/engine/quick-start');
   });
 
   it('keeps /llms.txt on each product’s default integration', () => {

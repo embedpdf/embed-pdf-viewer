@@ -1,13 +1,14 @@
 import type { MetadataRoute } from 'next';
 
 import { TOOLS } from '@/components/tools/content';
+import { docsSitemapPaths } from '@/lib/docs-sitemap';
 import { examplePages } from '@/lib/example-pages';
 import { examplePageHref } from '@/lib/examples';
 import { SITE_ORIGIN } from '@/lib/site';
 
 /**
- * The site's pages for search engines. The docs aren't listed yet: which of their framework
- * variants are live is decided per page by the publish gate.
+ * The site's pages for search engines: its own pages, then the docs, each docs page for every
+ * integration it is live for (`@/lib/docs-sitemap`).
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const examples = (await examplePages()).filter((page) => page.demo);
@@ -24,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/sponsors',
     '/tools',
     ...TOOLS.map((tool) => tool.href),
+    ...docsSitemapPaths(),
   ];
   return paths.map((path) => ({ url: `${SITE_ORIGIN}${path === '/' ? '' : path}` }));
 }

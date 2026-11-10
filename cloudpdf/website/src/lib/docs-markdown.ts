@@ -18,8 +18,7 @@ import {
 } from './docs-integrations';
 import { reactVersionHref, type DocsRelease } from './docs-release';
 import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
-
-const SITE_ORIGIN = 'https://www.cloudpdf.com';
+import { SITE_ORIGIN } from './site';
 
 /**
  * CloudPDF's binding of the kit Markdown projection. The `.md` route passes
