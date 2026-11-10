@@ -364,6 +364,31 @@ ctx.changes.stage({
   **`undo`** says what undoing it looks like, so a history can draw it; it is
   never sent. `history: false` keeps a change out of the history.
 
+A change one of the engine's own verbs makes (an import) has no ops to stage.
+It is staged with `send` in their place:
+
+```ts
+ctx.changes.stage({
+  label: { key: 'annotation.import' },
+  send: (doc, { opId }) =>
+    doc.annotations.import(bundle, { ...options, opId }).then((result) => ({
+      items: [{ type: 'annotations.import', ...result }],
+      meta: result.meta,
+    })),
+});
+```
+
+- **Sent in its turn.** The queue calls `send` when it sends the change, with
+  the `opId` the verb must run under, so the write keeps its place among the
+  others: what was typed before it is sent first. `send` resolves the verb's
+  result as a change's answer (`ChangeResult`).
+- **Nothing shows until the engine answers.** It has no ops, so no `predict`
+  runs. The views change when its events arrive, and so does undoing it.
+- **A step like any other.** The history records it, `onSettled` reports it,
+  and a refusal carries its label. It can't join a group.
+- **`opId`** is the id the caller of the verb chose, when the verb takes one.
+  The queue mints it otherwise.
+
 ### Predict
 
 `predict` is the engine's own rule for an op, from the engine-core functions
@@ -464,7 +489,9 @@ undo of that undo.
 - **What a plugin gives the history:** `undo` on every change it stages, so an
   undo is drawn before the engine answers, and `history: false` on a change
   that isn't the user's action. Holds that make up one step pass the same
-  `merge` key: `hold(label, { merge: 'annotation.text:<id>' })`.
+  `merge` key: `hold(label, { merge: 'annotation.text:<id>' })`. A verb the
+  app may call by itself (an import that loads stored annotations) takes
+  `history: false` from its caller (`HistoryOptions`) and passes it on.
 - **What a plugin may do around it:** listen to `onStaged` for changes whose
   `undoOf` is set, as the annotation plugin does to put the selection back
   (`services/selection-history.ts`). It never stages undos itself.
