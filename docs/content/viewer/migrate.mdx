@@ -106,6 +106,7 @@ the headless docs lists them, with plain strings where 2.x had enums. The ones 2
 | `annotations: { selectAfterCreate: false }` | `annotation: { afterCreate: { select: false } }` |
 | `annotations: { deactivateToolAfterCreate: true }` | `annotation: { afterCreate: { tool: 'default' } }` |
 | `stamp: { manifests: [] }` | `stamp: { standard: false }` |
+| `stamp: { manifests: [{ url }] }`, your own | `stamp: { libraries: [{ id, url }] }`, with the PDF the manifest names: see [Your own stamps](features/annotations#your-own-stamps) |
 | `capture: { scale: 2 }` | `render: { snapshot: { scale: 2 } }`. A snapshot is always PNG, with what the user may see drawn in. |
 
 All of them in one 3.0 config:

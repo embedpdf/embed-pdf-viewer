@@ -4,8 +4,8 @@
  *
  * A built-in's settings merge over the viewer's own for that plugin the way every plugin merges
  * settings (`mergeSettings`: plain objects key by key, arrays and other values whole). Two
- * plugins take settings only the viewer has, next to their own: `stamp` (the standard stamps, the
- * quick stamps) and `signature` (which marks people keep, the fonts for typed ones). A plugin
+ * plugins take settings only the viewer has, next to their own: `stamp` (the standard stamps, your
+ * own, the quick stamps) and `signature` (which marks people keep, the fonts for typed ones). A plugin
  * definition under a name the viewer doesn't use joins the viewer, and `viewer.get(name)` is its
  * API. Anything else is left out, with a warning that names the closest plugin.
  */
@@ -40,12 +40,32 @@ export interface ViewerStampSettings {
    */
   readonly standard?: boolean | string;
   /**
+   * Your own stamp libraries, each a PDF under an id you choose. They come from your app on every
+   * visit: loaded when the viewer starts, never stored in the browser, and not removable in the
+   * stamps panel. Default none.
+   */
+  readonly libraries?: readonly StampLibraryFile[];
+  /**
    * Stamps shown as buttons in the Insert toolbar, each as `library:name`: `standard` is the
-   * standard stamps (`'standard:Approved'`), any other library goes by its id. Default none.
+   * standard stamps (`'standard:Approved'`), any other library goes by its id
+   * (`'acme:Paid'`). Default none.
    */
   readonly quick?: readonly string[];
   /** The kinds of library the stamps panel lists. Default `['stamps']`. */
   readonly sidebar?: readonly string[];
+}
+
+/**
+ * A stamp library of your own: a PDF whose named pages are its stamps, as Acrobat's stamp files
+ * are. Its stamps go by `<id>:<name>`.
+ */
+export interface StampLibraryFile {
+  /** The library's id, which `quick` names its stamps by. Over the one the file names. */
+  readonly id: string;
+  /** Where the PDF comes from (same-origin or CORS-enabled). */
+  readonly url?: string;
+  /** The PDF's bytes, in place of `url`. */
+  readonly data?: Uint8Array | ArrayBuffer;
 }
 
 /**
@@ -74,7 +94,7 @@ export interface ViewerSignatureSettings {
   readonly libraries?: 'one' | 'many';
 }
 
-const VIEWER_STAMP_KEYS = ['standard', 'quick', 'sidebar'] as const;
+const VIEWER_STAMP_KEYS = ['standard', 'libraries', 'quick', 'sidebar'] as const;
 const VIEWER_SIGNATURE_KEYS = ['kinds', 'fonts', 'libraries'] as const;
 
 /** The settings each built-in plugin takes in `plugins`: what its factory takes. */

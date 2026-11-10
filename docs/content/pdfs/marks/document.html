@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Marks</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A stamp library: one page per stamp, each page the size of its stamp, with no background, so a
+     placed stamp shows the page under it. */
+  @page { size: 24px 24px; margin: 0; }
+
+  .mark {
+    width: 24px;
+    height: 24px;
+    break-after: page;
+  }
+  .mark svg { display: block; width: 24px; height: 24px; }
+  .mark path { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+  .check path { stroke: #1f8a4c; }
+  .cross path { stroke: #c4262e; }
+
+  @media screen {
+    body { padding: 24px; background: #f4f1ee; }
+    .mark { margin-bottom: 16px; background: #ffffff; }
+  }
+</style>
+</head>
+<body class="lanternfield">
+<section class="mark check">
+  <svg viewBox="0 0 48 48"><path d="M10 25l9 9 19-20"/></svg>
+</section>
+<section class="mark cross">
+  <svg viewBox="0 0 48 48"><path d="M13 13l22 22M35 13L13 35"/></svg>
+</section>
+</body>
+</html>

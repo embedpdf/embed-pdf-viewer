@@ -50,6 +50,12 @@ const ANNOTATE = ['doc.annotate.modify'];
 const FILL = ['doc.forms.fill'];
 
 /**
+ * Files the examples load by URL but never open as a document, such as a stamp library: they need
+ * no grant.
+ */
+const NOT_OPENED = new Set(['marks']);
+
+/**
  * What each document's examples change, on top of reading. A signature makes a version of the
  * reader's own layer only, deleted with it, so the signing examples sign for real.
  */
@@ -117,6 +123,7 @@ if (!dryRun && (!token || !tenantId)) {
 const documents = (await readdir(here, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory() && existsSync(join(here, entry.name, 'bake.mjs')))
   .map((entry) => entry.name)
+  .filter((name) => !NOT_OPENED.has(name))
   .sort();
 const unscoped = documents.filter((name) => !CHANGES[name]);
 if (unscoped.length > 0) {

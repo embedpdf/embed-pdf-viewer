@@ -30,6 +30,7 @@ import { useSurface } from '@embedpdf/react/shell';
 import { useI18nState, useT } from '@embedpdf/react/i18n';
 import { saveFile } from '@embedpdf/web';
 import { useStampSettings } from '../config-context';
+import { ensureAppLibraries } from '../config/app-stamps';
 import {
   DEFAULT_LIBRARY_ID,
   ensureDefaultLibrary,
@@ -44,7 +45,7 @@ const ALL = 'all';
 export function StampsPanel() {
   const t = useT();
   const stamp = useStamp();
-  const { standard, sidebar } = useStampSettings();
+  const { standard, sidebar, libraries: appLibraries } = useStampSettings();
   // Which catalogs this sidebar shows (`plugins.stamp.sidebar`): the plain stamps by
   // default — never the people's marks, which have their own panel.
   const libraries = useStampLibraries({ kind: sidebar ?? ['stamps'] });
@@ -64,16 +65,21 @@ export function StampsPanel() {
     if (typeof openedOn === 'string') setPicked(openedOn);
   }, [openedOn]);
 
-  // First open: the user's stored libraries (the workspace store restores
-  // them; this only awaits it), then the built-in library for this locale —
-  // never at viewer boot, so a viewer whose user never opens this panel pays
-  // nothing for it. A locale change while open swaps the built-in library;
-  // the user's own are untouched.
+  // First open: the user's stored libraries and the app's own (the workspace
+  // store brings them in; this only awaits it), then the built-in library for
+  // this locale — never at viewer boot, so a viewer whose user never opens
+  // this panel pays nothing for it. A locale change while open swaps the
+  // built-in library; the others are untouched.
   useEffect(() => {
     let live = true;
     setBusy('loading');
     restoreStampLibrariesOnce(stamp)
-      .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), standard))
+      .then(() =>
+        Promise.all([
+          ensureDefaultLibrary(stamp, resolveStampsLocale(locale), standard),
+          ensureAppLibraries(stamp, appLibraries ?? []),
+        ]),
+      )
       .catch((error: unknown) => {
         console.error('[embedpdf] default stamps failed:', error);
         if (live) setError(t('demo.stampsError'));
@@ -82,7 +88,7 @@ export function StampsPanel() {
     return () => {
       live = false;
     };
-    // `t` and `standard` are init-stable; only the locale re-runs this.
+    // `t`, `standard` and `appLibraries` are init-stable; only the locale re-runs this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, locale]);
 
@@ -137,7 +143,11 @@ export function StampsPanel() {
     selectedId === ALL ? null : (libraries.find((library) => library.id === selectedId) ?? null);
   const shown =
     selectedId === ALL ? assets : assets.filter((asset) => asset.libraryId === selectedId);
-  const isDefault = (libraryId: string) => libraryId === DEFAULT_LIBRARY_ID;
+  // The viewer's libraries, the standard one and the app's, come back on every
+  // visit, so the panel offers no way to remove them or their stamps.
+  const isViewers = (libraryId: string) =>
+    libraryId === DEFAULT_LIBRARY_ID ||
+    (appLibraries ?? []).some((library) => library.id === libraryId);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -171,7 +181,7 @@ export function StampsPanel() {
               >
                 <Icon name="download" size={14} />
               </TooltipButton>
-              {!isDefault(selected.id) && (
+              {!isViewers(selected.id) && (
                 <TooltipButton
                   label={t('demo.stampsRemoveLibrary')}
                   onClick={() => void stamp.deleteLibrary(selected.id)}
@@ -205,7 +215,7 @@ export function StampsPanel() {
                   armed={armedId === asset.id}
                   onArm={() => arm(asset)}
                 />
-                {!isDefault(asset.libraryId) && (
+                {!isViewers(asset.libraryId) && (
                   <TooltipButton
                     label={t('demo.stampsRemoveStamp')}
                     onClick={() => void stamp.deleteAsset(asset.id)}

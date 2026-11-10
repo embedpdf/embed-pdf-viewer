@@ -85,6 +85,7 @@ export type {
   SignatureMode,
   SignerPort,
   SignFieldInput,
+  StampLibraryFile,
   TrustPort,
   ViewerSignatureSettings,
   ViewerStampSettings,

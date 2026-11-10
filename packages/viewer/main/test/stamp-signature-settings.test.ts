@@ -1,7 +1,8 @@
 /**
  * The settings only the viewer has, next to the plugins' own: `plugins.stamp.quick` puts stamps in
  * the Insert toolbar by library and name, `plugins.stamp.standard: false` leaves the standard
- * stamps out, and `plugins.signature.kinds` and `fonts` shape the signature maker, which offers
+ * stamps out, `plugins.stamp.libraries` brings the app's own stamps in without keeping them in the
+ * browser, and `plugins.signature.kinds` and `fonts` shape the signature maker, which offers
  * three handwriting fonts by default and embeds the one a typed mark uses. The plugins' own
  * settings in the same objects still reach them.
  *
@@ -34,8 +35,21 @@ const CONFIGS = {
     },
   },
   'no-standard': { plugins: { stamp: { standard: false } } },
+  // An Acrobat stamp file as the app's own library, under the id the app gives it.
+  own: {
+    plugins: {
+      stamp: {
+        standard: false,
+        libraries: [{ id: 'mine', url: '/mine.pdf' }],
+        quick: ['mine:Rejected'],
+      },
+    },
+  },
   defaults: {},
 } as const;
+
+/** A stamp library, the standard stamps' English file, which the `own` page loads as its own. */
+const OWN_LIBRARY = readFileSync(resolve(dist, '../../../default-stamps/en/stamps.pdf'));
 
 /** A one-page PDF with an empty signature field, `sig`. */
 const SIGNATURE_FIELD = readFileSync(
@@ -121,6 +135,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
           {},
           `Uint8Array.from(atob('${SIGNATURE_FIELD}'), (char) => char.charCodeAt(0))`,
         ),
+        '/mine.pdf': OWN_LIBRARY,
       });
       browser = await launchChromium();
     });
@@ -272,6 +287,63 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
         null,
         { timeout: 20_000 },
       );
+      await tab.close();
+    });
+
+    /** The ids the browser keeps stamp libraries under (the viewer's store). */
+    const storedLibraries = (tab: Page): Promise<string[]> =>
+      tab.evaluate(
+        () =>
+          new Promise<string[]>((done) => {
+            const open = indexedDB.open('embedpdf-stamps');
+            open.onsuccess = () => {
+              const db = open.result;
+              if (!db.objectStoreNames.contains('libraries')) return done([]);
+              const keys = db.transaction('libraries').objectStore('libraries').getAllKeys();
+              keys.onsuccess = () => done(keys.result.map(String));
+            };
+            open.onerror = () => done([]);
+          }),
+      );
+
+    it('loads the app’s own library at start, in the Insert toolbar, never stored', async () => {
+      const tab = await open('own');
+      // There before any panel opens, under the id the config gives, not the file's.
+      await tab.waitForFunction(
+        () => window.element.viewer.get('stamp').getAsset('mine:Rejected') !== null,
+        null,
+        { timeout: 20_000 },
+      );
+      expect(await hasStandard(tab)).toBe(false);
+      await run(tab, 'mode:insert');
+      await tab.waitForFunction(
+        () =>
+          [...window.element.shadowRoot!.querySelectorAll('[role="toolbar"] button')].some(
+            (button) => button.getAttribute('aria-label') === 'Rejected',
+          ),
+        null,
+        { timeout: 20_000 },
+      );
+      // Saving happens a step after a change: give it time to have gone wrong.
+      await tab.evaluate(() => new Promise((done) => setTimeout(done, 1000)));
+      expect(await storedLibraries(tab)).not.toContain('mine');
+
+      // The next visit loads it again, once.
+      await tab.reload();
+      await waitForDocument(tab);
+      await tab.waitForFunction(
+        () => window.element.viewer.get('stamp').getLibrary('mine') !== null,
+        null,
+        { timeout: 20_000 },
+      );
+      await tab.evaluate(() => new Promise((done) => setTimeout(done, 1000)));
+      const names = await tab.evaluate(() =>
+        window.element.viewer
+          .get('stamp')
+          .listLibraries()
+          .map((library: { id: string }) => library.id),
+      );
+      expect(names).toEqual(['mine']);
       await tab.close();
     });
 

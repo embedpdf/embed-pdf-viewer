@@ -387,7 +387,8 @@ import {
     stamp: {
       standard: true, // the standard stamps, from your own build (a URL, or false for none)
       sidebar: ['stamps'], // library kinds the stamps sidebar lists
-      quick: ['standard:Approved', 'standard:Rejected'], // quick marks in the Insert bar
+      libraries: [{ id: 'marks', url: '/marks.pdf' }], // your own, loaded at start, never stored
+      quick: ['standard:Approved', 'marks:Check'], // quick marks in the Insert bar
     },
   }}
 />;

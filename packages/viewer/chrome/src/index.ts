@@ -27,6 +27,7 @@ export type { LanguageStrings, StringsLoader } from './locales';
 export type {
   PluginSettings,
   SignatureFont,
+  StampLibraryFile,
   ViewerPluginsConfig,
   ViewerSignatureSettings,
   ViewerStampSettings,

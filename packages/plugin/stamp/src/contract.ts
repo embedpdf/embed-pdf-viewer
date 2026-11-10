@@ -204,6 +204,8 @@ export interface StampLibraryPatch {
 }
 
 export interface ImportLibraryOptions extends OperationOptions {
+  /** The library's id, over the one the file names; a fresh one when left out or taken. */
+  id?: string;
   /**
    * Fallback library name, applied only when the PDF carries no `/Title`
    * (an Acrobat-authored or previously exported library names itself).

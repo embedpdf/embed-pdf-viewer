@@ -9,15 +9,10 @@
 import { useEffect } from 'react';
 import { isLocalEngine, useKernel } from '@embedpdf/react/runtime';
 import { useConfiguredFonts, type ViewerFont } from '../config-context';
+import { fileBytes } from '../config/file-bytes';
 
 /** A font's bytes: its `data`, or its file fetched from `url`. */
-async function bytesOf(font: ViewerFont): Promise<Uint8Array> {
-  if (font.data) return new Uint8Array(font.data);
-  if (!font.url) throw new Error('a font needs a url or its data');
-  const response = await fetch(font.url);
-  if (!response.ok) throw new Error(`${font.url}: HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
-}
+const bytesOf = (font: ViewerFont) => fileBytes(font, `font "${font.key}"`);
 
 export function AppFonts(): null {
   const kernel = useKernel();
