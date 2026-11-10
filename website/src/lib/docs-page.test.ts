@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createDocsPagePresentation } from './docs-page';
+import { buildDocsPageMetadata, createDocsPagePresentation } from './docs-page';
 
 describe('createDocsPagePresentation', () => {
   it('derives framework-specific metadata without duplicating the framework in the image title', () => {
@@ -57,5 +57,20 @@ describe('createDocsPagePresentation', () => {
 
     expect(page.variant).toBe('engine');
     expect(page.section).toBe('PDF Engine');
+  });
+});
+
+describe('buildDocsPageMetadata', () => {
+  it('names the page’s Markdown next to its canonical URL', () => {
+    const page = createDocsPagePresentation({
+      mdxPath: ['docs', 'headless', 'vue', 'text', 'search'],
+      metadata: { title: 'Search' },
+      resolved: { contentPath: ['docs', 'headless', 'text', 'search'], integration: 'vue' },
+    });
+
+    expect(buildDocsPageMetadata(page).alternates).toEqual({
+      canonical: 'https://www.embedpdf.com/docs/headless/vue/text/search',
+      types: { 'text/markdown': 'https://www.embedpdf.com/docs/headless/vue/text/search.md' },
+    });
   });
 });

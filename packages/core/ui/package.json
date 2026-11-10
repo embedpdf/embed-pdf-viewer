@@ -2,7 +2,7 @@
   "name": "@embedpdf/core-ui",
   "version": "3.1.0",
   "private": false,
-  "description": "Pure chrome core: the structure-only schema vocabulary, the toolbar fit solver (measure → solve → overflow), the overflow-to-menu projection, and the shortcut parser/matcher. DOM-free, kernel-free, framework-free.",
+  "description": "Toolbar logic for EmbedPDF: fits items into the space there is, moves the rest to a menu, and reads keyboard shortcuts. No DOM.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",

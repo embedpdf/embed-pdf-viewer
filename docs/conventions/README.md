@@ -71,7 +71,9 @@ verbs that do work, and events. A plugin talks to the engine only through
 | [`comments.md`](./comments.md)                           | What a comment may say, and how it is checked                                                                                            |
 | [`packages.md`](./packages.md)                           | Where a package lives and what it is called                                                                                              |
 | [`permissions.md`](./permissions.md)                     | Authorization-aware plugins: `can*` twins, gates, per-record authority                                                                   |
+| [`framework-adapters.md`](./framework-adapters.md)       | The React, Vue, Svelte and Angular adapters: what they do the same, and how a plugin's binding is added to each                          |
 | [`viewer-doors.md`](./viewer-doors.md)                   | One viewer, several deliveries: the entry points that choose the engine                                                                  |
+| [`viewer-chrome.md`](./viewer-chrome.md)                 | The viewer's interface and what an app may change in it: registries, the layout, sockets, regions, the `viewer`, the theme               |
 | [`engine-services.md`](./engine-services.md)             | Layout of `@embedpdf/engine-services`: readers, mutators, the worker host                                                                |
 | [`runtime-confinement.md`](./runtime-confinement.md)     | Thread-confined PDFium: per-thread state, the worker pool, the threading gate                                                            |
 | [`engine-host-isolation.md`](./engine-host-isolation.md) | Running engines in supervised child processes, and the threat model                                                                      |

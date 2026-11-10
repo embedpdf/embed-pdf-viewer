@@ -31,6 +31,14 @@ export interface StageHostCapability extends StageCapability {
   endGesture(): void;
   /** Momentum pan from a release velocity in viewport px/s. */
   fling(velocityX: number, velocityY: number): void;
+  /**
+   * Pan by a wheel's delta, in viewport px and signed like `panBy`. `timeMs`
+   * is when the wheel happened, on a clock that only goes forward: it tells a
+   * new push from a scroll that coasts. False: the view leaves this wheel to
+   * the page around the viewer (the `scrollChaining` setting), so the binding
+   * lets the browser have the event.
+   */
+  wheelBy(dxViewport: number, dyViewport: number, timeMs: number): boolean;
   /** The touch double-tap zoom ladder around a viewport point. */
   doubleTapZoom(point: ViewportPoint): void;
   /** Zoom by a factor holding a viewport point fixed — the pinch primitive. */

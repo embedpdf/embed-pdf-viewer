@@ -52,11 +52,14 @@ export {
 export * as mdast from './mdast';
 export {
   renderDocsMarkdownWith,
+  renderDocsReadmeWith,
   resolveDocsTreeWith,
   stringifyDocsTree,
   type AstNode,
   type DocsCodeFile,
   type DocsMarkdownSite,
+  type DocsReadmeOptions,
+  type DocsReadmeParts,
   type RenderDocsMarkdownOptions,
 } from './docs-markdown';
 export { PageMarkdownActions } from './page-markdown-actions';

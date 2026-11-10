@@ -112,9 +112,16 @@ template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)`
 <Fw only="vue">
 
 - **Do things with the API composable.** Its object never changes, so it's safe in watchers and
-  event handlers.
-- **Show things with the state composable.** It gives you refs: your template updates when a value
-  it reads changes.
+  event handlers. Keep it whole and call through it (`search.nextHit()`): don't take methods out
+  of it (`const { nextHit } = useSearch()`).
+- **Ask it things in your template.** A method whose name starts with `get`, `list`, `is`, `has`
+  or `can` is a read: called in a template, a `computed` or a `watchEffect`, it updates when its
+  answer changes (`v-if="search.canSearch()"`). Every other method is only called, never
+  followed.
+- **Show things with the state composable.** It gives you one ref per value, so you can take them
+  apart (`const { hitCount } = useSearchState()`), and your template updates when a value it reads
+  changes. Pass a function that picks one value, and you get one ref:
+  `useSearchState((state) => state.hitCount)`.
 - **React to things with the event composable.** It listens while the component is mounted, and
   stops when it unmounts:
 
@@ -123,9 +130,19 @@ template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)`
 <Fw only="svelte">
 
 - **Do things with the API function.** Its object never changes, so it's safe in `$effect` and
-  event handlers.
-- **Show things with the state function.** It gives you one reactive object: read its fields, and
-  your markup updates when they change.
+  event handlers. Keep it whole and call through it (`search.nextHit()`): don't take methods out
+  of it (`const { nextHit } = useSearch()`).
+- **Ask it things in your markup.** A method whose name starts with `get`, `list`, `is`, `has` or
+  `can` is a read: called in your markup, a `$derived` or an `$effect`, it updates when its answer
+  changes (`disabled={!search.canSearch()}`). Every other method is only called, never followed.
+  So a read in an `$effect` runs the effect again when its answer changes: for a read you want
+  once, use `onMount` or `untrack`.
+- **Show things with the state function.** It gives you one reactive object: read its fields
+  (`searchState.hitCount`), and your markup updates when they change. Taking it apart
+  (`const { hitCount } = searchState`) reads each field once, as with any reactive object in
+  Svelte. Pass a function that picks one value, and you get an object whose `current` is that
+  value. Don't name the object `state` in a component that also uses `$state`: Svelte then reads
+  `$state` as a store called `state`.
 - **React to things with the event function.** It listens while the component is mounted:
 
 </Fw>
@@ -136,6 +153,10 @@ template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)`
   lives, so call it from event bindings, `effect()` or your own methods.
 - **Show things with its signals.** Read them in your template or in a `computed()`. A signal
   updates only what reads it, so a count doesn't redraw a list.
+- **Ask it things in your template.** A method whose name starts with `get`, `list`, `is`, `has`
+  or `can` is a read: called in a template, a `computed()` or an `effect()`, it updates when its
+  answer changes (`[disabled]="!search.canSearch()"`). Every other method is only called, never
+  followed.
 - **React to things with its streams.** They're RxJS observables, and `takeUntilDestroyed()` stops
   listening when your component goes away:
 
@@ -162,6 +183,13 @@ A few signals read one specific thing, and the ones that need an argument are me
 signal: `annotation.watch(filter)`, `document.pages()` or `shell.surface(id)`.
 
 </Fw>
+
+### Before a document is open
+
+Before any document is open, <Fw only={['react', 'vue', 'svelte']}>a plugin's API is already there, so a component that holds one renders, and the state <Word of="hooks" /> give empty values</Fw><Fw only="angular">a plugin's service is already there, so a component that injects one renders, and its signals read empty</Fw>.
+Calling a method then is refused with a `PluginError` whose code is `not-ready`: a method that
+returns a promise rejects, so `.catch()` sees it, and every other method throws. The settings calls
+still work, as a plugin's settings are its own, not a document's. UI that needs a document goes <Fw only={['react', 'vue', 'svelte']}>inside `<DocumentGate>`</Fw><Fw only="angular">under `*epdfDocumentGate`</Fw>.
 
 ## Layers and overlays
 

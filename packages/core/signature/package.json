@@ -2,7 +2,7 @@
   "name": "@embedpdf/core-signature",
   "version": "3.1.0",
   "private": false,
-  "description": "Digital signatures, the cryptographic half: parse and verify detached CMS (PKCS#7 / CAdES-B) signatures, build one from a raw signer, gate a signing before it completes, validate trust chains, and the sign()/validateSignatures() helpers over an engine document handle. Pure: no PDFium, no DOM.",
+  "description": "Digital signatures for EmbedPDF: signs a PDF and validates the signatures it has. No DOM.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

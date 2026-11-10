@@ -76,14 +76,15 @@ It works with React 18 and later.
 
 <Fw only="vue">
 
-It's written for Vue 3: components for your templates and composables for `<script setup>`.
+It's written for Vue 3: components for your templates and composables for `<script setup>`. It
+needs Vue 3.4 or later.
 
 </Fw>
 
 <Fw only="svelte">
 
 It's written for Svelte 5: components that take snippets, and functions that give you reactive
-state for your runes.
+state for your runes. It needs Svelte 5.29 or later.
 
 </Fw>
 
@@ -91,6 +92,12 @@ state for your runes.
 
 It needs Angular 20.2 or later. Everything is standalone, `OnPush` and built on signals, so it works
 in zoneless apps (`provideZonelessChangeDetection()`), the default for new ones.
+
+`@angular/forms` and `@angular/cdk` are optional. Install `@angular/forms` to use a form field as
+a `FormControl` (`form.controlOf(ref)`). Install `@angular/cdk` to test your components with the
+harnesses in `@embedpdf/angular/testing`: `EpdfStageHarness` reads the pages a Stage shows and its
+cursor, and turns the wheel; `EpdfSearchLayerHarness` counts the highlights on a page and clicks
+one.
 
 </Fw>
 

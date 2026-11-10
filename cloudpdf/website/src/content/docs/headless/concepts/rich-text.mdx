@@ -113,3 +113,11 @@ text is laid out at 16 px or more and drawn back at the box's size, so iOS doesn
 when the box takes focus. Draw the box's fill, border and padding on the parent, as above; anything
 on the element itself would scale with the text. The formatting calls above work on your element as
 they do on the built-in one.
+
+<Fw only="svelte">
+
+A `style` string that changes replaces an element's whole inline style, what code set on it
+included. The editor sets its own properties again after each change. On an element of yours that
+code also styles, use `style:` directives.
+
+</Fw>

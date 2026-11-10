@@ -9,6 +9,7 @@
     "reference": "node scripts/reference.mjs",
     "snippets": "node scripts/snippets.mjs",
     "publish-gate": "node scripts/publish-gate.mjs",
+    "readmes": "tsx scripts/readmes.mjs",
     "samples": "node scripts/samples.mjs",
     "pdfs": "tsx pdfs/build.mjs",
     "pdfs:cloud": "node pdfs/cloud.mjs",

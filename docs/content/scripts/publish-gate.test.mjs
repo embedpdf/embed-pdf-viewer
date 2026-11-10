@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { strictProblems, viewerPendingByPage } from './publish-gate.mjs';
+import { readmeViewerPages, strictProblems, viewerPendingByPage } from './publish-gate.mjs';
 import { VIEWER_PENDING } from '../viewer-pending.mjs';
 
 const fails = (snippet) => ({
@@ -56,6 +56,59 @@ describe('the docs gate in CI', () => {
     const tools = { vue: { tool: null, reason: 'vue-tsc missed the canary' } };
     assert.deepEqual(strictProblems(status({ headless, tools })), [
       "the headless Vue check isn't checking: vue-tsc missed the canary",
+    ]);
+  });
+
+  it('fails on a viewer page a README shows, on the site and for the integration it shows it', () => {
+    const viewer = {
+      'viewer/quick-start': {
+        vanilla: fails('viewer/start/first'),
+        react: fails('viewer/start/first'),
+      },
+    };
+    const shown = [
+      {
+        name: '@cloudpdf/viewer-react',
+        page: 'viewer/quick-start',
+        engine: 'cloud',
+        framework: 'react',
+      },
+    ];
+
+    assert.deepEqual(strictProblems(status({ viewer }), []), []);
+    const [problem, ...rest] = strictProblems(status({ viewer }), shown);
+    assert.deepEqual(rest, []);
+    assert.match(
+      problem,
+      /^viewer\/quick-start\.mdx, which @cloudpdf\/viewer-react's README shows, doesn't compile for React on cloudpdf\.com/,
+    );
+    assert.match(problem, /viewer\/start\/first\.react\.tsx:3: Cannot find name/);
+  });
+
+  it('reads the viewer pages READMEs show from the manifest, the second page too', () => {
+    const pages = readmeViewerPages({
+      '@embedpdf/viewer': {
+        page: 'viewer/quick-start',
+        framework: 'vanilla',
+        also: { page: 'viewer/features/index' },
+      },
+      '@embedpdf/react': { page: 'headless/quick-start', framework: 'react' },
+      '@embedpdf/viewer-chrome': { by: 'hand' },
+    });
+
+    assert.deepEqual(pages, [
+      {
+        name: '@embedpdf/viewer',
+        page: 'viewer/quick-start',
+        engine: 'local',
+        framework: 'vanilla',
+      },
+      {
+        name: '@embedpdf/viewer',
+        page: 'viewer/features/index',
+        engine: 'local',
+        framework: 'vanilla',
+      },
     ]);
   });
 

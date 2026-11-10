@@ -117,6 +117,34 @@ export function frames(page: Page): Promise<unknown> {
 }
 
 /**
+ * How far apart a coasting scroll's wheels are, by their own time: a little over a frame, so each
+ * one tells the Stage a speed.
+ */
+const WHEEL_SECONDS = 0.02;
+
+/**
+ * Wheels down at a point, `WHEEL_SECONDS` apart by the time each says it happened, however late
+ * this machine delivers them. The Stage reads a scroll's speed from those times.
+ */
+export async function evenlyTimed(
+  page: Page,
+  at: { x: number; y: number },
+  deltas: number[],
+): Promise<void> {
+  const devtools = await page.context().newCDPSession(page);
+  const startSeconds = Date.now() / 1000;
+  for (const [wheel, deltaY] of deltas.entries()) {
+    await devtools.send('Input.dispatchMouseEvent', {
+      type: 'mouseWheel',
+      ...at,
+      deltaX: 0,
+      deltaY,
+      timestamp: startSeconds + wheel * WHEEL_SECONDS,
+    });
+  }
+}
+
+/**
  * Wait out a slide or a fade: the time one takes, then until none is still running in the viewer
  * (a busy machine starts one late). Endless animations, a spinner's, don't count.
  */

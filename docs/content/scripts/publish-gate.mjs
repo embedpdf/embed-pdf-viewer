@@ -16,6 +16,9 @@
  * and the code it shows compile for it, and `../viewer-pending.mjs` lists nothing that holds it
  * back: a page whose prose promises what the viewer doesn't do yet stays coming everywhere.
  *
+ * A viewer page a package's README shows (`../readmes.mjs`) must compile, for the integration and
+ * on the site the README shows it for: `--strict` fails on one that doesn't.
+ *
  * Each site has its own status (`sites.local` for embedpdf.com, `sites.cloud` for cloudpdf.com),
  * for the pages it has and the code it shows (`snippets.mjs`): a cloud snippet that doesn't
  * compile holds back cloudpdf.com's page only. The sites read `generated/live-pages.json` through
@@ -25,6 +28,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ENGINES } from '../engines.mjs';
+import { READMES } from '../readmes.mjs';
 import { REFERENCE } from '../reference.mjs';
 import { VIEWER_PENDING } from '../viewer-pending.mjs';
 import { FRAMEWORK_LABELS, FRAMEWORKS, VIEWER_INTEGRATIONS } from './compile.mjs';
@@ -79,7 +84,7 @@ function referenceNames(page) {
 }
 
 /** Per page (`text/search`, as the snippet status names it), the pending names it lists. */
-function pendingByPage() {
+export function pendingByPage() {
   const byPage = new Map();
   for (const entry of REFERENCE) {
     const pending = entry.pending ?? {};
@@ -188,14 +193,38 @@ export async function writePublishStatus() {
   return { sites, snippets };
 }
 
+/** The site each scope's packages are documented on: `@embedpdf` on `local`, embedpdf.com. */
+const ENGINE_BY_SCOPE = Object.fromEntries(
+  Object.entries(ENGINES).map(([engine, { package: name }]) => [name.split('/')[0], engine]),
+);
+
+/**
+ * The viewer pages a package's README shows part of (`../readmes.mjs`): each with the package,
+ * its site and the integration the README shows the page for.
+ */
+export function readmeViewerPages(readmes = READMES) {
+  return Object.entries(readmes).flatMap(([name, entry]) =>
+    [entry.page, entry.also?.page]
+      .filter((page) => page?.startsWith('viewer/'))
+      .map((page) => ({
+        name,
+        page,
+        engine: ENGINE_BY_SCOPE[name.split('/')[0]],
+        framework: entry.framework,
+      })),
+  );
+}
+
 /**
  * What fails the gate in CI: a compiler that isn't checking (then no page it compiles can be
  * vouched for), and a headless page whose snippets don't compile for a framework, on either site.
  * A headless page written ahead of the code names it `pending` in `../reference.mjs` instead. A
  * viewer page that doesn't compile yet is held back on its site and fails nothing: the viewer's
- * pages describe the API it's moving to. Each problem is said once, however many sites have it.
+ * pages describe the API it's moving to. The one exception is a viewer page a package's README
+ * shows (`readmePages`): a README is committed, so its code must compile where the README shows
+ * it. Each problem is said once, however many sites have it.
  */
-export function strictProblems(snippets) {
+export function strictProblems(snippets, readmePages = readmeViewerPages()) {
   const problems = new Set();
   for (const [engine, site] of Object.entries(snippets.sites)) {
     const checks = [
@@ -221,6 +250,19 @@ export function strictProblems(snippets) {
         );
       }
     }
+  }
+  for (const { name, page, engine, framework } of readmePages) {
+    const site = snippets.sites[engine];
+    const status = site?.viewer.pages[page]?.[framework];
+    if (!status || status.compiles || !site.viewer.frameworks[framework]?.tool) continue;
+    const [first] = status.errors;
+    const file = first.file ?? first.snippet ?? first.example;
+    const where = first.line ? `${file}:${first.line}` : file;
+    problems.add(
+      `${page}.mdx, which ${name}'s README shows, doesn't compile for ` +
+        `${FRAMEWORK_LABELS[framework]} on ${SITE_LABELS[engine] ?? engine} ` +
+        `(${status.errorCount} errors; ${where}: ${first.message})`,
+    );
   }
   return [...problems];
 }

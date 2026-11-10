@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-commands",
   "version": "3.1.0",
   "private": false,
-  "description": "The commands: one name per action of the viewer, with its label, icon, state and shortcut, which toolbars, menus, a command palette and the keyboard all show and run. A command's state is read from live state, so every reader follows the kernel's one change stream. `/standard` has the commands every viewer has.",
+  "description": "Commands for EmbedPDF: named actions with a label, an icon, a state and a shortcut, for toolbars, menus and the keyboard.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

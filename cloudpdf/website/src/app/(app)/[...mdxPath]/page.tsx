@@ -11,6 +11,7 @@ import { isDocsIntegration, type DocsIntegration } from '@/lib/docs-integrations
 import { docsRelease, reactVersionHref } from '@/lib/docs-release';
 import { socialImagePath } from '@/lib/docs-social-image';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
+import { SITE_ORIGIN } from '@/lib/site';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
 
@@ -46,6 +47,11 @@ export async function generateMetadata(props: PageProps) {
 
   return {
     ...metadata,
+    // The page as Markdown, for a reader that got the HTML and would take that instead.
+    alternates: {
+      ...(metadata?.alternates ?? {}),
+      types: { 'text/markdown': `${SITE_ORIGIN}/${params.mdxPath.join('/')}.md` },
+    },
     openGraph: { ...(metadata?.openGraph ?? {}), images: [image] },
     twitter: { ...(metadata?.twitter ?? {}), card: 'summary_large_image', images: [image] },
     // A page held back for this framework stays out of search engines until it's live.

@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-outline",
   "version": "3.1.0",
   "private": false,
-  "description": "Document-scoped outline (bookmarks): the document's outline mirrored from the engine with this session's pending edits shown, which items are expanded and selected, the item for the reading position, activation, and create, update, move and delete as undoable changes.",
+  "description": "The outline for EmbedPDF: shows a document's bookmarks as a tree, follows them, and adds, renames, moves and deletes them.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -2,7 +2,7 @@
   "name": "@embedpdf/core-form",
   "version": "3.1.0",
   "private": false,
-  "description": "The form widget painter: what a widget looks like for its facts, ported from the engine's appearance generator and checked against it. Pure TypeScript, DOM-free.",
+  "description": "Draws PDF form fields for EmbedPDF as the engine draws them. No DOM.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

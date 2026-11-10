@@ -5,6 +5,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
+import { parse as parseYaml } from 'yaml';
 
 import type { DocsEngine } from './axis';
 
@@ -36,6 +37,9 @@ import { applyInstallChannel } from '../mdx/install-channel.mjs';
  * page (`setup`, `../text/search`) included, and a link to a docs page names
  * that page's `.md`: the Markdown is read away from its page, by agents that
  * follow its links.
+ *
+ * A package README ({@link renderDocsReadmeWith}) is the same pass over the
+ * part of a page its package's npm page shows.
  *
  * Site-specific behaviour (sample resolution, integration routing, origin)
  * arrives through {@link DocsMarkdownSite}; unknown components stay
@@ -231,12 +235,23 @@ function engineFlavors(node: AstNode): DocsEngine[] {
   return flavors;
 }
 
-function fileNodes(files: DocsCodeFile[]): AstNode[] {
+/** A file that is a command to run (`install.sh`), not a file to make. */
+const isCommand = (file: DocsCodeFile) =>
+  ['sh', 'bash', 'shell', 'shellscript'].includes(file.language);
+
+/** Each file under its name. A README shows a command without one: there it is only run. */
+function fileNodes(files: DocsCodeFile[], readme = false): AstNode[] {
   return files.flatMap((file) => [
-    {
-      type: 'paragraph',
-      children: [{ type: 'strong', children: [{ type: 'inlineCode', value: file.filename }] }],
-    },
+    ...(readme && isCommand(file)
+      ? []
+      : [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'strong', children: [{ type: 'inlineCode', value: file.filename }] },
+            ],
+          },
+        ]),
     { type: 'code', lang: file.language, value: file.code.trimEnd() },
   ]);
 }
@@ -255,6 +270,13 @@ function noteNode(text: string): AstNode {
   };
 }
 
+/** The hint under a live example (`> **Try it:** …`): what to do in the demo the page runs. */
+function isDemoHint(node: AstNode) {
+  if (node.type !== 'blockquote') return false;
+  const lead = node.children?.[0]?.children?.[0];
+  return lead?.type === 'strong' && collectText(lead).startsWith('Try it');
+}
+
 /**
  * The framework a headless page's names are shown for (`useSearch()` → `inject(EpdfSearch)`),
  * or null when names stay as written.
@@ -266,6 +288,8 @@ function createResolver(
   integration: string | undefined,
   names: FrameworkNames = null,
   links: LinkTargets = {},
+  /** The nodes are a package README's: {@link renderDocsReadmeWith} says what that changes. */
+  readme = false,
 ) {
   const framework =
     integration && (FRAMEWORKS as readonly string[]).includes(integration)
@@ -277,6 +301,8 @@ function createResolver(
     if (links.canonicalPath && PAGE_RELATIVE.test(url)) {
       url = pathFromPage(url, links.canonicalPath);
     }
+    // A README holds part of the page, so a link to a place on the page names the page.
+    if (readme && links.canonicalPath && url.startsWith('#')) url = `${links.canonicalPath}${url}`;
     // Every docs link keeps the reader's framework, cross-site ones too.
     if (framework) url = frameworkHref(url, framework);
     if (!url.startsWith('/')) return url;
@@ -295,6 +321,7 @@ function createResolver(
       const node = { ...originalNode };
 
       if (node.type === 'yaml' || node.type === 'mdxjsEsm') return [];
+      if (readme && isDemoHint(node)) return [];
 
       if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
         if (node.name === 'Engine') {
@@ -313,6 +340,8 @@ function createResolver(
         }
 
         if (node.name === 'Example') {
+          // A README shows the code a page keeps open; any other example is a demo to try there.
+          if (readme && expressionStrings(getAttribute(node, 'mode'))[0] !== 'open') return [];
           if (!integration) {
             throw new Error('<Example> can only be exported from a variant-specific route.');
           }
@@ -320,7 +349,7 @@ function createResolver(
           const files = site.resolveExampleFiles(name, integration);
           const label = site.variantLabel?.(integration) ?? integration;
           return files?.length
-            ? fileNodes(files)
+            ? fileNodes(files, readme)
             : [noteNode(`This example is not available for ${label} yet.`)];
         }
 
@@ -332,7 +361,7 @@ function createResolver(
           const files = site.resolveExampleFiles(`snippets/${name}`, integration);
           const label = site.variantLabel?.(integration) ?? integration;
           return files?.length
-            ? fileNodes(files)
+            ? fileNodes(files, readme)
             : [noteNode(`This code isn't written for ${label} yet.`)];
         }
 
@@ -371,7 +400,7 @@ function createResolver(
           if (files.length !== paths.length) {
             throw new Error('<CodeExample> references a source file that could not be read.');
           }
-          return fileNodes(files);
+          return fileNodes(files, readme);
         }
 
         if (node.name === 'Tabs') {
@@ -424,7 +453,9 @@ function createResolver(
                       url: linkUrl(href),
                       children: [{ type: 'text', value: title }],
                     },
-                    ...(description ? [{ type: 'text', value: ` — ${description}` }] : []),
+                    ...(description
+                      ? [{ type: 'text', value: `${readme ? ': ' : ' — '}${description}` }]
+                      : []),
                   ],
                 },
               ],
@@ -536,7 +567,8 @@ function createResolver(
         if (names) node.value = frameworkCode(node.value as string, names.framework);
         const metadata = node.meta?.split(/\s+/).filter(Boolean) ?? [];
         if (metadata.includes('npm2yarn')) {
-          node.value = convertPackageManager(node.value as string, 'pnpm');
+          // A README keeps the command as the page's author wrote it, for npm.
+          if (!readme) node.value = convertPackageManager(node.value as string, 'pnpm');
           const remaining = metadata.filter((item) => item !== 'npm2yarn');
           node.meta = remaining.length > 0 ? remaining.join(' ') : null;
         }
@@ -570,6 +602,18 @@ function applyInstallChannelToTree(node: AstNode): void {
   for (const child of node.children ?? []) applyInstallChannelToTree(child);
 }
 
+/** Headless pages show each framework's names; other pages keep them as written. */
+function frameworkNamesOf(
+  tree: AstNode,
+  integration: string | undefined,
+  canonicalPath: string | undefined,
+): FrameworkNames {
+  const headless = canonicalPath ? canonicalPath.includes('/docs/headless/') : true;
+  return headless && integration && (FRAMEWORKS as readonly string[]).includes(integration)
+    ? { framework: integration as Framework, contexts: inlineCodeContexts(tree) }
+    : null;
+}
+
 /** Resolve raw MDX to the plain Markdown AST one concrete route shows. */
 export function resolveDocsTreeWith(
   site: DocsMarkdownSite,
@@ -585,12 +629,7 @@ export function resolveDocsTreeWith(
   },
 ) {
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
-  // Headless pages show each framework's names; other pages keep them as written.
-  const headless = canonicalPath ? canonicalPath.includes('/docs/headless/') : true;
-  const names: FrameworkNames =
-    headless && integration && (FRAMEWORKS as readonly string[]).includes(integration)
-      ? { framework: integration as Framework, contexts: inlineCodeContexts(tree) }
-      : null;
+  const names = frameworkNamesOf(tree, integration, canonicalPath);
   const links: LinkTargets = { canonicalPath, markdown: markdownLinks };
   tree.children = createResolver(site, integration, names, links)(tree.children ?? []);
   applyInstallChannelToTree(tree);
@@ -646,4 +685,150 @@ export function renderDocsMarkdownWith(
   ].join('\n');
 
   return `${frontmatter}${body}`;
+}
+
+// ── a package README ────────────────────────────────────────────────────────
+
+// Where a README's cut ends: an MDX comment that reads `readme: end`, on a line of its own at the
+// top level of the page.
+const README_END = /^\/\*\s*readme:\s*end\s*\*\/$/;
+
+/** The section whose cards a README lists as where to go next. */
+const NEXT_STEPS = 'Next steps';
+
+const isReadmeEnd = (node: AstNode) =>
+  (node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression') &&
+  typeof node.value === 'string' &&
+  README_END.test(node.value.trim());
+
+const holdsReadmeEnd = (node: AstNode): boolean =>
+  (node.children ?? []).some((child) => isReadmeEnd(child) || holdsReadmeEnd(child));
+
+const isSectionHeading = (node: AstNode) => node.type === 'heading' && node.depth === 2;
+
+const isCards = (node: AstNode) =>
+  node.type === 'mdxJsxFlowElement' && (node.name === 'Cards' || node.name === 'CardGrid');
+
+/**
+ * The `##` section whose heading reads `heading`: the heading, then what is under it. Null when
+ * the page has no such section.
+ */
+function sectionNodes(children: AstNode[], heading: string): AstNode[] | null {
+  const at = children.findIndex(
+    (node) => isSectionHeading(node) && collectText(node).trim() === heading,
+  );
+  if (at === -1) return null;
+  const end = children.findIndex((node, index) => index > at && isSectionHeading(node));
+  return children.slice(at, end === -1 ? undefined : end);
+}
+
+/**
+ * The part of a page a README shows, as the page's own nodes: the opening, which is everything
+ * under the title up to the first `##`; everything up to the end marker, on a page that has one;
+ * or the named section, up to the marker when it stands inside, with its heading when asked for.
+ */
+function readmeCut(
+  children: AstNode[],
+  section: string | undefined,
+  withHeading: boolean,
+): AstNode[] {
+  if (children.filter(isReadmeEnd).length > 1 || children.some(holdsReadmeEnd)) {
+    throw new Error('`{/* readme: end */}` stands once, at the top level of its page.');
+  }
+  if (section !== undefined) {
+    const nodes = sectionNodes(children, section);
+    if (!nodes) throw new Error(`The page has no section "${section}".`);
+    const end = nodes.findIndex(isReadmeEnd);
+    return nodes.slice(withHeading ? 0 : 1, end === -1 ? undefined : end);
+  }
+  const title = children.findIndex((node) => node.type === 'heading' && node.depth === 1);
+  const body = children.slice(title + 1);
+  const end = body.findIndex(body.some(isReadmeEnd) ? isReadmeEnd : isSectionHeading);
+  const opening = end === -1 ? body : body.slice(0, end);
+  return withHeading && title !== -1 ? [children[title], ...opening] : opening;
+}
+
+/** A README gives the page's title its second level, so the page's headings go one down. */
+function lowerHeadings(node: AstNode): void {
+  if (node.type === 'heading') node.depth = Math.min((node.depth as number) + 1, 6);
+  for (const child of node.children ?? []) lowerHeadings(child);
+}
+
+const stringifyNodes = (children: AstNode[]) =>
+  stringifyDocsTree({ type: 'root', children }).trimEnd();
+
+/** A page's frontmatter, as its fields that are text. */
+function frontmatterText(children: AstNode[]): Record<string, string> {
+  const yaml = children.find((node) => node.type === 'yaml');
+  const fields: unknown = typeof yaml?.value === 'string' ? parseYaml(yaml.value) : null;
+  if (!fields || typeof fields !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(fields).filter(
+      (field): field is [string, string] => typeof field[1] === 'string',
+    ),
+  );
+}
+
+export type DocsReadmeOptions = {
+  sourceCode: string;
+  /** The page's URL path for the README's variant: `/docs/headless/react/quick-start`. */
+  canonicalPath: string;
+  integration?: string;
+  /** The `##` section the README shows, by its heading. Without one, the page's opening. */
+  section?: string;
+  /**
+   * The cut comes with its heading, as a `##`: a section's own, at the levels the page has, or
+   * the page's title over its opening. For a README that shows the cut as a section of its own,
+   * beside another page's, and not under this page's title.
+   */
+  withHeading?: boolean;
+};
+
+export type DocsReadmeParts = {
+  /** The page's `title` and `description`, from its frontmatter; null for one it doesn't give. */
+  title: string | null;
+  description: string | null;
+  /** The cut as Markdown, its headings one level below the page's unless it has its own. */
+  cut: string;
+  /** The cards of the page's "Next steps" section as a list of links, or '' when it has none. */
+  nextSteps: string;
+};
+
+/**
+ * The parts of a page a package README is made of
+ * (docs/conventions/docs-architecture.md, "Package READMEs"). They are read on npm and GitHub, so
+ * they differ from the page's `.md` export in six ways, none of which adds a word:
+ *
+ * - an example the page keeps open (`mode="open"`) shows its code, and any other example, with
+ *   its "Try it" hint, is left out: a README runs no demo;
+ * - an install command stays as written, with no package manager or release channel put in;
+ * - every link is the full URL of a page, a link to a place on this page (`#zoom`) included;
+ * - a card is its linked title, a colon and its description;
+ * - a command (`install.sh`) shows without a file name: it is something to run;
+ * - the cut's headings are one level down, for a README that gives the page's title its own
+ *   (a section that comes with its heading keeps its levels).
+ *
+ * An unknown component in the cut is fatal, as in the export; outside the cut it is never read.
+ */
+export function renderDocsReadmeWith(
+  site: DocsMarkdownSite,
+  { sourceCode, canonicalPath, integration, section, withHeading = false }: DocsReadmeOptions,
+): DocsReadmeParts {
+  const tree = markdownProcessor.parse(sourceCode) as AstNode;
+  const children = tree.children ?? [];
+  // A name's framework form depends on where it stands on the whole page, so read that first.
+  const names = frameworkNamesOf(tree, integration, canonicalPath);
+  const resolve = createResolver(site, integration, names, { canonicalPath }, true);
+
+  const cut = resolve(readmeCut(children, section, withHeading));
+  // A section that comes with its heading is at a README's levels already.
+  if (!(withHeading && section !== undefined)) cut.forEach(lowerHeadings);
+  const cards = (sectionNodes(children, NEXT_STEPS) ?? []).filter(isCards);
+  const { title = null, description = null } = frontmatterText(children);
+  return {
+    title,
+    description,
+    cut: stringifyNodes(cut),
+    nextSteps: stringifyNodes(resolve(cards)),
+  };
 }

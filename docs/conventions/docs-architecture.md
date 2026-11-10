@@ -156,7 +156,8 @@ whose prose promises what the viewer doesn't do yet lists those gaps in
 `docs/content/viewer-pending.mjs`, each with why, and stays coming for every integration until
 they're removed, however little code it has. In CI, `publish-gate.mjs --strict` (the docs gate
 job in `.github/workflows/packages.yml`) fails when a check crashes or stops checking, or a
-headless page's snippets don't compile; a viewer page that's coming fails nothing.
+headless page's snippets don't compile; a viewer page that's coming fails nothing, unless a
+package's README shows it (see "Package READMEs").
 
 Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
 `docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
@@ -273,7 +274,8 @@ build.
 
 A page that isn't live shows its title and a notice that it describes 3.0 for
 that framework, linking to the React version when that one is live; it stays out
-of the llms files, that framework's search index and search engines. With
+of the llms files, that framework's search index and search engines (it says
+`noindex`, and each site's `sitemap.xml` lists only the live pages). With
 `DOCS_PREVIEW=1` (the preview site, and `next dev` unless `DOCS_PREVIEW=0`),
 every page is live under a banner. The sites read the gate through
 `@embedpdf/docs-kit/publish`. Both generated files are built, never committed.
@@ -295,15 +297,139 @@ it and AI agents read it, so it is read away from its page:
   `other_integrations` on a viewer page), so a reader working in Vue who lands
   on React's page can switch.
 
+A reader that doesn't know the `.md` address gets the Markdown two ways:
+
+- **The page's own URL serves it to a request that asks.** A request whose
+  `Accept` header names `text/markdown`, and ranks it no lower than `text/html`,
+  gets the Markdown at the page's URL (docs-kit `accept`, each site's
+  middleware). AI coding agents ask this way. A browser never names Markdown, so
+  a person always gets the page. Both answers carry `Vary: Accept`, so a cache
+  keeps them apart. A file under `/docs` has one answer.
+- **The page names it.** Each page's HTML has a
+  `<link rel="alternate" type="text/markdown">` with the `.md` URL.
+
 `/llms.txt` (llmstxt.org) lists each live page once, in its product's default
 integration: Vanilla JS for the viewer, React for headless.
 `/llms/<integration>.txt` lists every page one integration has, and the files
 link each other. Each site writes its files' framing (title, summary, section
-labels) and the page lists are generated (`src/lib/llms.ts` in each site).
+labels) and the page lists are generated (`src/lib/llms.ts` in each site), in
+the order the sidebar has the pages: the keys of each folder's `_meta.ts`, one
+to a line.
 
 `website/src/lib/docs-links.test.ts` reads every page's Markdown for every
 integration, and fails on a link that isn't a full URL or a docs link that names
 no page.
+
+## Package READMEs
+
+A package's `README.md` is the page npm shows for it. It is written from the
+docs page that documents the package, by `docs/content/scripts/readmes.mjs`, and
+committed, so it says nothing the docs don't. Change the page, never the README.
+
+Every published package has a README, of one of three kinds, by how a developer
+gets the package. `docs/content/readmes.mjs` says which, and a new package fails
+the check until it is there:
+
+| Kind      | Which packages                                    | Its README                                                      |
+| --------- | ------------------------------------------------- | --------------------------------------------------------------- |
+| Installed | The docs tell you to install it by name (`page`)  | The part of its page a README shows, then where to go next      |
+| Plugin    | A package under `packages/plugin/`, with no entry | The import path in each framework package, then its page, React |
+| Support   | It only comes along with others (`near`)          | The installed packages that bring it, and the nearest page      |
+
+- **A plugin is never installed by its own name**: it comes with the four
+  framework packages, each with an import path of the plugin's name
+  (`@embedpdf/vue/search`). Its pages are the ones `reference.mjs` lists for its
+  capability: the first is the one its README is cut from, and the others are
+  linked. An entry in the manifest is only for a plugin whose README shows a
+  `section` of its page.
+- **What brings a support package** is read from the workspace: the installed
+  packages that depend on it, directly or through packages that are not
+  installed themselves.
+- **A README someone else writes** is in the manifest too (`by`): one still
+  written by hand, and the SDK's, which Fern writes from the API contract.
+
+A README is a frame, `docs/content/readme/<kind>.md`, with its slots filled. The
+installed frame's:
+
+- **`{name}`, `{description}` and `{license}`** are the package's own, from its
+  `package.json`. The description is the README's first line and the sentence
+  npm's search shows, so it says what the package is, in plain words.
+- **`{pageTitle}`, `{pageDescription}` and `{pageUrl}`** are the page's, as the
+  package's site has it: embedpdf.com for an `@embedpdf/*` package, cloudpdf.com
+  for a `@cloudpdf/*` one, with that site's code.
+- **`{cut}`** is the part of the page the README shows, and **`{nextSteps}`**
+  the cards of the page's "Next steps" section.
+- **`{also}`** is part of a second page, where the manifest names one (`also`),
+  after the cut and under its own heading: a section, or the page's opening
+  under the page's title. It is what the package has. A framework package's
+  README shows the overview's "Every plugin" this way, and a viewer package's
+  the opening of "All features".
+
+The plugin frame has `{imports}`, the rows of its table of import paths, and
+`{otherPages}`, its other pages as links. The support frame has `{product}`,
+`{site}` and `{comesWith}`.
+
+The frame's words are the only ones in a README that no page has, and the script
+adds none. A slot with nothing to say takes its line with it, and so does a
+heading left with nothing under it.
+
+The cut is decided on the page:
+
+| The page has                               | The README shows                                           |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| Nothing special                            | The opening: what is under the title, up to the first `##` |
+| `{/* readme: end */}` on a line of its own | What is under the title, up to that line                   |
+| A section the manifest names (`section`)   | That section, up to the next `##` or the marker inside it  |
+
+The marker stands once, at the top level of the page, never inside an `<Fw>` or
+`<Engine>` block. When a cut reads wrong, change the page: move the marker, or
+move the code above it.
+
+The cut goes through the Markdown pass, as the page's `.md` does (docs-kit
+`renderDocsReadmeWith`). A README is read on npm and GitHub, so it differs in
+six ways, none of which adds a word:
+
+- **An example the page keeps open** (`mode="open"`) shows its code. Any other
+  example is a demo, left out with its "Try it" hint.
+- **An install command** stays `npm install`, as written.
+- **Every link is the full URL of a page**, never of its `.md`. A link to a
+  place on the page gets the page's URL too, as the README holds only part of
+  the page.
+- **A card** is its linked title, a colon and its description.
+- **A command** (`install.sh`) shows without a file name: it is something to
+  run, not a file to make.
+- **The page's headings go one level down**, under the page's title. A section
+  shown with its own heading (`also`) keeps its levels.
+
+A README describes its own commit: npm shows the release's, GitHub shows main's.
+A page that names something `pending` (`reference.mjs`, `viewer-pending.mjs`)
+holds its README back, as it holds the page back on the site: the README is then
+its frame without the cut. That is read from committed files only, never from
+what compiled, so the script writes the same README on every machine.
+
+What a README shows must compile, since it is committed. A headless page's
+snippets always must. A viewer page that doesn't compile is only held back on
+its site, so the docs gate job fails on a viewer page a README shows, for the
+integration and on the site the README shows it for. Engine pages' code is not
+compiled.
+
+`pnpm readme:sync` writes the READMEs, and `pnpm readme:check` fails on one that
+isn't current. Each site's `docs:sync` and `docs:check` do the same for the
+packages of its scope, and CI runs the check in the contract job. Both commands
+also fail on:
+
+- a description, a frame or a cut that holds an em-dash or names a release
+  ("v3"), outside its code;
+- a link that isn't a full URL, or a docs link that names no page on either
+  site;
+- an entry that names no published package, no page, or a framework the page
+  isn't shown for;
+- a published package with no README: no entry, and not a plugin with a page;
+- a plugin with no import path in one of the framework packages, or a support
+  package that nothing a reader installs brings along.
+
+Package READMEs are in `.prettierignore`: their code is the compiled file's, and
+the commit hook would reformat it.
 
 ## The support matrix is generated, not written
 

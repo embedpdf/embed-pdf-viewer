@@ -5,7 +5,7 @@
  * the readers turn its one change stream into Svelte reactivity and resolve capabilities against
  * the document in scope (the active one, or a `<DocumentScope>`'s), with a stand-in while there is
  * none; the page context is the seam every layer draws through. Every plugin binding is built from
- * these. How to add one: this package's README.
+ * these. How to add one: docs/conventions/framework-adapters.md.
  */
 
 // Registration travels with the UI: the kernel's types, tokens and helpers come from here too.
