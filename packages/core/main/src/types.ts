@@ -128,6 +128,15 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * For a write that is one step to undo unless its caller says it isn't:
+ * `history: false` keeps it out of undo and redo, as for what an app loads by
+ * itself when a document opens.
+ */
+export interface HistoryOptions {
+  readonly history?: false;
+}
+
 /** Load state of a resource a plugin hydrates from the engine. `forbidden` is a permission refusal, not an empty value. */
 export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'forbidden' | 'error';
 

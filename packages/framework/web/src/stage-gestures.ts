@@ -39,6 +39,13 @@ export type StagePointerKind = 'mouse' | 'pen' | 'touch';
 /** What the controller needs from the camera — `StageHostCapability` satisfies it. */
 export interface StageGestureHost {
   panBy(dxScreen: number, dyScreen: number): void;
+  /**
+   * Pan by a wheel's delta; `timeMs` is when the wheel happened. False: the
+   * stage leaves this wheel to the page around it, so the event goes
+   * uncancelled and the browser scrolls with it. A host without it keeps every
+   * wheel, panned through `panBy`.
+   */
+  wheelBy?(dxScreen: number, dyScreen: number, timeMs: number): boolean;
   zoomAround(screenPt: { x: number; y: number }, factor: number): void;
   beginGesture(options?: { elastic?: boolean }): void;
   endGesture(): void;
@@ -674,15 +681,32 @@ export function createStageGestureController(
   // Wheel is ambient navigation in both modes: ctrl/meta zooms (classified per
   // input by the injected wheelZoomFactor), else scrolls. With zoom gestures
   // off, a zoom-wheel falls through to ordinary pan.
+  //
+  // The stage says whether a scrolling wheel is its own. One it leaves alone
+  // goes uncancelled, and the browser scrolls the page around the stage with
+  // it, as it does past the end of any scrolling element.
+  const wheelBy = (dx: number, dy: number, timeMs: number): boolean => {
+    if (host.wheelBy) return host.wheelBy(dx, dy, timeMs);
+    host.panBy(dx, dy);
+    return true;
+  };
   const onWheel = (event: WheelEvent) => {
-    event.preventDefault();
-    if (zoomGestures && (event.ctrlKey || event.metaKey)) {
+    // The browser is already scrolling with this wheel's stream: it sends the
+    // rest of a stream whose first wheel went uncancelled as not cancelable.
+    if (!event.cancelable) return;
+    const zoomWheel = event.ctrlKey || event.metaKey;
+    if (zoomWheel && zoomGestures) {
+      event.preventDefault();
       host.zoomAround(vpt(event.clientX, event.clientY), wheelZoom(event));
-    } else {
-      const dx = event.shiftKey ? event.deltaY : event.deltaX;
-      const dy = event.shiftKey ? event.deltaX : event.deltaY;
-      host.panBy(-dx, -dy);
+      return;
     }
+    const dx = event.shiftKey ? event.deltaY : event.deltaX;
+    const dy = event.shiftKey ? event.deltaX : event.deltaY;
+    // The event's own time, not the time it got here: a busy page delivers
+    // wheels late and several as one, and the stage reads their speed.
+    const taken = wheelBy(-dx, -dy, event.timeStamp);
+    // A zoom wheel never reaches the browser: there it would zoom the whole page.
+    if (taken || zoomWheel) event.preventDefault();
   };
 
   // Safari's proprietary gesture events. On desktop Safari they are the only

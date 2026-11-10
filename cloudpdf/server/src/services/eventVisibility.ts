@@ -8,6 +8,7 @@
  * `withheld`, with only its pins (`meta.cacheDelta`): the client keeps its
  * cached manifest current, and the pins are in the shared manifest anyway.
  */
+import { isChangeKind, type ChangeKind } from '@embedpdf/engine-core/wire';
 
 /** What a connection may read. */
 export interface EventReadRights {
@@ -64,9 +65,20 @@ function visiblePayload(kind: string, payload: Payload, may: EventReadRights): P
   }
 }
 
-/** A change's item as the connection may see it, or null. */
+const isFormKind = (kind: ChangeKind): kind is Extract<ChangeKind, `forms.${string}`> =>
+  kind.startsWith('forms.');
+
+/**
+ * A change's item as the connection may see it, or null. Every kind is
+ * named, so a new one doesn't compile until it says who may read it.
+ */
 function visibleItem(type: string, item: Payload, may: EventReadRights): Payload | null {
-  if (type.startsWith('forms.')) return may.forms ? item : null;
+  // What an undo left alone: only the kind it would have been.
+  if (type === 'skipped') return item;
+  // A kind this server doesn't have, written by a newer replica: nothing
+  // here says who may read it.
+  if (!isChangeKind(type)) return null;
+  if (isFormKind(type)) return may.forms ? item : null;
   switch (type) {
     case 'annotations.create':
     case 'annotations.update':
@@ -76,8 +88,28 @@ function visibleItem(type: string, item: Payload, may: EventReadRights): Payload
     case 'annotations.reorder':
     case 'annotations.delete':
       return may.annotations ? item : null;
-    default:
+    // The document's own data, which `doc.open` reads.
+    case 'metadata.update':
+    case 'metadata.updateCustom':
+    case 'outline.create':
+    case 'outline.update':
+    case 'outline.move':
+    case 'outline.delete':
+    case 'outline.restore':
+    case 'pages.rotate':
+    case 'pages.setScale':
+    case 'pages.reorder':
+    case 'pages.delete':
+    case 'pages.insertBlank':
+    case 'pages.insert':
+    case 'pages.copy':
+    case 'pages.restore':
+    case 'attachments.create':
+    case 'attachments.delete':
+    case 'attachments.restore':
       return item;
+    default:
+      return type satisfies never;
   }
 }
 

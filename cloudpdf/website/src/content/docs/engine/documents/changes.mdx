@@ -75,6 +75,7 @@ error. The document is as it was before the call.
 | `outline.move`                 | `refs`, `parent`, `position`                              | `doc.outline.move(refs, parent, position)`                                      |
 | `outline.delete`               | `ref`, `expect`                                           | `doc.outline.delete(ref)`                                                       |
 | `pages.rotate`                 | `pages`, `rotation`                                       | `doc.pages.rotate(pages, rotation)`                                             |
+| `pages.setScale`               | `pages`, `measure`                                        | `doc.pages.setScale(pages, measure)`                                            |
 | `pages.reorder`                | `pages`, `position`                                       | `doc.pages.reorder(pages, position)`                                            |
 | `pages.delete`                 | `pages`                                                   | `doc.pages.delete(pages)`                                                       |
 | `pages.insertBlank`            | `spec`, `position`, `objectNumbers`                       | `doc.pages.insertBlank(spec, position, { objectNumbers })`                      |
@@ -85,6 +86,8 @@ error. The document is as it was before the call.
 
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
+
+`pages.setScale` arrived in 3.1. Every other op is as old as 3.0.
 
 ### What comes back
 
@@ -353,6 +356,11 @@ A request lost on the network goes again with the same `opId`s, so nothing is ap
 
 A change holds at most 512 ops; more fails with `PayloadTooLarge`. Split a bigger job into
 several changes.
+
+A server can be older than your app. A change with an op the server doesn't have yet fails on its
+own, before anything is sent, with `NotImplemented`. Its `details` name the op (`kind`), the
+version that has it (`needs`) and the server's (`serverVersion`). The changes around it still go
+out.
 
 </Engine>
 

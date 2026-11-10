@@ -1,12 +1,16 @@
 import {
   EngineError,
   EngineErrorCode,
+  type DocumentEventOf,
   type EditSessionStatus,
 } from '@embedpdf/engine-core/runtime';
 import { EditSessionStatusSchema } from '@embedpdf/engine-core/wire';
 
 import type { AuditEventRow } from './auditRowToEvents';
 import type { HttpClient } from '../transport/HttpClient';
+
+/** Why the stream can't be followed change by change (`stream.desynced`). */
+export type DesyncReason = DocumentEventOf<'stream.desynced'>['reason'];
 
 export interface SseClientOptions {
   http: HttpClient;
@@ -16,8 +20,12 @@ export interface SseClientOptions {
   initialCursor: number | null;
   /** One parsed audit row, in id order. The cursor has already advanced. */
   onRow(row: AuditEventRow): void;
-  /** Server says the gap is too large to replay — refetch state. */
-  onFullRefresh(): void;
+  /**
+   * The server sent `full-refresh` in place of rows: the gap is too large to
+   * replay, or a row holds a kind of change this client's version doesn't
+   * have. Refetch state.
+   */
+  onFullRefresh(reason: DesyncReason): void;
   /** Auth is permanently gone (401/403); the client stopped for good. */
   onAuthLost(): void;
   /** The editing session's `session` event: every object number it holds, and its expiry. */
@@ -144,7 +152,9 @@ export class SseClient {
       const status = EditSessionStatusSchema.safeParse(parsed);
       if (status.success) this.options.onSession?.(status.data);
     } else if (event === 'full-refresh') {
-      this.options.onFullRefresh();
+      // A server older than the reason sends none: it only refreshes a client too far behind.
+      const sent = (safeJson(data.join('\n')) as { reason?: unknown } | null)?.reason;
+      this.options.onFullRefresh(sent === 'unknown-change' ? sent : 'backlog-overflow');
     } else if (event === 'auth-revoked') {
       // Terminal: the credential is dead by decree, not by clock — never
       // retry against it (a reconnect would just 401; this saves the trip

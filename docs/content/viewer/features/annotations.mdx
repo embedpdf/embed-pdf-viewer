@@ -190,4 +190,6 @@ does a locked annotation. From code it's `annotation.selection.update({ subtype 
 ### Undo
 
 Undo and redo cover everything people do to annotations: drawing, moving, restyling, deleting,
-and comments.
+and comments. Annotations your code imports are one step too, unless the import passes
+`history: false`; see
+[An import is one step to undo](/docs/headless/annotations/saving#an-import-is-one-step-to-undo).
