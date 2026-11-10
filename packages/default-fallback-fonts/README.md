@@ -1,37 +1,18 @@
+<!-- Generated from docs/content/engine/documents/fonts.mdx and packages/default-fallback-fonts/NOTICE.md by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/default-fallback-fonts
 
-The fonts the EmbedPDF engine fills in Hebrew and Arabic with, when the font a
-text names doesn't have them:
+The fonts the EmbedPDF engine writes Hebrew and Arabic with: Noto Sans Hebrew and Noto Naskh Arabic, regular and bold.
 
-| Key                      | Font              | Weight | Size   |
-| ------------------------ | ----------------- | ------ | ------ |
-| `noto-sans-hebrew`       | Noto Sans Hebrew  | 400    | 25 KB  |
-| `noto-sans-hebrew-bold`  | Noto Sans Hebrew  | 700    | 25 KB  |
-| `noto-naskh-arabic`      | Noto Naskh Arabic | 400    | 131 KB |
-| `noto-naskh-arabic-bold` | Noto Naskh Arabic | 700    | 129 KB |
+Part of [EmbedPDF](https://www.embedpdf.com). It comes with `@embedpdf/engine`, `@cloudpdf/server`.
 
-The engine adds them as fallback fonts by default, after any you add yourself,
-so Hebrew and Arabic work with no setup. `localEngine({ defaultFallbackFonts:
-false })` leaves them out; `engine.fonts.clearFallbacks()` removes them along
-with yours.
+## Documentation
 
-## Use
+- [Fonts](https://www.embedpdf.com/docs/engine/documents/fonts): Write text in any font and any language, use the fonts a document already has, and show typed text in a browser exactly as the engine will draw it.
 
-The engine loads them for you. To load one yourself:
+## License
 
-```ts
-import {
-  DEFAULT_FALLBACK_FONTS,
-  loadFallbackFont,
-} from '@embedpdf/default-fallback-fonts/library';
-
-const bytes = await loadFallbackFont('noto-sans-hebrew'); // a lazy chunk of your build
-```
-
-Each font is its own lazy module: your bundler splits it out. The `.ttf` files
-are exported too (`@embedpdf/default-fallback-fonts/fonts/NotoSansHebrew-Regular.ttf`).
-
-## Licences
+Apache-2.0
 
 The fonts are Google's Noto fonts, licensed under the Apache License 2.0
 (`licenses/Noto-Apache-2.0.txt`), as their files say; the package's code is

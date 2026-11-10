@@ -2,7 +2,7 @@
   "name": "@embedpdf/engine-core",
   "version": "3.1.0",
   "private": false,
-  "description": "Engine v3 core: AbortablePromise, Engine/DocumentHandle interfaces, DTOs, wire schemas, error codes, and a transport-agnostic conformance harness shared by every Engine implementation.",
+  "description": "The contract every EmbedPDF engine follows: its types, its errors and the shape of every call.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

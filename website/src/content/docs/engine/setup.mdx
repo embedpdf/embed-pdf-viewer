@@ -71,6 +71,9 @@ Rendering works in Node without a canvas: `render.image()` gives you PNG or BMP 
 canvas, so in Node pass your own `imageEncoder` (for example one built on `sharp`) if you need it.
 To pick the runtime yourself, pass `runtime: { prefer: 'wasm' }` or `{ prefer: 'native' }`.
 
+There is a native build for macOS (Apple silicon and Intel), for Linux (x64 and ARM64, with glibc
+or musl) and for Windows (x64 and ARM64).
+
 ## Fonts
 
 Text the engine draws (a free text annotation, a filled form field) needs a font that has its
@@ -108,6 +111,24 @@ The viewer can use your engine or create its own:
   wires the engine to pages, selection and annotation tools for you.
 </Callout>
 
+## What comes with it
+
+`@embedpdf/engine` is the one package you install. It brings these with it:
+
+| Package | What it is |
+| :-- | :-- |
+| `@embedpdf/engine-core` | The engine's contract: its types, its errors and the shape of every call |
+| `@embedpdf/engine-services` | The PDF logic. The same code runs in the browser's worker and on a CloudPDF server |
+| `@embedpdf/engine-runtime` | Loads PDFium: a native build in Node where your platform has one, WebAssembly everywhere else |
+| `@embedpdf/engine-runtime-wasm32` | The WebAssembly build, `embedpdf.wasm` |
+| `@embedpdf/engine-runtime-<platform>` | The native builds. Your package manager installs only your platform's |
+| `@embedpdf/core-fonts` | The 14 standard PDF fonts, as the engine draws them |
+| `@embedpdf/default-fallback-fonts` | The Hebrew and Arabic fonts under [Fonts](#fonts) |
+
+`@embedpdf/engine` exports the contract's public part again, so `Engine` and `EngineError` come
+from there. Depend on `@embedpdf/engine-core` by name in one case: to write an engine of your own,
+or to type code against the contract without choosing an engine.
+
 ## Options
 
 | Option                 | What it does                                                                                                                                     |
@@ -117,6 +138,9 @@ The viewer can use your engine or create its own:
 | `defaultFallbackFonts` | `false` leaves out the Hebrew and Arabic fonts the engine comes with.                                                                            |
 | `worker`               | Your own worker: a `Worker`, a function returning one, a URL, or `'inline'`.                                                                     |
 | `wasmUrl`              | Where to load the WebAssembly file from, when you host it yourself.                                                                              |
+| `assetsUrl`            | A directory you serve the WebAssembly file from: `embedpdf.wasm` is added to it.                                                                 |
+| `wasmBinary`           | The WebAssembly file's bytes, when you already have them. No request is made.                                                                    |
+| `encoderWorker`        | The worker that encodes images: a URL to your own copy of it, or `false` to encode on the main thread.                                           |
 | `renderPolicy`         | The render sizes documents answer with; see [Render policy](/docs/engine/documents/rendering#render-policy).                                     |
 | `imageEncoder`         | Your own image encoder, for formats the engine can't encode where it runs (WebP in Node).                                                        |
 | `signedDocumentPolicy` | `'permit'` stops the engine refusing what signatures forbid; see [Turning protection off](/docs/engine/forms/signatures#turning-protection-off). |

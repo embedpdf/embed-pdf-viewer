@@ -1,5 +1,6 @@
 {
   "version": "3.1.0",
+  "description": "The native build of the EmbedPDF engine's PDF runtime for Windows on ARM64.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

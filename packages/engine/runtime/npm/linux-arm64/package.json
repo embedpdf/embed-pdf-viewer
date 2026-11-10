@@ -1,5 +1,6 @@
 {
   "version": "3.1.0",
+  "description": "The native build of the EmbedPDF engine's PDF runtime for Linux on ARM64, with glibc.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
