@@ -2,7 +2,7 @@
   "name": "@embedpdf/core-geometry",
   "version": "3.1.0",
   "private": false,
-  "description": "The viewer's pure 2D coordinate primitives: Point/Size, page rotation, and the rotation/scale transforms shared by stage-core, the stage plugin, and every framework adapter. Zero dependencies, DOM-free, serializable — the bottom of the pyramid.",
+  "description": "Points, sizes, boxes and page rotation for EmbedPDF, with the transforms between a page, the view and the screen. No dependencies, no DOM.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

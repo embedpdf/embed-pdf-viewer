@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-render",
   "version": "3.1.0",
   "private": false,
-  "description": "Document-scoped render capability: turns the engine DocumentHandle into an abortable renderPage(pageIndex, scale) → RGBA. The home for tiling.",
+  "description": "Rendering for EmbedPDF: draws sharp pages at every zoom, with tiles for deep zoom.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

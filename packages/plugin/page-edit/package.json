@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-page-edit",
   "version": "3.1.0",
   "private": false,
-  "description": "Document-scoped page-edit capability: ref-addressed rotate/move/delete/insert over the engine DocumentHandle, each one change of the history, and the page selection. Owns relative→absolute rotation and position resolution so framework adapters never re-derive them.",
+  "description": "Page editing for EmbedPDF: rotates, reorders, inserts and deletes pages.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

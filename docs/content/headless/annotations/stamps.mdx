@@ -9,16 +9,19 @@ A stamp is artwork you place on a page: "Approved", a company seal, a signature.
 keeps stamps in **libraries**, arms one for a click, and writes the placed stamp the way Acrobat
 does, so it's the same stamp there.
 
-Register `stampPlugin()` next to `annotationPlugin()`, and use `useStamp()`. The example imports the
-standard library, lists its stamps and arms one: hover a page to see where it lands, and click to
-place it:
-
-<Example name="stamp/basic" mode="open" />
+Register `stampPlugin()` next to `annotationPlugin()`, and use `useStamp()`:
 
 ```ts
 const { library } = await stamp.importLibrary(await loadDefaultLibrary('en'));
 await stamp.armAsset(assetId); // the next click places it
 ```
+
+{/* readme: end */}
+
+The example imports the standard library, lists its stamps and arms one: hover a page to see where
+it lands, and click to place it:
+
+<Example name="stamp/basic" mode="open" />
 
 - **A library names itself.** A library is a PDF: its title is the library's name, and its named
   pages are the stamps. An Acrobat stamp file imports as it is.

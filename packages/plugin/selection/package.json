@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-selection",
   "version": "3.1.0",
   "private": false,
-  "description": "Text selection: reads engine text geometry (PDF y-up), bridges it to viewer content space, hit-tests glyphs, and renders highlight rects. The first client of the interaction hub.",
+  "description": "Text selection for EmbedPDF: selecting and copying a document's text.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
