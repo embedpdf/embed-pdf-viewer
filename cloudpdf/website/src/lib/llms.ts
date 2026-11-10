@@ -15,7 +15,7 @@ import { urlForSection } from './search-site';
 const SITE_ORIGIN = 'https://www.cloudpdf.com';
 
 /**
- * The site's entry maps for AI agents (llmstxt.org): authored framing and
+ * The site's entry maps for ai agents (llmstxt.org): authored framing and
  * section order, generated page inventory. Every link points at the page's
  * `.md` representation — the same projection Copy Page serves — so an agent
  * can go from a file to full, honest page content (the API reference
