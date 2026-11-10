@@ -9,6 +9,7 @@ import type {
   DeepPartial,
   EventHook,
   EventOrigin,
+  HistoryOptions,
   OperationOptions,
   ResourceStatus,
   SettingsApi,
@@ -501,17 +502,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    */
   export(selection?: FormExportSelection, options?: OperationOptions): Promise<FormBundle>;
   /**
-   * Copy a bundle's fields into this document, as one change you can undo:
-   * their widgets on the same pages (or `options.pages`), their values, and
-   * their place in the calculation order. A field whose name is taken is
-   * left out, as are scripts, submits and links without `doc.forms.script`.
-   * Fires `onFieldCreated` per field. Rejects `permission-denied` without
-   * `doc.forms.modify` (and, for the default `attribution: 'restore'`,
-   * `doc.forms.import`).
+   * Copy a bundle's fields into this document, as one change and one step to
+   * undo: their widgets on the same pages (or `options.pages`), their values,
+   * and their place in the calculation order. `history: false` keeps it out
+   * of undo and redo, for what your app adds by itself. A field whose name is
+   * taken is left out, as are scripts, submits and links without
+   * `doc.forms.script`. Fires `onFieldCreated` per field. Rejects
+   * `permission-denied` without `doc.forms.modify` (and, for the default
+   * `attribution: 'restore'`, `doc.forms.import`).
    */
   import(
     bundle: FormBundle,
-    options?: FormImportOptions & OperationOptions,
+    options?: FormImportOptions & OperationOptions & HistoryOptions,
   ): Promise<FormImportResult>;
   /** Read the whole form again; fires `onResynced`. */
   refresh(options?: OperationOptions): Promise<void>;

@@ -2,6 +2,8 @@
  * Fields in and out as bundles: whole fields with their widgets, values and
  * scripts, taken out of one document and copied into another, or the same.
  */
+import type { ChangeItem } from '@embedpdf/engine-core/runtime';
+
 import type { FormCapability } from '../contract';
 import type { FormContext, FormServices } from '../services';
 
@@ -30,17 +32,32 @@ export function createInterchange(
   };
 
   const importBundle: FormCapability['import'] = async (bundle, options = {}) => {
-    const { signal, ...importOptions } = options;
+    const { signal, history, ...importOptions } = options;
     ctx.assertAllowed('doc.forms.modify', 'form.import');
     if ((importOptions.attribution ?? 'restore') === 'restore') {
       ctx.assertAllowed('doc.forms.import', 'form.import');
     }
+    // After the fills on their way, as one change on the queue: the history
+    // keeps it as one step unless the caller says it isn't one.
     return enqueue(async () => {
-      const result = await ctx.cancellable(signal, ctx.doc.forms.import(bundle, importOptions));
+      const change = ctx.changes.stage({
+        label: { key: 'form.import' },
+        opId: importOptions.opId,
+        history,
+        send: (doc, { opId }) =>
+          ctx
+            .cancellable(signal, doc.forms.import(bundle, { ...importOptions, opId }))
+            .then((result) => ({
+              items: [{ type: 'forms.import' as const, ...result }],
+              meta: result.meta,
+            })),
+      });
+      const { items } = await change.result;
+      const imported = items[0] as Extract<ChangeItem, { type: 'forms.import' }>;
       // Wait for the annotation plugin to read the new widgets, as `create()` does.
       const annotationHost = siblings.annotation();
       if (annotationHost) await annotationHost.whenSynced();
-      return { fields: result.fields, refMap: result.refMap, dropped: result.dropped };
+      return { fields: imported.fields, refMap: imported.refMap, dropped: imported.dropped };
     }, options);
   };
 

@@ -4,9 +4,10 @@
  * states itself through `store.apply`, so it shows at once and is sent,
  * answered and refused exactly like a gesture's, and each resolves with what
  * the engine wrote for it: its own change's answer, never another change
- * still on its way.
+ * still on its way. An import is a change too: the engine's own verb makes
+ * it, so it is staged on the document's queue as that verb's call.
  */
-import { PluginError, type OperationOptions } from '@embedpdf/core';
+import { PluginError, type HistoryOptions, type OperationOptions } from '@embedpdf/core';
 import { defaultsFor } from '@embedpdf/core-annotation';
 import {
   ANNOTATION_FIELD_NAMES,
@@ -21,6 +22,7 @@ import {
   type AnnotationRef,
   type AnnotationResourceRole,
   type AnnotationResources,
+  type ChangeItem,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -30,7 +32,7 @@ import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
 export function createCrud(
-  ctx: Pick<AnnotationContext, 'doc' | 'pageOf' | 'assertAllowed' | 'cancellable'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'pageOf' | 'assertAllowed' | 'cancellable' | 'changes'>,
   { store, tools, records }: Pick<AnnotationServices, 'store' | 'tools' | 'records'>,
   annotations: Pick<AnnotationReads, 'get' | 'pageOf'>,
   /** Write what is held back (typed text) and wait for every write on its way. */
@@ -183,15 +185,34 @@ export function createCrud(
 
   const importBundle = async (
     bundle: AnnotationBundle,
-    options: AnnotationImportOptions & OperationOptions = {},
+    options: AnnotationImportOptions & OperationOptions & HistoryOptions = {},
   ): Promise<AnnotationImportResult> => {
     ctx.assertAllowed('annotations:create', 'annotation.import');
-    const { signal, ...importOptions } = options;
-    const result = await ctx.cancellable(signal, ctx.doc.annotations.import(bundle, importOptions));
+    const { signal, history, ...importOptions } = options;
+    // One change on the queue: what was typed is sent first, and the history
+    // keeps it as one step unless the caller says it isn't one.
+    const change = ctx.changes.stage({
+      label: { key: 'annotation.import' },
+      opId: importOptions.opId,
+      history,
+      send: (doc, { opId }) =>
+        ctx
+          .cancellable(signal, doc.annotations.import(bundle, { ...importOptions, opId }))
+          .then((result) => ({
+            items: [{ type: 'annotations.import' as const, ...result }],
+            meta: result.meta,
+          })),
+    });
+    const { items } = await change.result;
+    const imported = items[0] as Extract<ChangeItem, { type: 'annotations.import' }>;
     // The engine published one `annotations.created` per annotation: once the
     // records hold them, `list()` shows them.
     await records.settled();
-    return { annotations: result.annotations, refMap: result.refMap, dropped: result.dropped };
+    return {
+      annotations: imported.annotations,
+      refMap: imported.refMap,
+      dropped: imported.dropped,
+    };
   };
 
   const downloadResource = async (

@@ -179,9 +179,11 @@ const text = FormTransfer.stringify(bundle);
 const { fields, dropped } = await otherForm.import(await FormTransfer.parse(text));
 ```
 
-The import adds the fields as one change you can undo. A field whose name the form has already is
-left out and listed in `dropped`. By default each field keeps who created and filled it in, which
-needs `canRestoreAttribution()`; pass `{ attribution: 'stamp' }` to make them yours. See
+The import adds the fields as one change, and one step to undo: an undo takes them away again.
+When your app adds the fields by itself, pass `{ history: false }`, and undo leaves them alone. A
+field whose name the form has already is left out and listed in `dropped`. By default each field
+keeps who created and filled it in, which needs `canRestoreAttribution()`; pass
+`{ attribution: 'stamp' }` to make them yours. See
 [Import & export](/docs/engine/forms/import-export).
 
 <Example name="form/data" />
@@ -205,7 +207,7 @@ on [Building forms](forms/building#methods).
 | `importValues(values)`     | Fills in fields by full name from a plain object, as one change with one recalculation. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
 | `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
-| `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
+| `import(bundle, options?)` | Adds a bundle's fields, as one change and one step to undo. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
 | `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
 | `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
 | `focus(ref, options?)`     | Brings a field into view and puts the cursor in it; `{ select: true }` selects its text. Returns `false` for a field the user can't fill in. [Move between fields](#move-between-fields) |

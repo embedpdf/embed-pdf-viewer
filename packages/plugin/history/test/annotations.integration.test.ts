@@ -426,3 +426,130 @@ describe.each(ACTIONS)('$name', (action) => {
     }
   });
 });
+
+/**
+ * An import is a change the engine's own verb makes. Nothing shows for it before the engine
+ * answers; the history keeps it as one step, unless its caller says it isn't one.
+ */
+describe('import a bundle', () => {
+  /** Two squares and a bundle of them. Importing it with `'stamp'` adds a copy of each. */
+  const start = async (booted: Booted) => {
+    const { annotation, history } = booted;
+    await square(annotation, 100);
+    await square(annotation, 200);
+    await booted.caughtUp();
+    const bundle = await annotation.export();
+    annotation.selection.clear();
+    history.clear();
+    return { bundle, before: await booted.truth() };
+  };
+
+  it('is one step: an undo takes every imported annotation away, a redo brings them back', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history } = booted;
+      const { bundle, before } = await start(booted);
+
+      const { annotations } = await annotation.import(bundle, { attribution: 'stamp' });
+      expect(annotations).toHaveLength(2);
+      await booted.caughtUp();
+      const after = await booted.truth();
+      expect(after).not.toEqual(before);
+      expect(history.getUndoLabel()).toEqual({ key: 'annotation.import' });
+
+      await booted.step('undo');
+      expect(await booted.truth()).toEqual(before);
+      expect(booted.view()).toEqual(before);
+      expect(history.canUndo()).toBe(false);
+
+      await booted.step('redo');
+      expect(await booted.truth()).toEqual(after);
+      expect(booted.view()).toEqual(after);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('keeps its place among the steps: a later move is undone first, then the import', async () => {
+    const booted = await boot();
+    try {
+      const { annotation } = booted;
+      const { bundle, before } = await start(booted);
+
+      const { annotations } = await annotation.import(bundle, { attribution: 'stamp' });
+      await booted.caughtUp();
+      const imported = await booted.truth();
+      await annotation.update(annotations[0]!.ref, { subtype: 'square', box: box(300, 300) });
+      await booted.caughtUp();
+
+      await booted.step('undo');
+      expect(await booted.truth()).toEqual(imported);
+      await booted.step('undo');
+      expect(await booted.truth()).toEqual(before);
+      expect(booted.view()).toEqual(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('is undone while it is still on its way', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history } = booted;
+      const { bundle, before } = await start(booted);
+
+      const imported = annotation.import(bundle, { attribution: 'stamp' });
+      // Staged, not answered: the history holds the step already.
+      expect(history.canUndo()).toBe(true);
+      const answered = new Promise<void>((done) => {
+        const off = history.onUndone(() => {
+          off();
+          done();
+        });
+      });
+      history.undo();
+      await imported;
+      await answered;
+      await booted.caughtUp();
+      expect(await booted.truth()).toEqual(before);
+      expect(booted.view()).toEqual(before);
+
+      await booted.step('redo');
+      expect(await booted.truth()).not.toEqual(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('is no step with `history: false`: an undo leaves it alone', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history } = booted;
+      const { bundle, before } = await start(booted);
+
+      await annotation.import(bundle, { attribution: 'stamp', history: false });
+      await booted.caughtUp();
+      expect(await booted.truth()).not.toEqual(before);
+      expect(history.canUndo()).toBe(false);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('is no step when it wrote nothing', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history } = booted;
+      const { bundle, before } = await start(booted);
+
+      // A restoring import keeps the names, and each is taken on its page already.
+      const { annotations, dropped } = await annotation.import(bundle);
+      expect(annotations).toEqual([]);
+      expect(dropped.map((drop) => drop.reason)).toEqual(['name-conflict', 'name-conflict']);
+      expect(await booted.truth()).toEqual(before);
+      expect(history.canUndo()).toBe(false);
+    } finally {
+      await booted.destroy();
+    }
+  });
+});
