@@ -117,7 +117,7 @@ What signing does depends on whether you give the viewer a key:
 | `signingKey` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
 | `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
 | `trust` | The certificates you trust, for checking signatures | none |
-| `allowCertify` | Let the first signature be a certification, which sets what may still change | `false` |
+| `allowCertify` | Let the first signature be a certification, which sets what may still change: comments, form filling only, or nothing | `false` |
 | `kinds` | Which marks people keep: `'signature'`, `'initials'` | both |
 | `fonts` | Fonts for typed signatures | three handwriting fonts |
 

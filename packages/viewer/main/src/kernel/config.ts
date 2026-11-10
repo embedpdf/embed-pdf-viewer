@@ -1,8 +1,8 @@
 /**
  * The kernel's config: the chrome's customization contract + document sourcing.
  *
- * Deliberately door-blind. `ViewerCustomization` is shared verbatim (README of
- * @embedpdf/viewer-chrome is the law for it); this file adds only what any
+ * Deliberately door-blind. `ViewerCustomization` is shared verbatim
+ * (docs/conventions/viewer-chrome.md is the law for it); this file adds only what any
  * delivery needs — where the PDFs come from, and which keys a running viewer
  * follows. The engine seam is not declared
  * here: each door declares its own (see ../doors and ../local), because a

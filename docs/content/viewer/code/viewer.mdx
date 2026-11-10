@@ -124,7 +124,9 @@ other.
 ### When the viewer goes away
 
 When the viewer unmounts, or [mounts again](../setup#change-the-config-later) with a new config,
-its `viewer` is done: listeners stop and calls reject. A new `onReady` brings the new one.
+its `viewer` is done: listeners stop and calls reject, with a `PluginError` whose code is
+`instance-closed`. A read, such as `getActiveId()` or `canUndo()`, throws it. A new `onReady`
+brings the new one.
 
 ### Events on the element
 
