@@ -12,6 +12,9 @@ import { contentPathFor, readFrontmatter, walkMdx } from './search/corpus';
  * content path becomes a public URL (fan-out default integration, `.md`
  * suffix). Authored pointers, generated inventory: prose never comes from
  * machinery, and no page can silently fall out of the index.
+ *
+ * A site serves one such file per integration too (`/llms/vue.txt`), with
+ * every page that integration has, so an agent working in Vue reads Vue's.
  */
 
 export type LlmsPage = {
@@ -55,12 +58,20 @@ export type RenderLlmsTxtOptions = {
   title: string;
   /** One-paragraph framing, authored by the site. */
   summary: string;
+  /** What a reader should know before the lists, a paragraph each, authored by the site. */
+  details?: string[];
   sections: LlmsSection[];
 };
 
-/** Serializes the llms.txt document (H1 → blockquote summary → H2 link lists). */
-export function renderLlmsTxt({ title, summary, sections }: RenderLlmsTxtOptions): string {
+/** Serializes the llms.txt document (H1 → blockquote summary → paragraphs → H2 link lists). */
+export function renderLlmsTxt({
+  title,
+  summary,
+  details = [],
+  sections,
+}: RenderLlmsTxtOptions): string {
   const lines: string[] = [`# ${title}`, '', `> ${summary}`, ''];
+  for (const paragraph of details) lines.push(paragraph, '');
 
   for (const section of sections) {
     if (section.pages.length === 0) continue;

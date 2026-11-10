@@ -32,6 +32,11 @@ import { applyInstallChannel } from '../mdx/install-channel.mjs';
  * build on this single pass, so neither can claim something the page does
  * not say.
  *
+ * In the `.md` export every link is a full URL, the ones written from the
+ * page (`setup`, `../text/search`) included, and a link to a docs page names
+ * that page's `.md`: the Markdown is read away from its page, by agents that
+ * follow its links.
+ *
  * Site-specific behaviour (sample resolution, integration routing, origin)
  * arrives through {@link DocsMarkdownSite}; unknown components stay
  * deliberately fatal so an unprojected page fails the build, never ships
@@ -77,12 +82,17 @@ export interface DocsMarkdownSite {
   isFramework: (value: string) => boolean;
   /** Human label for a variant (frontmatter + gap notes). */
   variantLabel?: (integration: string) => string;
-  /** Rewrite a relative content link before absolutising (fan-out routing). */
+  /**
+   * Rewrite a site path for a variant (fan-out routing): a link's before it is absolutised, and
+   * the page's own for the URL of a sibling.
+   */
   resolveContentHref?: (url: string, integration: string | undefined) => string;
   /**
    * Site-specific component projections (an API reference, most of all),
    * consulted after the built-ins and before the fatal unknown-component
    * throw. Return mdast nodes to project, or null/undefined to fall through.
+   * `absoluteContentUrl` gives a target as the page's own links have it: a full
+   * URL, and in the `.md` export a docs page's Markdown (a file keeps its URL).
    */
   projectComponent?: (
     node: AstNode,
@@ -106,7 +116,48 @@ export type RenderDocsMarkdownOptions = {
   metadata?: MarkdownMetadata;
   /** Frontmatter key for the variant line ('framework' | 'integration'). */
   variantKey?: string;
+  /**
+   * The page's other variants the site shows (`vue`, `svelte`). The frontmatter names each with
+   * the URL of its own Markdown (`other_frameworks`), so a reader working in one can switch.
+   */
+  siblings?: string[];
 };
+
+/** How a resolved tree's links read. */
+type LinkTargets = {
+  /** The page's URL path. A link written from the page (`setup`, `../text/search`) is read from it. */
+  canonicalPath?: string;
+  /** A link to a docs page names the page's Markdown (`….md`), so its reader stays in Markdown. */
+  markdown?: boolean;
+};
+
+/** The docs sites: a link from one to the other's docs is a docs link too. */
+const DOCS_ORIGINS = ['https://www.embedpdf.com', 'https://www.cloudpdf.com'];
+
+/** A link written from the page: not a full URL, a site path (`/docs/…`) or a place on the page. */
+const PAGE_RELATIVE = /^(?![a-z][a-z0-9+.-]*:|[/#?])./i;
+
+/** `../text/search#options` from `/docs/headless/react/viewing/stage`, as a site path. */
+function pathFromPage(url: string, canonicalPath: string): string {
+  const resolved = new URL(url, `https://page.invalid${canonicalPath}`);
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+}
+
+/** A docs page's URL as its Markdown's: `…/viewing/stage#zoom` → `…/viewing/stage.md#zoom`. */
+function markdownPageUrl(url: string, siteOrigin: string): string {
+  const origin = [siteOrigin, ...DOCS_ORIGINS].find((docs) => url.startsWith(`${docs}/`));
+  if (!origin) return url;
+  // The path ends where the query or the fragment starts, less any slashes it ends on.
+  const marks = [url.indexOf('?'), url.indexOf('#')].filter((at) => at !== -1);
+  let end = marks.length > 0 ? Math.min(...marks) : url.length;
+  const rest = url.slice(end);
+  while (url[end - 1] === '/') end -= 1;
+  const page = url.slice(origin.length, end);
+  if (page !== '/docs' && !page.startsWith('/docs/')) return url;
+  // A file a site serves under `/docs` (a screenshot), or a link that names the Markdown already.
+  if (page.slice(page.lastIndexOf('/') + 1).includes('.')) return url;
+  return `${origin}${page}.md${rest}`;
+}
 
 const markdownProcessor = unified()
   .use(remarkParse)
@@ -214,6 +265,7 @@ function createResolver(
   site: DocsMarkdownSite,
   integration: string | undefined,
   names: FrameworkNames = null,
+  links: LinkTargets = {},
 ) {
   const framework =
     integration && (FRAMEWORKS as readonly string[]).includes(integration)
@@ -221,11 +273,21 @@ function createResolver(
       : null;
 
   function absoluteContentUrl(url: string) {
+    // Markdown leaves its page (a copy, a paste, a README), so no link may depend on the page's URL.
+    if (links.canonicalPath && PAGE_RELATIVE.test(url)) {
+      url = pathFromPage(url, links.canonicalPath);
+    }
     // Every docs link keeps the reader's framework, cross-site ones too.
     if (framework) url = frameworkHref(url, framework);
     if (!url.startsWith('/')) return url;
     const resolved = site.resolveContentHref?.(url, integration) ?? url;
     return `${site.siteOrigin}${resolved}`;
+  }
+
+  /** Where a link goes. An image keeps `absoluteContentUrl`: it has no Markdown of its own. */
+  function linkUrl(url: string) {
+    const absolute = absoluteContentUrl(url);
+    return links.markdown ? markdownPageUrl(absolute, site.siteOrigin) : absolute;
   }
 
   function resolveNodes(nodes: AstNode[]): AstNode[] {
@@ -359,7 +421,7 @@ function createResolver(
                   children: [
                     {
                       type: 'link',
-                      url: absoluteContentUrl(href),
+                      url: linkUrl(href),
                       children: [{ type: 'text', value: title }],
                     },
                     ...(description ? [{ type: 'text', value: ` — ${description}` }] : []),
@@ -427,7 +489,7 @@ function createResolver(
         // Site-specific projections (API reference components et al).
         const projected = site.projectComponent?.(node, {
           resolveNodes,
-          absoluteContentUrl,
+          absoluteContentUrl: linkUrl,
           stringAttribute,
         });
         if (projected) return projected;
@@ -443,7 +505,7 @@ function createResolver(
             return [
               {
                 type: 'link',
-                url: absoluteContentUrl(href),
+                url: linkUrl(href),
                 children: resolveNodes(node.children ?? []),
               },
             ];
@@ -480,9 +542,8 @@ function createResolver(
         }
       }
 
-      if ((node.type === 'link' || node.type === 'image') && node.url) {
-        node.url = absoluteContentUrl(node.url);
-      }
+      if (node.type === 'link' && node.url) node.url = linkUrl(node.url);
+      if (node.type === 'image' && node.url) node.url = absoluteContentUrl(node.url);
 
       if (node.type === 'inlineCode' && names && typeof node.value === 'string') {
         const spot = names.contexts.get(originalNode);
@@ -516,7 +577,12 @@ export function resolveDocsTreeWith(
     sourceCode,
     integration,
     canonicalPath,
-  }: Pick<RenderDocsMarkdownOptions, 'sourceCode' | 'integration'> & { canonicalPath?: string },
+    markdownLinks,
+  }: Pick<RenderDocsMarkdownOptions, 'sourceCode' | 'integration'> & {
+    canonicalPath?: string;
+    /** Links to docs pages name each page's Markdown, as the `.md` export's do. */
+    markdownLinks?: boolean;
+  },
 ) {
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
   // Headless pages show each framework's names; other pages keep them as written.
@@ -525,7 +591,8 @@ export function resolveDocsTreeWith(
     headless && integration && (FRAMEWORKS as readonly string[]).includes(integration)
       ? { framework: integration as Framework, contexts: inlineCodeContexts(tree) }
       : null;
-  tree.children = createResolver(site, integration, names)(tree.children ?? []);
+  const links: LinkTargets = { canonicalPath, markdown: markdownLinks };
+  tree.children = createResolver(site, integration, names, links)(tree.children ?? []);
   applyInstallChannelToTree(tree);
   return tree;
 }
@@ -538,21 +605,40 @@ export function stringifyDocsTree(tree: AstNode) {
 /** Produce plain, route-specific Markdown from raw MDX source. */
 export function renderDocsMarkdownWith(
   site: DocsMarkdownSite,
-  { sourceCode, canonicalPath, integration, metadata, variantKey }: RenderDocsMarkdownOptions,
+  {
+    sourceCode,
+    canonicalPath,
+    integration,
+    metadata,
+    variantKey = 'integration',
+    siblings = [],
+  }: RenderDocsMarkdownOptions,
 ) {
-  const tree = resolveDocsTreeWith(site, { sourceCode, integration, canonicalPath });
+  const tree = resolveDocsTreeWith(site, {
+    sourceCode,
+    integration,
+    canonicalPath,
+    markdownLinks: true,
+  });
   const body = stringifyDocsTree(tree);
 
+  const labelOf = (variant: string) => site.variantLabel?.(variant) ?? variant;
   const baseTitle = typeof metadata?.title === 'string' ? metadata.title : undefined;
-  const label = integration ? (site.variantLabel?.(integration) ?? integration) : undefined;
+  const label = integration ? labelOf(integration) : undefined;
   const title = baseTitle && label ? `${baseTitle} — ${label}` : baseTitle;
   const description = typeof metadata?.description === 'string' ? metadata.description : undefined;
+  // The same page for each other variant, by the URL of its Markdown.
+  const others = siblings.map((sibling) => {
+    const route = site.resolveContentHref?.(canonicalPath, sibling) ?? canonicalPath;
+    return `  ${yamlValue(labelOf(sibling))}: ${yamlValue(`${site.siteOrigin}${route}.md`)}`;
+  });
 
   const frontmatter = [
     '---',
     ...(title ? [`title: ${yamlValue(title)}`] : []),
     ...(description ? [`description: ${yamlValue(description)}`] : []),
-    ...(integration && label ? [`${variantKey ?? 'integration'}: ${yamlValue(label)}`] : []),
+    ...(integration && label ? [`${variantKey}: ${yamlValue(label)}`] : []),
+    ...(others.length > 0 ? [`other_${variantKey}s:`, ...others] : []),
     `source: ${yamlValue(`${site.siteOrigin}${canonicalPath}`)}`,
     '---',
     '',

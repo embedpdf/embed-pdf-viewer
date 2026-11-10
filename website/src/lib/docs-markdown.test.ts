@@ -49,7 +49,42 @@ describe('renderDocsMarkdown', () => {
       integration: 'vue',
     });
 
-    expect(markdown).toContain('(https://www.embedpdf.com/docs/headless/vue/selection)');
+    expect(markdown).toContain('(https://www.embedpdf.com/docs/headless/vue/selection.md)');
+  });
+
+  it('gives a link written from the page its full URL, in the page’s integration', () => {
+    const from = (canonicalPath: string, integration: 'react' | 'vanilla', link: string) =>
+      renderDocsMarkdown({ sourceCode: `[Next](${link})`, canonicalPath, integration });
+
+    expect(from('/docs/headless/react/viewing/stage', 'react', '../text/selection')).toContain(
+      '(https://www.embedpdf.com/docs/headless/react/text/selection.md)',
+    );
+    // An index page's URL has no folder of its own: `/docs/headless/react` reads `setup` beside it.
+    expect(from('/docs/headless/react', 'react', 'setup')).toContain(
+      '(https://www.embedpdf.com/docs/headless/react/setup.md)',
+    );
+    expect(from('/docs/viewer/vanilla', 'vanilla', 'code/plugins')).toContain(
+      '(https://www.embedpdf.com/docs/viewer/vanilla/code/plugins.md)',
+    );
+  });
+
+  it('names the page’s other integrations by the URL of their Markdown', () => {
+    const markdown = renderDocsMarkdown({
+      sourceCode: '# Setup',
+      canonicalPath: '/docs/viewer/vanilla/setup',
+      integration: 'vanilla',
+      siblings: ['react', 'vue'],
+    });
+
+    expect(markdown).toContain(
+      [
+        'integration: "Vanilla JS"',
+        'other_integrations:',
+        '  "React": "https://www.embedpdf.com/docs/viewer/react/setup.md"',
+        '  "Vue": "https://www.embedpdf.com/docs/viewer/vue/setup.md"',
+        'source: "https://www.embedpdf.com/docs/viewer/vanilla/setup"',
+      ].join('\n'),
+    );
   });
 
   it('exports only the selected Viewer integration', () => {

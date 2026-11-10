@@ -273,10 +273,37 @@ build.
 
 A page that isn't live shows its title and a notice that it describes 3.0 for
 that framework, linking to the React version when that one is live; it stays out
-of `llms.txt`, that framework's search index and search engines. With
+of the llms files, that framework's search index and search engines. With
 `DOCS_PREVIEW=1` (the preview site, and `next dev` unless `DOCS_PREVIEW=0`),
 every page is live under a banner. The sites read the gate through
 `@embedpdf/docs-kit/publish`. Both generated files are built, never committed.
+
+## Each page as Markdown, and the llms files
+
+Every docs route has a Markdown version at its URL plus `.md`
+(`/docs/headless/vue/text/search.md`): what the page shows for that integration,
+from the pass the search index reads (docs-kit `docs-markdown`). Copy page copies
+it and AI agents read it, so it is read away from its page:
+
+- **Every link is a full URL.** A link written from the page (`setup`,
+  `../text/search`) is read from the page's URL, as a browser reads it.
+- **A link to a docs page names that page's `.md`**, on either site, so a reader
+  that follows links stays in Markdown. A file under `/docs` (a screenshot)
+  keeps its URL, and `source:` in the frontmatter is the page itself.
+- **The frontmatter names the page's other integrations** that are live, each by
+  the URL of its Markdown (`other_frameworks` on a headless page,
+  `other_integrations` on a viewer page), so a reader working in Vue who lands
+  on React's page can switch.
+
+`/llms.txt` (llmstxt.org) lists each live page once, in its product's default
+integration: Vanilla JS for the viewer, React for headless.
+`/llms/<integration>.txt` lists every page one integration has, and the files
+link each other. Each site writes its files' framing (title, summary, section
+labels) and the page lists are generated (`src/lib/llms.ts` in each site).
+
+`website/src/lib/docs-links.test.ts` reads every page's Markdown for every
+integration, and fails on a link that isn't a full URL or a docs link that names
+no page.
 
 ## The support matrix is generated, not written
 
