@@ -11,8 +11,7 @@ import {
 } from './docs-integrations';
 import { docsRelease } from './docs-release';
 import { urlForSection } from './search-site';
-
-const SITE_ORIGIN = 'https://www.cloudpdf.com';
+import { SITE_ORIGIN } from './site';
 
 /**
  * The site's entry maps for AI agents (llmstxt.org): authored framing and

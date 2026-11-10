@@ -273,7 +273,8 @@ build.
 
 A page that isn't live shows its title and a notice that it describes 3.0 for
 that framework, linking to the React version when that one is live; it stays out
-of the llms files, that framework's search index and search engines. With
+of the llms files, that framework's search index and search engines (it says
+`noindex`, and each site's `sitemap.xml` lists only the live pages). With
 `DOCS_PREVIEW=1` (the preview site, and `next dev` unless `DOCS_PREVIEW=0`),
 every page is live under a banner. The sites read the gate through
 `@embedpdf/docs-kit/publish`. Both generated files are built, never committed.
