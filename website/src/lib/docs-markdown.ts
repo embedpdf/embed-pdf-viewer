@@ -30,6 +30,8 @@ export type RenderDocsMarkdownOptions = {
   metadata?: { title?: unknown; description?: unknown };
   /** What the route shows (`./docs-release`). Without it, the page in full. */
   release?: DocsRelease;
+  /** The page's other integrations to name, each by its own Markdown (`liveSiblings`). */
+  siblings?: DocsIntegration[];
 };
 
 /** This site's binding of the kit's Markdown projection. */
@@ -80,6 +82,7 @@ export function renderDocsMarkdown({
   integration,
   metadata,
   release,
+  siblings,
 }: RenderDocsMarkdownOptions) {
   const product = docsProductFromPath(canonicalPath);
   const react = release && reactVersionHref(canonicalPath, release);
@@ -97,5 +100,6 @@ export function renderDocsMarkdown({
     integration,
     metadata,
     variantKey: product === 'headless' ? 'framework' : 'integration',
+    siblings,
   });
 }
