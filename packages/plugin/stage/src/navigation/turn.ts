@@ -1,11 +1,12 @@
 /**
  * Page turns in paged flow: a push past the edge of the page turns it, read
  * off what the host port reports (pans, the drag bracket, the release fling).
- * A push is the part of a pan the clamp refused. A stream is one drag, or the
- * pans between two pauses (a wheel or trackpad gesture with its momentum). A
- * stream turns only at an edge it began at, so reading down to the bottom
- * stops there, and it turns once: the rest of it is spent, so momentum never
- * scrolls the page that just arrived.
+ * A push is the part of a pan the clamp refused. A stream is one drag, or one
+ * push of a wheel or trackpad with its momentum: the pans up to the next
+ * pause, or up to the next push the wheel tells while the last still coasts
+ * (`camera/wheel.ts`). A stream turns only at an edge it began at, so reading
+ * down to the bottom stops there, and it turns once: the rest of it is spent,
+ * so momentum never scrolls the page that just arrived.
  *
  * In every flow it also says whether a push has anywhere to go, which is how
  * the wheel tells a stream of its own from one for the page around the viewer
@@ -134,6 +135,13 @@ export function createTurns(
       stream.push = plus(stream.push, ahead(delta));
       // A wheel turns as soon as it has pushed far enough; a drag waits for its release.
       if (!dragging) turnPast(stream, stream.push, TURN_PUSH);
+    },
+    /**
+     * A wheel or trackpad pushes anew while its last push still coasts: the
+     * next stream begins here, with no pause before it.
+     */
+    pushBegan: (): void => {
+      if (!dragging) stream = null;
     },
     /** A drag begins: one stream for all of it, however long it holds still. */
     dragBegan: (): void => {

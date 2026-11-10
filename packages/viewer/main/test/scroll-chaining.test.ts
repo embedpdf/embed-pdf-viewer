@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   dist,
+  evenlyTimed,
   frames,
   launchChromium,
   serveViewer,
@@ -139,6 +140,24 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('inside a page that scro
     await tab.mouse.wheel(0, -120);
     await expect.poll(() => camera(tab)).not.toBe(atEnd);
     expect(await pageScroll(tab)).toBe(240);
+    await tab.close();
+  });
+
+  it('a push that begins while the last scroll still coasts at the end scrolls the page', async () => {
+    const tab = await open('/chains.html');
+    await toTheEnd(tab);
+    const atEnd = await camera(tab);
+    await tab.mouse.wheel(0, -120);
+    await expect.poll(() => camera(tab)).not.toBe(atEnd);
+    await tab.waitForTimeout(PAUSE_MS);
+
+    // A trackpad leaves no pause between two swipes: the first still coasts, slower and slower,
+    // when the second begins. So no wait here. The swipe reaches the end, coasts on there, and
+    // then the scroll speeds up again: a new push, and the page's. A machine slow enough to put a
+    // pause between two wheels only gives the page more.
+    await evenlyTimed(tab, POINTER, [60, 60, 60, 40, 20, 10, 30, 60, 90]);
+    await expect.poll(() => pageScroll(tab)).toBeGreaterThanOrEqual(120);
+    expect(await camera(tab)).toBe(atEnd);
     await tab.close();
   });
 

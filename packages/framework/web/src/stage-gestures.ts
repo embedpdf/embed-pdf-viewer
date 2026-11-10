@@ -40,11 +40,12 @@ export type StagePointerKind = 'mouse' | 'pen' | 'touch';
 export interface StageGestureHost {
   panBy(dxScreen: number, dyScreen: number): void;
   /**
-   * Pan by a wheel's delta. False: the stage leaves this wheel to the page
-   * around it, so the event goes uncancelled and the browser scrolls with it.
-   * A host without it keeps every wheel, panned through `panBy`.
+   * Pan by a wheel's delta; `timeMs` is when the wheel happened. False: the
+   * stage leaves this wheel to the page around it, so the event goes
+   * uncancelled and the browser scrolls with it. A host without it keeps every
+   * wheel, panned through `panBy`.
    */
-  wheelBy?(dxScreen: number, dyScreen: number): boolean;
+  wheelBy?(dxScreen: number, dyScreen: number, timeMs: number): boolean;
   zoomAround(screenPt: { x: number; y: number }, factor: number): void;
   beginGesture(options?: { elastic?: boolean }): void;
   endGesture(): void;
@@ -684,8 +685,8 @@ export function createStageGestureController(
   // The stage says whether a scrolling wheel is its own. One it leaves alone
   // goes uncancelled, and the browser scrolls the page around the stage with
   // it, as it does past the end of any scrolling element.
-  const wheelBy = (dx: number, dy: number): boolean => {
-    if (host.wheelBy) return host.wheelBy(dx, dy);
+  const wheelBy = (dx: number, dy: number, timeMs: number): boolean => {
+    if (host.wheelBy) return host.wheelBy(dx, dy, timeMs);
     host.panBy(dx, dy);
     return true;
   };
@@ -701,7 +702,9 @@ export function createStageGestureController(
     }
     const dx = event.shiftKey ? event.deltaY : event.deltaX;
     const dy = event.shiftKey ? event.deltaX : event.deltaY;
-    const taken = wheelBy(-dx, -dy);
+    // The event's own time, not the time it got here: a busy page delivers
+    // wheels late and several as one, and the stage reads their speed.
+    const taken = wheelBy(-dx, -dy, event.timeStamp);
     // A zoom wheel never reaches the browser: there it would zoom the whole page.
     if (taken || zoomWheel) event.preventDefault();
   };

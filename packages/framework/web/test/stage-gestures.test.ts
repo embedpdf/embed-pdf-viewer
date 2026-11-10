@@ -158,6 +158,7 @@ function controllerHarness(options: HarnessOptions = {}) {
         clientX: 10,
         clientY: 10,
         cancelable: true,
+        timeStamp: 0,
         preventDefault,
         ...overrides,
       });
@@ -302,14 +303,15 @@ describe('gesture controller lifecycle', () => {
     const harness = controllerHarness({ sink: false });
     expect(harness.wheel({ ctrlKey: true, clientX: 50, clientY: 60 })).toBe(true);
     expect(harness.host.zoomAround).toHaveBeenCalledWith({ x: 50, y: 60 }, 1.2);
-    expect(harness.wheel({ deltaY: 40, deltaX: 4 })).toBe(true);
-    expect(harness.host.wheelBy).toHaveBeenCalledWith(-4, -40);
+    expect(harness.wheel({ deltaY: 40, deltaX: 4, timeStamp: 1234 })).toBe(true);
+    // The wheel's delta, and the time the event says it happened.
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-4, -40, 1234);
   });
 
   it('wheel: one the stage leaves to the page goes uncancelled, for the browser to scroll with', () => {
     const harness = controllerHarness({ sink: false, takesWheel: false });
     expect(harness.wheel({ deltaY: 40 })).toBe(false);
-    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40);
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40, 0);
   });
 
   it('wheel: a host with no wheelBy keeps every wheel and pans', () => {
@@ -323,7 +325,7 @@ describe('gesture controller lifecycle', () => {
     const harness = controllerHarness({ sink: false, takesWheel: false, zoomGestures: false });
     expect(harness.wheel({ ctrlKey: true, deltaY: 40 })).toBe(true);
     expect(harness.host.zoomAround).not.toHaveBeenCalled();
-    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40); // it pans instead
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40, 0); // it pans instead
   });
 
   it('wheel: one that cannot be cancelled is already scrolling the page, so the stage stays put', () => {
