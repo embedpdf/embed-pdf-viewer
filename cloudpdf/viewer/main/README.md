@@ -1,17 +1,31 @@
+<!-- Generated from docs/content/viewer/quick-start.mdx and docs/content/viewer/features/index.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @cloudpdf/viewer
 
-The full EmbedPDF viewer with the CloudPDF engine as its default: the same
-`<embedpdf-viewer>` element and `init()` as
-[`@embedpdf/viewer`](https://www.npmjs.com/package/@embedpdf/viewer), whose
-documents live on CloudPDF (the SaaS, or your own
-[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)). Opening
-and reading a document is HTTPS API traffic only. The one exception is stamps:
-a stamp library is a PDF cut into stamps in the browser, so the first time
-someone opens Stamps or Signatures the viewer loads the local engine
-(`embedpdf.wasm`, shipped in the same folder). Pass
-`plugins: { stamp: { assetEngine } }` to supply your own.
+A complete PDF viewer for any web page, with CloudPDF as its engine: the file stays on the server, and pages arrive as images.
 
-## Usage
+## Quick start
+
+This guide adds the viewer to your app, then makes it yours in four small steps. Each step works on
+its own, so stop whenever it's enough.
+
+### 1. Install
+
+**`install.html`**
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js"></script>
+```
+
+The package brings everything: the toolbar and panels, and the engine that opens your documents on
+CloudPDF, which renders the pages. Only Stamps and Signatures load WebAssembly, the first time
+someone opens them.
+
+### 2. Show a PDF
+
+Give the viewer a document and a height:
+
+**`first.html`**
 
 ```html
 <embedpdf-viewer id="viewer" style="height: 100vh"></embedpdf-viewer>
@@ -19,52 +33,53 @@ someone opens Stamps or Signatures the viewer loads the local engine
 <script type="module">
   import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
 
-  document.getElementById('viewer').src = { grant: 'grt_…' };
+  document.getElementById('viewer').src = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 ```
 
-A cloud document isn't a URL, so it's given from script, not as an attribute.
-Or create the viewer from script:
+`grant` is public access from the CloudPDF dashboard, which needs no backend; this one opens our
+demo document. In your app, open each document with a token your backend creates for the user: see
+[Documents](https://www.cloudpdf.com/docs/viewer/vanilla/documents).
+
+The viewer fills the box you give it, so it needs a height: a fixed one, `100vh`, or the rest of a
+flex layout. People can now scroll, zoom, search, select text, annotate, fill in forms, sign and
+download.
+
+## All features
+
+Most features are on from the start; measuring, redaction, building forms and snapshots wait until
+you turn them on. Turn features on or off with `features`, by the name in the first column:
 
 ```js
-import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
-
-CloudPDF.init({ target: '#viewer', src: { token: '<document token>' } });
+{ features: { measurement: true, redaction: true, comments: false } }
 ```
 
-`src` is the document: `{ token }` with a document token your backend creates
-for the user (a string, or a function that gives a fresh one), `{ id }` when the
-engine's own `token` already allows it, or `{ grant }` with a grant
-from the dashboard. Another `src` opens in its place. For several documents at
-once, pass `documents`: entries of `{ src, name, password, active }`.
+| Feature       | What people can do                                                                           | On from the start | Settings                                                                                                    |
+| :------------ | :------------------------------------------------------------------------------------------- | :---------------- | :---------------------------------------------------------------------------------------------------------- |
+| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts           | yes               | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations)                            |
+| `shapes`      | Draw rectangles, circles, lines, arrows and polygons                                         | yes               | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations#the-tools)                  |
+| `comments`    | Comment on annotations and reply, in a panel with every thread                               | yes               | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations#comments)                   |
+| `stamps`      | Place stamps: the standard ones, their own, or images                                        | yes               | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations#stamps)                     |
+| `signatures`  | Draw, type or upload a signature; sign fields; check signatures                              | yes               | [Forms & signatures](https://www.cloudpdf.com/docs/viewer/vanilla/features/forms-and-signatures#signatures) |
+| `forms`       | Fill in forms; build them in the Form mode                                                   | Filling only      | [Forms & signatures](https://www.cloudpdf.com/docs/viewer/vanilla/features/forms-and-signatures)            |
+| `redaction`   | Mark text and areas, then remove them from the file for good                                 | no                | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations#redaction)                  |
+| `measurement` | Measure distances, perimeters and areas at the drawing's scale                               | no                | [Annotations](https://www.cloudpdf.com/docs/viewer/vanilla/features/annotations#measurements)               |
+| `pages`       | Rotate, move, insert, duplicate and delete pages in the thumbnails panel, each step undoable | yes               | [Panels](https://www.cloudpdf.com/docs/viewer/vanilla/customize/panels#organize-pages)                      |
+| `attachments` | See, save, attach and remove files inside the PDF                                            | yes               | [Panels](https://www.cloudpdf.com/docs/viewer/vanilla/customize/panels#the-attachments)                     |
+| `search`      | Find text, with every match highlighted and listed                                           | yes               | [`plugins.search`](https://www.cloudpdf.com/docs/headless/react/text/search#settings)                       |
+| `text`        | Select and copy text                                                                         | yes               | [`plugins.selection`](https://www.cloudpdf.com/docs/headless/react/text/selection#settings)                 |
+| `snapshots`   | Copy or save part of a page as a picture                                                     | no                | [Documents](https://www.cloudpdf.com/docs/viewer/vanilla/documents#take-a-snapshot)                         |
+| `thumbnails`  | A picture of every page, to jump around                                                      | yes               | [Panels](https://www.cloudpdf.com/docs/viewer/vanilla/customize/panels)                                     |
+| `outline`     | The document's table of contents                                                             | yes               | [Panels](https://www.cloudpdf.com/docs/viewer/vanilla/customize/panels)                                     |
+| `documents`   | Open other files (with the local engine), download, print, several documents in tabs         | yes               | [Documents](https://www.cloudpdf.com/docs/viewer/vanilla/documents)                                         |
 
-The viewer connects to CloudPDF SaaS (`https://engine.cloudpdf.com`). Your own
-[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) goes in the
-engine's settings: `engine: { baseUrl: 'https://pdf.example.com' }`, with the
-engine's own `token` and `fetch` beside it.
+## Documentation
 
-Every customization option of the open-source viewer (the layout, commands,
-icons, themes, languages) rides along verbatim; see the
-[EmbedPDF docs](https://www.embedpdf.com/docs) for the vocabulary.
-
-From npm instead of the CDN:
-
-```bash
-npm install @cloudpdf/viewer
-```
-
-```ts
-import CloudPDF from '@cloudpdf/viewer';
-```
+- [Quick start](https://www.cloudpdf.com/docs/viewer/vanilla/quick-start): Install the viewer, show a PDF, give it your color and your own button, put your own component in the toolbar, and talk to it from code.
+- [Setup](https://www.cloudpdf.com/docs/viewer/vanilla/setup): Sizing, server-side rendering, the engine, and several viewers on a page.
+- [Layout](https://www.cloudpdf.com/docs/viewer/vanilla/customize/layout): Toolbars at the bottom, on the side, floating, or several at once.
+- [Theming](https://www.cloudpdf.com/docs/viewer/vanilla/customize/theming): Your colors, light and dark, and the look of every part.
 
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE).
-
-Everything CloudPDF ships to a browser is open source; everything that runs on a
-server is commercial. This artifact is browser-side, so it is Apache-2.0 — as
-are the viewer chrome and engine interfaces it is built on, from the
-[EmbedPDF](https://www.embedpdf.com) open-source project. Rendering happens on a
-CloudPDF deployment (the SaaS, or a self-hosted
-[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) under a
-separate written agreement), which is the commercial part.
+Apache-2.0

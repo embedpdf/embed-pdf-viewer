@@ -54,6 +54,26 @@ Everything the viewer can do is one config object. In a framework, every key is 
 
 <Snippet name="viewer/setup/config" />
 
+<Fw only="vanilla">
+
+On a plain HTML page, `init()` takes the config with a `target`, a selector or an element: it puts
+the viewer inside it and returns the `<embedpdf-viewer>` element. Written as a tag, the element
+takes its config through its `config` property.
+
+<Engine local>
+
+Three keys can be attributes of the tag too: `src`, `locale` and `theme`.
+
+</Engine>
+
+<Engine cloud>
+
+Two keys can be attributes of the tag too: `locale` and `theme`.
+
+</Engine>
+
+</Fw>
+
 <Engine local>
 
 | Key | What it is | Page |
@@ -162,6 +182,13 @@ Pass a function, and the viewer asks it again a minute before each token expires
 `src: { id: contract.documentId, token: () => fetchDocumentToken(contract.id) }`. See
 [Authentication](/docs/engine/authentication) for the ways to open a document and what a token
 carries.
+
+<Fw only="vanilla">
+
+A cloud document is an object, not a URL, so on a plain HTML page it is given from script, never as
+the `src` attribute: `element.src = { token }`.
+
+</Fw>
 
 </Engine>
 

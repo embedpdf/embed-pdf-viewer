@@ -2,7 +2,7 @@
   "name": "@embedpdf/viewer-vue",
   "version": "3.1.0",
   "private": false,
-  "description": "Vue wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element, with ToolbarItem, Panel and Region for your own components.",
+  "description": "A complete PDF viewer as a Vue component: toolbars, annotations, forms and signatures, with the PDF engine built in.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -108,7 +108,8 @@ jobs:
   # code a viewer page shows, compiled against the packages in this commit, per framework, and
   # which pages are live (docs/content/scripts/publish-gate.mjs). A viewer page that doesn't
   # compile yet is held back on the site and fails nothing here; the job fails when a check
-  # crashes or stops checking, or a headless page stops compiling (`--strict`).
+  # crashes or stops checking, or when a headless page, or a viewer page a package's README
+  # shows, stops compiling (`--strict`).
   docs:
     name: docs gate
     runs-on: ubuntu-latest

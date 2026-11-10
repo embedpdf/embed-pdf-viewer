@@ -235,12 +235,23 @@ function engineFlavors(node: AstNode): DocsEngine[] {
   return flavors;
 }
 
-function fileNodes(files: DocsCodeFile[]): AstNode[] {
+/** A file that is a command to run (`install.sh`), not a file to make. */
+const isCommand = (file: DocsCodeFile) =>
+  ['sh', 'bash', 'shell', 'shellscript'].includes(file.language);
+
+/** Each file under its name. A README shows a command without one: there it is only run. */
+function fileNodes(files: DocsCodeFile[], readme = false): AstNode[] {
   return files.flatMap((file) => [
-    {
-      type: 'paragraph',
-      children: [{ type: 'strong', children: [{ type: 'inlineCode', value: file.filename }] }],
-    },
+    ...(readme && isCommand(file)
+      ? []
+      : [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'strong', children: [{ type: 'inlineCode', value: file.filename }] },
+            ],
+          },
+        ]),
     { type: 'code', lang: file.language, value: file.code.trimEnd() },
   ]);
 }
@@ -338,7 +349,7 @@ function createResolver(
           const files = site.resolveExampleFiles(name, integration);
           const label = site.variantLabel?.(integration) ?? integration;
           return files?.length
-            ? fileNodes(files)
+            ? fileNodes(files, readme)
             : [noteNode(`This example is not available for ${label} yet.`)];
         }
 
@@ -350,7 +361,7 @@ function createResolver(
           const files = site.resolveExampleFiles(`snippets/${name}`, integration);
           const label = site.variantLabel?.(integration) ?? integration;
           return files?.length
-            ? fileNodes(files)
+            ? fileNodes(files, readme)
             : [noteNode(`This code isn't written for ${label} yet.`)];
         }
 
@@ -389,7 +400,7 @@ function createResolver(
           if (files.length !== paths.length) {
             throw new Error('<CodeExample> references a source file that could not be read.');
           }
-          return fileNodes(files);
+          return fileNodes(files, readme);
         }
 
         if (node.name === 'Tabs') {
@@ -733,7 +744,8 @@ function readmeCut(
   const title = children.findIndex((node) => node.type === 'heading' && node.depth === 1);
   const body = children.slice(title + 1);
   const end = body.findIndex(body.some(isReadmeEnd) ? isReadmeEnd : isSectionHeading);
-  return end === -1 ? body : body.slice(0, end);
+  const opening = end === -1 ? body : body.slice(0, end);
+  return withHeading && title !== -1 ? [children[title], ...opening] : opening;
 }
 
 /** A README gives the page's title its second level, so the page's headings go one down. */
@@ -765,8 +777,9 @@ export type DocsReadmeOptions = {
   /** The `##` section the README shows, by its heading. Without one, the page's opening. */
   section?: string;
   /**
-   * The section comes with its heading, at the levels the page has: for a README that shows it
-   * as a section of its own, beside another page's cut, and not under this page's title.
+   * The cut comes with its heading, as a `##`: a section's own, at the levels the page has, or
+   * the page's title over its opening. For a README that shows the cut as a section of its own,
+   * beside another page's, and not under this page's title.
    */
   withHeading?: boolean;
 };
@@ -784,13 +797,14 @@ export type DocsReadmeParts = {
 /**
  * The parts of a page a package README is made of
  * (docs/conventions/docs-architecture.md, "Package READMEs"). They are read on npm and GitHub, so
- * they differ from the page's `.md` export in five ways, none of which adds a word:
+ * they differ from the page's `.md` export in six ways, none of which adds a word:
  *
  * - an example the page keeps open (`mode="open"`) shows its code, and any other example, with
  *   its "Try it" hint, is left out: a README runs no demo;
  * - an install command stays as written, with no package manager or release channel put in;
  * - every link is the full URL of a page, a link to a place on this page (`#zoom`) included;
  * - a card is its linked title, a colon and its description;
+ * - a command (`install.sh`) shows without a file name: it is something to run;
  * - the cut's headings are one level down, for a README that gives the page's title its own
  *   (a section that comes with its heading keeps its levels).
  *
@@ -807,7 +821,8 @@ export function renderDocsReadmeWith(
   const resolve = createResolver(site, integration, names, { canonicalPath }, true);
 
   const cut = resolve(readmeCut(children, section, withHeading));
-  if (!withHeading) cut.forEach(lowerHeadings);
+  // A section that comes with its heading is at a README's levels already.
+  if (!(withHeading && section !== undefined)) cut.forEach(lowerHeadings);
   const cards = (sectionNodes(children, NEXT_STEPS) ?? []).filter(isCards);
   const { title = null, description = null } = frontmatterText(children);
   return {
