@@ -296,6 +296,17 @@ it and AI agents read it, so it is read away from its page:
   `other_integrations` on a viewer page), so a reader working in Vue who lands
   on React's page can switch.
 
+A reader that doesn't know the `.md` address gets the Markdown two ways:
+
+- **The page's own URL serves it to a request that asks.** A request whose
+  `Accept` header names `text/markdown`, and ranks it no lower than `text/html`,
+  gets the Markdown at the page's URL (docs-kit `accept`, each site's
+  middleware). AI coding agents ask this way. A browser never names Markdown, so
+  a person always gets the page. Both answers carry `Vary: Accept`, so a cache
+  keeps them apart. A file under `/docs` has one answer.
+- **The page names it.** Each page's HTML has a
+  `<link rel="alternate" type="text/markdown">` with the `.md` URL.
+
 `/llms.txt` (llmstxt.org) lists each live page once, in its product's default
 integration: Vanilla JS for the viewer, React for headless.
 `/llms/<integration>.txt` lists every page one integration has, and the files
