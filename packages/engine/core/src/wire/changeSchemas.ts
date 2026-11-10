@@ -87,188 +87,195 @@ const OpIdSchema = z.string().regex(/^[\x21-\x7e]{1,255}$/);
 
 const FormFieldDisplaySchema = z.enum(['visible', 'hidden', 'noPrint', 'noView']);
 
+/**
+ * One kind of op: its own fields and no others. A request is read strictly
+ * (docs/conventions/api-evolution.md), so a field this server doesn't know
+ * refuses the change rather than being dropped and the op applied without it.
+ */
+const op = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
+
 /** One op of a change, as the request sends it. */
 export const ChangeOpWireSchema = z.discriminatedUnion('type', [
-  z.object({
+  op({
     type: z.literal('annotations.create'),
     page: PageRefSchema,
     data: AnnotationDraftSchema,
     objectNumber: z.number().int().positive().optional(),
     resources: AnnotationResourceKeysSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('annotations.update'),
     ref: AnnotationRefSchema,
     patch: AnnotationPatchSchema,
     resources: AnnotationResourceKeysSchema.optional(),
     expect: AnnotationPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('annotations.delete'),
     ref: AnnotationRefSchema,
     expect: AnnotationPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('annotations.reorder'),
     page: PageRefSchema,
     refs: z.array(AnnotationRefSchema).min(1),
     position: AnnotationPositionSchema,
   }),
-  z.object({
+  op({
     type: z.literal('forms.setValue'),
     field: FormFieldRefSchema,
     value: FormFieldValueSchema,
     expect: FormFieldValueSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.setDisplay'),
     field: FormFieldRefSchema,
     display: FormFieldDisplaySchema,
   }),
-  z.object({
+  op({
     type: z.literal('forms.setAppearanceText'),
     field: FormFieldRefSchema,
     text: z.string(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.reset'),
     fields: z.array(FormFieldRefSchema).optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.create'),
     draft: FormFieldDraftSchema,
     objectNumber: z.number().int().positive().optional(),
     widgetObjectNumbers: z.array(z.number().int().positive()).optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.update'),
     field: FormFieldRefSchema,
     patch: FormFieldPatchSchema,
     expect: FormFieldPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.delete'),
     field: FormFieldRefSchema,
     expect: FormFieldPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.addWidget'),
     field: FormFieldRefSchema,
     placement: WidgetPlacementSchema,
     objectNumber: z.number().int().positive().optional(),
     splitObjectNumber: z.number().int().positive().optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.removeWidget'),
     field: FormFieldRefSchema,
     widget: AnnotationRefSchema,
   }),
-  z.object({
+  op({
     type: z.literal('forms.deleteWidget'),
     widget: AnnotationRefSchema,
     expect: WidgetPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.reorderCalculations'),
     fields: z.array(FormFieldRefSchema).min(1),
     position: FieldPositionSchema,
   }),
-  z.object({
+  op({
     type: z.literal('forms.reorderWidgets'),
     page: PageRefSchema,
     widgets: z.array(AnnotationRefSchema).min(1),
     position: AnnotationPositionSchema,
   }),
-  z.object({
+  op({
     type: z.literal('forms.updateWidget'),
     widget: AnnotationRefSchema,
     patch: WidgetPatchSchema,
     expect: WidgetPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('forms.setSignatureAppearance'),
     field: FormFieldRefSchema,
     /** The one-page PDF drawn in, as the key of its multipart part. */
     resources: AppearanceResourceKeysSchema,
   }),
-  z.object({
+  op({
     type: z.literal('metadata.update'),
     patch: MetadataPatchSchema,
     expect: MetadataPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('metadata.updateCustom'),
     patch: CustomMetadataPatchSchema,
   }),
-  z.object({
+  op({
     type: z.literal('outline.create'),
     parent: OutlineItemRefSchema.nullable(),
     position: OutlinePositionSchema.optional(),
     data: OutlineItemDraftSchema,
     objectNumber: z.number().int().positive().optional(),
   }),
-  z.object({
+  op({
     type: z.literal('outline.update'),
     ref: OutlineItemRefSchema,
     patch: OutlineItemPatchSchema,
     expect: OutlineItemPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('outline.move'),
     refs: z.array(OutlineItemRefSchema).min(1),
     parent: OutlineItemRefSchema.nullable(),
     position: OutlinePositionSchema,
   }),
-  z.object({
+  op({
     type: z.literal('outline.delete'),
     ref: OutlineItemRefSchema,
     expect: OutlineItemPatchSchema.optional(),
   }),
-  z.object({
+  op({
     type: z.literal('pages.rotate'),
     pages: z.array(PageRefSchema).min(1),
     rotation: PdfRotationSchema,
   }),
-  z.object({
+  op({
     type: z.literal('pages.setScale'),
     pages: z.array(PageRefSchema).min(1),
     measure: PdfMeasureWriteSchema.nullable(),
   }),
-  z.object({
+  op({
     type: z.literal('pages.reorder'),
     pages: z.array(PageRefSchema).min(1),
     position: PagePositionSchema,
   }),
-  z.object({
+  op({
     type: z.literal('pages.delete'),
     pages: z.array(PageRefSchema).min(1),
   }),
-  z.object({
+  op({
     type: z.literal('pages.insertBlank'),
     spec: PageInsertBlankSpecSchema,
     position: PagePositionSchema.optional(),
     objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
-  z.object({
+  op({
     type: z.literal('pages.insert'),
     /** The PDF whose pages come in, as the key of its multipart part. */
     resources: SourceResourceKeysSchema,
     position: PagePositionSchema.optional(),
     objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
-  z.object({
+  op({
     type: z.literal('pages.copy'),
     pages: z.array(PageRefSchema).min(1),
     position: PagePositionSchema.optional(),
     objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
-  z.object({
+  op({
     type: z.literal('attachments.create'),
     file: AttachmentFileBaseSchema,
     /** The file's bytes, as the key of their multipart part. */
     resources: FileResourceKeysSchema,
   }),
-  z.object({
+  op({
     type: z.literal('attachments.delete'),
     ref: AttachmentRefSchema,
   }),
@@ -306,7 +313,7 @@ export const ChangeRequestSchema = z.object({
 /** What an item can be: an op's type, or a restore (only in an undo). */
 const ChangeItemTypeSchema = closed(
   z.enum([
-    ...ChangeOpWireSchema.options.map((op) => op.shape.type.value),
+    ...ChangeOpWireSchema.options.map((option) => option.shape.type.value),
     'annotations.restore',
     'forms.restore',
     'forms.restoreWidget',
@@ -315,6 +322,9 @@ const ChangeItemTypeSchema = closed(
     'attachments.restore',
   ] as unknown as [ChangeItemType, ...ChangeItemType[]]),
 );
+
+/** Every kind of change op and result item this build has: an op's type, or a restore. */
+export const CHANGE_KINDS: readonly string[] = ChangeItemTypeSchema.options;
 
 /** What an undo left alone, by name. */
 const SkippedFieldsSchema = z.array(z.string()).optional();

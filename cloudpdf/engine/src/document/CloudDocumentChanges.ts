@@ -31,6 +31,7 @@ import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { ChangeSender, CloudWrites, SentChange } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
+import { opsTheServerLacks } from '../transport/serverVersion';
 
 /** How many `opId`s a handle remembers having published: far more than any retry spans. */
 const PUBLISHED_MEMORY = 4096;
@@ -40,7 +41,9 @@ const PUBLISHED_MEMORY = 4096;
  * line of writes, and goes out with the changes called right after it, as
  * one `POST …/changes` (see {@link CloudWrites.change}). The server checks
  * every op against the caller inside the write, so nothing about the ops is
- * checked here beyond what the request must hold.
+ * checked here beyond what the request must hold, and that the server has
+ * each kind of op: an older server refuses a request with a kind it doesn't
+ * know whole, with every change that shares it.
  *
  * A change's events are published once its answer arrives, all sharing its
  * `opId`. A change asked again gets the first answer and publishes nothing:
@@ -55,6 +58,8 @@ export class CloudDocumentChanges {
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
     private readonly writes: CloudWrites,
+    /** The version the server last said it is; `null` before it said so. */
+    private readonly serverVersion: () => string | null,
   ) {}
 
   apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
@@ -76,6 +81,14 @@ export class CloudDocumentChanges {
         meta: { affectedPages: [], cacheDelta: null, opId, undoable: false },
       });
     }
+    // A kind of op the server doesn't have yet is refused here, alone.
+    const lacking = isUndoChange(change)
+      ? null
+      : opsTheServerLacks(
+          this.serverVersion(),
+          change.ops.map((op) => op.type),
+        );
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<ChangeResult>(async (signal) => {
       // In line now, so it keeps its place among this document's writes while
       // its bytes are read.

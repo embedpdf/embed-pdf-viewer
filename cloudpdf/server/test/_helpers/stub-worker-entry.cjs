@@ -448,6 +448,15 @@ function applyStubOp(meta, op, opId) {
         meta: pageOpMeta(stamp),
       };
     }
+    case 'pages.setScale':
+      // A scale changes no page's place: same pages, same order.
+      return {
+        type: op.type,
+        pages: op.pages,
+        measure: op.measure,
+        layout: layoutSnapshot(meta),
+        meta: pageOpMeta(stamp),
+      };
     case 'pages.delete': {
       const current = pageOrderOf(meta);
       const deleting = new Set(op.pages.map(ponOf));

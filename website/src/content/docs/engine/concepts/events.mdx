@@ -163,7 +163,8 @@ The engine connects to the server when you add the first listener and disconnect
 remove the last, so listening is free until you need it.
 
 If the connection drops and the engine can't catch up with everything that happened in the
-meantime, you get a `stream.desynced` event. Read what you show again (`doc.annotations.list()`,
+meantime, you get a `stream.desynced` event. You get it too when someone on a newer version makes
+a kind of change this version doesn't know. Read what you show again (`doc.annotations.list()`,
 `doc.pages.list()`); events continue from there.
 
 </Engine>

@@ -61,18 +61,21 @@ class FakeEvents {
   }
 }
 
-function fakeEngine(initialPages: PageLayout[]): { engine: Engine; events: FakeEvents } {
+function fakeEngine(initialPages: PageLayout[]) {
   const events = new FakeEvents();
+  let listed = initialPages;
+  /** While set, a read of the pages waits until the test answers it. */
+  let held: (() => void)[] | null = null;
   const handle = {
     id: 'doc-1',
     events,
     pages: {
-      list: () =>
-        AbortablePromise.resolveValue({
-          pageCount: initialPages.length,
-          labels: [],
-          pages: initialPages,
-        }),
+      list: () => {
+        const snapshot = { pageCount: listed.length, labels: [], pages: listed };
+        const waiting = held;
+        if (!waiting) return AbortablePromise.resolveValue(snapshot);
+        return new Promise((resolve) => waiting.push(() => resolve(snapshot)));
+      },
     },
     close: () => AbortablePromise.resolveValue<void>(undefined),
   } as unknown as DocumentHandle;
@@ -81,8 +84,31 @@ function fakeEngine(initialPages: PageLayout[]): { engine: Engine; events: FakeE
     open: () => AbortablePromise.resolveValue(handle),
     destroy: () => AbortablePromise.resolveValue<void>(undefined),
   };
-  return { engine, events };
+  return {
+    engine,
+    events,
+    /** The pages the engine holds from now on: what a read of them answers. */
+    setPages: (pages: PageLayout[]) => {
+      listed = pages;
+    },
+    /** Hold the reads of the pages; the function it returns answers them, the last one first. */
+    holdReads: () => {
+      const waiting: (() => void)[] = [];
+      held = waiting;
+      return () => {
+        held = null;
+        for (const answer of [...waiting].reverse()) answer();
+      };
+    },
+  };
 }
+
+const desynced: DocumentEvent = {
+  type: 'stream.desynced',
+  reason: 'unknown-change',
+  at: new Date(1).toISOString(),
+};
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** A document-scoped plugin that just captures its context, so the test can
  *  read `ctx.document()` exactly as a real plugin (e.g. a Stage lens) sees it. */
@@ -175,6 +201,71 @@ describe('kernel: document events → page registry', () => {
     expect(after.pagesSequence).toBe(1);
     expect(after.pageCount).toBe(2);
     expect(after.pages.map((pageInfo) => pageInfo.ref.objectNumber)).toEqual([1, 3]);
+  });
+
+  it('a stream that skipped events has the pages read again', async () => {
+    const { engine, events, setPages } = fakeEngine([page(1, 0), page(2, 1), page(3, 2)]);
+    const capture = captureDoc();
+    const kernel = createKernel({ engine, plugins: [capture.plugin] });
+    await kernel.documents.open({ kind: 'bytes', id: 'doc-1', bytes: new Uint8Array() });
+
+    // Someone deleted a page, and the stream never told: its row was skipped.
+    setPages([page(1, 0), page(3, 1)]);
+    events.emit(desynced);
+    expect(capture.ctx().document()!.pageCount).toBe(3);
+    await tick();
+
+    const after = capture.ctx().document()!;
+    expect(after.pagesSequence).toBe(1);
+    expect(after.pages.map((pageInfo) => pageInfo.ref.objectNumber)).toEqual([1, 3]);
+  });
+
+  it('a page event that arrives while the pages are read again wins over the read', async () => {
+    const { engine, events, setPages, holdReads } = fakeEngine([
+      page(1, 0),
+      page(2, 1),
+      page(3, 2),
+    ]);
+    const capture = captureDoc();
+    const kernel = createKernel({ engine, plugins: [capture.plugin] });
+    await kernel.documents.open({ kind: 'bytes', id: 'doc-1', bytes: new Uint8Array() });
+    const pagesNow = () =>
+      capture
+        .ctx()
+        .document()!
+        .pages.map((pageInfo) => pageInfo.ref.objectNumber);
+
+    const answer = holdReads();
+    setPages([page(1, 0), page(3, 1)]);
+    events.emit(desynced);
+    // A later delete arrives as an event before the read is answered.
+    events.emit({
+      type: 'pages.deleted',
+      pages: [toPageRef(3)],
+      layout: { pageCount: 1, pages: [page(1, 0)], labels: [], namedPages: [] },
+      meta: { affectedPages: [], cacheDelta: null, opId: 'op-2', undoable: true },
+      origin: {
+        kind: 'remote',
+        sessionId: 'other',
+        subject: 'alice',
+        at: new Date(2).toISOString(),
+        serverSequence: 9,
+      },
+    } as DocumentEvent);
+    expect(pagesNow()).toEqual([1]);
+    answer();
+    await tick();
+    expect(pagesNow()).toEqual([1]);
+
+    // Of two reads only the last counts, though the first is answered after it.
+    const answerBoth = holdReads();
+    setPages([page(1, 0), page(4, 1)]);
+    events.emit(desynced);
+    setPages([page(1, 0), page(4, 1), page(5, 2)]);
+    events.emit(desynced);
+    answerBoth();
+    await tick();
+    expect(pagesNow()).toEqual([1, 4, 5]);
   });
 
   it('an annotation event does NOT touch the registry (origin-agnostic, structure-only)', async () => {

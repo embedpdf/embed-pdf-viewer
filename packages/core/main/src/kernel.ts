@@ -1359,11 +1359,34 @@ export function createKernel(config: {
     // Page mutation events (rotate, move, delete, insert, restore) carry the
     // engine's pages, the same list pages.list() returns, so they replace the
     // engine's pages whole; the page view replays the pending changes on top.
+    // When the stream skipped events (`stream.desynced`), the list is read again.
     // Own and remote (collaborator) mutations arrive alike: the handler is
     // origin-agnostic, as the event model intends.
     // The kernel listens first and last, so a change's events land as one store update.
     const bursts = createBurstGate(store);
     session.scope.defer(bursts.close);
+    /** How many events carried the engine's pages, and how many reads of them started. */
+    let layoutsSeen = 0;
+    let pageReads = 0;
+    /**
+     * The stream skipped events, a page change maybe among them: read the
+     * pages again. A page event that arrives meanwhile carries pages at least
+     * as new, and only the last read counts.
+     */
+    const readPagesAgain = (): void => {
+      const seen = layoutsSeen;
+      const read = ++pageReads;
+      session.handle!.pages.list().then(
+        (snapshot) => {
+          if (session.cancel.signal.aborted || layoutsSeen !== seen || pageReads !== read) return;
+          session.pageView.setEnginePages(snapshot);
+          refreshPages(session);
+        },
+        (error: unknown) => {
+          if (!session.cancel.signal.aborted) report(error);
+        },
+      );
+    };
     const unsubscribeEvents = session.handle!.events.subscribe((event) => {
       bursts.first(event);
       if (changesDocument(event)) {
@@ -1374,7 +1397,11 @@ export function createKernel(config: {
         }
       }
       const layout = layoutFromEvent(event);
-      if (layout) session.pageView.setEnginePages(layout);
+      if (layout) {
+        layoutsSeen += 1;
+        session.pageView.setEnginePages(layout);
+      }
+      if (event.type === 'stream.desynced') readPagesAgain();
       session.pageView.fold(event);
       refreshPages(session);
     });
