@@ -145,6 +145,8 @@ export function buildDocsPageMetadata(
     alternates: {
       ...(page.metadata.alternates ?? {}),
       canonical: page.canonicalUrl,
+      // The page as Markdown, for a reader that got the HTML and would take that instead.
+      types: { 'text/markdown': `${page.canonicalUrl}.md` },
     },
     openGraph: {
       ...(page.metadata.openGraph ?? {}),
