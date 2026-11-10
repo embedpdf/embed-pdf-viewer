@@ -87,6 +87,14 @@ describe('visibleRow', () => {
     expect(visibleRow(skipped, FILLER)).toBe(skipped);
   });
 
+  it('shows of a copy only the copies the connection may read', () => {
+    const copy = row('change', {
+      items: [{ type: 'annotations.copy', annotations: [square], refMap: [], dropped: [] }],
+    });
+    expect(visibleRow(copy, COMMENTER)).toBe(copy);
+    expect(visibleRow(copy, FILLER)).toEqual(withheld('change'));
+  });
+
   it('sends what neither capability guards to everyone', () => {
     const rotate = row('change', {
       items: [{ type: 'pages.rotate', pages: [], rotation: 90, layout: { pages: [] } }],

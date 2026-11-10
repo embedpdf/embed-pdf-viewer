@@ -7,6 +7,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.AnnotationsUpdate
     | CloudPDF.ChangeOp.AnnotationsDelete
     | CloudPDF.ChangeOp.AnnotationsReorder
+    | CloudPDF.ChangeOp.AnnotationsCopy
     | CloudPDF.ChangeOp.FormsSetValue
     | CloudPDF.ChangeOp.FormsSetDisplay
     | CloudPDF.ChangeOp.FormsSetAppearanceText
@@ -79,6 +80,21 @@ export namespace ChangeOp {
         page: CloudPDF.PageRef;
         refs: CloudPDF.AnnotationRef[];
         position: CloudPDF.AnnotationPosition;
+    }
+
+    export interface AnnotationsCopy {
+        type: "annotations.copy";
+        refs: CloudPDF.AnnotationRef[];
+        page?: CloudPDF.PageRef | undefined;
+        offset?: ChangeOpAnnotationsCopy.Offset | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpAnnotationsCopy {
+        export interface Offset {
+            x: number;
+            y: number;
+        }
     }
 
     export interface FormsSetValue {

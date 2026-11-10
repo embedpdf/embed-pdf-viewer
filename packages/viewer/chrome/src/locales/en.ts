@@ -103,6 +103,7 @@ export const en: Locale = {
         saveFile: 'Save file',
         removeLink: 'Remove link',
         delete: 'Delete',
+        duplicate: 'Duplicate',
         group: 'Group',
         ungroup: 'Ungroup',
         stampFromSelection: 'Make stamp',

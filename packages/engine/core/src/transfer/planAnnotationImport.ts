@@ -104,7 +104,10 @@ export function planAnnotationImport(input: {
     }
     const markers = [...fieldMarkersOf(data), ...unwritable];
     if (markers.length > 0) fieldDrops.set(index, markers);
-    drafts.set(index, draftOf(data, markers, mapPage, index));
+    drafts.set(
+      index,
+      draftOf(data, markers, mapPage, { label: `import: item ${index}`, details: { item: index } }),
+    );
   });
 
   const byKey = new Map<string, number>();
@@ -200,7 +203,9 @@ function pagesNamedBy(data: Annotation): PageRef[] {
 }
 
 /** The fields of `data` that are markers for something the engine can't write. */
-function fieldMarkersOf(data: Annotation): Array<{ field: string; reason: AnnotationDropReason }> {
+export function fieldMarkersOf(
+  data: Annotation,
+): Array<{ field: string; reason: AnnotationDropReason }> {
   const markers: Array<{ field: string; reason: AnnotationDropReason }> = [];
   const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
   if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
@@ -224,7 +229,7 @@ function fieldMarkersOf(data: Annotation): Array<{ field: string; reason: Annota
  * read-only values), each left out; `'item'` when one is a field every
  * create needs. A link's target is reported by {@link fieldMarkersOf}.
  */
-function unwritableValuesOf(
+export function unwritableValuesOf(
   data: Annotation,
 ): Array<{ field: string; reason: AnnotationDropReason }> | 'item' {
   const unwritable: Array<{ field: string; reason: AnnotationDropReason }> = [];
@@ -261,12 +266,16 @@ const STANDARD_NAMED_ACTIONS: ReadonlySet<string> = new Set([
   'LastPage',
 ]);
 
-/** The create an item becomes, checked against its kind's create schema. */
-function draftOf(
+/**
+ * The create `data` becomes, checked against its kind's create schema.
+ * `where` names it in the refusal: its label, and what the error's details
+ * say of it.
+ */
+export function draftOf(
   data: Annotation,
   markers: ReadonlyArray<{ field: string }>,
   mapPage: (page: PageRef) => PageRef,
-  index: number,
+  where: { readonly label: string; readonly details: Readonly<Record<string, unknown>> },
 ): AnnotationDraft {
   const fields = { ...data } as Record<string, unknown>;
   delete fields.reply;
@@ -285,8 +294,8 @@ function draftOf(
     const path = issue.path.join('.');
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `import: item ${index}${path ? ` field '${path}'` : ''}: ${issue.message}`,
-      { details: { item: index, ...(path ? { field: path } : {}) } },
+      `${where.label}${path ? ` field '${path}'` : ''}: ${issue.message}`,
+      { details: { ...where.details, ...(path ? { field: path } : {}) } },
     );
   }
   // The item's own data, not the schema's output, so nothing a read carries

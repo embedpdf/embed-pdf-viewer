@@ -2,6 +2,7 @@ import {
   groupOf,
   isSubstrateOnly,
   type Model,
+  type ModelAnnotation,
   pageItems as corePageItems,
   refOf,
   type RenderItem,
@@ -20,6 +21,7 @@ import {
   RenderToken as RenderHostToken,
   type AppearanceFamily,
   type AppearanceItem,
+  type AppearancePicture,
 } from '@embedpdf/plugin-render/contract/host';
 
 import type { LinkNavItem, TextItem } from '../contract';
@@ -36,17 +38,18 @@ import type { Stamps } from '../write/stamps';
  * areas, and the baked-appearance seam (epoch and pictures). The engine's
  * pictures come through the render plugin, which shares and keeps them. A
  * stamp this session placed shows the preview it was placed with until the
- * engine's picture of it exists, and an annotation an undo brings back the
- * picture it had.
+ * engine's picture of it exists, an annotation an undo brings back the
+ * picture it had, and a copy of a stamp its original's.
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc' | 'tryGet'>,
   {
     view: { pageModel },
     lending,
+    records,
     fonts: fontLookup,
     textFonts,
-  }: Pick<AnnotationServices, 'view' | 'lending' | 'fonts' | 'textFonts'>,
+  }: Pick<AnnotationServices, 'view' | 'lending' | 'records' | 'fonts' | 'textFonts'>,
   ghost: Pick<Ghost, 'itemsOn'>,
   stamps: Pick<Stamps, 'lookOf'>,
 ) {
@@ -254,7 +257,8 @@ export function createRenderReads(
    * (`pictureVersion`, which advances when the engine confirms a re-bake).
    * `placed`: the stamps this session placed that the engine hasn't written
    * yet, which show the preview they were placed with, and the records an
-   * undo brought back, which show the pictures kept of them. Position,
+   * undo brought back or a copy made, which show the pictures kept of them
+   * or of their original (`keptOf`). Position,
    * rotation and the state shown are absent: the blit translates (`apBox`)
    * and turns (`apRot`) the same pixels, and every state is held, so a move,
    * a spin or a switch costs no new picture. `lent`: the lender's epoch for
@@ -279,7 +283,7 @@ export function createRenderReads(
       if (isSubstrateOnly(record)) continue;
       if (record.unconfirmed) {
         if (stamps.lookOf(record)) placed.push(`${id}@placed`);
-        else if (keptOf(id, record.annotation.ref).length) placed.push(`${id}@kept`);
+        else if (keptOf(record).length) placed.push(`${id}@kept`);
         continue;
       }
       if (lending.owns(id)) {
@@ -331,9 +335,23 @@ export function createRenderReads(
   /** The family whose pictures a record's are: the lender's widgets, or annotations. */
   const familyOf = (id: string): AppearanceFamily => (lending.owns(id) ? 'widgets' : 'annotations');
 
-  /** The engine's last pictures of a record, kept a while after it left its page. */
-  const keptOf = (id: string, ref: AnnotationRef) =>
-    ctx.tryGet(RenderHostToken)?.getKeptAppearances(familyOf(id), ref) ?? [];
+  /**
+   * The pictures a record the engine hasn't written shows when it has no
+   * live drawing: the engine's last pictures of it, kept a while after it
+   * left its page (an undo brings it back), or, for a copy, the ones of the
+   * annotation it copies, where the copy is.
+   */
+  const keptOf = (record: ModelAnnotation): readonly AppearancePicture[] => {
+    const render = ctx.tryGet(RenderHostToken);
+    if (!render) return [];
+    const { ref } = record.annotation;
+    const own = render.getKeptAppearances(familyOf(record.id), ref);
+    const original = own.length ? undefined : records.view().byKey[record.id]?.copyOf;
+    if (!original) return own;
+    return render
+      .getKeptAppearances('annotations', original)
+      .map((kept) => ({ ...kept, ref, rect: record.apBox ?? kept.rect }));
+  };
 
   /**
    * The pictures of what shows on `page` that the engine hasn't written yet:
@@ -352,7 +370,7 @@ export function createRenderReads(
       const version = record.pictureVersion ?? 0;
       const look = stamps.lookOf(record);
       // Brought back as it was: the pictures kept of it are its look.
-      if (!look) return keptOf(id, record.annotation.ref).map((kept) => ({ ...kept, version }));
+      if (!look) return keptOf(record).map((kept) => ({ ...kept, version }));
       const rect = record.apBox;
       if (!rect) return [];
       const preview = await look(rect.width * scale);

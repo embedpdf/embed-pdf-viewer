@@ -85,12 +85,12 @@ export interface AnnotationImportResult<C extends Coordinates = PageCoordinates>
 }
 
 /**
- * The facts an import committed: one `annotations.created` per annotation, in
- * bundle order, each with the envelope of its own page and its own id. The
- * cache pins move once, with the last.
+ * The facts an import committed, or a copy: one `annotations.created` per
+ * annotation, in the order they were made, each with the envelope of its own
+ * page and its own id. The cache pins move once, with the last.
  */
 export function annotationImportFacts(
-  result: AnnotationImportResult,
+  result: Pick<AnnotationImportResult, 'annotations' | 'meta'>,
 ): Array<{ page: PageRef } & AnnotationCreateResult> {
   const last = result.annotations.length - 1;
   return result.annotations.map((annotation, index) => {

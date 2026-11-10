@@ -310,6 +310,45 @@ const ACTIONS: readonly Action[] = [
       annotation.links.set(ref!, { kind: 'uri', uri: 'https://www.embedpdf.com/' }),
   },
   {
+    name: 'duplicate an annotation',
+    setup: async (annotation) => [await square(annotation)],
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 10, y: 10 } }),
+  },
+  {
+    name: 'duplicate a stamp',
+    setup: async (annotation) => [
+      (
+        await annotation.stamps.place(
+          { source: PNG_1X1, targetWidth: 80 },
+          { page: PAGE, center: { x: 200, y: 200 } },
+        )
+      ).annotation.ref,
+    ],
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 40, y: 0 } }),
+  },
+  {
+    name: 'duplicate a linked annotation',
+    setup: async (annotation) => {
+      const ref = await square(annotation);
+      await annotation.links.set(ref, { kind: 'uri', uri: 'https://www.embedpdf.com/' });
+      return [ref];
+    },
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 10, y: 10 } }),
+  },
+  {
+    name: 'duplicate a selected group',
+    setup: async (annotation) => {
+      const refs = [await square(annotation, 100), await square(annotation, 200)];
+      annotation.selection.select(refs);
+      await annotation.selection.group();
+      return refs;
+    },
+    act: (annotation, refs) => {
+      annotation.selection.select(refs);
+      return annotation.selection.duplicate();
+    },
+  },
+  {
     name: 'reply to a note',
     setup: async (annotation) => [await note(annotation)],
     act: (annotation, [ref]) => annotation.comments.reply(ref!, 'A reply'),
@@ -421,6 +460,90 @@ describe.each(ACTIONS)('$name', (action) => {
 
       await booted.step('redo');
       expect(await booted.truth()).not.toEqual(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+});
+
+/**
+ * A duplicate is one op the engine makes its copies from. The viewer shows the copies before
+ * the engine answers, by the engine's own rule, so what it shows is what the engine writes.
+ */
+describe('duplicate', () => {
+  /** What a prediction can't know: the engine names a copy and stamps who made it, and when. */
+  const STAMPED = new Set(['nm', 'author', 'createdAt', 'modifiedAt', 'userId', 'createdBy']);
+  const withoutStamps = (annotations: unknown): unknown =>
+    JSON.parse(
+      JSON.stringify(annotations, (name, value: unknown) =>
+        STAMPED.has(name) ? undefined : value,
+      ),
+    );
+
+  it('shows the copies of a linked group at once, as the engine then writes them', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history, gate } = booted;
+      const refs = [await square(annotation, 100), await square(annotation, 200)];
+      await annotation.links.set(refs[0]!, { kind: 'uri', uri: 'https://www.embedpdf.com/' });
+      annotation.selection.select(refs);
+      await annotation.selection.group();
+      await booted.caughtUp();
+      history.clear();
+      const before = annotation.list().length;
+
+      gate.hold();
+      const duplicated = annotation.selection.duplicate();
+      // Two squares and the link the first one carries, before the engine answers.
+      const shown = booted.view(true);
+      expect(annotation.list()).toHaveLength(before + 3);
+      const copies = annotation.selection.getSelected();
+      expect(copies).toHaveLength(2);
+      expect(copies.every((copy) => annotation.isPending(copy.ref))).toBe(true);
+      expect(annotation.links.get(copies[0]!.ref)).toEqual({
+        kind: 'uri',
+        uri: 'https://www.embedpdf.com/',
+      });
+      gate.release();
+
+      const { annotations, dropped } = await duplicated;
+      await booted.caughtUp();
+      expect(dropped).toEqual([]);
+      expect(annotations.map((copy) => copy.ref)).toEqual(copies.map((copy) => copy.ref));
+      expect(withoutStamps(booted.view(true))).toEqual(withoutStamps(shown));
+      // A copy is new: its own name, and the copies are a group of their own.
+      expect(annotations[0]!.nm).not.toBe(annotation.get(refs[0]!)!.nm);
+      expect(annotations[1]!.reply).toEqual({ to: annotations[0]!.ref, type: 'group' });
+      expect(history.getUndoLabel()).toMatchObject({ key: 'annotation.copy' });
+
+      // One step: the copies go, and the originals are selected again.
+      await booted.step('undo');
+      expect(annotation.list()).toHaveLength(before);
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual(refs);
+      await booted.step('redo');
+      expect(annotation.list()).toHaveLength(before + 3);
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual(
+        copies.map((copy) => copy.ref),
+      );
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('copies onto another page, and a locked annotation stays locked', async () => {
+    const booted = await boot();
+    try {
+      const { annotation } = booted;
+      const ref = await square(annotation);
+      await annotation.update(ref, { subtype: 'square', locked: true });
+      await booted.caughtUp();
+      expect(annotation.canDuplicate([ref])).toBe(false);
+
+      const { annotations } = await annotation.duplicate([ref], { offset: { x: 10, y: 10 } });
+      await booted.caughtUp();
+      expect(annotations).toHaveLength(1);
+      expect(annotations[0]).toMatchObject({ subtype: 'square', locked: true });
+      expect((annotations[0] as { box: unknown }).box).toEqual(box(110, 110));
     } finally {
       await booted.destroy();
     }

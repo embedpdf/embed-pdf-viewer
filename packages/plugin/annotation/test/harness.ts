@@ -5,8 +5,8 @@
  * events as one burst before its promise resolves, so the model changes
  * through the same event path as in production. A create that names an
  * object number gets that ref. The engine's answer to each op comes from the
- * per-verb mocks (`create`, `update`, `remove`, `reorder`), which tests hold
- * or refuse. Its annotations are the file's values, as tests write them; it
+ * per-verb mocks (`create`, `update`, `remove`, `reorder`, `copy`), which tests
+ * hold or refuse. Its annotations are the file's values, as tests write them; it
  * hands them out in page space, as the engines do (`pageAnnotationOf`).
  */
 import { createEventHook, type DocumentEvent } from '@embedpdf/core';
@@ -20,7 +20,7 @@ import type {
   PdfCoordinates,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { renderPlugin } from '@embedpdf/plugin-render';
@@ -97,6 +97,15 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   /** A page's drawing-order change: resolves with the page's new order. */
   const reorder = vi.fn(async (_refs: AnnotationRef[], _position: unknown) => ({
     order: [] as AnnotationRef[],
+  }));
+  /**
+   * A copy: resolves with the copies the engine made, in the order of the
+   * annotations named, and what it left out. A drop without a `field` is an
+   * annotation left out whole.
+   */
+  const copy = vi.fn(async (_refs: AnnotationRef[], _placement: unknown) => ({
+    annotations: [] as FileAnnotation[],
+    dropped: [] as { ref: AnnotationRef; field?: string; reason: string }[],
   }));
   const downloadResource = vi.fn(async (_ref: AnnotationRef, _role: string) => new Uint8Array([1]));
   /** A page's appearance pictures: none, unless a test gives some. */
@@ -212,6 +221,44 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
           const { order } = await reorder([...op.refs], op.position);
           items.push({ type: op.type, page: op.page, order, meta: metaOf() } as never);
           events.push({ type: 'annotations.reordered', page: op.page, order, meta: metaOf() });
+          break;
+        }
+        case 'annotations.copy': {
+          const answer = await copy([...op.refs], { page: op.page, offset: op.offset });
+          // Each copy takes the object number the op gave the annotation it copies.
+          const left = new Set(
+            answer.dropped.filter((drop) => drop.field === undefined).map((drop) => drop.ref),
+          );
+          const copied = op.refs
+            .map((ref, at) => ({ ref, objectNumber: op.objectNumbers?.[at] }))
+            .filter(
+              ({ ref }) => ![...left].some((gone) => annotationKey(gone) === annotationKey(ref)),
+            );
+          const annotations = answer.annotations.map((made, at) => {
+            const annotation = read(made);
+            const objectNumber = copied[at]?.objectNumber;
+            return objectNumber === undefined
+              ? annotation
+              : {
+                  ...annotation,
+                  ref: { kind: 'objectNumber' as const, page: annotation.page, objectNumber },
+                };
+          });
+          items.push({
+            type: op.type,
+            annotations,
+            refMap: annotations.map((made, at) => ({ from: copied[at]!.ref, to: made.ref })),
+            dropped: answer.dropped,
+            meta: metaOf(),
+          } as never);
+          for (const annotation of annotations) {
+            events.push({
+              type: 'annotations.created',
+              page: annotation.page,
+              annotation,
+              meta: metaOf(),
+            });
+          }
           break;
         }
         default:
@@ -361,6 +408,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     update,
     remove,
     reorder,
+    copy,
     downloadResource,
     renderAppearances,
     exportBundle,

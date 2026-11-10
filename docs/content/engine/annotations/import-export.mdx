@@ -257,7 +257,9 @@ engine.
 
 - Link a reply to a comment that's already in the target document: replies and popups link only
   to items of the same bundle.
-- Move or scale annotations, to paste them at an offset or onto a page of another size.
+- Move or scale annotations, to paste them at an offset or onto a page of another size. Inside
+  one document, [`doc.annotations.copy()`](/docs/engine/annotations#copy-annotations) copies
+  with an offset, and needs no bundle.
 - Carry what the engine doesn't model: those annotations and fields are in `dropped`.
 
 ### Bundles you build

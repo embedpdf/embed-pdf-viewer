@@ -106,6 +106,7 @@ export const de: Locale = {
         saveFile: 'Datei speichern',
         removeLink: 'Link entfernen',
         delete: 'Löschen',
+        duplicate: 'Duplizieren',
         group: 'Gruppieren',
         ungroup: 'Gruppierung aufheben',
         stampFromSelection: 'Stempel erstellen',

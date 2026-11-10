@@ -28,14 +28,19 @@ import type { PropertyReads } from '../read/properties';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationContext } from '../services';
 import type { AnnotationServices } from '../services';
+import type { Crud } from './crud';
 import { appliedOrThrow, batchResultOf, throwIfFailed } from './outcomes';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit, type StoreChange } from '../services/store';
 
+/** How far a duplicate lands from its original, in page points. */
+const DUPLICATE_OFFSET = 10;
+
 /**
  * The selection: what is selected, and the verbs that change its fields,
- * link, delete, rotate, group and ungroup it as one, every member through the
- * same `update → patch effect` path a gesture takes. Each verb is one change.
+ * link, delete, rotate, group, ungroup and duplicate it as one, every member
+ * through the same `update → patch effect` path a gesture takes. Each verb is
+ * one change.
  */
 export function createSelectionWrites(
   ctx: Pick<AnnotationContext, 'pageOf' | 'getPage' | 'cancellable'>,
@@ -45,13 +50,36 @@ export function createSelectionWrites(
     fonts,
     behaviors,
     lending,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors' | 'lending'>,
+    geometry,
+  }: Pick<
+    AnnotationServices,
+    'store' | 'authority' | 'fonts' | 'behaviors' | 'lending' | 'geometry'
+  >,
   annotations: Pick<AnnotationReads, 'selectedRecords' | 'listSelected'>,
   properties: Pick<PropertyReads, 'activeTextRange' | 'activeCaret' | 'selectionPropertiesOf'>,
   chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
   text: Pick<TextEditing, 'type' | 'styleTyping'>,
+  crud: Pick<Crud, 'duplicate'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
+
+  /**
+   * Where copies of the selection land: right and down of the originals, or
+   * left or up where that keeps on its page a copy that would leave it.
+   */
+  const beside = (): { x: number; y: number } => {
+    const boxes = annotations.selectedRecords().flatMap(({ annotation }) => {
+      const page = geometry.pageBoxOf(annotation.page.objectNumber);
+      return page ? [{ rect: annotation.rect, page }] : [];
+    });
+    const flips = (axis: 'x' | 'y', size: 'width' | 'height'): boolean =>
+      boxes.some(({ rect, page }) => rect[axis] + rect[size] + DUPLICATE_OFFSET > page[size]) &&
+      boxes.every(({ rect }) => rect[axis] - DUPLICATE_OFFSET >= 0);
+    return {
+      x: flips('x', 'width') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
+      y: flips('y', 'height') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
+    };
+  };
 
   /** Commit a selection message; resolves with its outcome over the refs that were selected. */
   const commitOverSelection = async (commit: () => Commit[], signal?: AbortSignal) => {
@@ -251,6 +279,17 @@ export function createSelectionWrites(
         })
       );
     },
+    // The selection holds every member of a selected group, so its copies
+    // are a group of their own.
+    duplicate: (
+      options: OperationOptions & { offset?: { readonly x: number; readonly y: number } } = {},
+    ) =>
+      crud.duplicate(selectedRefs(), {
+        offset: options.offset ?? beside(),
+        select: true,
+        ...(options.signal ? { signal: options.signal } : {}),
+      }),
+    canDuplicate: (): boolean => authority.canDuplicate(selectedRefs()),
   };
 
   /** One relationship (`/IRT` + `/RT`) written onto every record, as one change. */

@@ -52,6 +52,7 @@ error. The document is as it was before the call.
 | `annotations.update`           | `ref`, `patch`, `resources`, `expect`                     | `page.annotations.update(ref, patch, { resources })`                            |
 | `annotations.delete`           | `ref`, `expect`                                           | `page.annotations.delete(ref)`                                                  |
 | `annotations.reorder`          | `page`, `refs`, `position`                                | `page.annotations.reorder(refs, position)`                                      |
+| `annotations.copy`             | `refs`, `page`, `offset`, `objectNumbers`                 | `doc.annotations.copy(refs, { page, offset, objectNumbers })`                   |
 | `forms.setValue`               | `field`, `value`, `expect`                                | `doc.forms.setValue(field, value)`                                              |
 | `forms.reset`                  | `fields`                                                  | `doc.forms.reset(fields)`                                                       |
 | `forms.create`                 | `draft`, `objectNumber`, `widgetObjectNumbers`            | `doc.forms.create(draft, { objectNumber, widgetObjectNumbers })`                |
@@ -85,7 +86,7 @@ error. The document is as it was before the call.
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
 
-`pages.setScale` arrived in 3.1. Every other op is as old as 3.0.
+`pages.setScale` arrived in 3.1 and `annotations.copy` in 3.2. Every other op is as old as 3.0.
 
 ### What comes back
 

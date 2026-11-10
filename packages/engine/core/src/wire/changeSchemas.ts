@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  AnnotationCopyResultSchema,
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
   AnnotationListMutationMetaSchema,
@@ -120,6 +121,13 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     page: PageRefSchema,
     refs: z.array(AnnotationRefSchema).min(1),
     position: AnnotationPositionSchema,
+  }),
+  op({
+    type: z.literal('annotations.copy'),
+    refs: z.array(AnnotationRefSchema).min(1),
+    page: PageRefSchema.optional(),
+    offset: z.object({ x: z.number().finite(), y: z.number().finite() }).strict().optional(),
+    objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
   op({
     type: z.literal('forms.setValue'),
@@ -357,6 +365,7 @@ export const ChangeItemSchema = closed(
     }),
     itemOf('annotations.delete', AnnotationDeleteResultSchema, { page: PageRefSchema }),
     itemOf('annotations.reorder', AnnotationReorderResultSchema, { page: PageRefSchema }),
+    itemOf('annotations.copy', AnnotationCopyResultSchema),
     z.object({
       type: z.literal('annotations.restore'),
       page: PageRefSchema,

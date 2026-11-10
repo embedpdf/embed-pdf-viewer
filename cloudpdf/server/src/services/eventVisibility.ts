@@ -84,6 +84,7 @@ function visibleItem(type: string, item: Payload, may: EventReadRights): Payload
     case 'annotations.update':
       return mayRead(item.annotation, may) ? item : null;
     case 'annotations.restore':
+    case 'annotations.copy':
       return withVisibleAnnotations(item, may);
     case 'annotations.reorder':
     case 'annotations.delete':

@@ -23,7 +23,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { StoreChange } from './store';
-import { annotationOfCreate, type AnnotationRecords } from '../sync/records';
+import { annotationOfCreate, copiesOf, type AnnotationRecords } from '../sync/records';
 
 /**
  * What an update brings along in the same change (an annotation's attached
@@ -34,6 +34,12 @@ export type FollowUp = (
   op: Extract<ChangeOp, { type: 'annotations.update' }>,
   model: Model,
 ) => readonly ChangeOp[];
+
+type Copy = Extract<StoreChange, { type: 'copy' }>;
+
+/** The annotations a stated copy copies: the ones it names, then what comes along. */
+const copiedBy = (change: Copy): readonly AnnotationRef[] =>
+  change.along?.length ? [...change.refs, ...change.along] : change.refs;
 
 /**
  * A stated change as its op, as given: what an op builder adds for changes
@@ -64,6 +70,13 @@ export const opOfStated = (change: StoreChange): ChangeOp => {
         refs: change.refs,
         position: change.position,
       };
+    case 'copy':
+      return {
+        type: 'annotations.copy',
+        refs: copiedBy(change),
+        ...(change.page ? { page: change.page } : {}),
+        ...(change.offset ? { offset: change.offset } : {}),
+      };
   }
 };
 
@@ -72,6 +85,9 @@ const keysOf = (op: ChangeOp): string[] => {
   switch (op.type) {
     case 'annotations.create':
       return op.objectNumber === undefined ? [] : [`obj:${op.objectNumber}`];
+    // The copies: the annotations it copies stay as they are.
+    case 'annotations.copy':
+      return (op.objectNumbers ?? []).map((objectNumber) => `obj:${objectNumber}`);
     case 'annotations.update':
     case 'annotations.delete':
       return [annotationKey(op.ref)];
@@ -178,6 +194,49 @@ export function modelAfter(before: Model, result: UpdateResult): Model {
 const notFound = (ref: AnnotationRef): PluginError =>
   new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
 
+/** How many object numbers stated changes take: one per create, and one per annotation a copy copies. */
+export const numbersFor = (changes: readonly StoreChange[]): number =>
+  changes.reduce(
+    (count, change) =>
+      count + (change.type === 'create' ? 1 : change.type === 'copy' ? copiedBy(change).length : 0),
+    0,
+  );
+
+/**
+ * A stated copy as its op, with an object number for each annotation it
+ * copies, so the copies show at once under them. `ids`: the copies of the
+ * annotations it names, in their order (one the engine leaves out has none);
+ * `live`: the copies that draw live from now on. Throws for an annotation
+ * the view doesn't have.
+ */
+export function checkedCopyOf(
+  change: Copy,
+  current: AnnotationRecords,
+  taken: number[],
+): { ids: Id[]; op: Extract<ChangeOp, { type: 'annotations.copy' }>; live: Id[] } {
+  const refs = copiedBy(change);
+  for (const ref of refs) {
+    if (!(annotationKey(ref) in current.byKey)) throw notFound(ref);
+  }
+  const op = {
+    type: 'annotations.copy' as const,
+    refs,
+    ...(change.page ? { page: change.page } : {}),
+    ...(change.offset ? { offset: change.offset } : {}),
+    objectNumbers: taken.splice(0, refs.length),
+  };
+  const copies = copiesOf(current, op);
+  return {
+    ids: copies
+      .filter(({ source }) => source < change.refs.length)
+      .map(({ copy }) => annotationKey(copy.ref)),
+    op,
+    live: copies
+      .filter(({ copy }) => sourceOfNew(copy) === 'vector')
+      .map(({ copy }) => annotationKey(copy.ref)),
+  };
+}
+
 /**
  * One stated change as its op, resolved by the engine's own rules against
  * `current`: what shows is what the engine will write, and a change those
@@ -185,7 +244,7 @@ const notFound = (ref: AnnotationRef): PluginError =>
  * the change reaches it. `live`: the record draws live from now on.
  */
 export function checkedOpOf(
-  change: StoreChange,
+  change: Exclude<StoreChange, { type: 'copy' }>,
   current: AnnotationRecords,
   taken: number[],
   recordOf: (id: Id) => ModelAnnotation | undefined,

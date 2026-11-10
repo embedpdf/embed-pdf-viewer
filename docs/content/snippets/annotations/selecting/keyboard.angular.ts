@@ -13,7 +13,13 @@ export class AnnotationKeys {
 
   protected onKey(event: KeyboardEvent) {
     if (event.target instanceof HTMLInputElement || this.annotation.text.getEditing()) return;
-    if (event.key === 'Delete' || event.key === 'Backspace') void this.annotation.selection.delete();
+    if (event.key === 'Delete' || event.key === 'Backspace')
+      void this.annotation.selection.delete();
+    const duplicate = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd';
+    if (duplicate && this.annotation.selection.canDuplicate()) {
+      event.preventDefault(); // the browser's bookmark key
+      void this.annotation.selection.duplicate();
+    }
     if (event.key === 'Escape') {
       this.annotation.cancel(); // a drag or a polygon in progress
       this.interaction.activateDefaultTool();

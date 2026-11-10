@@ -10,6 +10,7 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { ChangeRecord, ReverseStep } from './ChangeRecord';
 import {
+  copyAnnotations,
   createAnnotation,
   deleteAnnotation,
   importAnnotations,
@@ -234,6 +235,8 @@ function runOp(
       return deleteAnnotation(ctx, op, at);
     case 'annotations.reorder':
       return reorderAnnotations(ctx, op);
+    case 'annotations.copy':
+      return copyAnnotations(ctx, op);
     case 'forms.setValue':
       return setValue(ctx, op, at);
     case 'forms.setDisplay':

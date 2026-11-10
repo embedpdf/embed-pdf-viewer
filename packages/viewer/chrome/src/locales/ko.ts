@@ -106,6 +106,7 @@ export const ko: Locale = {
         saveFile: '파일 저장',
         removeLink: '링크 제거',
         delete: '삭제',
+        duplicate: '복제',
         group: '그룹화',
         ungroup: '그룹 해제',
         stampFromSelection: '스탬프 만들기',

@@ -178,6 +178,7 @@ import type {
   SearchSnippet,
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
+import type { AnnotationCopyResult } from '../transfer/annotationCopy';
 import type {
   AnnotationImportBody,
   AnnotationImportOptions,
@@ -1178,7 +1179,8 @@ export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z
   meta: AnnotationListMutationMetaSchema,
 });
 
-export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
+/** What an import and a copy answer: the annotations made, where each came from, what was left out. */
+const annotationsMadeShape = {
   annotations: z.array(AnnotationSchema),
   refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
   dropped: z.array(
@@ -1202,7 +1204,15 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
     }),
   ),
   meta: AnnotationListMutationMetaSchema,
-}) as z.ZodType<AnnotationImportResult>;
+};
+
+export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object(
+  annotationsMadeShape,
+) as z.ZodType<AnnotationImportResult>;
+
+export const AnnotationCopyResultSchema: z.ZodType<AnnotationCopyResult> = z.object(
+  annotationsMadeShape,
+) as z.ZodType<AnnotationCopyResult>;
 
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */

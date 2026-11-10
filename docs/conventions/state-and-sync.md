@@ -450,7 +450,11 @@ The kernel tests each rule in `packages/core/main/test/changes.test.ts`.
 The annotation plugin is the reference: one change per message
 (`services/store.ts`), its records mirror predicts (`sync/records.ts`), new
 records are named by the object numbers they take, and typing is a hold
-(`write/text-editing.ts`).
+(`write/text-editing.ts`). Copies the engine makes (`annotations.copy`) are
+predicted by the engine's own rule (`planAnnotationCopies`), each under the
+object number the op gives it. A copied stamp has no live drawing, so it
+shows its original's picture until the engine has drawn the copy
+(`read/render.ts`).
 
 ### The page list
 

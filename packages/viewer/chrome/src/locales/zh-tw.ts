@@ -108,6 +108,7 @@ export const zhTW: Locale = {
         saveFile: '儲存檔案',
         removeLink: '移除連結',
         delete: '刪除',
+        duplicate: '建立副本',
         group: '群組',
         ungroup: '取消群組',
         stampFromSelection: '建立圖章',
