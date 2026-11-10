@@ -15,6 +15,7 @@ import type {
   DeepPartial,
   EventHook,
   EventOrigin,
+  HistoryOptions,
   OperationOptions,
   PluginErrorInfo,
   ResourceStatus,
@@ -904,13 +905,15 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   ): Promise<AnnotationBundle>;
   /**
    * Put a bundle's annotations into this document, as one change: they show
-   * once it's done. Resolves `{ annotations, refMap, dropped }`. Rejects
-   * `permission-denied` without `annotations:create` (and, for the default
+   * once the engine wrote them, and it is one step to undo. `history: false`
+   * keeps it out of undo and redo, for what your app loads by itself.
+   * Resolves `{ annotations, refMap, dropped }`. Rejects `permission-denied`
+   * without `annotations:create` (and, for the default
    * `attribution: 'restore'`, `doc.annotate.import`).
    */
   import(
     bundle: AnnotationBundle,
-    options?: AnnotationImportOptions & OperationOptions,
+    options?: AnnotationImportOptions & OperationOptions & HistoryOptions,
   ): Promise<AnnotationImportResult>;
   /**
    * Download a stamp's drawing (`'appearance'`) or an attachment's file
