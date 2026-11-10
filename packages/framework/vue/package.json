@@ -2,7 +2,7 @@
   "name": "@embedpdf/vue",
   "version": "3.1.0",
   "private": false,
-  "description": "Vue adapter for EmbedPDF v3: composables, components with v-model and scoped slots, headless layers. The whole framework surface, one entry point per feature.",
+  "description": "Vue 3 components and composables for building your own PDF viewer with EmbedPDF.",
   "type": "module",
   "sideEffects": false,
   "license": "Apache-2.0",

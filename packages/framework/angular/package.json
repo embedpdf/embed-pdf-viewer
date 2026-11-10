@@ -2,7 +2,7 @@
   "name": "@embedpdf/angular",
   "version": "3.1.0",
   "private": false,
-  "description": "Angular adapter for EmbedPDF: provideEmbedPdf() with one feature per plugin, one service per plugin with signals and RxJS streams, and standalone components (<epdf-stage>, layers). One secondary entry point per feature.",
+  "description": "Angular services and components for building your own PDF viewer with EmbedPDF.",
   "sideEffects": false,
   "module": "./dist/fesm2022/embedpdf-angular.mjs",
   "types": "./dist/index.d.ts",

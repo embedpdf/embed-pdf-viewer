@@ -14,10 +14,11 @@
  * An `@embedpdf/*` package gets embedpdf.com's form of the page and its code, a `@cloudpdf/*`
  * package cloudpdf.com's.
  */
+const EVERY_PLUGIN = { page: 'headless/index', section: 'Every plugin' };
+
 export const READMES = {
-  '@embedpdf/react': {
-    page: 'headless/quick-start',
-    framework: 'react',
-    also: { page: 'headless/index', section: 'Every plugin' },
-  },
+  '@embedpdf/react': { page: 'headless/quick-start', framework: 'react', also: EVERY_PLUGIN },
+  '@embedpdf/vue': { page: 'headless/quick-start', framework: 'vue', also: EVERY_PLUGIN },
+  '@embedpdf/svelte': { page: 'headless/quick-start', framework: 'svelte', also: EVERY_PLUGIN },
+  '@embedpdf/angular': { page: 'headless/quick-start', framework: 'angular', also: EVERY_PLUGIN },
 };
