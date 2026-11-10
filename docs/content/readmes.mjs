@@ -9,8 +9,9 @@
  *   framework the page is shown for: one of the four on a headless page, those or `vanilla` on a
  *   viewer page, none on an engine page. `section` names a `##` section of the page by its
  *   heading; the README then shows that section in place of the page's opening. `also` names a
- *   section of a second page, `{ page, section }`, shown after the cut under the section's own
- *   heading: the list of every plugin, from the overview.
+ *   second page, `{ page, section }`, shown after the cut under its own heading: that section,
+ *   or the page's opening under the page's title. It is what the package has: every plugin, or
+ *   every feature of the viewer.
  * - **`near`**: a package that only comes along with others. Its README says which, and links
  *   the page nearest to what the package does.
  * - **`by`**: this script doesn't write the README. `'hand'` is one still written by hand, with
@@ -21,6 +22,8 @@
  * package cloudpdf.com's.
  */
 const EVERY_PLUGIN = { page: 'headless/index', section: 'Every plugin' };
+const ALL_FEATURES = { page: 'viewer/features/index' };
+const viewer = (framework) => ({ page: 'viewer/quick-start', framework, also: ALL_FEATURES });
 const BY_HAND = { by: 'hand' };
 const INSTALLED_BY_HAND = { by: 'hand', installed: true };
 
@@ -56,11 +59,11 @@ export const READMES = {
   '@embedpdf/plugin-stage': BY_HAND,
 
   // ── packages/viewer ──
-  '@embedpdf/viewer': INSTALLED_BY_HAND,
-  '@embedpdf/viewer-react': INSTALLED_BY_HAND,
-  '@embedpdf/viewer-vue': INSTALLED_BY_HAND,
-  '@embedpdf/viewer-svelte': INSTALLED_BY_HAND,
-  '@embedpdf/viewer-angular': INSTALLED_BY_HAND,
+  '@embedpdf/viewer': viewer('vanilla'),
+  '@embedpdf/viewer-react': viewer('react'),
+  '@embedpdf/viewer-vue': viewer('vue'),
+  '@embedpdf/viewer-svelte': viewer('svelte'),
+  '@embedpdf/viewer-angular': viewer('angular'),
   '@embedpdf/viewer-chrome': BY_HAND,
 
   // ── packages/engine, and the font and stamp packages ──
@@ -82,11 +85,11 @@ export const READMES = {
   '@embedpdf/default-stamps': INSTALLED_BY_HAND,
 
   // ── cloudpdf ──
-  '@cloudpdf/viewer': INSTALLED_BY_HAND,
-  '@cloudpdf/viewer-react': INSTALLED_BY_HAND,
-  '@cloudpdf/viewer-vue': INSTALLED_BY_HAND,
-  '@cloudpdf/viewer-svelte': INSTALLED_BY_HAND,
-  '@cloudpdf/viewer-angular': INSTALLED_BY_HAND,
+  '@cloudpdf/viewer': viewer('vanilla'),
+  '@cloudpdf/viewer-react': viewer('react'),
+  '@cloudpdf/viewer-vue': viewer('vue'),
+  '@cloudpdf/viewer-svelte': viewer('svelte'),
+  '@cloudpdf/viewer-angular': viewer('angular'),
   '@cloudpdf/engine': INSTALLED_BY_HAND,
   '@cloudpdf/plugin-protected-display': INSTALLED_BY_HAND,
   '@cloudpdf/web': INSTALLED_BY_HAND,

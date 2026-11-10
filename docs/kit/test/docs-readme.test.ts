@@ -109,6 +109,17 @@ describe('the cut of a page', () => {
     );
   });
 
+  it('gives the opening under the page’s title, as a second-level heading, when asked for', () => {
+    const { cut } = renderDocsReadmeWith(site, {
+      sourceCode: source,
+      canonicalPath: page,
+      integration: 'react',
+      withHeading: true,
+    });
+
+    expect(cut).toBe(lines('## Search', '', 'Finds text.'));
+  });
+
   it('fails on a section the page does not have', () => {
     expect(() => readme(source, 'Settings')).toThrow('The page has no section "Settings".');
   });
@@ -162,6 +173,22 @@ describe('a page’s Markdown in a README', () => {
         '> A note that stays.',
       ),
     );
+  });
+
+  it('shows a command without a file name', () => {
+    const installs: DocsMarkdownSite = {
+      ...site,
+      resolveExampleFiles: () => [
+        { filename: 'install.sh', code: 'npm install @embedpdf/viewer-react\n', language: 'sh' },
+      ],
+    };
+    const { cut } = renderDocsReadmeWith(installs, {
+      sourceCode: '# Quick start\n\n<Snippet name="viewer/start/install" />',
+      canonicalPath: '/docs/viewer/react/quick-start',
+      integration: 'react',
+    });
+
+    expect(cut).toBe(lines('```sh', 'npm install @embedpdf/viewer-react', '```'));
   });
 
   it('keeps an install command as written', () => {

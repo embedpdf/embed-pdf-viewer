@@ -2,7 +2,7 @@
   "name": "@embedpdf/viewer-angular",
   "version": "3.1.0",
   "private": false,
-  "description": "Angular wrapper for the full viewer: the epdf-pdf-viewer component around the embedpdf-viewer custom element, with template directives for your own components.",
+  "description": "A complete PDF viewer as an Angular component: toolbars, annotations, forms and signatures, with the PDF engine built in.",
   "type": "module",
   "module": "./dist/fesm2022/embedpdf-viewer-angular.mjs",
   "types": "./dist/index.d.ts",

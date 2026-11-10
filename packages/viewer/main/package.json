@@ -2,7 +2,7 @@
   "name": "@embedpdf/viewer",
   "version": "3.1.0",
   "private": false,
-  "description": "The full viewer, delivered: the <embedpdf-viewer> custom element + EmbedPDF.init(). One Preact-compiled artifact of @embedpdf/viewer-chrome with the local wasm engine wired in — the thing the CDN serves and every framework wrapper wraps. Ships DIST only (the preact aliasing happens in THIS package's build), so consumers never compile the chrome.",
+  "description": "A complete PDF viewer for any web page: one element with toolbars, annotations, forms and signatures, with the PDF engine built in.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

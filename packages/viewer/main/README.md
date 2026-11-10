@@ -1,74 +1,76 @@
+<!-- Generated from docs/content/viewer/quick-start.mdx and docs/content/viewer/features/index.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/viewer
 
-The full viewer, delivered: the `<embedpdf-viewer>` custom element and
-`EmbedPDF.init()`. One artifact — `@embedpdf/viewer-chrome` compiled with
-Preact, the local wasm engine and its worker wired in — served from the CDN
-and wrapped by every framework package. No peer dependencies, no React
-version matrix, no style collisions (shadow DOM; theming stays inside it).
+A complete PDF viewer for any web page: one element with toolbars, annotations, forms and signatures, with the PDF engine built in.
 
-## Use
+## Quick start
 
-```html
-<div id="viewer" style="height: 100vh"></div>
-<script type="module">
-  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
-  EmbedPDF.init({ target: '#viewer', src: 'https://www.embedpdf.com/pdfs/welcome.pdf' });
-</script>
-```
+This guide adds the viewer to your app, then makes it yours in four small steps. Each step works on
+its own, so stop whenever it's enough.
 
-Or declaratively — it's a real custom element:
+### 1. Install
+
+**`install.html`**
 
 ```html
-<embedpdf-viewer
-  src="https://www.embedpdf.com/pdfs/welcome.pdf"
-  locale="auto"
-  theme="system"
-  style="height: 100vh"
-></embedpdf-viewer>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js"></script>
 ```
 
-`init` accepts the whole customization contract (`commands`, `icons`,
-`strings`, `layout`, `features`, `readOnly`, `scope`, `identity`, `notAllowed`,
-`locale`, `theme`) — see
-`@embedpdf/viewer-chrome`'s README for the ladder. `layout` takes a function
-of the default layout and the viewer's env, so changing the toolbar needs no
-import at all:
+The package brings everything: the toolbar and panels, the PDF engine, and its WebAssembly, which
+your build serves from your own site.
+
+### 2. Show a PDF
+
+Give the viewer a document and a height:
+
+**`first.html`**
+
+```html
+<embedpdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh"></embedpdf-viewer>
+
+<script type="module" src="https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js"></script>
+```
+
+The viewer fills the box you give it, so it needs a height: a fixed one, `100vh`, or the rest of a
+flex layout. People can now scroll, zoom, search, select text, annotate, fill in forms, sign and
+download.
+
+## All features
+
+Most features are on from the start; measuring, redaction, building forms and snapshots wait until
+you turn them on. Turn features on or off with `features`, by the name in the first column:
 
 ```js
-EmbedPDF.init({
-  target: '#viewer',
-  src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
-  layout: (layout, env) =>
-    layout
-      .remove('tool:pan', { from: 'main' })
-      .place('main', env.size === 'compact' ? 'bottom' : 'top'),
-});
+{ features: { measurement: true, redaction: true, comments: false } }
 ```
 
-The default layout (`defaultLayout`) and `createLayout` re-export from this
-module for a layout written from scratch.
+| Feature       | What people can do                                                                           | On from the start | Settings                                                                                                    |
+| :------------ | :------------------------------------------------------------------------------------------- | :---------------- | :---------------------------------------------------------------------------------------------------------- |
+| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts           | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations)                            |
+| `shapes`      | Draw rectangles, circles, lines, arrows and polygons                                         | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations#the-tools)                  |
+| `comments`    | Comment on annotations and reply, in a panel with every thread                               | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations#comments)                   |
+| `stamps`      | Place stamps: the standard ones, their own, or images                                        | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations#stamps)                     |
+| `signatures`  | Draw, type or upload a signature; sign fields; check signatures                              | yes               | [Forms & signatures](https://www.embedpdf.com/docs/viewer/vanilla/features/forms-and-signatures#signatures) |
+| `forms`       | Fill in forms; build them in the Form mode                                                   | Filling only      | [Forms & signatures](https://www.embedpdf.com/docs/viewer/vanilla/features/forms-and-signatures)            |
+| `redaction`   | Mark text and areas, then remove them from the file for good                                 | no                | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations#redaction)                  |
+| `measurement` | Measure distances, perimeters and areas at the drawing's scale                               | no                | [Annotations](https://www.embedpdf.com/docs/viewer/vanilla/features/annotations#measurements)               |
+| `pages`       | Rotate, move, insert, duplicate and delete pages in the thumbnails panel, each step undoable | yes               | [Panels](https://www.embedpdf.com/docs/viewer/vanilla/customize/panels#organize-pages)                      |
+| `attachments` | See, save, attach and remove files inside the PDF                                            | yes               | [Panels](https://www.embedpdf.com/docs/viewer/vanilla/customize/panels#the-attachments)                     |
+| `search`      | Find text, with every match highlighted and listed                                           | yes               | [`plugins.search`](https://www.embedpdf.com/docs/headless/react/text/search#settings)                       |
+| `text`        | Select and copy text                                                                         | yes               | [`plugins.selection`](https://www.embedpdf.com/docs/headless/react/text/selection#settings)                 |
+| `snapshots`   | Copy or save part of a page as a picture                                                     | no                | [Documents](https://www.embedpdf.com/docs/viewer/vanilla/documents#take-a-snapshot)                         |
+| `thumbnails`  | A picture of every page, to jump around                                                      | yes               | [Panels](https://www.embedpdf.com/docs/viewer/vanilla/customize/panels)                                     |
+| `outline`     | The document's table of contents                                                             | yes               | [Panels](https://www.embedpdf.com/docs/viewer/vanilla/customize/panels)                                     |
+| `documents`   | Open other files (with the local engine), download, print, several documents in tabs         | yes               | [Documents](https://www.embedpdf.com/docs/viewer/vanilla/documents)                                         |
 
-Set `.config` (or the attributes) and the element builds the viewer. Six keys
-follow their value while it runs, from `.config`, their own properties
-(`element.src = file`, `.theme`, `.locale`, `.features`, `.readOnly`, `.fetch`)
-or the `src`, `theme` and `locale` attributes: `src` opens the new document (a
-URL, a `File` or bytes) in place of the old one, `fetch` downloads the next
-document at a URL, and the others change the look, the language and the tools.
-Changing any other key re-creates the viewer from scratch, documents and all.
+## Documentation
 
-## Build notes
+- [Quick start](https://www.embedpdf.com/docs/viewer/vanilla/quick-start): Install the viewer, show a PDF, give it your color and your own button, put your own component in the toolbar, and talk to it from code.
+- [Setup](https://www.embedpdf.com/docs/viewer/vanilla/setup): Sizing, server-side rendering, the engine, and several viewers on a page.
+- [Layout](https://www.embedpdf.com/docs/viewer/vanilla/customize/layout): Toolbars at the bottom, on the side, floating, or several at once.
+- [Theming](https://www.embedpdf.com/docs/viewer/vanilla/customize/theming): Your colors, light and dark, and the look of every part.
 
-- `vite build` produces `dist/embedpdf.js` + chunks + the engine worker/wasm
-  assets. All asset URLs are RELATIVE (`renderBuiltUrl`) so the directory is
-  relocatable to any CDN path.
-- The react→preact aliasing happens HERE and only here (vite.config.ts) —
-  aliases point at absolute file paths because the aliased imports live in
-  other workspace packages whose node_modules have no preact.
-- `process.env.NODE_ENV` compiles to `'production'`; the viewer therefore
-  checks the layout UNCONDITIONALLY (the chrome's layout root) — a CDN user's
-  typo'd id warns with the exact id and the closest one that exists instead of
-  failing silently.
-- Light-DOM children with a `slot` attribute project into the chrome's
-  matching `custom()` sockets (children-as-slots — see the viewer-chrome
-  README). They stay in the page's world: page CSS and the host framework's
-  state keep working, and the toolbar live-measures the projected box.
+## License
+
+Apache-2.0

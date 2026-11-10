@@ -2,7 +2,7 @@
   "name": "@cloudpdf/viewer-angular",
   "version": "3.1.0",
   "private": false,
-  "description": "The full viewer as an Angular component with the CloudPDF engine as its default: the same <epdf-pdf-viewer> as @embedpdf/viewer-angular, rendering on CloudPDF SaaS or your own @cloudpdf/server over HTTPS, the local engine loaded only when stamps need it.",
+  "description": "A complete PDF viewer as an Angular component, with CloudPDF as its engine: the file stays on the server, and pages arrive as images.",
   "type": "module",
   "module": "./dist/fesm2022/cloudpdf-viewer-angular.mjs",
   "types": "./dist/index.d.ts",

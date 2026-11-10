@@ -156,7 +156,8 @@ whose prose promises what the viewer doesn't do yet lists those gaps in
 `docs/content/viewer-pending.mjs`, each with why, and stays coming for every integration until
 they're removed, however little code it has. In CI, `publish-gate.mjs --strict` (the docs gate
 job in `.github/workflows/packages.yml`) fails when a check crashes or stops checking, or a
-headless page's snippets don't compile; a viewer page that's coming fails nothing.
+headless page's snippets don't compile; a viewer page that's coming fails nothing, unless a
+package's README shows it (see "Package READMEs").
 
 Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
 `docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
@@ -358,9 +359,11 @@ installed frame's:
   for a `@cloudpdf/*` one, with that site's code.
 - **`{cut}`** is the part of the page the README shows, and **`{nextSteps}`**
   the cards of the page's "Next steps" section.
-- **`{also}`** is a section of a second page, where the manifest names one
-  (`also`): the section with its own heading, after the cut. A framework
-  package's README shows the overview's "Every plugin" this way.
+- **`{also}`** is part of a second page, where the manifest names one (`also`),
+  after the cut and under its own heading: a section, or the page's opening
+  under the page's title. It is what the package has. A framework package's
+  README shows the overview's "Every plugin" this way, and a viewer package's
+  the opening of "All features".
 
 The plugin frame has `{imports}`, the rows of its table of import paths, and
 `{otherPages}`, its other pages as links. The support frame has `{product}`,
@@ -384,7 +387,7 @@ move the code above it.
 
 The cut goes through the Markdown pass, as the page's `.md` does (docs-kit
 `renderDocsReadmeWith`). A README is read on npm and GitHub, so it differs in
-five ways, none of which adds a word:
+six ways, none of which adds a word:
 
 - **An example the page keeps open** (`mode="open"`) shows its code. Any other
   example is a demo, left out with its "Try it" hint.
@@ -393,6 +396,8 @@ five ways, none of which adds a word:
   place on the page gets the page's URL too, as the README holds only part of
   the page.
 - **A card** is its linked title, a colon and its description.
+- **A command** (`install.sh`) shows without a file name: it is something to
+  run, not a file to make.
 - **The page's headings go one level down**, under the page's title. A section
   shown with its own heading (`also`) keeps its levels.
 
@@ -401,6 +406,12 @@ A page that names something `pending` (`reference.mjs`, `viewer-pending.mjs`)
 holds its README back, as it holds the page back on the site: the README is then
 its frame without the cut. That is read from committed files only, never from
 what compiled, so the script writes the same README on every machine.
+
+What a README shows must compile, since it is committed. A headless page's
+snippets always must. A viewer page that doesn't compile is only held back on
+its site, so the docs gate job fails on a viewer page a README shows, for the
+integration and on the site the README shows it for. Engine pages' code is not
+compiled.
 
 `pnpm readme:sync` writes the READMEs, and `pnpm readme:check` fails on one that
 isn't current. Each site's `docs:sync` and `docs:check` do the same for the
