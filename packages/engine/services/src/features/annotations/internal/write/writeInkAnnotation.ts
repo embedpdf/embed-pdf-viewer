@@ -72,9 +72,6 @@ export function isInkSubtype(subtype: string): subtype is 'ink' {
   return subtype === 'ink';
 }
 
-/** `EPDF_STAMP_FIT_STRETCH`: the drawing fills `/Rect`, as any PDF places an appearance. */
-const FIT_FILL = 2;
-
 /**
  * Validate an ink's `appearance` resource before the first native write: it
  * must be a one-page PDF (a drawing, not a picture of one).
@@ -137,12 +134,6 @@ export function drawInkAppearance(
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'the appearance page could not be drawn into the ink',
-      );
-    }
-    if (!fn.EPDFAnnot_UpdateAppearanceToRect(annotPtr, FIT_FILL)) {
-      throw new EngineError(
-        EngineErrorCode.Unknown,
-        'the appearance page could not be fitted into the ink',
       );
     }
     return true;
