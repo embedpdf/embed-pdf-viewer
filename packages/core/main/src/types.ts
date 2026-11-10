@@ -753,6 +753,12 @@ export interface DownloadOptions extends OperationOptions {
    * signatures stay valid; `'rewrite'` writes a fresh file without earlier revisions.
    */
   readonly mode?: PdfSaveMode;
+  /**
+   * With `'incremental'`: merge the changes into the file's last update section instead of
+   * appending a new one, so repeated saves don't grow the file. Falls back to an append when
+   * the file has no update yet, its structure cannot be proven, or the last section is signed.
+   */
+  readonly mergeLastUpdate?: boolean;
 }
 
 /**

@@ -1769,7 +1769,14 @@ export function createKernel(config: {
     // Reading the file: download() and downloadLayer() (downloadFile above).
     download: (id, options) =>
       downloadFile(id, options?.signal, 'download', (handle) =>
-        handle.download(options?.mode !== undefined ? { mode: options.mode } : undefined),
+        handle.download(
+          options?.mode !== undefined || options?.mergeLastUpdate
+            ? {
+                ...(options.mode !== undefined ? { mode: options.mode } : {}),
+                ...(options.mergeLastUpdate ? { mergeLastUpdate: true } : {}),
+              }
+            : undefined,
+        ),
       ),
     downloadLayer: (id, options) =>
       downloadFile(
