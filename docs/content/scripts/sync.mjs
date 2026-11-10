@@ -544,6 +544,30 @@ export function transformFile(source, engine, relative, { viewer }) {
   return swapDocumentSite(output, engine);
 }
 
+/** Where a site keeps its copy of the examples and snippets. */
+const SAMPLES_DIR = 'src/samples';
+
+/**
+ * The examples and snippets a flavor's site has, as it shows them: each file's path under the
+ * site's samples (`search/basic.react.tsx`, `snippets/start/save-button.vue`) and its code.
+ */
+export function siteSamples(engine, frameworks = ALL_FRAMEWORKS) {
+  const samples = new Map();
+  for (const mount of MOUNTS.samples) {
+    const root = path.join(contentRoot, mount.from);
+    const relatives = walk(root).map((file) => toPosix(path.relative(root, file)));
+    for (const { source: relative, emitAs } of siteFiles(relatives, engine)) {
+      const integration = integrationOf(emitAs);
+      // `--frameworks` narrows the frameworks; a plain HTML page belongs to none of them.
+      if (integration && integration !== 'vanilla' && !frameworks.includes(integration)) continue;
+      const source = fs.readFileSync(path.join(root, relative), 'utf8');
+      const emitted = transformFile(source, engine, emitAs, { viewer: mount.viewer(emitAs) });
+      samples.set(toPosix(path.join(path.relative(SAMPLES_DIR, mount.to), emitAs)), emitted);
+    }
+  }
+  return samples;
+}
+
 // ── the site's copy ─────────────────────────────────────────────────────────
 
 function buildExpected(engine, frameworks) {
@@ -575,17 +599,8 @@ function buildExpected(engine, frameworks) {
     }
   }
 
-  for (const mount of MOUNTS.samples) {
-    const root = path.join(contentRoot, mount.from);
-    const relatives = walk(root).map((file) => toPosix(path.relative(root, file)));
-    for (const { source: relative, emitAs } of siteFiles(relatives, engine)) {
-      const integration = integrationOf(emitAs);
-      // `--frameworks` narrows the frameworks; a plain HTML page belongs to none of them.
-      if (integration && integration !== 'vanilla' && !frameworks.includes(integration)) continue;
-      const source = fs.readFileSync(path.join(root, relative), 'utf8');
-      const emitted = transformFile(source, engine, emitAs, { viewer: mount.viewer(emitAs) });
-      expected.set(path.join(mount.to, emitAs), emitted);
-    }
+  for (const [file, code] of siteSamples(engine, frameworks)) {
+    expected.set(path.join(SAMPLES_DIR, file), code);
   }
 
   // The ?inline/css ambient declarations every synced samples tree needs.
@@ -698,7 +713,8 @@ async function main() {
   );
 }
 
-// The snippet check reads the pages and files a site gets from here (`sitePages`, `siteFiles`,
-// `transformViewerFile`); only `node scripts/sync.mjs` syncs.
+// The snippet check and the package READMEs read the pages and files a site gets from here
+// (`sitePages`, `siteFiles`, `siteSamples`, `transformViewerFile`); only `node scripts/sync.mjs`
+// syncs.
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]))
   await main();

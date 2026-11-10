@@ -308,6 +308,79 @@ to a line.
 integration, and fails on a link that isn't a full URL or a docs link that names
 no page.
 
+## Package READMEs
+
+A package's `README.md` is the page npm shows for it. It is written from the
+docs page that documents the package, by `docs/content/scripts/readmes.mjs`, and
+committed, so it says nothing the docs don't. `docs/content/readmes.mjs` lists
+the packages, each with the page its README is cut from and the framework the
+page is shown for. Change the page, never the README.
+
+A README is a frame, `docs/content/readme/installed.md`, with its slots filled:
+
+- **`{name}`, `{description}` and `{license}`** are the package's own, from its
+  `package.json`. The description is the README's first line and the sentence
+  npm's search shows, so it says what the package is, in plain words.
+- **`{pageTitle}`, `{pageDescription}` and `{pageUrl}`** are the page's, as the
+  package's site has it: embedpdf.com for an `@embedpdf/*` package, cloudpdf.com
+  for a `@cloudpdf/*` one, with that site's code.
+- **`{cut}`** is the part of the page the README shows, and **`{nextSteps}`**
+  the cards of the page's "Next steps" section.
+- **`{also}`** is a section of a second page, where the manifest names one
+  (`also`): the section with its own heading, after the cut. A framework
+  package's README shows the overview's "Every plugin" this way.
+
+The frame's words are the only ones in a README that no page has, and the script
+adds none. A slot with nothing to say takes its line with it, and so does a
+heading left with nothing under it.
+
+The cut is decided on the page:
+
+| The page has                               | The README shows                                           |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| Nothing special                            | The opening: what is under the title, up to the first `##` |
+| `{/* readme: end */}` on a line of its own | What is under the title, up to that line                   |
+| A section the manifest names (`section`)   | That section, up to the next `##` or the marker inside it  |
+
+The marker stands once, at the top level of the page, never inside an `<Fw>` or
+`<Engine>` block. When a cut reads wrong, change the page: move the marker, or
+move the code above it.
+
+The cut goes through the Markdown pass, as the page's `.md` does (docs-kit
+`renderDocsReadmeWith`). A README is read on npm and GitHub, so it differs in
+five ways, none of which adds a word:
+
+- **An example the page keeps open** (`mode="open"`) shows its code. Any other
+  example is a demo, left out with its "Try it" hint.
+- **An install command** stays `npm install`, as written.
+- **Every link is the full URL of a page**, never of its `.md`. A link to a
+  place on the page gets the page's URL too, as the README holds only part of
+  the page.
+- **A card** is its linked title, a colon and its description.
+- **The page's headings go one level down**, under the page's title. A section
+  shown with its own heading (`also`) keeps its levels.
+
+A README describes its own commit: npm shows the release's, GitHub shows main's.
+A page that names something `pending` (`reference.mjs`, `viewer-pending.mjs`)
+holds its README back, as it holds the page back on the site: the README is then
+its frame without the cut. That is read from committed files only, never from
+what compiled, so the script writes the same README on every machine.
+
+`pnpm readme:sync` writes the READMEs, and `pnpm readme:check` fails on one that
+isn't current. Each site's `docs:sync` and `docs:check` do the same for the
+packages of its scope, and CI runs the check in the contract job. Both commands
+also fail on:
+
+- a description, a frame or a cut that holds an em-dash or names a release
+  ("v3"), outside its code;
+- a link that isn't a full URL, or a docs link that names no page on either
+  site;
+- an entry that names no published package, no page, or a framework the page
+  isn't shown for.
+
+Package READMEs are in `.prettierignore`: their code is the compiled file's, and
+the commit hook would reformat it.
+
 ## The support matrix is generated, not written
 
 During the rollout (React complete → Vue/Svelte/Angular incremental), every

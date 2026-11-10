@@ -79,7 +79,7 @@ function referenceNames(page) {
 }
 
 /** Per page (`text/search`, as the snippet status names it), the pending names it lists. */
-function pendingByPage() {
+export function pendingByPage() {
   const byPage = new Map();
   for (const entry of REFERENCE) {
     const pending = entry.pending ?? {};
