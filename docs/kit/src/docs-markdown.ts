@@ -147,11 +147,15 @@ function pathFromPage(url: string, canonicalPath: string): string {
 function markdownPageUrl(url: string, siteOrigin: string): string {
   const origin = [siteOrigin, ...DOCS_ORIGINS].find((docs) => url.startsWith(`${docs}/`));
   if (!origin) return url;
-  const [, pathname = '', rest = ''] = url.slice(origin.length).match(/^([^?#]*)(.*)$/) ?? [];
-  const page = pathname.replace(/\/+$/, '');
+  // The path ends where the query or the fragment starts, less any slashes it ends on.
+  const marks = [url.indexOf('?'), url.indexOf('#')].filter((at) => at !== -1);
+  let end = marks.length > 0 ? Math.min(...marks) : url.length;
+  const rest = url.slice(end);
+  while (url[end - 1] === '/') end -= 1;
+  const page = url.slice(origin.length, end);
   if (page !== '/docs' && !page.startsWith('/docs/')) return url;
   // A file a site serves under `/docs` (a screenshot), or a link that names the Markdown already.
-  if (/\.[a-z0-9]+$/i.test(page)) return url;
+  if (page.slice(page.lastIndexOf('/') + 1).includes('.')) return url;
   return `${origin}${page}.md${rest}`;
 }
 

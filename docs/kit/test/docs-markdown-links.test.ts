@@ -82,6 +82,34 @@ describe('links in the Markdown export', () => {
     expect(markdown).not.toContain('.md.md');
   });
 
+  it('reads a docs link’s page up to its query or fragment, without the slashes it ends on', () => {
+    const markdown = exported(
+      [
+        '[Slash](/docs/engine/fonts/)',
+        '[Slashes](/docs/engine/fonts///#subsets)',
+        '[Fragment first](/docs/engine/fonts#a?b)',
+        '[Home](https://www.embedpdf.com/)',
+        '[Not docs](/docsify/setup)',
+      ].join('\n\n'),
+      stage,
+      'react',
+    );
+
+    expect(markdown).toContain('[Slash](https://docs.example/docs/engine/fonts.md)');
+    expect(markdown).toContain('[Slashes](https://docs.example/docs/engine/fonts.md#subsets)');
+    expect(markdown).toContain('[Fragment first](https://docs.example/docs/engine/fonts.md#a?b)');
+    expect(markdown).toContain('[Home](https://www.embedpdf.com/)');
+    expect(markdown).toContain('[Not docs](https://docs.example/docsify/setup)');
+  });
+
+  // A pass that starts over at every slash takes minutes here, and the test times out.
+  it('reads a link of any length in one pass', () => {
+    const slashes = '/'.repeat(200_000);
+    const markdown = exported(`[Long](/docs/engine/fonts${slashes}x${slashes})`, stage, 'react');
+
+    expect(markdown).toContain(`fonts${slashes}x.md)`);
+  });
+
   it('leaves every other link as written', () => {
     const markdown = exported(
       [
