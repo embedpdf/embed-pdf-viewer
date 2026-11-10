@@ -30,6 +30,21 @@ describe('the llms files', () => {
     expect(new Set(linksOf(body, 'viewer')).size).toBe(linksOf(body, 'viewer').length);
   });
 
+  it('lists a product’s pages in the order its sidebar has them', () => {
+    const headless = linksOf(renderLlms(null), 'headless').map((url) =>
+      url.replace('https://www.embedpdf.com/docs/headless/react', '').replace(/\.md$/, ''),
+    );
+
+    // The overview, the quick start and setup lead; then each group, in its own order.
+    expect(headless.slice(0, 4)).toEqual(['', '/quick-start', '/setup', '/viewing/stage']);
+    expect(headless.indexOf('/viewing/stage')).toBeLessThan(headless.indexOf('/documents/opening'));
+    expect(headless.indexOf('/annotations')).toBeLessThan(headless.indexOf('/annotations/tools'));
+    expect(headless.indexOf('/annotations/tools')).toBeLessThan(
+      headless.indexOf('/annotations/comments'),
+    );
+    expect(headless.at(-1)).toBe('/errors');
+  });
+
   it('links every integration’s file from /llms.txt, before the pages', () => {
     const body = renderLlms(null);
     const files = DOCS_INTEGRATIONS.map(

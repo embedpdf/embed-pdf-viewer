@@ -299,7 +299,9 @@ it and AI agents read it, so it is read away from its page:
 integration: Vanilla JS for the viewer, React for headless.
 `/llms/<integration>.txt` lists every page one integration has, and the files
 link each other. Each site writes its files' framing (title, summary, section
-labels) and the page lists are generated (`src/lib/llms.ts` in each site).
+labels) and the page lists are generated (`src/lib/llms.ts` in each site), in
+the order the sidebar has the pages: the keys of each folder's `_meta.ts`, one
+to a line.
 
 `website/src/lib/docs-links.test.ts` reads every page's Markdown for every
 integration, and fails on a link that isn't a full URL or a docs link that names
