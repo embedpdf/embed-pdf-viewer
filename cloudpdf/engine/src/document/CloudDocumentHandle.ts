@@ -70,7 +70,7 @@ import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
 import type { GrantSessionSource } from '../grant';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
-import { SseClient } from '../realtime/SseClient';
+import { SseClient, type DesyncReason } from '../realtime/SseClient';
 import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -311,6 +311,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
+      () => http.serverVersion,
     );
     this.metadata = new CloudMetadataService(
       http,
@@ -781,26 +782,22 @@ export class CloudDocumentHandle implements DocumentHandle {
           const sha = (row.payload as { version?: { sha256?: unknown } }).version?.sha256;
           if (typeof sha === 'string') this.pool.versioned(sha);
         }
-        // None for an own echo or an unknown kind; one per fact otherwise.
-        for (const event of auditRowToEvents(row, this.sessionId)) {
+        const events = auditRowToEvents(row, this.sessionId);
+        // A kind of change this version doesn't have, from a newer server:
+        // nothing says what it changed, so everything is read again.
+        if (events === null) {
+          this.desynced('unknown-change');
+          return;
+        }
+        // None for an own echo; one per fact otherwise.
+        for (const event of events) {
           // Absorb before publish: a listener reading the manifest in its
           // callback must see post-mutation state (same order as local).
           this.absorbRemoteEvent(event);
           this.hub.publish(event);
         }
       },
-      onFullRefresh: () => {
-        // Too far behind to replay: drop the cache; the next read refetches.
-        this.manifestCache = null;
-        this.inflightManifest = null;
-        // Tell subscribers their event-derived state may be stale — the
-        // gap's mutations will never arrive as events.
-        this.hub.publish({
-          type: 'stream.desynced',
-          reason: 'backlog-overflow',
-          at: new Date().toISOString(),
-        });
-      },
+      onFullRefresh: (reason) => this.desynced(reason),
       onAuthLost: () => {
         // The stream is gone for good under this credential. Local events
         // keep flowing; remote delivery resumes if the doc is re-opened
@@ -811,6 +808,18 @@ export class CloudDocumentHandle implements DocumentHandle {
       onConnected: (connected) => this.pool.connected(connected),
     });
     this.sseClient.open();
+  }
+
+  /**
+   * The stream can't be followed change by change from here: drop the cached
+   * manifest, so the next read refetches, and tell subscribers their
+   * event-derived state may be stale. The missed mutations will never arrive
+   * as events.
+   */
+  private desynced(reason: DesyncReason): void {
+    this.manifestCache = null;
+    this.inflightManifest = null;
+    this.hub.publish({ type: 'stream.desynced', reason, at: new Date().toISOString() });
   }
 
   private releaseRemoteStream(): void {

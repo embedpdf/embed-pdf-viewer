@@ -393,6 +393,16 @@ describe('the request', () => {
     expect(without.body.error.code).toBe('InvalidArg');
   });
 
+  test('an op with a field the server does not know refuses the request, naming the field', async () => {
+    const layer = 'strict';
+    const answered = await post(layer, [{ opId: 's1', ops: [{ ...create(20), colour: 'red' }] }]);
+    expect(answered.status).toBe(400);
+    expect(answered.body.error.code).toBe('InvalidArg');
+    expect(answered.body.error.message).toContain('colour');
+    expect(await lefts(layer)).toEqual([]);
+    expect(await auditRows(layer)).toEqual([]);
+  });
+
   test('the limits refuse the whole request', async () => {
     const layer = 'limits';
     const many = Array.from({ length: 65 }, (_, i) => ({ opId: `l${i}`, ops: [create(20)] }));

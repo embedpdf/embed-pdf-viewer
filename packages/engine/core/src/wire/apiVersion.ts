@@ -29,3 +29,28 @@ export function apiVersionOf(packageVersion: string): string {
  * packages release together, so they all speak this one.
  */
 export const API_VERSION: string = apiVersionOf(version);
+
+const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
+  version.major < than.major || (version.major === than.major && version.minor < than.minor);
+
+/**
+ * Whether the other side lacks something that arrived in the version
+ * `since`. `version` is what the other side said it speaks
+ * (`EmbedPDF-Version`, `EmbedPDF-Server-Version`); `null` when it didn't
+ * say, which reads as this build's own version. `since` is `null` for
+ * something this build doesn't have itself.
+ *
+ * A side of this build's version has exactly what this build has, and a
+ * newer side has all of it. So `since` is compared only with an older side's
+ * version, and two sides of one build talk even while something names a
+ * version the packages don't carry yet. What this build doesn't have, only a
+ * newer side can have.
+ */
+export function lacksWhatArrivedIn(version: string | null, since: string | null): boolean {
+  const own = parseApiVersion(API_VERSION)!;
+  const other = (version === null ? null : parseApiVersion(version)) ?? own;
+  if (since === null) return !isOlder(own, other);
+  const arrived = parseApiVersion(since);
+  if (!arrived) throw new Error(`not an API version: ${since}`);
+  return isOlder(other, own) && isOlder(other, arrived);
+}

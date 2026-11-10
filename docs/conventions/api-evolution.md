@@ -35,6 +35,7 @@ may depend on both sides being the same version.
 | Add a request header                                                | Yes, behind a version check | A browser asks the server's CORS configuration before it sends a header the server hasn't allowed, and an older server's doesn't list the new one, so the browser blocks the whole request. A client sends a new header only to a server that has it. |
 | Add a response field                                                | Yes                         | Older clients drop it. On a cached kind, also raise that kind's `FIELDS` number (see [Engine values](#engine-values)), so bodies with the field get new URLs.                                                                                         |
 | Add a value to a set (an enum, a union's kinds)                     | Only with a catch-all       | The set documents what older clients read an unknown value as, like an annotation's `unsupported` kind. A set without one is closed.                                                                                                                  |
+| Add a kind of change op or result item                              | Yes, with its version       | The kind says the version it arrived in, and neither side sends it to an older side (see [Adding a change kind](#adding-a-change-kind)). The set of kinds stays closed: it is closed per version.                                                     |
 | Rename, remove or retype a field; change what one means             | No                          | First choice: expand and contract. Add the new field beside the old one and send both until the next major. Otherwise, a version change.                                                                                                              |
 | Change documented behavior, in the same shape                       | No                          | A client written against the docs can break on a new unit, a new default or another line break just as on a renamed field. The same shape doesn't make it compatible, and neither does an engine value.                                               |
 | Fix or improve what the server computes, within documented behavior | Yes                         | Not a contract change: raise the rule it changes (see [Engine values](#engine-values)).                                                                                                                                                               |
@@ -49,7 +50,9 @@ The client parses every response with the wire schemas in
   client needs. A test enforces it rather than a list of names: real responses
   from the conformance runs, with an unknown field added to every object in
   them, still parse. Request schemas stay strict on the server, so a
-  misspelled field fails loudly.
+  misspelled field fails loudly. Each op of a change is strict about its own
+  fields too: a field the server doesn't know refuses the change, where
+  dropping it would apply the op without it.
 - **A union read from the server has a catch-all kind**, and an unknown
   discriminator parses as that kind instead of failing the whole response. A
   known discriminator with a malformed body still fails: the catch-all is for
@@ -90,9 +93,19 @@ The client parses every response with the wire schemas in
   it, which can be older or newer than the server answering now, so a client
   reads the server's version from `/head`, which is live.
 - **A client feature that needs a newer server names the minimum version it
-  needs.** The client checks it against `/head` before using the feature.
-  Against an older server, that feature fails with an error that names both
-  versions, and everything else keeps working.
+  needs.** The client keeps the version the server last said it is, from its
+  live answers (`HttpClient.serverVersion`; `/head` is read as a document
+  opens), and checks the feature against it before using it. Against an older
+  server, that feature fails with an error that names both versions
+  (`NotImplemented`, with `needs` and `serverVersion` in its details), and
+  everything else keeps working. One helper makes every such check:
+  `serverLacks` in `cloudpdf/engine/src/transport/serverVersion.ts`.
+- **A version is compared only with an older side's.** A side of this
+  build's version has exactly what this build has, and a newer side has all
+  of it (`lacksWhatArrivedIn` in `@embedpdf/engine-core/wire`). That matters
+  before a release: the packages still carry the last version while a new
+  kind already names the next one, and a client and a server of one build
+  must still talk.
 - **A server answers every version of its major and refuses another.** An
   older minor is answered through the version changes: additive changes need
   none, a breaking change needs one. A newer minor is answered as the server's
@@ -107,6 +120,61 @@ The client parses every response with the wire schemas in
   Without that, browsers refuse every cross-origin request that sends the
   header. They are in 3.0.0's list, so every 3.x client can send them to every
   3.x server.
+
+### Adding a change kind
+
+A change is a list of ops, and its answer a list of items
+(`POST …/changes`). Both name themselves by `type`, a kind. The set of kinds
+is closed, so a side can't read a kind it doesn't know. And a kind can meet
+an older side: a client and a server update on their own schedules, and two
+viewers of one document can be of two versions. So:
+
+**Every kind of change op and result item says the version it arrived in,
+and neither side sends a kind to a side that is older than the kind.**
+
+`CHANGE_KIND_SINCE` in `@embedpdf/engine-core/wire` is the list. A kind that
+isn't in it arrived in 3.0. A test keeps it whole: the kinds of 3.0 are a
+fixed list there, and any other kind without a row fails it.
+
+| Who meets the new kind             | What happens                                                                 | Where                                                  |
+| :--------------------------------- | :--------------------------------------------------------------------------- | :----------------------------------------------------- |
+| An older server, from a new client | The client refuses the change alone, before anything is sent.                | `cloudpdf/engine/src/document/CloudDocumentChanges.ts` |
+| An older client, on the stream     | The server sends `full-refresh` in place of the row, then the rows after it. | `cloudpdf/server/src/services/eventReadability.ts`     |
+| A client, in any other way         | It treats a row it can't read as a `full-refresh`.                           | `cloudpdf/engine/src/realtime/auditRowToEvents.ts`     |
+
+- **A `full-refresh` is not a page reload.** The client drops its cached
+  manifest and publishes `stream.desynced`. Every mirror reads again, every
+  page is drawn again, and the viewer reads the page list again. Scroll,
+  zoom, the selection, the history and the changes on their way stay. It is
+  slower than an event, and it is correct. Every 3.x client does it, so the
+  server can send it to any of them.
+- **Why the client refuses alone.** An older server refuses a request with a
+  kind it doesn't know whole, with every change that shares the request.
+- **The visibility filter names every kind too**
+  (`cloudpdf/server/src/services/eventVisibility.ts`): a new kind doesn't
+  compile until it says who may read its items.
+- **A new kind of audit row follows the same rule.** A write with a route of
+  its own has a row kind of its own; `ROW_KIND_SINCE` in
+  `eventReadability.ts` names every kind's version, and the stream sends
+  `full-refresh` in place of a row newer than the client.
+- **During a rolling deploy** a replica can meet a kind a newer replica
+  wrote. A kind a side doesn't have itself is one only a newer side has: the
+  server sends `full-refresh` for it to every client that isn't newer than
+  the server, and withholds its items from a connection that may not read
+  everything.
+
+To add a kind: add its row to `CHANGE_KIND_SINCE`, give it a case in
+`eventVisibility.ts` and in the client's `absorbRemoteEvent` (both fail to
+compile without one), and document it with the version it arrived in.
+
+What the rule doesn't do:
+
+- It doesn't make an older viewer faster. Beside a newer one, it reads its
+  lists again on each change of a kind it doesn't know.
+- A 3.0 or 3.1 viewer keeps its page list as it was after such a refresh,
+  for a new kind that changes pages, until the document is opened again.
+  Viewers from 3.2 read it again.
+- It doesn't cover a renamed or removed field. That stays a breaking change.
 
 ### Version changes
 
@@ -404,9 +472,6 @@ version header, and every response is read tolerantly; what is left:
 
 - The version-change machinery, built with the first breaking change that
   needs it.
-- The client's minimum-version check, built with the first feature that needs
-  a newer server. Every 3.x server sends its version, so a later client can
-  check any of them.
 - The runtime's release check renders the test PDFs with the old and the new
   runtime and lists the pages that differ, which decides `drawing`.
 - CI keeps the 3.0.0 server image as an older server for the client's suite,

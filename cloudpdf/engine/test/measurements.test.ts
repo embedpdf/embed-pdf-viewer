@@ -95,6 +95,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
     const [event] = auditRowToEvents(
+      // A row of this version: it reads as its events.
       {
         id: Number(row.id),
         ts: row.ts,
@@ -106,7 +107,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
         payload: JSON.parse(row.payload_json),
       },
       'another-session',
-    );
+    )!;
     expect(event).toMatchObject({
       type: 'pages.scaleSet',
       page: ref,

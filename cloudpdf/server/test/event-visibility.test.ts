@@ -79,6 +79,14 @@ describe('visibleRow', () => {
     expect(visibleRow(onlyComments, FILLER)).toEqual(withheld('change'));
   });
 
+  it('withholds an item of a kind this server does not have, unless the connection reads everything', () => {
+    const change = row('change', { items: [{ type: 'future.thing', secret: 'x' }] });
+    expect(visibleRow(change, EVERYTHING)).toBe(change);
+    expect(visibleRow(change, FILLER)).toEqual(withheld('change'));
+    const skipped = row('change', { items: [{ type: 'skipped', op: 'annotations.update' }] });
+    expect(visibleRow(skipped, FILLER)).toBe(skipped);
+  });
+
   it('sends what neither capability guards to everyone', () => {
     const rotate = row('change', {
       items: [{ type: 'pages.rotate', pages: [], rotation: 90, layout: { pages: [] } }],
