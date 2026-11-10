@@ -2,7 +2,7 @@
 
 {description}
 
-## {pageTitle}
+## {heading}
 
 {cut}
 

@@ -63,7 +63,7 @@ import {
 } from './readme-text.mjs';
 import { sitePages, siteSamples } from './sync.mjs';
 
-/** The first line of every README this script writes, naming the pages it is cut from. No reader sees it. */
+/** The first line of every README this script writes, naming the files it is made from. No reader sees it. */
 const marker = (pages) =>
   `<!-- Generated from ${pages.join(' and ')} by docs/content/scripts/readmes.mjs. Edit there, then run \`pnpm readme:sync\`. -->`;
 
@@ -305,19 +305,38 @@ function readPage(name, engine, { source, mdx, integration, canonicalPath }, opt
 /** A page that is held back on the site has no part in a README either. */
 const shownOf = (page, cut) => (namesPending(page.id) ? '' : cut);
 
-/** The slots every frame has, from the package's own `package.json`, and what it lacks for them. */
+/**
+ * A package's notice: the `NOTICE.md` beside its `package.json`, as `{ file, text }`, or null.
+ * It is written by hand, for what a license's name doesn't say (whose fonts these are, whose
+ * project the code comes from), and a README shows it under the license, word for word.
+ */
+const noticeOf = once((directory) => {
+  const file = `${directory}/NOTICE.md`;
+  try {
+    return { file, text: fs.readFileSync(path.join(repoRoot, file), 'utf8').trim() };
+  } catch {
+    return null;
+  }
+});
+
+/** The slots every frame has, from the package's own files, and what it lacks for them. */
 function packageSlots(name, { directory, manifest }) {
   const manifestFile = `${directory}/package.json`;
+  const notice = noticeOf(directory);
+  const license = manifest.license ?? '';
   const slots = {
     name,
     description: manifest.description?.trim() ?? '',
-    license: manifest.license ?? '',
+    license: notice && license ? `${license}\n\n${notice.text}` : license,
   };
   const problems = [
     ...(slots.description ? [] : [`${manifestFile} has no description`]),
-    ...(slots.license ? [] : [`${manifestFile} has no license`]),
+    ...(license ? [] : [`${manifestFile} has no license`]),
     ...wordingProblems(slots.description).map(
       (problem) => `${manifestFile}: its description ${problem}`,
+    ),
+    ...(notice ? wordingProblems(proseOf(notice.text)) : []).map(
+      (problem) => `${notice.file} ${problem}`,
     ),
   ];
   return { slots, problems };
@@ -336,7 +355,11 @@ function finish(name, { directory }, kind, slots, shown, problems) {
       problems.push(`${source} ${problem}, in what ${name}'s README shows of it`);
     }
   }
-  const sources = [...new Set(shown.map(([{ source }]) => source))];
+  const notice = noticeOf(directory);
+  const sources = [
+    ...new Set(shown.map(([{ source }]) => source)),
+    ...(notice ? [notice.file] : []),
+  ];
   const text = `${marker(sources)}\n\n${fillFrame(frame.text, slots)}`;
   for (const problem of linkProblems(text, docsRoutesAt)) {
     problems.push(`${file}: ${problem} (${sources.join(', ')})`);
@@ -368,6 +391,8 @@ function installedReadme(name, entry, listed) {
   const { slots, problems } = packageSlots(name, listed);
   problems.push(...pageProblems(page));
   Object.assign(slots, {
+    // What the README shows stands under its own heading: the section's, or the page's title.
+    heading: entry.section ?? page.title,
     pageTitle: page.title,
     pageDescription: page.description,
     pageUrl: `${DOCUMENT_SITES[engine]}${page.canonicalPath}`,

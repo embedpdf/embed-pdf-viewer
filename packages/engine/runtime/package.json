@@ -2,7 +2,7 @@
   "name": "@embedpdf/engine-runtime",
   "version": "3.1.0",
   "private": false,
-  "description": "Low-level PDF execution runtime for EmbedPDF, backed by EmbedPDF's fork of PDFium and distributed as WASM and native platform packages.",
+  "description": "Loads the PDF runtime of the EmbedPDF engine: a native build in Node where the platform has one, WebAssembly everywhere else.",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./dist/index.node.cjs",
@@ -87,7 +87,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "NOTICE.md"
   ],
   "dependencies": {
     "detect-libc": "^2.1.2"

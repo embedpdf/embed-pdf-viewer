@@ -2,7 +2,7 @@
   "name": "@embedpdf/engine",
   "version": "3.1.0",
   "private": false,
-  "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
+  "description": "The EmbedPDF engine: opens, renders, searches, edits and saves PDF files in the browser and in Node, with one typed API.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

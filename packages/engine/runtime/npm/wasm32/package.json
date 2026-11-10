@@ -1,5 +1,6 @@
 {
   "version": "3.1.0",
+  "description": "The EmbedPDF engine's PDF runtime as WebAssembly, for browsers, and for Node where no native build fits.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
@@ -32,7 +33,8 @@
     "wasm-url.d.ts",
     "wasm-inline.d.ts",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE.md"
   ],
   "repository": {
     "type": "git",

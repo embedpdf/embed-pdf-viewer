@@ -354,6 +354,11 @@ installed frame's:
 - **`{name}`, `{description}` and `{license}`** are the package's own, from its
   `package.json`. The description is the README's first line and the sentence
   npm's search shows, so it says what the package is, in plain words.
+- **A `NOTICE.md` beside the `package.json`** is shown under the license, word
+  for word. It is written by hand, for what a license's name doesn't say: whose
+  fonts a package holds, whose project its code comes from.
+- **`{heading}`** is what the cut stands under: the page's title, or the
+  section's heading when the README shows a section.
 - **`{pageTitle}`, `{pageDescription}` and `{pageUrl}`** are the page's, as the
   package's site has it: embedpdf.com for an `@embedpdf/*` package, cloudpdf.com
   for a `@cloudpdf/*` one, with that site's code.
@@ -362,8 +367,8 @@ installed frame's:
 - **`{also}`** is part of a second page, where the manifest names one (`also`),
   after the cut and under its own heading: a section, or the page's opening
   under the page's title. It is what the package has. A framework package's
-  README shows the overview's "Every plugin" this way, and a viewer package's
-  the opening of "All features".
+  README shows the overview's "Every plugin" this way, a viewer package's the
+  opening of "All features", and the engine's "What you can do".
 
 The plugin frame has `{imports}`, the rows of its table of import paths, and
 `{otherPages}`, its other pages as links. The support frame has `{product}`,
