@@ -171,7 +171,8 @@ export function createCrud(
   /**
    * Copies of annotations in this document, which the engine makes in one
    * op: they show at once, and it is one step to undo. An annotation's
-   * attached link is a child of it, so it is copied along.
+   * attached link is a child of it, so it is copied along. A link `refs`
+   * names itself is copied once, as one of the copies named.
    */
   const duplicate = async (
     refs: readonly AnnotationRef[],
@@ -181,8 +182,11 @@ export function createCrud(
     if (!refs.length) return { annotations: [], dropped: [] };
     const page = options.page === undefined ? undefined : ctx.pageOf(options.page).ref;
     const model = store.model();
+    const stated = new Set(refs.map(annotationKey));
     const along = refs.flatMap((ref) =>
-      linkChildrenOf(model, annotationKey(ref)).map((child) => child.annotation.ref),
+      linkChildrenOf(model, annotationKey(ref))
+        .map((child) => child.annotation.ref)
+        .filter((child) => !stated.has(annotationKey(child))),
     );
     const applied = await store.applyWhenNumbered(
       [
