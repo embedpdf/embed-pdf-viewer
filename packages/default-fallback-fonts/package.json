@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/default-fallback-fonts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "description": "The fonts the EmbedPDF engine writes Hebrew and Arabic with: Noto Sans Hebrew and Noto Naskh Arabic, regular and bold.",
   "type": "module",

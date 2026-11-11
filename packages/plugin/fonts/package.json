@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-fonts",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Fonts for EmbedPDF: lists the fonts a document can be written in, and draws text in a browser as the engine writes it.",
   "type": "module",

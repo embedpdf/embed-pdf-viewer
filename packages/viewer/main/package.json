@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "A complete PDF viewer for any web page: one element with toolbars, annotations, forms and signatures, with the PDF engine built in.",
   "type": "module",

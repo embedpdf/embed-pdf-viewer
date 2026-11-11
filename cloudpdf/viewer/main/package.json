@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "A complete PDF viewer for any web page, with CloudPDF as its engine: the file stays on the server, and pages arrive as images.",
   "type": "module",

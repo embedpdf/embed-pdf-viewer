@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-form",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Draws PDF form fields for EmbedPDF as the engine draws them. No DOM.",
   "type": "module",

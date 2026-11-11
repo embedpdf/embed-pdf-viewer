@@ -1,5 +1,5 @@
 {
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "The native build of the EmbedPDF engine's PDF runtime for macOS on Intel.",
   "license": "Apache-2.0",
   "publishConfig": {

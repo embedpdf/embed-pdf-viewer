@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The EmbedPDF engine: opens, renders, searches, edits and saves PDF files in the browser and in Node, with one typed API.",
   "type": "module",

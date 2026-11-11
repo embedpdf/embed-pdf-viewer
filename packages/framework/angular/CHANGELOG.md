@@ -1,5 +1,17 @@
 # @embedpdf/angular
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – `EpdfAnnotation` has `duplicate(refs, options)`, `canDuplicate(refs)`, `isMovable(ref)`, `selection.duplicate(options)` and `selection.canDuplicate()`.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – `EpdfForm` has `duplicate(fields, options)` and `duplicateWidgets(widgets, options)`.
+
+### Patch Changes
+
+- [#1074](https://github.com/embedpdf/embed-pdf-viewer/pull/1074) by [@bobsingor](https://github.com/bobsingor) – `<epdf-form-layer>` draws a field's picture where the field is now. A field that was moved, in Form design or with `updateWidget()`, kept its picture at the old place until the page's pictures were loaded again: the field showed in one place and took clicks in another.
+
 ## 3.1.0
 
 ## 3.0.0

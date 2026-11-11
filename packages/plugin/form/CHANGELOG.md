@@ -1,5 +1,13 @@
 # @embedpdf/plugin-form
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – New `duplicate(fields, { page?, offset?, values? })` copies whole fields: each copy is a new field named after its original (`email_2`), with its settings, scripts and widgets, and no answer unless `values` is true. New `duplicateWidgets(widgets, options)` copies widgets as Duplicate does in a form designer: a radio button's copy is another button of its group, with the next free `Choice<n>`, and any other widget's copy is a new field; widgets of one field copied together become one new field. Both show their copies at once, are one step to undo, and resolve `{ fields, widgets, dropped }`. In design mode the annotation plugin's `selection.duplicate()` copies the selected widgets through this plugin. `addWidget()` now shows its new widget before the engine answers. `getSelectedField()` is also the field when several of its widgets are selected, such as a radio group's buttons. Past the engine's item limit (10,000 fields by default) the call is refused with `invalid-input`, and nothing is copied.
+
+- [#1054](https://github.com/embedpdf/embed-pdf-viewer/pull/1054) by [@bobsingor](https://github.com/bobsingor) – `import()` is now one step to undo: an undo takes away the fields the import added, and a redo brings them back. An app that adds fields by itself passes `history: false` to keep the import out of undo and redo: `form.import(bundle, { history: false })`.
+
 ## 3.1.0
 
 ## 3.0.0

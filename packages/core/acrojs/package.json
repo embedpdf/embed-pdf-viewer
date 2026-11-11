@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-acrojs",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The Acrobat JavaScript a PDF's scripts expect, for EmbedPDF: its objects, its security rules and the code a sandbox starts with.",
   "type": "module",

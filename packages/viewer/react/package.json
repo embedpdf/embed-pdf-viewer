@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer-react",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "A complete PDF viewer as a React component: toolbars, annotations, forms and signatures, with the PDF engine built in.",
   "type": "module",
