@@ -122,6 +122,36 @@ const onScreen = (tab: Page, point: { x: number; y: number }) =>
     return { x: viewport.left + spot.x, y: viewport.top + spot.y };
   }, point);
 
+/** A box of page 1, in page space. */
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Whether a picture (an `<img>`) sits on `box` of page 1, to the pixel. */
+const pictureAt = (tab: Page, box: Box) =>
+  tab.evaluate((at) => {
+    const { viewer } = window.element;
+    const page = viewer.documents.getPage(0);
+    const viewport = (
+      window.element.shadowRoot!.querySelector('[data-float]') as HTMLElement
+    ).offsetParent!.getBoundingClientRect();
+    const rect = viewer.get('stage').pageRectToViewport(page.ref, at);
+    if (!rect) return false;
+    const near = (left: number, right: number) => Math.abs(left - right) < 1.5;
+    return [...window.element.shadowRoot!.querySelectorAll('img')].some((image) => {
+      const frame = image.getBoundingClientRect();
+      return (
+        near(frame.left, viewport.left + rect.x) &&
+        near(frame.top, viewport.top + rect.y) &&
+        near(frame.width, rect.width) &&
+        near(frame.height, rect.height)
+      );
+    });
+  }, box);
+
 describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () => {
   let host: ViewerHost;
   let browser: Browser;
@@ -346,5 +376,31 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
       () => !window.element.viewer.get('shell').isOpen('form-design'),
       'the sidebar to close',
     );
+  });
+
+  it("draws a moved field's picture where the field is now", async () => {
+    // Design is off: the form layer draws the fields, each as the engine's picture of it.
+    const was: Box = { x: 320, y: 40, width: 120, height: 20 };
+    const now: Box = { ...was, x: 60, y: 90 };
+    const ref = await tab.evaluate(async (rect) => {
+      const { viewer } = window.element;
+      const page = viewer.documents.getPage(0);
+      const { field } = await viewer.get('form').create({
+        kind: 'text',
+        name: 'guard-moved',
+        widgets: [{ page: page.ref, rect }],
+      });
+      return field.widgets[0].ref;
+    }, was);
+    await expect.poll(() => pictureAt(tab, was), { timeout: 10_000 }).toBe(true);
+
+    // A move keeps the field's look, so the engine draws nothing again: the picture the layer
+    // holds goes where the field is.
+    await tab.evaluate(
+      ([widget, rect]) => window.element.viewer.get('form').updateWidget(widget, { rect }),
+      [ref, now] as const,
+    );
+    await expect.poll(() => pictureAt(tab, now), { timeout: 10_000 }).toBe(true);
+    expect(await pictureAt(tab, was)).toBe(false);
   });
 });

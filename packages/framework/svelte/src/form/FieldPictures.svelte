@@ -2,7 +2,8 @@
   The page's fields as they look now. Each widget shows its picture, as the engine draws it (the
   form plugin's, every state loaded, so a check box shows its new state at once), or the painter's
   drawing while its look is pending or its picture is of an older version (`pictureOrPainting`): a
-  value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
+  value, a calculation, a restyle shows at once. Either is drawn at the widget's box: a moved
+  widget keeps its picture and takes it along. Hidden widgets aren't drawn.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -91,15 +92,10 @@
         paint: () => form.current?.getWidgetPainting(widget.ref) ?? null,
       });
       if (!look) return [];
+      // Where the widget is now: a move keeps its picture, which comes along with it.
+      const frame = rectInPixels(widget.rect, page.transform);
       if (look.kind === 'picture') {
-        return [
-          {
-            key,
-            url: look.picture.url,
-            painting: null,
-            frame: rectInPixels(look.picture.box, page.transform),
-          },
-        ];
+        return [{ key, url: look.picture.url, painting: null, frame }];
       }
       const { x, y, width, height } = widget.rect;
       return [
@@ -110,7 +106,7 @@
             viewBox: `${x} ${y} ${width} ${height}`,
             shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
           },
-          frame: rectInPixels(widget.rect, page.transform),
+          frame,
         },
       ];
     }),

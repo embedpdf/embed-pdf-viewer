@@ -524,7 +524,9 @@ export function FormLayer() {
  * engine draws it (the form plugin's, every state loaded, so a check box
  * shows its new state at once), or the painter's drawing while its look is
  * pending or its picture is of an older version (`pictureOrPainting`): a
- * value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
+ * value, a calculation, a restyle shows at once. Either is drawn at the
+ * widget's box: a moved widget keeps its picture and takes it along. Hidden
+ * widgets aren't drawn.
  */
 function FieldPictures({ page }: { page: PageContextValue }) {
   const form = useCapability(FormHostToken);
@@ -572,9 +574,10 @@ function FieldPictures({ page }: { page: PageContextValue }) {
         const look = looks[index];
         if (!look) return null;
         const key = annotationKey(widget.ref);
+        // Where the widget is now: a move keeps its picture, which comes along with it.
+        const frame = rectInPixels(widget.rect, page.transform);
         if (look.kind === 'painting') {
           const { x, y, width, height } = widget.rect;
-          const frame = rectInPixels(widget.rect, page.transform);
           return (
             <svg
               key={key}
@@ -593,7 +596,6 @@ function FieldPictures({ page }: { page: PageContextValue }) {
             </svg>
           );
         }
-        const frame = rectInPixels(look.picture.box, page.transform);
         return (
           <img
             key={key}
