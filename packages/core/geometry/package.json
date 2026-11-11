@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-geometry",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Points, sizes, boxes and page rotation for EmbedPDF, with the transforms between a page, the view and the screen. No dependencies, no DOM.",
   "type": "module",

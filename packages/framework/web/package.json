@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/web",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The browser code EmbedPDF's framework packages share: gestures, cursors, the clipboard, file dialogs and printing.",
   "type": "module",

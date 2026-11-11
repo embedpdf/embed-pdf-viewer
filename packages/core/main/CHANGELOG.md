@@ -1,5 +1,15 @@
 # @embedpdf/core
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1054](https://github.com/embedpdf/embed-pdf-viewer/pull/1054) by [@bobsingor](https://github.com/bobsingor) – A plugin can stage a change that one of the engine's own verbs makes, such as an import: `ctx.changes.stage({ label, send })`. The queue calls `send(doc, { opId })` when it sends the change, so the verb keeps its place among the other changes, and the history records it as one step. `opId` names the change when the caller of the verb chose an id, and `history: false` keeps it out of the history. The new `HistoryOptions` type is the `history?: false` option a verb takes from its caller.
+
+### Patch Changes
+
+- [#1056](https://github.com/embedpdf/embed-pdf-viewer/pull/1056) by [@bobsingor](https://github.com/bobsingor) – The page list is read again when the event stream skipped events (`stream.desynced`). A page inserted or deleted by someone else while a viewer was too far behind used to show only after the document was opened again.
+
 ## 3.1.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-stage",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The layout and the camera of EmbedPDF's Stage: where the pages are, and which part of them is in view. No DOM.",
   "type": "module",

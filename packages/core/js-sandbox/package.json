@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-js-sandbox",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Runs a PDF's JavaScript for EmbedPDF inside QuickJS, within limits on time and memory.",
   "type": "module",

@@ -1,5 +1,11 @@
 # @embedpdf/default-fallback-fonts
 
+## 1.0.1
+
+### Patch Changes
+
+- [#1070](https://github.com/embedpdf/embed-pdf-viewer/pull/1070) by [@bobsingor](https://github.com/bobsingor) – The package's page on npm says what the fonts are and which packages bring them, with the fonts' license notice under it. The notice is a file of the package too, `NOTICE.md`.
+
 ## 1.0.0
 
 ### Minor Changes

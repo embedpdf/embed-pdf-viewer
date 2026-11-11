@@ -1,5 +1,13 @@
 # @cloudpdf/sdk
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – The SDK has the change op `annotations.copy` and its result item: `ChangeOp.AnnotationsCopy` and `ChangeItem.AnnotationsCopy`.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – The SDK has the change op `forms.copy` and its result item: `ChangeOp.FormsCopy` and `ChangeItem.FormsCopy`.
+
 ## 3.1.0
 
 ### Minor Changes

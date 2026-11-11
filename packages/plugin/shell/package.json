@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-shell",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Panels and menus for EmbedPDF: keeps track of which panels, dialogs and menus are open.",
   "type": "module",

@@ -57,7 +57,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -138,7 +138,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -228,7 +228,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -339,7 +339,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -439,7 +439,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": request["X-Document-Password"],
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
                 ..._maybeEncodedRequest.headers,
             }),
             requestOptions?.headers,

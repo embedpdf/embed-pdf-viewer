@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-fonts",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The 14 standard PDF fonts as the EmbedPDF engine draws them: font files a browser can load, and the measures the engine lays text out with.",
   "type": "module",

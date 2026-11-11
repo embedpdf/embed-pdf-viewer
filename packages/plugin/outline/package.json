@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-outline",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The outline for EmbedPDF: shows a document's bookmarks as a tree, follows them, and adds, renames, moves and deletes them.",
   "type": "module",

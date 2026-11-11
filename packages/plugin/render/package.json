@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-render",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Rendering for EmbedPDF: draws sharp pages at every zoom, with tiles for deep zoom.",
   "type": "module",

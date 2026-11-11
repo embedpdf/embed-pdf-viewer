@@ -1,5 +1,5 @@
 {
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "The EmbedPDF engine's PDF runtime as WebAssembly, for browsers, and for Node where no native build fits.",
   "license": "Apache-2.0",
   "publishConfig": {

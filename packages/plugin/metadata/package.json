@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-metadata",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Metadata for EmbedPDF: reads and changes a document's title, author and your own fields.",
   "type": "module",

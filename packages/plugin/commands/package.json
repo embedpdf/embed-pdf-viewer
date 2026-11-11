@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-commands",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Commands for EmbedPDF: named actions with a label, an icon, a state and a shortcut, for toolbars, menus and the keyboard.",
   "type": "module",

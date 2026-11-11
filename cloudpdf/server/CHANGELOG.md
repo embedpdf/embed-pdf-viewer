@@ -1,5 +1,15 @@
 # @cloudpdf/server
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – `POST …/changes` takes the new op `annotations.copy`: copies of annotations in the same document, with a stamp's drawing and an attachment's file copied on the server. It needs `doc.annotate.read` and the right to create each kind, not `doc.download`. A ref the document doesn't have refuses the change with `NotFound`. On the event stream, a client that says a version before 3.2 gets `full-refresh` in place of a change with this op. A copy stays within the server's `bundleLimits`: past one, its change is refused with `PayloadTooLarge`, and `details.limit` names the limit.
+
+- [#1056](https://github.com/embedpdf/embed-pdf-viewer/pull/1056) by [@bobsingor](https://github.com/bobsingor) – The event stream answers each client as its version reads. A change with a kind that arrived after the client's `EmbedPDF-Version` goes out as `full-refresh` in the row's place, and the stream carries on with the rows after it; a `full-refresh` now says why in its data (`reason`). An op of `POST …/changes` with a field the server doesn't know refuses the request with `InvalidArg`, naming the field, where the field used to be dropped and the op applied without it. An item of a kind the server doesn't know is withheld from a connection that may not read everything.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – `POST …/changes` takes the new op `forms.copy`: a new field from each field named, with its widgets, made on the server. It needs `doc.forms.modify`, and `doc.forms.script` to keep scripts, submits and links. A field the form doesn't have refuses the change with `NotFound`. On the event stream, a client that says a version before 3.2 gets `full-refresh` in place of a change with this op. A copy stays within the server's `bundleLimits`: more fields than `items` refuses its change with `PayloadTooLarge`.
+
 ## 3.1.0
 
 ### Minor Changes

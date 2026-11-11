@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine-services",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "The PDF logic of the EmbedPDF engine, the same code in the browser's worker and on a CloudPDF server.",
   "type": "module",
