@@ -20,6 +20,7 @@ const item = (objectNumber: number, title: string, parent: number | null): Outli
   title,
   target: null,
   action: null,
+  destinationName: null,
   open: false,
   color: null,
   bold: false,

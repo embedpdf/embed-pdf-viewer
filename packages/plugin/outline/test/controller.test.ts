@@ -43,6 +43,7 @@ const item = (ref: OutlineItemRef, title: string, extra: Partial<OutlineItem>): 
   title,
   target: null,
   action: null,
+  destinationName: null,
   open: false,
   color: null,
   bold: false,
