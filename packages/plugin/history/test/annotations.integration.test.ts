@@ -537,7 +537,7 @@ describe('duplicate', () => {
       // A copy is new: its own name, and the copies are a group of their own.
       expect(annotations[0]!.nm).not.toBe(annotation.get(refs[0]!)!.nm);
       expect(annotations[1]!.reply).toEqual({ to: annotations[0]!.ref, type: 'group' });
-      expect(history.getUndoLabel()).toMatchObject({ key: 'annotation.copy' });
+      expect(history.getUndoLabel()).toMatchObject({ key: 'annotation.duplicate' });
 
       // One step: the copies go, and the originals are selected again.
       await booted.step('undo');

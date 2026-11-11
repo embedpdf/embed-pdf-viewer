@@ -317,7 +317,6 @@ A few annotations can't be made again. `duplicate()` leaves them out and lists t
 `dropped`, each with its `ref` and a `reason`:
 
 - a kind the engine doesn't know (`subtype: 'unsupported'`);
-- a form field's box (a widget), which belongs to the form;
 - a popup copied without the annotation it shows.
 
 Some copies are made without one field, and `dropped` names the `field`:
@@ -328,6 +327,12 @@ Some copies are made without one field, and `dropped` names the `field`:
 
 [Import](saving#export-and-import) leaves the same things out. `create()` with such a read
 refuses it with `invalid-input`.
+
+A form field's box (a widget) belongs to the form, so `duplicate()` doesn't copy one, and
+`canDuplicate()` is false for it. In [design mode](../forms/building), where the form lends its
+boxes to this plugin, the whole call is refused with `invalid-input` and nothing is copied.
+Outside design mode a box isn't one of this plugin's annotations, so the call is refused with
+`not-found`.
 
 ### Changes other people make
 

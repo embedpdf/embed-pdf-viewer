@@ -108,8 +108,18 @@ const keysOf = (op: ChangeOp): string[] => {
 export const idsOf = (ops: readonly ChangeOp[]): Id[] => [...new Set(ops.flatMap(keysOf))];
 
 /**
- * What a change is called, from what it does: one kind of op (`annotation.move`,
- * or a lent record's own, `form.updateWidget`), or several (`annotation.change`).
+ * The verb of this plugin that makes an op, where the engine names the op
+ * differently: `duplicate()` makes copies, and the page plugin calls its own
+ * `pages.duplicate`.
+ */
+const LABEL_VERBS: Partial<Record<ChangeOp['type'], string>> = {
+  'annotations.copy': 'duplicate',
+};
+
+/**
+ * What a change is called, from what it does: one kind of op, by the verb
+ * that makes it (`annotation.update`, `annotation.duplicate`, or a lent
+ * record's own, `form.updateWidget`), or several (`annotation.change`).
  * History and refusals show it.
  */
 export const labelOf = (ops: readonly ChangeOp[]): ChangeLabel => {
@@ -117,7 +127,8 @@ export const labelOf = (ops: readonly ChangeOp[]): ChangeLabel => {
   const [only] = kinds;
   const [plane, verb] = kinds.size === 1 && only ? only.split('.') : ['annotations', 'change'];
   const owner = plane === 'annotations' ? 'annotation' : plane === 'forms' ? 'form' : plane;
-  return { key: `${owner}.${verb}`, count: idsOf(ops).length };
+  const named = kinds.size === 1 && only ? LABEL_VERBS[only] : undefined;
+  return { key: `${owner}.${named ?? verb}`, count: idsOf(ops).length };
 };
 
 /**

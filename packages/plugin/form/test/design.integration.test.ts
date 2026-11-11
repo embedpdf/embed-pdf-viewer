@@ -337,6 +337,27 @@ describe('design through lending', () => {
     }
   });
 
+  it("a widget is the form's to copy: `duplicate()` refuses one, in design mode and out of it", async () => {
+    const booted = await boot();
+    try {
+      const { annotation } = booted;
+      const widget = booted.widgetOf(NAME);
+      // Filling: a widget isn't one of the annotation plugin's records.
+      expect(annotation.canDuplicate([widget])).toBe(false);
+      await expect(annotation.duplicate([widget])).rejects.toMatchObject({ code: 'not-found' });
+      booted.design();
+      const before = annotation.list().length;
+      expect(annotation.canDuplicate([widget])).toBe(false);
+      await expect(annotation.duplicate([widget])).rejects.toMatchObject({
+        code: 'invalid-input',
+        message: expect.stringContaining('form plugin'),
+      });
+      expect(annotation.list()).toHaveLength(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
   it("describes a field's settings, and a change to one shows at once", async () => {
     const booted = await boot();
     try {

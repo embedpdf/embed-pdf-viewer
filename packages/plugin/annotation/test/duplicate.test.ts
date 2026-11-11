@@ -141,7 +141,8 @@ describe('duplicate', () => {
       author: null,
     });
     expect(harness.model().selected).toEqual([]);
-    expect(harness.pending()[0]!.label).toEqual({ key: 'annotation.copy', count: 1 });
+    // Named by the plugin's verb, as the page plugin's duplicate is `pages.duplicate`.
+    expect(harness.pending()[0]!.label).toEqual({ key: 'annotation.duplicate', count: 1 });
 
     answer.resolve({
       annotations: [
