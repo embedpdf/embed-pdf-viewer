@@ -331,15 +331,19 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
         const time = window.element.shadowRoot!.querySelector<HTMLTimeElement>(
           '[data-epdf-panel="comments"] time',
         )!;
+        // Plain spaces for both: the panel holds a time's words together with no-break spaces.
+        const plain = (text: string) => text.replace(/\s/g, ' ');
         const written = (tag: string) =>
-          new Intl.DateTimeFormat(tag, {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          }).format(new Date(time.dateTime));
+          plain(
+            new Intl.DateTimeFormat(tag, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            }).format(new Date(time.dateTime)),
+          );
         return {
-          shown: time.textContent,
+          shown: plain(time.textContent ?? ''),
           american: written('en-US'),
           british: written('en-GB'),
           french: written('fr'),
