@@ -24380,6 +24380,48 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["annotations.copy"]
+              },
+              "refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationRef"
+                },
+                "minItems": 1
+              },
+              "page": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "objectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              }
+            },
+            "required": ["type", "refs"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.setValue"]
               },
               "field": {
@@ -24885,48 +24927,48 @@
                   "y": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
                     }
                   },
                   "distance": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
                     }
                   },
                   "area": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
                     }
                   },
                   "angle": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
                     }
                   },
                   "slope": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
                     }
                   },
                   "origin": {
                     "type": "object",
                     "properties": {
                       "x": {
-                        "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
                       },
                       "y": {
-                        "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
                       }
                     },
                     "required": ["x", "y"],
                     "additionalProperties": false
                   },
                   "cyx": {
-                    "$ref": "#/components/schemas/ChangeOp/anyOf/25/properties/measure/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
                   }
                 },
                 "required": ["subtype", "x", "distance", "area"],
@@ -25144,6 +25186,7 @@
                   "annotations.update",
                   "annotations.delete",
                   "annotations.reorder",
+                  "annotations.copy",
                   "forms.setValue",
                   "forms.setDisplay",
                   "forms.setAppearanceText",
@@ -25293,6 +25336,73 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["annotations.copy"]
+              },
+              "annotations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              },
+              "refMap": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "$ref": "#/components/schemas/AnnotationRef"
+                    },
+                    "to": {
+                      "$ref": "#/components/schemas/AnnotationRef"
+                    }
+                  },
+                  "required": ["from", "to"],
+                  "additionalProperties": false
+                }
+              },
+              "dropped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "$ref": "#/components/schemas/AnnotationRef"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "unsupported-kind",
+                        "widget",
+                        "geospatial",
+                        "unknown-measure",
+                        "unsupported-action",
+                        "unsupported-value",
+                        "name-conflict",
+                        "parent-dropped",
+                        "parent-missing",
+                        "popup-taken"
+                      ]
+                    }
+                  },
+                  "required": ["ref", "reason"],
+                  "additionalProperties": false
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/AnnotationMutationMeta"
+              }
+            },
+            "required": ["type", "annotations", "refMap", "dropped", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["annotations.restore"]
               },
               "page": {
@@ -25374,10 +25484,10 @@
                 "$ref": "#/components/schemas/FormField"
               },
               "widgets": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/widgets"
               },
               "calculationOrder": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -25458,10 +25568,10 @@
                 "$ref": "#/components/schemas/FormField"
               },
               "widgets": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/widgets"
               },
               "calculationOrder": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -25524,10 +25634,10 @@
                 "$ref": "#/components/schemas/FormField"
               },
               "widgets": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/widgets"
               },
               "calculationOrder": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/8/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -25570,7 +25680,7 @@
                 "$ref": "#/components/schemas/FormField"
               },
               "widgets": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/15/properties/widgets"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/16/properties/widgets"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -25938,48 +26048,48 @@
                   "y": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
                     }
                   },
                   "distance": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
                     }
                   },
                   "area": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
                     }
                   },
                   "angle": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
                     }
                   },
                   "slope": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
                     }
                   },
                   "origin": {
                     "type": "object",
                     "properties": {
                       "x": {
-                        "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
                       },
                       "y": {
-                        "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
                       }
                     },
                     "required": ["x", "y"],
                     "additionalProperties": false
                   },
                   "cyx": {
-                    "$ref": "#/components/schemas/ChangeItem/anyOf/30/properties/measure/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
                   }
                 },
                 "required": ["subtype", "x", "distance", "area"],
@@ -26076,7 +26186,7 @@
                 "enum": ["pages.insert"]
               },
               "insertedPages": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/33/properties/insertedPages"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/34/properties/insertedPages"
               },
               "layout": {
                 "$ref": "#/components/schemas/PageListSnapshot"
@@ -26096,7 +26206,7 @@
                 "enum": ["pages.copy"]
               },
               "insertedPages": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/33/properties/insertedPages"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/34/properties/insertedPages"
               },
               "layout": {
                 "$ref": "#/components/schemas/PageListSnapshot"

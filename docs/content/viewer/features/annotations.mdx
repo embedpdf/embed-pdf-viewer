@@ -7,9 +7,9 @@ description: The annotation, shape and insert tools, comments, fonts, stamps, re
 
 People mark up a document in three modes: **Annotate** (highlights, notes, ink and text),
 **Shapes** and **Insert** (stamps, images, files and signatures). They select an annotation to
-move, resize or turn it, change its color, width or kind in the style panel, and undo with
-`Ctrl`/`Cmd`+`Z`. Everything they make is a standard PDF annotation, so it opens the same in
-Acrobat and every other PDF app.
+move, resize or turn it, change its color, width or kind in the style panel, copy it with
+**Duplicate** (`Ctrl`/`Cmd`+`D`), and undo with `Ctrl`/`Cmd`+`Z`. Everything they make is a
+standard PDF annotation, so it opens the same in Acrobat and every other PDF app.
 
 ## The tools
 
@@ -187,9 +187,18 @@ comment and its replies. A strikethrough that is part of a replacement keeps its
 does a locked annotation. From code it's `annotation.selection.update({ subtype })`; see
 [A style panel](/docs/headless/annotations/selecting#a-style-panel).
 
+### Duplicate
+
+**Duplicate** in the bar over a selection, or `Ctrl`/`Cmd`+`D`, copies the selected annotations
+beside the originals and selects the copies. A stamp keeps its drawing and a group stays a
+group. The button shows for annotations that can be moved, so not for a highlight, and it is
+greyed out while a locked annotation is selected: its copy would be locked too. From code it's
+`annotation.selection.duplicate()`; see
+[Duplicate the selection](/docs/headless/annotations/selecting#duplicate-the-selection).
+
 ### Undo
 
 Undo and redo cover everything people do to annotations: drawing, moving, restyling, deleting,
-and comments. Annotations your code imports are one step too, unless the import passes
-`history: false`; see
+duplicating, and comments. Annotations your code imports are one step too, unless the import
+passes `history: false`; see
 [An import is one step to undo](/docs/headless/annotations/saving#an-import-is-one-step-to-undo).

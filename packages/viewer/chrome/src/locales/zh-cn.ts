@@ -106,6 +106,7 @@ export const zhCN: Locale = {
         saveFile: '保存文件',
         removeLink: '删除链接',
         delete: '删除',
+        duplicate: '创建副本',
         group: '分组',
         ungroup: '取消分组',
         stampFromSelection: '创建图章',

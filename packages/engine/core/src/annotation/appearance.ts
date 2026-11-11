@@ -305,6 +305,50 @@ function rigidTranslationOf(
   return { x: dx, y: dy };
 }
 
+/** `value` with every position in it moved by `(dx, dy)`, by its axis names, as {@link shiftedBy} reads them. */
+function shifted(value: unknown, dx: number, dy: number): unknown {
+  if (Array.isArray(value)) return value.map((each) => shifted(each, dx, dy));
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, field]) => {
+      if (typeof field !== 'number') return [key, shifted(field, dx, dy)];
+      const delta =
+        key === 'left' || key === 'right' || key === 'x'
+          ? dx
+          : key === 'bottom' || key === 'top' || key === 'y'
+            ? dy
+            : 0;
+      return [key, field + delta];
+    }),
+  );
+}
+
+/**
+ * `annotation` moved by `by`, in the coordinates its values are in: the
+ * geometry its kind moves by ({@link TRANSLATABLE_GEOMETRY}), a shape
+ * caption's own centre, and the `rect` the engine works out, each shifted
+ * the same distance. Everything else is as it was, so
+ * `appearanceChangeOf(annotation, moved)` says it is a translation by `by`.
+ * A kind the table doesn't have moves its `rect` alone.
+ */
+export function translatedAnnotation<A extends { readonly subtype: string }>(
+  annotation: A,
+  by: { readonly x: number; readonly y: number },
+): A {
+  if (by.x === 0 && by.y === 0) return annotation;
+  const fields = annotation as unknown as Record<string, unknown>;
+  const keys = new Set([
+    'rect',
+    'captionCenter',
+    ...(TRANSLATABLE_GEOMETRY[annotation.subtype] ?? []),
+  ]);
+  const moved: Record<string, unknown> = { ...fields };
+  for (const key of keys) {
+    if (fields[key] != null) moved[key] = shifted(fields[key], by.x, by.y);
+  }
+  return moved as unknown as A;
+}
+
 const INERT: AppearanceChange = { impact: 'inert' };
 const REGENERATE: AppearanceChange = { impact: 'regenerate' };
 

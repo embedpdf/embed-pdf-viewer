@@ -8,6 +8,7 @@ import {
   SessionEventPublisher,
   attachmentVerbs,
   outlineVerbs,
+  annotationVerbs,
   pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
@@ -178,7 +179,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.metadata = new LocalMetadataService(id, queue, view, guard, publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
-    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
+    this.annotations = annotationVerbs(
+      new LocalDocumentAnnotationsService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.attachments = attachmentVerbs(
       new LocalDocumentAttachmentsService(id, queue, view, guard),
       (change, options) => this.apply(change, options),

@@ -106,6 +106,7 @@ export const nl: Locale = {
         saveFile: 'Bestand opslaan',
         removeLink: 'Koppeling verwijderen',
         delete: 'Verwijderen',
+        duplicate: 'Dupliceren',
         group: 'Groeperen',
         ungroup: 'Groep opheffen',
         stampFromSelection: 'Stempel maken',

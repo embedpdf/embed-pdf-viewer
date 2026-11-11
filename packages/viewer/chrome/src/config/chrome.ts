@@ -226,6 +226,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:goto-link',
             'annotation:save-file',
             'annotation:remove-link',
+            'annotation:duplicate',
             'annotation:group',
             'annotation:ungroup',
           ],

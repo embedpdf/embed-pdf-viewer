@@ -107,6 +107,7 @@ export const he: Locale = {
         saveFile: 'שמירת הקובץ',
         removeLink: 'הסר קישור',
         delete: 'מחק',
+        duplicate: 'שכפל',
         group: 'קבץ',
         ungroup: 'פרק קבוצה',
         stampFromSelection: 'צור חותמת',

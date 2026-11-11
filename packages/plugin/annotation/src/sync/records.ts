@@ -26,6 +26,7 @@ import {
   annotationKey,
   annotationPatchBetween,
   deletedWith,
+  planAnnotationCopies,
   reorderedList,
   reorderPart,
   type Annotation,
@@ -48,6 +49,12 @@ export interface AnnotationRecord {
    * only then: the page's rasters are fetched again exactly when it changes.
    */
   readonly pictureVersion: number;
+  /**
+   * On a copy this session asked for that the engine hasn't written: the
+   * annotation it copies. A copy with no live drawing (a stamp) shows that
+   * one's picture until the engine has its own (read/render.ts).
+   */
+  readonly copyOf?: AnnotationRef;
 }
 
 /** Every confirmed annotation of the document, by annotation key. */
@@ -238,6 +245,65 @@ export function annotationOfCreate(draft: AnnotationDraft, ref: AnnotationRef): 
   } as Annotation;
 }
 
+type CopyOp = Extract<ChangeOp, { type: 'annotations.copy' }>;
+
+/** One copy an `annotations.copy` op makes. */
+export interface CopyOf {
+  /** The ref it has: the page it goes on, and the object number the op gives it. */
+  readonly ref: AnnotationRef;
+  /**
+   * The copy as the engine reads it back; `null` for one that can't be read
+   * as a create is, which shows when the engine answers.
+   */
+  readonly copy: Annotation | null;
+  /** The annotation it copies, and that one's place among the op's refs. */
+  readonly of: AnnotationRef;
+  readonly source: number;
+}
+
+/**
+ * The copies a copy makes, each with the annotation it copies: the engine's
+ * own rule (`planAnnotationCopies`) over the records, and each copy read as
+ * a create of the same data is (`annotationOfCreate`). None for a copy the
+ * engine numbers itself, which has no keys to show its copies by, and none
+ * when the engine would refuse it (an annotation it names is gone).
+ */
+export function copiesOf(records: AnnotationRecords, op: CopyOp): CopyOf[] {
+  const { objectNumbers } = op;
+  if (!objectNumbers || objectNumbers.length !== op.refs.length) return [];
+  const sources: Annotation[] = [];
+  for (const ref of op.refs) {
+    const stored = records.byKey[annotationKey(ref)];
+    if (!stored) return [];
+    sources.push(stored.dto);
+  }
+  const { copies } = planAnnotationCopies(sources, {
+    ...(op.page ? { page: op.page } : {}),
+    ...(op.offset ? { offset: op.offset } : {}),
+  });
+  const refs = copies.map(
+    (copy): AnnotationRef => ({
+      kind: 'objectNumber',
+      page: copy.page,
+      objectNumber: objectNumbers[copy.source]!,
+    }),
+  );
+  return copies.map((copy, at): CopyOf => {
+    const draft = {
+      ...copy.data,
+      ...(copy.replyTo ? { reply: { to: refs[copy.replyTo.copy]!, type: copy.replyTo.type } } : {}),
+      ...(copy.parent !== undefined ? { parent: refs[copy.parent]! } : {}),
+    } as AnnotationDraft;
+    let read: Annotation | null;
+    try {
+      read = annotationOfCreate(draft, refs[at]!);
+    } catch {
+      read = null;
+    }
+    return { ref: refs[at]!, copy: read, of: sources[copy.source]!.ref, source: copy.source };
+  });
+}
+
 /**
  * The record keys of one page in a new drawing order: `keys` moved to
  * `position` among the page's others, in the order given, as the engine
@@ -323,6 +389,22 @@ export function predictRecords(records: AnnotationRecords, op: PredictedOp): Ann
       );
       return order === records.order ? records : { ...records, order };
     }
+    case 'annotations.copy': {
+      // Each copy shows under the object number it was given, after the
+      // annotations there are.
+      const made = copiesOf(records, op).flatMap(({ copy, of }) =>
+        copy && !(annotationKey(copy.ref) in records.byKey) ? [{ copy, of }] : [],
+      );
+      if (!made.length) return records;
+      const byKey = { ...records.byKey };
+      for (const { copy, of } of made) {
+        byKey[annotationKey(copy.ref)] = { dto: copy, pictureVersion: 0, copyOf: of };
+      }
+      return {
+        byKey,
+        order: [...records.order, ...made.map(({ copy }) => annotationKey(copy.ref))],
+      };
+    }
     case 'annotations.restore': {
       const key = annotationKey(op.annotation.ref);
       if (key in records.byKey) return records;
@@ -378,6 +460,9 @@ function undoOfOp(records: AnnotationRecords, op: ChangeOp): PredictedOp[] {
         gone.has(annotation) ? [{ type: 'annotations.restore', annotation, index }] : [],
       );
     }
+    case 'annotations.copy':
+      // The copies go: a reply or a popup among them goes with its parent.
+      return copiesOf(records, op).map(({ ref }) => ({ type: 'annotations.delete', ref }));
     case 'annotations.reorder':
       // The page's whole order as it was.
       return [

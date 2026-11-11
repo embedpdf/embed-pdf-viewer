@@ -448,6 +448,7 @@ describe('the built-in commands', () => {
     expect(shortcutOf('document:download')).toBe('Mod+S');
     expect(shortcutOf('document:print')).toBe('Mod+P');
     expect(shortcutOf('annotation:delete')).toEqual(['Delete', 'Backspace']);
+    expect(shortcutOf('annotation:duplicate')).toBe('Mod+D');
     expect(shortcutOf('help:shortcuts')).toBe('?');
     expect(shortcutOf('history:undo')).toBe('Mod+z');
   });

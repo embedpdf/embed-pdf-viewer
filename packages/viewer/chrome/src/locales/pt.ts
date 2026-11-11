@@ -106,6 +106,7 @@ export const pt: Locale = {
         saveFile: 'Salvar arquivo',
         removeLink: 'Remover link',
         delete: 'Excluir',
+        duplicate: 'Duplicar',
         group: 'Agrupar',
         ungroup: 'Desagrupar',
         stampFromSelection: 'Criar carimbo',

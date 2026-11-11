@@ -8,6 +8,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.AnnotationsUpdate
     | CloudPDF.ChangeItem.AnnotationsDelete
     | CloudPDF.ChangeItem.AnnotationsReorder
+    | CloudPDF.ChangeItem.AnnotationsCopy
     | CloudPDF.ChangeItem.AnnotationsRestore
     | CloudPDF.ChangeItem.FormsSetValue
     | CloudPDF.ChangeItem.FormsSetDisplay
@@ -57,6 +58,7 @@ export namespace ChangeItem {
             AnnotationsUpdate: "annotations.update",
             AnnotationsDelete: "annotations.delete",
             AnnotationsReorder: "annotations.reorder",
+            AnnotationsCopy: "annotations.copy",
             FormsSetValue: "forms.setValue",
             FormsSetDisplay: "forms.setDisplay",
             FormsSetAppearanceText: "forms.setAppearanceText",
@@ -140,6 +142,51 @@ export namespace ChangeItem {
         page: CloudPDF.PageRef;
         order: CloudPDF.AnnotationRef[];
         meta: CloudPDF.AnnotationMutationMeta;
+    }
+
+    export interface AnnotationsCopy {
+        type: "annotations.copy";
+        annotations: CloudPDF.Annotation[];
+        refMap: ChangeItemAnnotationsCopy.RefMap.Item[];
+        dropped: ChangeItemAnnotationsCopy.Dropped.Item[];
+        meta: CloudPDF.AnnotationMutationMeta;
+    }
+
+    export namespace ChangeItemAnnotationsCopy {
+        export type RefMap = RefMap.Item[];
+
+        export namespace RefMap {
+            export interface Item {
+                from: CloudPDF.AnnotationRef;
+                to: CloudPDF.AnnotationRef;
+            }
+        }
+
+        export type Dropped = Dropped.Item[];
+
+        export namespace Dropped {
+            export interface Item {
+                ref: CloudPDF.AnnotationRef;
+                field?: string | undefined;
+                reason: Item.Reason;
+            }
+
+            export namespace Item {
+                export const Reason = {
+                    UnsupportedKind: "unsupported-kind",
+                    Widget: "widget",
+                    Geospatial: "geospatial",
+                    UnknownMeasure: "unknown-measure",
+                    UnsupportedAction: "unsupported-action",
+                    UnsupportedValue: "unsupported-value",
+                    NameConflict: "name-conflict",
+                    ParentDropped: "parent-dropped",
+                    ParentMissing: "parent-missing",
+                    PopupTaken: "popup-taken",
+                } as const;
+                export type Reason = (typeof Reason)[keyof typeof Reason];
+            }
+        }
     }
 
     export interface AnnotationsRestore {

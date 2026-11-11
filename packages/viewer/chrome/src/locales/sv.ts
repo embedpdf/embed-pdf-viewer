@@ -107,6 +107,7 @@ export const sv: Locale = {
         saveFile: 'Spara fil',
         removeLink: 'Ta bort länk',
         delete: 'Ta bort',
+        duplicate: 'Duplicera',
         group: 'Gruppera',
         ungroup: 'Dela upp grupp',
         stampFromSelection: 'Skapa stämpel',

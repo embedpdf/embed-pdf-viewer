@@ -77,6 +77,7 @@ import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { SignatureAppearanceInput } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationCopyResult } from '../transfer/annotationCopy';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
 import type { WireFormBundle } from '../transfer/FormBundle';
 import type { FormImportResult, FormValuesImportResult } from '../transfer/formImport';
@@ -138,6 +139,19 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly page: PageRef;
       readonly refs: readonly AnnotationRef[];
       readonly position: AnnotationPosition;
+    }
+  | {
+      /**
+       * Copies of annotations of this document (`doc.annotations.copy`):
+       * each on its own page or on `page`, moved by `offset`, which is in
+       * page points from the top-left in either space. `objectNumbers`
+       * names each copy, in the order of `refs`.
+       */
+      readonly type: 'annotations.copy';
+      readonly refs: readonly AnnotationRef[];
+      readonly page?: PageRef;
+      readonly offset?: { readonly x: number; readonly y: number };
+      readonly objectNumbers?: readonly number[];
     }
   | {
       readonly type: 'forms.setValue';
@@ -435,6 +449,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
     } & AnnotationUpdateResult<C>)
   | ({ type: 'annotations.delete'; page: PageRef } & AnnotationDeleteResult)
   | ({ type: 'annotations.reorder'; page: PageRef } & AnnotationReorderResult)
+  | ({ type: 'annotations.copy' } & AnnotationCopyResult<C>)
   /** An import's answer: only `doc.annotations.import` answers one. */
   | ({ type: 'annotations.import' } & AnnotationImportResult<C>)
   /** A form import's answer: only `doc.forms.import` and `doc.forms.importValues` answer one. */
@@ -538,13 +553,15 @@ export function isSkippedItem<C extends Coordinates>(
 
 /**
  * Whether an item wrote to the document: not an op an undo left alone, nor
- * an import that left every row of its bundle out.
+ * an import that left every row of its bundle out, nor a copy that left
+ * every annotation out.
  */
 export function itemWrote<C extends Coordinates>(item: ChangeItem<C>): boolean {
   switch (item.type) {
     case 'skipped':
       return false;
     case 'annotations.import':
+    case 'annotations.copy':
       return item.annotations.length > 0;
     case 'forms.import':
     case 'forms.importValues':
@@ -595,6 +612,9 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
     switch (op.type) {
       case 'annotations.create':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);
+        break;
+      case 'annotations.copy':
+        named.push(...(op.objectNumbers ?? []));
         break;
       case 'forms.create':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);

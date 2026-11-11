@@ -1058,6 +1058,35 @@ export const defaultCommands: CommandDefinition[] = [
       ).size === 1,
   },
   {
+    // Copies of the selection beside the originals, selected, ready to drag
+    // into place: one step to undo.
+    id: 'annotation:duplicate',
+    labelKey: 'commands.annotate.duplicate',
+    icon: 'duplicate',
+    shortcut: 'Mod+D',
+    categories: ['annotations'],
+    ...CREATES_ANNOTATIONS,
+    // A refusal reaches the user as any failed write does (`onWriteFailed`).
+    run: (commandContext) =>
+      void anno(commandContext)
+        ?.selection.duplicate()
+        .catch(() => {}),
+    // For what people place and drag: an annotation that sits on text (a
+    // highlight) stays there, and a form field's box is the form's to copy.
+    visible: (commandContext) => {
+      const annotation = anno(commandContext);
+      const selected = annotation?.selection.getSelected() ?? [];
+      return (
+        selected.length > 0 &&
+        selectionEditable(commandContext) &&
+        selected.every(({ ref, subtype }) => subtype !== 'widget' && annotation!.isMovable(ref))
+      );
+    },
+    // A copy of a locked annotation would be locked too: nobody could move
+    // or delete it by hand, so the button shows greyed out, as Delete does.
+    enabled: (commandContext) => anno(commandContext)?.selection.canDuplicate() ?? false,
+  },
+  {
     id: 'annotation:group',
     labelKey: 'commands.annotate.group',
     icon: 'group',

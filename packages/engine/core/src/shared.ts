@@ -389,6 +389,14 @@ export type {
   AnnotationImportResult,
 } from './transfer/annotationImport';
 export { annotationImportFacts } from './transfer/annotationImport';
+export type {
+  AnnotationCopyOptions,
+  AnnotationCopyPlacement,
+  AnnotationCopyPlan,
+  AnnotationCopyResult,
+  PlannedAnnotationCopy,
+} from './transfer/annotationCopy';
+export { planAnnotationCopies } from './transfer/annotationCopy';
 export { closeExportSelection } from './transfer/exportSelection';
 export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
 export {
@@ -585,6 +593,7 @@ export type {
 } from './annotation/appearance';
 export {
   appearanceChangeOf,
+  translatedAnnotation,
   appearanceImpactOf,
   semanticEqual,
   UNBAKED_KINDS,

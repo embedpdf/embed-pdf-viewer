@@ -106,6 +106,7 @@ export const it: Locale = {
         saveFile: 'Salva file',
         removeLink: 'Rimuovi collegamento',
         delete: 'Elimina',
+        duplicate: 'Duplica',
         group: 'Raggruppa',
         ungroup: 'Separa',
         stampFromSelection: 'Crea timbro',

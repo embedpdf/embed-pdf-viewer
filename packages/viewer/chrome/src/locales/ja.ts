@@ -106,6 +106,7 @@ export const ja: Locale = {
         saveFile: 'ファイルを保存',
         removeLink: 'リンクを削除',
         delete: '削除',
+        duplicate: '複製',
         group: 'グループ化',
         ungroup: 'グループ解除',
         stampFromSelection: 'スタンプを作成',

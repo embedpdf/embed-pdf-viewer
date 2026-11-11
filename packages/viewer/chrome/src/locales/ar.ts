@@ -107,6 +107,7 @@ export const ar: Locale = {
         saveFile: 'حفظ الملف',
         removeLink: 'إزالة الارتباط',
         delete: 'حذف',
+        duplicate: 'تكرار',
         group: 'تجميع',
         ungroup: 'فك التجميع',
         stampFromSelection: 'إنشاء ختم',

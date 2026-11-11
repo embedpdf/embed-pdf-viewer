@@ -203,6 +203,8 @@ export type {
   AnnotationDeleteResult,
   AnnotationReorderResult,
   AnnotationImportResult,
+  AnnotationCopyOptions,
+  AnnotationCopyResult,
   CommentThread,
   PdfMeasure,
   PdfMeasurement,

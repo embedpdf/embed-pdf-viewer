@@ -85,7 +85,15 @@ export function createAnnotationController(ctx: AnnotationContext) {
   const ghost = createGhost(ctx, services, stamps);
   const render = createRenderReads(ctx, services, ghost, stamps);
   const icons = createIcons(ctx, services, stamps);
-  const selection = createSelectionWrites(ctx, services, annotations, properties, chrome, text);
+  const selection = createSelectionWrites(
+    ctx,
+    services,
+    annotations,
+    properties,
+    chrome,
+    text,
+    crud,
+  );
   const measurement = createMeasurement(ctx, services);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(ctx, services, annotations);
@@ -137,6 +145,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
       canCreate: authority.canCreate,
       canUpdate: authority.canUpdate,
       canDelete: authority.canDelete,
+      canDuplicate: authority.canDuplicate,
       onCreated: events.created.on,
       onUpdated: events.updated.on,
       onDeleted: events.deleted.on,
