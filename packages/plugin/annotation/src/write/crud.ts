@@ -176,7 +176,8 @@ export function createCrud(
   /**
    * Copies of annotations in this document, which the engine makes in one
    * op: they show at once, and it is one step to undo. An annotation's
-   * attached link is a child of it, so it is copied along.
+   * attached link is a child of it, so it is copied along. A link `refs`
+   * names itself is copied once, as one of the copies named.
    *
    * `lent` are the selection's lent records (a form's widgets, in design
    * mode), which only the selection's own duplicate passes: their lender
@@ -201,8 +202,11 @@ export function createCrud(
     const lender = lent.length ? lending.lender() : null;
     const lentCopy = lender ? await lender.copyOps(lent, placement) : null;
     const model = store.model();
+    const stated = new Set(refs.map(annotationKey));
     const along = refs.flatMap((ref) =>
-      linkChildrenOf(model, annotationKey(ref)).map((child) => child.annotation.ref),
+      linkChildrenOf(model, annotationKey(ref))
+        .map((child) => child.annotation.ref)
+        .filter((child) => !stated.has(annotationKey(child))),
     );
     const lentIds = lentCopy?.copies.map(annotationKey) ?? [];
     const applied = await store.applyWhenNumbered(

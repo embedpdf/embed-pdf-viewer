@@ -1,10 +1,12 @@
-import type {
-  ChangeAuthority,
-  ChangeItem,
-  Coordinates,
-  PdfCoordinates,
-  RecordedOp,
-  WireAnnotationResources,
+import {
+  DEFAULT_BUNDLE_LIMITS,
+  type BundleLimits,
+  type ChangeAuthority,
+  type ChangeItem,
+  type Coordinates,
+  type PdfCoordinates,
+  type RecordedOp,
+  type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -131,6 +133,8 @@ export class ChangeApplier {
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
     private readonly fonts?: FontRegistrar,
+    /** What a copy inside the document may carry (see `ChangeContext.limits`). */
+    private readonly limits: BundleLimits = DEFAULT_BUNDLE_LIMITS,
   ) {}
 
   apply<In extends Coordinates, Out extends Coordinates>(
@@ -179,6 +183,7 @@ export class ChangeApplier {
       ...(this.fonts ? { fonts: this.fonts } : {}),
       authority,
       signal,
+      limits: this.limits,
       fillsOwnField: () => (answer ??= ownFill(ctx)),
     };
     return ctx;

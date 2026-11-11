@@ -1,6 +1,5 @@
 import {
   ANNOTATION_RESOURCE_ROLES,
-  DEFAULT_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
   annotationKey,
@@ -11,6 +10,7 @@ import {
   type AnnotationCopyResult,
   type AnnotationDraft,
   type AnnotationRef,
+  type BundleLimits,
   type PageRef,
   type PdfCoordinates,
   type WireAnnotationResources,
@@ -46,10 +46,20 @@ export interface AnnotationCopyRequest {
    * answers who the copy is attributed to, as `create` stamps it.
    */
   readonly authorizeCreate: (draft: AnnotationDraft<PdfCoordinates>) => AnnotationActor | undefined;
+  /** What the copy may carry: what a bundle of the same annotations may. */
+  readonly limits: BundleLimits;
 }
 
-/** The largest attached file a copy carries: what an export carries. */
-const MAX_FILE_BYTES = DEFAULT_BUNDLE_LIMITS.resourceBytes;
+/** Refuses the copy when `value` is past the limit named `limit`, as a bundle past it is refused. */
+function assertCarries(limits: BundleLimits, limit: keyof BundleLimits, value: number): void {
+  const max = limits[limit];
+  if (value <= max) return;
+  throw new EngineError(
+    EngineErrorCode.PayloadTooLarge,
+    `copy: past the ${limit} limit: ${value} > ${max}`,
+    { details: { limit, max, value } },
+  );
+}
 
 /**
  * `doc.annotations.copy`: copies of this document's annotations, created as
@@ -62,6 +72,12 @@ const MAX_FILE_BYTES = DEFAULT_BUNDLE_LIMITS.resourceBytes;
  * A stamp's drawing and an attachment's file are read from the source here
  * and never leave the engine. The drawing index places a drawing the document
  * has again, so a copied stamp adds no second drawing. No page is loaded.
+ *
+ * A copy carries what a bundle may (`limits`): `items` annotations, and
+ * `resources` drawings and files of `resourceBytes` each and `bundleBytes`
+ * together. A drawing counts once however many copies place it; a file
+ * counts for each copy, which gets its own. Past a limit the copy is refused
+ * with `PayloadTooLarge`, before anything is written.
  */
 export class AnnotationCopier {
   constructor(
@@ -73,7 +89,7 @@ export class AnnotationCopier {
 
   copy(request: AnnotationCopyRequest, signal: AbortSignal): AnnotationCopyResult<PdfCoordinates> {
     throwIfAborted(signal);
-    const { refs, objectNumbers } = request;
+    const { refs, objectNumbers, limits } = request;
     if (objectNumbers && objectNumbers.length !== refs.length) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -81,6 +97,8 @@ export class AnnotationCopier {
         { details: { field: 'objectNumbers' } },
       );
     }
+    // Counted as asked, before anything is read.
+    assertCarries(limits, 'items', refs.length);
     // A page the document doesn't have refuses the copy before anything is read.
     if (request.page) this.session.resolvePageRef(request.page);
 
@@ -94,7 +112,7 @@ export class AnnotationCopier {
       },
     );
 
-    const resources = this.resourceReader();
+    const resources = this.resourceReader(limits);
     const creates = plan.creates.map((planned): BatchCreate => {
       throwIfAborted(signal);
       const source = sources[planned.source]!;
@@ -139,12 +157,25 @@ export class AnnotationCopier {
   }
 
   /**
-   * Reads the bytes a source carries, by role. A drawing is read once however
+   * Reads the bytes a source carries, by role, and counts them against
+   * `limits` as they are read. A drawing is read and counted once however
    * many copies place it, so the drawing index hashes it once.
    */
-  private resourceReader(): (source: Annotation<PdfCoordinates>) => WireAnnotationResources {
+  private resourceReader(
+    limits: BundleLimits,
+  ): (source: Annotation<PdfCoordinates>) => WireAnnotationResources {
     const { fn } = this.runtime;
     const drawings = new Map<number, ArrayBuffer>();
+    let count = 0;
+    let total = 0;
+    const counted = (bytes: ArrayBuffer): ArrayBuffer => {
+      assertCarries(limits, 'resourceBytes', bytes.byteLength);
+      count += 1;
+      assertCarries(limits, 'resources', count);
+      total += bytes.byteLength;
+      assertCarries(limits, 'bundleBytes', total);
+      return bytes;
+    };
     return (source) => {
       const roles = ANNOTATION_RESOURCE_ROLES[source.subtype];
       if (!roles) return {};
@@ -153,15 +184,16 @@ export class AnnotationCopier {
         const found: WireAnnotationResources = {};
         if (roles.appearance) {
           const drawing = fn.EPDFAnnot_GetStampDrawing(annotPtr);
+          const read = drawings.get(drawing);
           const bytes =
-            drawings.get(drawing) ??
+            read ??
             appearanceBytesOf(this.runtime, this.session.requireDocPtr(), annotPtr, drawing);
-          if (bytes) found.appearance = bytes;
+          if (bytes) found.appearance = read ?? counted(bytes);
           if (bytes && drawing) drawings.set(drawing, bytes);
         }
         if (roles.file) {
-          const bytes = this.fileOf(annotPtr);
-          if (bytes) found.file = bytes;
+          const bytes = this.fileOf(annotPtr, limits.resourceBytes);
+          if (bytes) found.file = counted(bytes);
         }
         return found;
       } finally {
@@ -170,15 +202,16 @@ export class AnnotationCopier {
     };
   }
 
-  private fileOf(annotPtr: Ptr): ArrayBuffer | null {
+  /** An attached file's bytes. One larger than `max` is refused before it is read. */
+  private fileOf(annotPtr: Ptr, max: number): ArrayBuffer | null {
     try {
-      return attachedFileBytesOf(this.runtime, annotPtr, MAX_FILE_BYTES);
+      return attachedFileBytesOf(this.runtime, annotPtr, max);
     } catch (error) {
       if (!isTooLarge(error)) throw error;
       throw new EngineError(
         EngineErrorCode.PayloadTooLarge,
-        `copy: an attached file is larger than ${MAX_FILE_BYTES} bytes`,
-        { details: { limit: 'resourceBytes', max: MAX_FILE_BYTES } },
+        `copy: an attached file is larger than ${max} bytes`,
+        { details: { limit: 'resourceBytes', max } },
       );
     }
   }

@@ -322,6 +322,12 @@ a kind the engine doesn't know, a widget, a popup without its parent, and, as si
 action or a value only another app can write. A ref the document doesn't have refuses the change
 with `NotFound`.
 
+A copy stays within the [limits of a bundle](/docs/engine/annotations/import-export#limits): as
+many annotations as a bundle holds, and as many drawings and files, of that size each and
+together. A stamp's drawing counts once however many copies place it, and an attached file counts
+for each copy. Past a limit the change is refused with `PayloadTooLarge`, `err.details.limit`
+names the limit, and nothing is copied. Copy fewer annotations at a time to stay under.
+
 In a change of your own it is the op `annotations.copy`; see
 [Changes & undo](/docs/engine/documents/changes). To copy into another document, use
 [Import & export](/docs/engine/annotations/import-export).
