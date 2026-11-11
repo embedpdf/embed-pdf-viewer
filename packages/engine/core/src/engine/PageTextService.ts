@@ -1,3 +1,4 @@
+import type { PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { TextLayout } from '../text/layout';
@@ -21,4 +22,10 @@ export interface PageTextService {
    * (where text is, not what it says).
    */
   layout(): AbortablePromise<TextLayout>;
+  /**
+   * The page's objects in content order: marked content, and for text
+   * objects their font, matrix and glyphs in drawing order. Needs
+   * `doc.text.copy`.
+   */
+  objects(): AbortablePromise<PageTextObjectsSnapshot>;
 }

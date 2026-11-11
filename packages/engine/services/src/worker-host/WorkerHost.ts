@@ -103,6 +103,7 @@ import {
   type EncodedImageWire,
   type RenderEncode,
   type PagesTextWorkerRequest,
+  type PagesTextObjectsWorkerRequest,
   type SearchQueryWorkerRequest,
   type PageRef,
   type PagesWorkingSetWorkerRequest,
@@ -201,7 +202,7 @@ import {
   SignatureReader,
   disposeSignatureModel,
 } from '../features/signature';
-import { PageTextReader } from '../features/text';
+import { PageTextObjectsReader, PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
 import type { Slices } from '../shared/slices';
 import { generateUuid } from '../shared/uuid';
@@ -1897,6 +1898,17 @@ export class WorkerHost {
     return wirePack({ tag: 'pages.geometry', page: req.page, snapshot });
   }
 
+  private async handlePagesTextObjects(
+    req: PagesTextObjectsWorkerRequest,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
+    const session = this.requireSession(req);
+    const reader = new PageTextObjectsReader(this.runtime, session);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
+    return wirePack({ tag: 'pages.textObjects', snapshot });
+  }
+
   private async handleSearchQuery(
     req: SearchQueryWorkerRequest,
     signal: AbortSignal,
@@ -1961,6 +1973,8 @@ export class WorkerHost {
         return { pdfium: (signal) => this.handlePagesText(msg, signal) };
       case 'pages.geometry':
         return { pdfium: (signal) => this.handlePagesGeometry(msg, signal) };
+      case 'pages.textObjects':
+        return { pdfium: (signal) => this.handlePagesTextObjects(msg, signal) };
       case 'measure.viewports':
         return { pdfium: (signal) => this.handleMeasureViewports(msg, signal) };
       case 'annotations.readFile':

@@ -77,6 +77,7 @@ export {
   AnnotationListSchema,
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
+  PageTextObjectsSnapshotSchema,
   PageNetworkRenderFormatSchema,
   PageRenderQuerySchemas,
   PagePrintQuerySchemas,

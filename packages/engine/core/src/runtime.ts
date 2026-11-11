@@ -181,6 +181,7 @@ export type {
   PieceInfoDeleteWorkerRequest,
   PagesTextWorkerRequest,
   PagesGeometryWorkerRequest,
+  PagesTextObjectsWorkerRequest,
   PagesRenderWorkerRequest,
   PagesRenderEncodedWorkerRequest,
   SearchQueryWorkerRequest,

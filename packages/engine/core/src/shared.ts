@@ -150,6 +150,16 @@ export {
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
 export type {
+  PageContentMark,
+  PageContentObject,
+  PageContentObjectKind,
+  PageOtherObject,
+  PageTextFont,
+  PageTextGlyph,
+  PageTextObject,
+  PageTextObjectsSnapshot,
+} from './dto/PageTextObjectsSnapshot';
+export type {
   PageGeometryGlyph,
   PageGeometryRun,
   PageGeometrySnapshot,

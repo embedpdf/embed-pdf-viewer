@@ -183,6 +183,11 @@ export {
 } from './conformance/runPieceInfoConformance';
 export { runDocumentEventsConformance } from './conformance/runDocumentEventsConformance';
 export { runPageTextConformance } from './conformance/runPageTextConformance';
+export {
+  PAGE_TEXT_OBJECTS_FIXTURE_PDF,
+  runPageTextObjectsConformance,
+} from './conformance/runPageTextObjectsConformance';
+export type { PageTextObjectsConformanceOptions } from './conformance/runPageTextObjectsConformance';
 export type {
   PageTextConformanceFixture,
   PageTextConformanceOptions,
