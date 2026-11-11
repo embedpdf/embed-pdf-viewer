@@ -177,6 +177,7 @@ export function copyAnnotations(ctx: ChangeContext, op: Op<'annotations.copy'>):
         // A copy is the caller's own create, in the caller's group.
         return authorizeAnnotationCreate(ctx.authority, draft.subtype, undefined);
       },
+      limits: ctx.limits,
     },
     ctx.signal,
   );

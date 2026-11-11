@@ -267,6 +267,28 @@ describe('duplicate', () => {
     expect(annotations.map((copy) => annotationKey(copy.ref))).toEqual([parent]);
   });
 
+  it('a link named with its annotation is copied once, as one of the copies named', async () => {
+    const harness = annotationHarness();
+    const link = linkOn(31, 30);
+    await harness.load([square(30), link]);
+    harness.copy.mockResolvedValueOnce({ annotations: [square(0), link], dropped: [] });
+
+    const pending = harness.capability.duplicate([refOf(30), refOf(31)]);
+
+    const [parent, child, ...more] = harness.model().order.slice(2);
+    expect(more).toEqual([]);
+    expect(harness.applied[0]!.change).toMatchObject({
+      ops: [{ type: 'annotations.copy', refs: [refOf(30), refOf(31)] }],
+    });
+    expect(harness.model().byId[child!]!.annotation.reply).toEqual({
+      to: harness.model().byId[parent!]!.annotation.ref,
+      type: 'group',
+    });
+
+    const { annotations } = await pending;
+    expect(annotations.map((copy) => annotationKey(copy.ref))).toEqual([parent, child]);
+  });
+
   it('shows no copy of what the engine leaves out, and resolves why', async () => {
     const harness = annotationHarness();
     const unknown = { ...square(31), subtype: 'unsupported' } as unknown as FileAnnotation;
