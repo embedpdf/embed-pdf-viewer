@@ -43,6 +43,7 @@ const item = (
   title,
   target: null,
   action: null,
+  destinationName: null,
   open: false,
   color: null,
   bold: false,

@@ -1,7 +1,12 @@
-import type { CustomMetadata, DocumentMetadata } from '@embedpdf/engine-core/runtime';
+import type {
+  CustomMetadata,
+  DocumentFileInfo,
+  DocumentMetadata,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { readAllCustomMeta } from './internal/readCustomMetadata';
+import { readFileInfo } from './internal/readFileInfo';
 import { readMetaText } from './internal/readMetadataText';
 import { readTrapped } from './internal/readTrappedStatus';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -64,5 +69,12 @@ export class MetadataReader {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     return readAllCustomMeta(fn, mem, this.session.requireDocPtr());
+  }
+
+  /** Header, trailer and catalog facts (`doc.metadata.file()`). */
+  readFile(signal: AbortSignal): DocumentFileInfo {
+    throwIfAborted(signal);
+    const { fn, mem } = this.runtime;
+    return readFileInfo(fn, mem, this.session.requireDocPtr());
   }
 }

@@ -29,6 +29,14 @@ export interface OutlineItem<D = PageDestination> {
    */
   action: PdfActionTree<D> | null;
   /**
+   * The name of the named destination its target goes to (a `/Dest` name or
+   * string, or a GoTo action's `/D`), as the file writes it; `target` holds
+   * the place the name resolves to. `null` for an explicit destination, or
+   * when the item has no `goto` target. A viewer that addresses places by
+   * name (`#nameddest=`) reads it.
+   */
+  destinationName: string | null;
+  /**
    * Whether its children show when the document opens (`/Count` above 0).
    * Always `false` for an item without children: a leaf has no open state.
    */

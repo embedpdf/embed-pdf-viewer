@@ -130,6 +130,8 @@ export type {
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
   MetadataReadCustomWorkerRequest,
+  MetadataReadFileWorkerRequest,
+  ActionsResolveNamedDestinationWorkerRequest,
   MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
   OutlineReadWorkerRequest,

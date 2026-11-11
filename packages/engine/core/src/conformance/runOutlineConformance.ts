@@ -186,6 +186,7 @@ export function runOutlineConformance(
           bold: false,
           italic: false,
           action: null,
+          destinationName: null,
           target: {
             kind: 'goto',
             destination: { kind: 'xyz', page: FIRST_PAGE, x: 20, y: 20, zoom: null },
@@ -240,6 +241,8 @@ export function runOutlineConformance(
           target: { kind: 'goto', destination: { kind: 'fitH', page: SECOND_PAGE, y: 50 } },
           action: null,
         });
+        expect(itemOf(outline, OLD_DESTS)?.destinationName).toBeTruthy();
+        expect(itemOf(outline, BY_NUMBER)?.destinationName).toBeNull();
         expect(itemOf(outline, BY_NUMBER)).toMatchObject({
           target: { kind: 'goto', destination: { kind: 'fit', page: SECOND_PAGE } },
         });

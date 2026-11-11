@@ -9,6 +9,7 @@ import {
   type CustomMetadataService,
   type CustomMetadataUpdateResult,
   type DocCapability,
+  type DocumentFileInfo,
   type DocumentMetadata,
   type MetadataPatch,
   type MetadataService,
@@ -144,6 +145,19 @@ export class LocalMetadataService implements MetadataService {
         buildPack: (jobId) => wirePack({ kind: 'metadata.read', effect: 'read', jobId, docId }),
       },
       (payload) => payload.metadata,
+    );
+  }
+
+  file(): AbortablePromise<DocumentFileInfo> {
+    const { docId } = this.deps;
+    return runMetadataJob(
+      this.deps,
+      'doc.open',
+      {
+        tag: 'metadata.readFile',
+        buildPack: (jobId) => wirePack({ kind: 'metadata.readFile', effect: 'read', jobId, docId }),
+      },
+      (payload) => payload.file,
     );
   }
 

@@ -40,6 +40,7 @@ const item = (objectNumber: number, title: string, parent: number | null, open =
     title,
     target: null,
     action: null,
+    destinationName: null,
     open,
     color: null,
     bold: false,
