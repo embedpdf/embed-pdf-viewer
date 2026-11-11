@@ -15,6 +15,7 @@ import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
 import { planAnnotationCopies } from '../transfer/annotationCopy';
+import { DEFAULT_BUNDLE_LIMITS } from '../transfer/bundleLimits';
 
 /**
  * `doc.annotations.copy` on both engines: a copy reads back as the copy rule
@@ -23,7 +24,7 @@ import { planAnnotationCopies } from '../transfer/annotationCopy';
  * source places and an attachment gets its file, with no download. Links
  * between copies stay and others are left out. A copy is a change: one fact
  * per copy as one transaction, undone and redone with `doc.apply({ undoOf })`,
- * and refused before anything is written.
+ * and refused before anything is written, past the bundle limits too.
  */
 export function runAnnotationCopyConformance(
   runner: ConformanceTestRunner,
@@ -348,6 +349,20 @@ export function runAnnotationCopyConformance(
         expect(mixed.refMap.map((pair) => annotationKey(pair.from))).toEqual([
           annotationKey(square.ref),
         ]);
+      });
+    });
+
+    test('a copy of more annotations than a bundle holds is refused, and writes nothing', async () => {
+      await withDocument(async (doc, pageRef) => {
+        const square = await create(doc.page(pageRef), { subtype: 'square', box: box(20) });
+        const before = await listed(doc, pageRef);
+        const max = DEFAULT_BUNDLE_LIMITS.items;
+        const refs = Array.from({ length: max + 1 }, () => square.ref);
+        await expect(doc.annotations.copy(refs)).rejects.toMatchObject({
+          code: EngineErrorCode.PayloadTooLarge,
+          details: { limit: 'items', max, value: max + 1 },
+        });
+        expect(await listed(doc, pageRef)).toEqual(before);
       });
     });
 

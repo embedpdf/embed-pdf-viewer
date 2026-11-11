@@ -1689,6 +1689,8 @@ export class LayerService {
       authority: ChangeAuthority;
       /** A single-op route's change: its audit row keeps the route's kind and result. */
       single?: SingleOpAudit;
+      /** The limits a copy inside the document must stay within; the defaults otherwise. */
+      limits?: BundleLimits;
     },
     signal?: AbortSignal,
   ): Promise<ChangeAnswer[]> {
@@ -1730,6 +1732,7 @@ export class LayerService {
               docId: input.docId,
               layerName: input.layerName,
               changes: plan.run,
+              ...(input.limits ? { limits: input.limits } : {}),
               artifactPath,
             }),
           signal,

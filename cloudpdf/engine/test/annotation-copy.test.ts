@@ -3,11 +3,16 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   annotationKey,
+  DEFAULT_BUNDLE_LIMITS,
   toPageRef,
+  type AnnotationRef,
+  type BundleLimits,
   type DocumentEvent,
   type DocumentHandle,
 } from '@embedpdf/engine-core/runtime';
 import {
+  BANDS_PDF,
+  iconRect,
   runAnnotationCopyConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
@@ -202,6 +207,94 @@ describe('annotation copy on the cloud engine', () => {
     } finally {
       await writer!.close();
       await older!.close();
+    }
+  });
+});
+
+describe('the server holds a copy to its bundle limits', () => {
+  const limits: BundleLimits = {
+    ...DEFAULT_BUNDLE_LIMITS,
+    items: 3,
+    resources: 2,
+    resourceBytes: 30_000,
+    bundleBytes: 50_000,
+  };
+  let small: DbSeededFixture | undefined;
+
+  beforeAll(async () => {
+    small = await buildDbSeededFixture({
+      secret: 'cloud-annotation-copy-limits-secret',
+      bundleLimits: limits,
+    });
+  });
+
+  afterAll(async () => {
+    await teardownDbSeededFixture(small);
+  });
+
+  test('refuses each limit with PayloadTooLarge naming it, and writes nothing', async () => {
+    if (!small) throw new Error('fixture not initialised');
+    const engine = cloudEngine({ baseUrl: small.baseUrl, token: tenantToken(small, TENANT_ID) });
+    const id = `copy-limits-${++opened}`;
+    await seedDocumentFromBytes(small, TENANT_ID, id, fixtures.authoring, 1);
+    const doc = await engine.open({ kind: 'id', id });
+    try {
+      const { pages } = await doc.pages.list();
+      const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
+      const square = (
+        await page.annotations.create({
+          subtype: 'square',
+          box: { x: 20, y: 20, width: 40, height: 30 },
+        })
+      ).annotation;
+      const stamp = (
+        await page.annotations.create(
+          { subtype: 'stamp', box: { x: 80, y: 20, width: 40, height: 30 } },
+          { resources: { appearance: BANDS_PDF } },
+        )
+      ).annotation;
+      /** An attachment whose file is `size` bytes. */
+      const attached = async (size: number): Promise<AnnotationRef> =>
+        (
+          await page.annotations.create(
+            {
+              subtype: 'file-attachment',
+              rect: iconRect(140, 20),
+              file: { name: `${size}.bin`, mimeType: null, description: null },
+            },
+            { resources: { file: new Uint8Array(size).fill(7) } },
+          )
+        ).annotation.ref;
+      const [large, half, tiny] = [
+        await attached(30_001),
+        await attached(29_000),
+        await attached(100),
+      ];
+      const { annotations: before } = await page.annotations.list();
+
+      const refused = (refs: readonly AnnotationRef[], limit: keyof BundleLimits) =>
+        expect(doc.annotations.copy(refs)).rejects.toMatchObject({
+          code: 'PayloadTooLarge',
+          details: { limit, max: limits[limit] },
+        });
+      await refused([square.ref, square.ref, square.ref, square.ref], 'items');
+      await refused([large], 'resourceBytes');
+      // Each copy of an attachment gets a file of its own.
+      await refused([tiny, tiny, tiny], 'resources');
+      await refused([half, half], 'bundleBytes');
+      expect((await page.annotations.list()).annotations).toEqual(before);
+
+      // Within them. A drawing counts once however many copies place it.
+      const copied = await doc.annotations.copy([stamp.ref, stamp.ref, tiny]);
+      expect(copied.dropped).toEqual([]);
+      expect(copied.annotations.map((copy) => copy.subtype)).toEqual([
+        'stamp',
+        'stamp',
+        'file-attachment',
+      ]);
+    } finally {
+      await doc.close();
+      await engine.destroy();
     }
   });
 });
