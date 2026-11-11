@@ -60,6 +60,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
+import type { CopySources } from './copy-sources';
 import type { AnnotationEvents } from './events';
 import { ownReorder, refuseLent, type Lending } from './lending';
 import { createObjectNumbers } from './object-numbers';
@@ -78,7 +79,7 @@ import {
 } from './staging';
 import { withSession } from '../model';
 import type { View } from '../read/view';
-import { predictRecords, undoOf, type AnnotationRecords } from '../sync/records';
+import { predictRecords, undoOf, type AnnotationRecords, type CopyOf } from '../sync/records';
 
 /**
  * Turns one kind of effect into the engine's ops, reading the records it
@@ -260,6 +261,7 @@ export function createStore(
   records: Pick<Mirror<AnnotationRecords>, 'view'>,
   events: AnnotationEvents,
   lending: Pick<Lending, 'lender' | 'owns'>,
+  copySources: Pick<CopySources, 'note'>,
 ): AnnotationStore {
   let followUp: FollowUp | null = null;
   // Keyed by effect type, so a builder only ever receives effects of its own kind.
@@ -450,6 +452,8 @@ export function createStore(
     const opIndex: number[] = [];
     const ids: Id[] = [];
     const vector: Id[] = [];
+    /** The copies the change makes, each with the annotation it copies. */
+    const copied: CopyOf[] = [];
     let current = shown;
     try {
       for (const stated of changes) {
@@ -462,6 +466,7 @@ export function createStore(
           opIndex.push(ops.length);
           ops.push(copy.op);
           vector.push(...copy.live);
+          copied.push(...copy.copies);
           current = predictRecords(current, copy.op);
           continue;
         }
@@ -507,6 +512,8 @@ export function createStore(
       }));
     }
     const selected = model().selected;
+    // Before the copies show: a view reads their picture source as soon as they do.
+    copySources.note(copied);
     const change = stage(
       withoutCoveredDeletes(shown, [...ops, ...following.ops]),
       shown,

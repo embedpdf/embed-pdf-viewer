@@ -47,9 +47,13 @@ export function createRenderReads(
     view: { pageModel },
     lending,
     records,
+    copySources,
     fonts: fontLookup,
     textFonts,
-  }: Pick<AnnotationServices, 'view' | 'lending' | 'records' | 'fonts' | 'textFonts'>,
+  }: Pick<
+    AnnotationServices,
+    'view' | 'lending' | 'records' | 'copySources' | 'fonts' | 'textFonts'
+  >,
   ghost: Pick<Ghost, 'itemsOn'>,
   stamps: Pick<Stamps, 'lookOf'>,
 ) {
@@ -338,7 +342,9 @@ export function createRenderReads(
   /**
    * The annotations a copy the engine hasn't written stands in for, nearest
    * first: the one it copies, then, while that one is such a copy too, the
-   * one behind it. A copy of a copy finds its look this way.
+   * one behind it, and last the source noted when the copy was staged
+   * (services/copy-sources.ts), which still holds once the engine wrote a
+   * copy in between. A copy of a copy finds its look this way.
    */
   const originalsOf = (id: string): AnnotationRef[] => {
     const { byKey } = records.view();
@@ -350,6 +356,8 @@ export function createRenderReads(
       originals.push(next);
       next = byKey[annotationKey(next)]?.copyOf;
     }
+    const noted = copySources.of(id);
+    if (noted && !seen.has(annotationKey(noted))) originals.push(noted);
     return originals;
   };
 

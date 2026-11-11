@@ -23,7 +23,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { StoreChange } from './store';
-import { annotationOfCreate, copiesOf, type AnnotationRecords } from '../sync/records';
+import { annotationOfCreate, copiesOf, type AnnotationRecords, type CopyOf } from '../sync/records';
 
 /**
  * What an update brings along in the same change (an annotation's attached
@@ -218,14 +218,20 @@ export const numbersFor = (changes: readonly StoreChange[]): number =>
  * copies, so the copies show at once under them. `ids`: the copies of the
  * annotations it names, in their order (one the engine leaves out has none),
  * each by the object number it gets, whether it shows before the engine
- * answers or not; `live`: the copies that draw live from now on. Throws for
- * an annotation the view doesn't have.
+ * answers or not; `live`: the copies that draw live from now on; `copies`:
+ * every copy it makes, each with the annotation it copies. Throws for an
+ * annotation the view doesn't have.
  */
 export function checkedCopyOf(
   change: Copy,
   current: AnnotationRecords,
   taken: number[],
-): { ids: Id[]; op: Extract<ChangeOp, { type: 'annotations.copy' }>; live: Id[] } {
+): {
+  ids: Id[];
+  op: Extract<ChangeOp, { type: 'annotations.copy' }>;
+  live: Id[];
+  copies: readonly CopyOf[];
+} {
   const refs = copiedBy(change);
   for (const ref of refs) {
     if (!(annotationKey(ref) in current.byKey)) throw notFound(ref);
@@ -246,6 +252,7 @@ export function checkedCopyOf(
     live: copies.flatMap(({ copy }) =>
       copy && sourceOfNew(copy) === 'vector' ? [annotationKey(copy.ref)] : [],
     ),
+    copies,
   };
 }
 
