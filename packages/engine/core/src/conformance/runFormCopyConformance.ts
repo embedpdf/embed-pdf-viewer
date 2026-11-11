@@ -10,13 +10,15 @@ import type { FormField } from '../forms/field';
 import { annotationKey } from '../identity/annotationKey';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
+import { DEFAULT_BUNDLE_LIMITS } from '../transfer/bundleLimits';
 
 /**
  * `doc.forms.copy` on both engines: a copy is a new field, named after its
  * source, with its source's settings, scripts, value and widgets, each moved.
  * A radio group's copy keeps its buttons and their values. A copy is a
  * change: one `forms.created` per field as one transaction, undone and redone
- * with `doc.apply({ undoOf })`, and refused before anything is written.
+ * with `doc.apply({ undoOf })`, and refused before anything is written, past
+ * the bundle's item limit too.
  */
 export function runFormCopyConformance(
   runner: ConformanceTestRunner,
@@ -332,6 +334,24 @@ export function runFormCopyConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.NotFound });
         await expect(doc.forms.copy([field.ref], { page: toPageRef(9999) })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,
+        });
+        expect(await doc.forms.list()).toEqual(before);
+      });
+    });
+
+    test('a copy of more fields than a bundle holds items is refused, and writes nothing', async () => {
+      await withDocument(async (doc, page) => {
+        const { field } = await doc.forms.create({
+          kind: 'text',
+          name: 'many',
+          widgets: [{ page, rect: rect(40) }],
+        });
+        const before = await doc.forms.list();
+        const max = DEFAULT_BUNDLE_LIMITS.items;
+        const fields = Array.from({ length: max + 1 }, () => field.ref);
+        await expect(doc.forms.copy(fields)).rejects.toMatchObject({
+          code: EngineErrorCode.PayloadTooLarge,
+          details: { limit: 'items', max, value: max + 1 },
         });
         expect(await doc.forms.list()).toEqual(before);
       });

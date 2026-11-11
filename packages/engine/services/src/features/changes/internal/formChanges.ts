@@ -226,6 +226,7 @@ export function copyFields(ctx: ChangeContext, op: Op<'forms.copy'>): Done {
       // A copy is the caller's own create: it keeps its source's group when
       // the caller may set it.
       groupOf: (groupId) => newFieldGroup(ctx, groupId),
+      limits: ctx.limits,
     },
     ctx.signal,
   );

@@ -192,6 +192,10 @@ an [import](/docs/engine/forms/import-export#whats-left-out) leaves out: a field
 engine doesn't know, a script when `canWriteScripts()` is false, an action it can't write. A box
 in no field is left out too.
 
+One call makes at most 10,000 new fields: the engine's item
+[limit](/docs/engine/forms/import-export#limits), which a server can change. More is refused with
+`invalid-input`, and nothing is copied.
+
 In design mode, [Duplicate the selection](../annotations/selecting#duplicate-the-selection)
 does this for the selected boxes, together with the annotations selected beside them.
 

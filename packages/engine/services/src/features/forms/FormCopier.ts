@@ -5,6 +5,7 @@ import {
   pageFormSnapshotOf,
   type AnnotationActor,
   type AnnotationRef,
+  type BundleLimits,
   type FormCopyResult,
   type FormFieldRef,
   type PageRef,
@@ -19,6 +20,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { visibleBoxReader } from '../pages/PagesReader';
+import { assertCopyWithinLimit } from '../transfer/copyLimits';
 
 export interface FormCopyRequest {
   readonly fields: readonly FormFieldRef[];
@@ -41,6 +43,8 @@ export interface FormCopyRequest {
    * checked by the caller, which refuses one it may not set.
    */
   readonly groupOf: (groupId: string | undefined) => string | undefined;
+  /** What the copy may carry: `fields` names as many fields as a bundle holds items. */
+  readonly limits: BundleLimits;
 }
 
 /**
@@ -51,6 +55,10 @@ export interface FormCopyRequest {
  * (`createPlannedFields`). So everything that is left out is decided before
  * the first write. A widget is drawn from its data: nothing is read from a
  * source but what `list()` returns.
+ *
+ * `fields` names at most `limits.items` fields; more is refused with
+ * `PayloadTooLarge` before the form is read. A widget carries no bytes, so
+ * the other bundle limits have nothing to count.
  */
 export class FormCopier {
   constructor(
@@ -62,6 +70,8 @@ export class FormCopier {
 
   copy(request: FormCopyRequest, signal: AbortSignal): FormCopyResult<PdfCoordinates> {
     throwIfAborted(signal);
+    // Counted as asked, before anything is read.
+    assertCopyWithinLimit(request.limits, 'items', request.fields.length);
     // A page the document doesn't have refuses the copy before anything is read.
     if (request.page) this.session.resolvePageRef(request.page);
     const form = pageFormSnapshotOf(

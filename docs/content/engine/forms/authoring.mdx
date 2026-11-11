@@ -306,6 +306,9 @@ reasons: a field of a kind the engine doesn't know, a script or a link without
 `doc.forms.script`, an action the engine can't write. Everything else is copied. A ref the form
 doesn't have refuses the call with `NotFound`.
 
+One call names at most as many fields as a bundle holds [items](import-export#limits), 10,000
+by default. More refuses the call with `PayloadTooLarge`, and nothing is copied.
+
 A copy is one change, and one undo takes all of it away. To show the same field in one more
 place, with the same value, use [`addWidget()`](#add-a-widget).
 

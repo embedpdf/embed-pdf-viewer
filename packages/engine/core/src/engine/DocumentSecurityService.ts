@@ -144,7 +144,7 @@ export interface DocumentAccessInfo {
   /**
    * The deployment's limits for an annotation import: the cloud client
    * checks a bundle against these before its bytes move. A copy inside the
-   * document (`annotations.copy`) stays within them too.
+   * document (`annotations.copy`, `forms.copy`) stays within them too.
    */
   readonly bundleLimits: BundleLimits;
   /**
