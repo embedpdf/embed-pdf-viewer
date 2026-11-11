@@ -250,9 +250,18 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
       ].find((each) => each.textContent?.includes(text))!;
       button.click();
     }, label);
+    // The new widget shows at once; the sidebar selects it once the engine has written it.
     await tab.waitForFunction(
-      (called) =>
-        window.element.viewer.get('form').get({ kind: 'fqn', name: called })?.widgets.length === 2,
+      (called) => {
+        const { viewer } = window.element;
+        const widgets = viewer.get('form').get({ kind: 'fqn', name: called })?.widgets ?? [];
+        const selected = viewer.get('annotation').selection.getSelected();
+        return (
+          widgets.length === 2 &&
+          selected.length === 1 &&
+          selected[0].ref.objectNumber === widgets[1].objectNumber
+        );
+      },
       name,
       { timeout: 10_000 },
     );
@@ -387,8 +396,17 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
       ].find((each) => each.textContent?.includes('Duplicate group'))!;
       button.click();
     });
+    // The new group shows at once; the sidebar selects it once the engine has written it.
     await tab.waitForFunction(
-      () => !!window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-plan_2' }),
+      () => {
+        const { viewer } = window.element;
+        const widgets =
+          viewer.get('form').get({ kind: 'fqn', name: 'guard-plan_2' })?.widgets ?? [];
+        return (
+          widgets.length === 3 &&
+          viewer.get('annotation').selection.getSelected().length === widgets.length
+        );
+      },
       null,
       { timeout: 10_000 },
     );
