@@ -14,18 +14,19 @@ import {
   type AttachedFile,
 } from '@embedpdf/react/attachment';
 import { useCommand, useCommands } from '@embedpdf/react/commands';
-import { useI18nSettings, useT } from '@embedpdf/react/i18n';
+import { useT } from '@embedpdf/react/i18n';
 import { usePageList } from '@embedpdf/react/runtime';
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 
 import { useLayoutEnv } from '../config-context';
+import { useFormatLocale } from '../format-locale';
 import { Icon, type IconName } from './icons';
 import { useCloseOnPick } from './panel-frame';
 import { CommandButton } from './toolbar';
 import { useTooltip } from './tooltip';
 import type { AttachmentAddArgs } from '../config/attachments';
 
-/** A file's size in the viewer's language: bytes, then kB and MB with one decimal. */
+/** A file's size as the viewer's format language writes it: bytes, then kB and MB with one decimal. */
 function sizeText(bytes: number, locale: string | undefined): string {
   const [value, unit] =
     bytes < 1000
@@ -54,7 +55,7 @@ const carriesFiles = (event: DragEvent) => event.dataTransfer.types.includes('Fi
 
 export function AttachmentsPanel() {
   const t = useT();
-  const locale = useI18nSettings((settings) => settings.locale) ?? undefined;
+  const locale = useFormatLocale();
   const attachment = useAttachment();
   const { files, selected, status } = useAttachmentState();
   const commands = useCommands();

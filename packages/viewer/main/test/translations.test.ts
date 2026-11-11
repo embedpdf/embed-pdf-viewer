@@ -6,8 +6,9 @@
  * a language has no words; one string, or one layout title, renames a panel's button and its
  * header; the style panel's words change through `strings`; a language of your
  * own falls back to English, and reads right to left when its code says so; `setLocale` resolves once the language shows; `addTranslations`
- * changes words in place; and the toolbar moves more or fewer buttons into "More" as the words
- * get longer or shorter. Arabic, `fa` and a built-in button's label by its command id are
+ * changes words in place; the toolbar moves more or fewer buttons into "More" as the words
+ * get longer or shorter; and a comment's time is written in the language on screen, the way the
+ * reader's region writes it. Arabic, `fa` and a built-in button's label by its command id are
  * `languages.test.ts`'s.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -305,6 +306,71 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     await switchTo(tab, 'auto', 'fr');
     expect(await buttonOf(tab, stringOf(fr.translations, 'panels.search'))).not.toBeNull();
     await close(tab);
+  });
+
+  it("writes a comment's time in the language on screen, the way the reader's region does", async () => {
+    /** Put a note on the first page and open the comments panel: one card, with its time. */
+    const addNote = async (tab: Page) => {
+      await tab.evaluate(async () => {
+        await window.element.viewer.get('annotation').create(0, {
+          subtype: 'text',
+          rect: { x: 72, y: 72, width: 24, height: 24 },
+          contents: 'A note',
+        });
+        await window.element.viewer.commands.execute('panel:comments');
+      });
+      await tab.waitForFunction(
+        () => window.element.shadowRoot!.querySelector('[data-epdf-panel="comments"] time'),
+        undefined,
+        { timeout: 20_000 },
+      );
+    };
+    /** The note's time: as the panel shows it, and as each language tag writes that moment. */
+    const noteTimeOf = (tab: Page) =>
+      tab.evaluate(() => {
+        const time = window.element.shadowRoot!.querySelector<HTMLTimeElement>(
+          '[data-epdf-panel="comments"] time',
+        )!;
+        // Plain spaces for both: the panel holds a time's words together with no-break spaces.
+        const plain = (text: string) => text.replace(/\s/g, ' ');
+        const written = (tag: string) =>
+          plain(
+            new Intl.DateTimeFormat(tag, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            }).format(new Date(time.dateTime)),
+          );
+        return {
+          shown: plain(time.textContent ?? ''),
+          american: written('en-US'),
+          british: written('en-GB'),
+          french: written('fr'),
+        };
+      });
+
+    // The same English words, written the way each reader's region writes a time.
+    const american = await open('/english.html', 'en', 'en-US');
+    await addNote(american);
+    const inAmerica = await noteTimeOf(american);
+    expect(inAmerica.shown).toBe(inAmerica.american);
+    expect(inAmerica.shown).not.toBe(inAmerica.british);
+    await close(american);
+
+    const british = await open('/english.html', 'en', 'en-GB');
+    await addNote(british);
+    const inBritain = await noteTimeOf(british);
+    expect(inBritain.shown).toBe(inBritain.british);
+
+    // A locale that names a region wins over the browser's.
+    await switchTo(british, 'en-US', 'en');
+    expect((await noteTimeOf(british)).shown).toBe(inBritain.american);
+
+    // French on screen is written in French, whatever the browser's own language.
+    await switchTo(british, 'fr');
+    expect((await noteTimeOf(british)).shown).toBe(inBritain.french);
+    await close(british);
   });
 
   it('speaks fifteen languages, each loaded the first time it shows, Hebrew right to left', async () => {
