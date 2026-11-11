@@ -594,4 +594,97 @@ describe('a copied stamp', () => {
       },
     ]);
   });
+
+  it('a copy of a copy keeps its picture when the engine writes the first copy', async () => {
+    const harness = annotationHarness();
+    await harness.load([stamp(30)]);
+    const picture = {
+      ref: refOf(30),
+      mode: 'normal',
+      state: null,
+      rect: { x: 100, y: 140, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    await harness.capability.renderAppearances(PAGE, 1);
+    const firstAnswer = deferred<{ annotations: FileAnnotation[]; dropped: never[] }>();
+    harness.copy.mockReturnValueOnce(firstAnswer.promise);
+    harness.copy.mockReturnValue(new Promise(() => {}));
+
+    const { selection } = harness.capability;
+    selection.select([refOf(30)]);
+    const written = selection.duplicate();
+    void selection.duplicate();
+    const [, first, second] = harness.model().order;
+    const firstRef = harness.model().byId[first!]!.annotation.ref;
+    const secondRef = harness.model().byId[second!]!.annotation.ref;
+    const secondBox = { x: 120, y: 160, width: 100, height: 60 };
+
+    // The engine writes the first copy. Its record no longer says what it copies, and its own
+    // picture isn't loaded: the second copy, still on its way, shows the original's.
+    const moved = { left: 110, bottom: 590, right: 210, top: 650 };
+    firstAnswer.resolve({ annotations: [stamp(0, { rect: moved, box: moved })], dropped: [] });
+    await written;
+    expect(harness.model().byId[second!]!.unconfirmed).toBe(true);
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`obj:30@0|${first}@1|${second}@kept`);
+    const firstPicture = {
+      ...picture,
+      ref: firstRef,
+      rect: { x: 110, y: 150, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture, firstPicture] });
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+      { ...firstPicture, version: 1 },
+      { ...picture, ref: secondRef, rect: secondBox, version: 0 },
+    ]);
+
+    // The first copy's own picture is loaded now, and it is the nearer one: the second shows it.
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+      { ...firstPicture, version: 1 },
+      { ...firstPicture, ref: secondRef, rect: secondBox, version: 0 },
+    ]);
+  });
+
+  it('a copy of a copy the engine just wrote shows the picture behind it', async () => {
+    const harness = annotationHarness();
+    await harness.load([stamp(30)]);
+    const picture = {
+      ref: refOf(30),
+      mode: 'normal',
+      state: null,
+      rect: { x: 100, y: 140, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    await harness.capability.renderAppearances(PAGE, 1);
+    const moved = { left: 110, bottom: 590, right: 210, top: 650 };
+    harness.copy.mockResolvedValueOnce({
+      annotations: [stamp(0, { rect: moved, box: moved })],
+      dropped: [],
+    });
+    harness.copy.mockReturnValue(new Promise(() => {}));
+
+    // The first copy is written, and copied again before its own picture is loaded.
+    const { selection } = harness.capability;
+    selection.select([refOf(30)]);
+    await selection.duplicate();
+    void selection.duplicate();
+
+    const [, first, second] = harness.model().order;
+    expect(harness.model().byId[first!]!.unconfirmed).toBeFalsy();
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`obj:30@0|${first}@1|${second}@kept`);
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+      {
+        ...picture,
+        ref: harness.model().byId[second!]!.annotation.ref,
+        rect: { x: 120, y: 160, width: 100, height: 60 },
+        version: 0,
+      },
+    ]);
+  });
 });

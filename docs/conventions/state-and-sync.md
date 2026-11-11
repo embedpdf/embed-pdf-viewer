@@ -457,7 +457,10 @@ could show it before the engine answered or not, so what `duplicate()`
 resolves and selects never depends on the prediction. A copied stamp has no
 live drawing, so it shows its original's picture until the engine has drawn
 the copy; a copy of a copy shows the picture of the first annotation behind
-it that has one (`read/render.ts`).
+it that has one (`read/render.ts`). A replayed prediction can't remember what
+a copy copied once the engine has written that copy, so the store notes each
+staged copy's picture source (`services/copy-sources.ts`): a copy that is
+still on its way keeps its picture when the engine writes the one it copies.
 
 ### The page list
 
