@@ -13,6 +13,7 @@ import {
   type BundleLimits,
   type DocumentEventInit,
   type DocumentFormsService,
+  type FormChangeVerb,
   type FormBundle,
   type FormExportSelection,
   type FormFieldCreateResult,
@@ -92,7 +93,7 @@ import type { HttpClient } from '../transport/HttpClient';
  * page's `widgetVersion`); `absorbMutation` folds it into the cached
  * manifest and owns the `forms` plane.
  */
-export class CloudDocumentFormsService implements DocumentFormsService {
+export class CloudDocumentFormsService implements Omit<DocumentFormsService, FormChangeVerb> {
   constructor(
     private readonly http: HttpClient,
     private readonly docId: string,

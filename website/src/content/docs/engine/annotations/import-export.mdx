@@ -185,6 +185,9 @@ takes:
 Past a limit, the call fails with `PayloadTooLarge`, and `err.details.limit` names the limit.
 Export checks while it builds the bundle; export fewer pages at a time to stay under.
 
+A [copy inside a document](/docs/engine/annotations#copy-annotations) makes no bundle, and is
+held to the same limits on annotations and resources.
+
 <Engine cloud>
 
 The server holds the limits, with these defaults unless you set others. The client checks a
@@ -259,7 +262,9 @@ engine.
 
 - Link a reply to a comment that's already in the target document: replies and popups link only
   to items of the same bundle.
-- Move or scale annotations, to paste them at an offset or onto a page of another size.
+- Move or scale annotations, to paste them at an offset or onto a page of another size. Inside
+  one document, [`doc.annotations.copy()`](/docs/engine/annotations#copy-annotations) copies
+  with an offset, and needs no bundle.
 - Carry what the engine doesn't model: those annotations and fields are in `dropped`.
 
 ### Bundles you build

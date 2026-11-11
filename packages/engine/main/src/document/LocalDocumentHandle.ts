@@ -8,9 +8,12 @@ import {
   SessionEventPublisher,
   attachmentVerbs,
   outlineVerbs,
+  annotationVerbs,
+  formVerbs,
   pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
+  type DocumentFormsService,
   type DocumentAttachmentsService,
   type DocumentActionsService,
   type DocumentEventStream,
@@ -86,7 +89,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly attachments: DocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly outline: DocumentOutlineService;
-  readonly forms: LocalDocumentFormsService;
+  readonly forms: DocumentFormsService;
   readonly fonts: LocalDocumentFontsService;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
@@ -178,7 +181,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.metadata = new LocalMetadataService(id, queue, view, guard, publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
-    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
+    this.annotations = annotationVerbs(
+      new LocalDocumentAnnotationsService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.attachments = attachmentVerbs(
       new LocalDocumentAttachmentsService(id, queue, view, guard),
       (change, options) => this.apply(change, options),
@@ -188,7 +194,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       () => readLocalOutline(id, queue, view, guard),
       (change, options) => this.apply(change, options),
     );
-    this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
+    this.forms = formVerbs(
+      new LocalDocumentFormsService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.fonts = new LocalDocumentFontsService(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = pageVerbs(

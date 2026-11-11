@@ -60,23 +60,26 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
+import type { CopySources } from './copy-sources';
 import type { AnnotationEvents } from './events';
 import { ownReorder, refuseLent, type Lending } from './lending';
 import { createObjectNumbers } from './object-numbers';
 import { createSelectionHistory } from './selection-history';
 import {
+  checkedCopyOf,
   checkedOpOf,
   idsOf,
   labelOf,
   modelAfter,
   modelOver,
+  numbersFor,
   withFollowUps,
   withoutCoveredDeletes,
   type FollowUp,
 } from './staging';
 import { withSession } from '../model';
 import type { View } from '../read/view';
-import { predictRecords, undoOf, type AnnotationRecords } from '../sync/records';
+import { predictRecords, undoOf, type AnnotationRecords, type CopyOf } from '../sync/records';
 
 /**
  * Turns one kind of effect into the engine's ops, reading the records it
@@ -109,7 +112,7 @@ export interface Commit {
 /**
  * A change stated in code, in the engine's own terms. A create takes an
  * object number, its record is keyed by it, and a later change in the same
- * call can name it.
+ * call can name it. So does each copy a `copy` makes.
  */
 export type StoreChange =
   | {
@@ -131,13 +134,38 @@ export type StoreChange =
       readonly page: PageRef;
       readonly refs: readonly AnnotationRef[];
       readonly position: AnnotationPosition;
+    }
+  /**
+   * Copies of these annotations, which the engine makes in one op: moved by
+   * `offset`, on `page` when one is named. `along` is copied after them
+   * (an annotation's attached link), and its copies aren't among the records
+   * the change names.
+   */
+  | {
+      readonly type: 'copy';
+      readonly refs: readonly AnnotationRef[];
+      readonly along?: readonly AnnotationRef[];
+      readonly page?: PageRef;
+      readonly offset?: { readonly x: number; readonly y: number };
     };
 
 export interface ApplyOptions {
   readonly select?: boolean;
+  /**
+   * What the change does to lent records, worked out by their lender (the
+   * copies of a form's widgets): its ops join the change after this
+   * plugin's, and `ids` are the records they make, named with the rest.
+   */
+  readonly lent?: { readonly ops: readonly ChangeOp[]; readonly ids: readonly Id[] };
+  /** What the change is called, when its ops alone don't say (`labelOf`). */
+  readonly label?: ChangeLabel;
 }
 
-/** What applying stated changes started: the record each change names, in order. */
+/**
+ * What applying stated changes started: the records the changes name, in
+ * order. One per change, except a copy, which names the copy of each
+ * annotation in its `refs`.
+ */
 export interface Applied {
   readonly ids: readonly Id[];
   /** Settles when the engine answered. */
@@ -148,8 +176,8 @@ export interface Applied {
 export interface AppliedOutcome extends Written {
   /**
    * The annotation each create or update left, as the engine read it back, in
-   * the order of the changes. `null` for a delete, a reorder, a change with
-   * nothing to write, and a refused one.
+   * the order of the changes. `null` for a delete, a reorder, a copy (its
+   * copies are in `result`), a change with nothing to write, and a refused one.
    */
   readonly annotations: readonly (Annotation | null)[];
 }
@@ -191,11 +219,12 @@ export interface AnnotationStore {
    * gesture's. Throws, before anything shows, for a change the engine refuses
    * without its schemas (`resolveAnnotationPatch`), a record the view doesn't
    * have, or, when the document's pool is
-   * out of object numbers, a create (`applyWhenNumbered` waits for them).
-   * `select`: the records it names are selected as they show.
+   * out of object numbers, a create or a copy (`applyWhenNumbered` waits for
+   * them). `select`: the records it names are selected as they show: at
+   * once, or, for one that shows only when the engine answers, then.
    */
   apply(changes: readonly StoreChange[], options?: ApplyOptions): Applied;
-  /** `apply`, once the object numbers its creates take are there: at once, in this call, when they are. */
+  /** `apply`, once the object numbers its creates and copies take are there: at once, in this call, when they are. */
   applyWhenNumbered(changes: readonly StoreChange[], options?: ApplyOptions): Promise<Applied>;
   /**
    * A change that later commits go into (`commit(…, { into })`); its label names it in history,
@@ -232,6 +261,7 @@ export function createStore(
   records: Pick<Mirror<AnnotationRecords>, 'view'>,
   events: AnnotationEvents,
   lending: Pick<Lending, 'lender' | 'owns'>,
+  copySources: Pick<CopySources, 'note'>,
 ): AnnotationStore {
   let followUp: FollowUp | null = null;
   // Keyed by effect type, so a builder only ever receives effects of its own kind.
@@ -253,13 +283,15 @@ export function createStore(
         ? [{ kind: 'objectNumber' as const, page: op.page, objectNumber: op.objectNumber }]
         : op.type === 'annotations.update' || op.type === 'annotations.delete'
           ? [op.ref]
-          : op.type === 'forms.updateWidget' || op.type === 'forms.deleteWidget'
-            ? [op.widget]
-            : op.type === 'annotations.reorder'
-              ? [...op.refs]
-              : op.type === 'forms.reorderWidgets'
-                ? [...op.widgets]
-                : [],
+          : op.type === 'annotations.copy'
+            ? [...op.refs]
+            : op.type === 'forms.updateWidget' || op.type === 'forms.deleteWidget'
+              ? [op.widget]
+              : op.type === 'annotations.reorder'
+                ? [...op.refs]
+                : op.type === 'forms.reorderWidgets'
+                  ? [...op.widgets]
+                  : [],
     );
     events.writeFailed.emit({ refs, error: toPluginErrorInfo(settled.error) });
   });
@@ -282,13 +314,14 @@ export function createStore(
     ops: readonly ChangeOp[],
     before: AnnotationRecords,
     lent: readonly ChangeOp[] = [],
+    label?: ChangeLabel,
   ): PendingChange => {
     const all = [...ops, ...lent];
     const undo = [
       ...(lent.length ? (lending.lender()?.undoOf(lent) ?? []) : []),
       ...undoOf(before, ops),
     ];
-    const change = ctx.changes.stage({ label: labelOf(all), ops: all, undo });
+    const change = ctx.changes.stage({ label: label ?? labelOf(all), ops: all, undo });
     mine.add(change.opId);
     return change;
   };
@@ -409,8 +442,8 @@ export function createStore(
     // stages none. Each change is worked out against the ones before it, as
     // the engine will apply them.
     const shown = records.view();
-    const creates = changes.filter((change) => change.type === 'create').length;
-    const taken = creates ? numbers.take(creates) : [];
+    const needed = numbersFor(changes);
+    const taken = needed ? numbers.take(needed) : [];
     if (!taken) throw noNumbers();
     const ops: ChangeOp[] = [];
     /** Lent records reordered: their lender's ops, last in the change. */
@@ -419,10 +452,24 @@ export function createStore(
     const opIndex: number[] = [];
     const ids: Id[] = [];
     const vector: Id[] = [];
+    /** The copies the change makes, each with the annotation it copies. */
+    const copied: CopyOf[] = [];
     let current = shown;
     try {
       for (const stated of changes) {
         if (stated.type === 'update' || stated.type === 'delete') refuseLent(lending, stated.ref);
+        if (stated.type === 'copy') {
+          // A lent record is its lender's to copy.
+          for (const ref of [...stated.refs, ...(stated.along ?? [])]) refuseLent(lending, ref);
+          const copy = checkedCopyOf(stated, current, taken);
+          ids.push(...copy.ids);
+          opIndex.push(ops.length);
+          ops.push(copy.op);
+          vector.push(...copy.live);
+          copied.push(...copy.copies);
+          current = predictRecords(current, copy.op);
+          continue;
+        }
         const change = stated.type === 'reorder' ? ownReorder(lending, stated, lent) : stated;
         if (!change) {
           ids.push(annotationKey((stated as Extract<StoreChange, { type: 'reorder' }>).refs[0]!));
@@ -439,6 +486,10 @@ export function createStore(
       }
     } catch (error) {
       throw toPluginError('annotation', error);
+    }
+    if (options.lent) {
+      lent.push(...options.lent.ops);
+      ids.push(...options.lent.ids);
     }
     if (!ops.length && !lent.length) {
       return {
@@ -461,10 +512,29 @@ export function createStore(
       }));
     }
     const selected = model().selected;
-    const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown, lent);
+    // Before the copies show: a view reads their picture source as soon as they do.
+    copySources.note(copied);
+    const change = stage(
+      withoutCoveredDeletes(shown, [...ops, ...following.ops]),
+      shown,
+      lent,
+      options.label,
+    );
     selections.remember(change.opId, selected, options.select ? ids : selected);
     if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
-    if (options.select) commit({ type: 'select', ids });
+    if (options.select) {
+      commit({ type: 'select', ids });
+      // A record that only shows once the engine answered (a copy the view
+      // can't read beforehand) is selected then, with the others, unless
+      // the selection moved on meanwhile.
+      if (ids.some((id) => !(id in model().byId))) {
+        const staged = model().selected;
+        const selectLate = (): void => {
+          if (sameIds(model().selected, staged)) commit({ type: 'select', ids });
+        };
+        void change.result.then(selectLate, () => {});
+      }
+    }
     const written = writtenOf(change, idsOf([...ops, ...lent])).then(
       (outcome): AppliedOutcome => ({
         ...outcome,
@@ -478,8 +548,8 @@ export function createStore(
   };
 
   const applyWhenNumbered: AnnotationStore['applyWhenNumbered'] = async (changes, options) => {
-    const creates = changes.filter((change) => change.type === 'create').length;
-    while (!numbers.hold(creates)) await ctx.changes.reserveObjectNumbers(creates);
+    const needed = numbersFor(changes);
+    while (!numbers.hold(needed)) await ctx.changes.reserveObjectNumbers(needed);
     return apply(changes, options);
   };
 

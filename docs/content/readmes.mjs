@@ -8,7 +8,8 @@
  *   `docs/content` and as its sidebar routes it (`headless/quick-start`). `framework` is the
  *   framework the page is shown for: one of the four on a headless page, those or `vanilla` on a
  *   viewer page, none on an engine page. `section` names a `##` section of the page by its
- *   heading; the README then shows that section in place of the page's opening. `also` names a
+ *   heading; the README then shows that section, under that heading, in place of the page's
+ *   opening under the page's title. `also` names a
  *   second page, `{ page, section }`, shown after the cut under its own heading: that section,
  *   or the page's opening under the page's title. It is what the package has: every plugin, or
  *   every feature of the viewer.
@@ -24,6 +25,7 @@
 const EVERY_PLUGIN = { page: 'headless/index', section: 'Every plugin' };
 const ALL_FEATURES = { page: 'viewer/features/index' };
 const viewer = (framework) => ({ page: 'viewer/quick-start', framework, also: ALL_FEATURES });
+const ENGINE_SETUP = { near: 'engine/setup' };
 const BY_HAND = { by: 'hand' };
 const INSTALLED_BY_HAND = { by: 'hand', installed: true };
 
@@ -64,24 +66,32 @@ export const READMES = {
   '@embedpdf/viewer-vue': viewer('vue'),
   '@embedpdf/viewer-svelte': viewer('svelte'),
   '@embedpdf/viewer-angular': viewer('angular'),
-  '@embedpdf/viewer-chrome': BY_HAND,
+  '@embedpdf/viewer-chrome': { near: 'viewer/index' },
 
   // ── packages/engine, and the font and stamp packages ──
-  '@embedpdf/engine': INSTALLED_BY_HAND,
-  '@embedpdf/engine-core': BY_HAND,
-  '@embedpdf/engine-services': BY_HAND,
-  '@embedpdf/engine-runtime': BY_HAND,
-  '@embedpdf/engine-runtime-darwin-arm64': BY_HAND,
-  '@embedpdf/engine-runtime-darwin-x64': BY_HAND,
-  '@embedpdf/engine-runtime-linux-arm64': BY_HAND,
-  '@embedpdf/engine-runtime-linux-x64': BY_HAND,
-  '@embedpdf/engine-runtime-linuxmusl-arm64': BY_HAND,
-  '@embedpdf/engine-runtime-linuxmusl-x64': BY_HAND,
-  '@embedpdf/engine-runtime-wasm32': BY_HAND,
-  '@embedpdf/engine-runtime-win32-arm64': BY_HAND,
-  '@embedpdf/engine-runtime-win32-x64': BY_HAND,
-  '@embedpdf/default-fallback-fonts': BY_HAND,
-  '@embedpdf/default-signature-fonts': BY_HAND,
+  '@embedpdf/engine': {
+    page: 'engine/quick-start',
+    also: { page: 'engine/index', section: 'What you can do' },
+  },
+  '@embedpdf/engine-core': ENGINE_SETUP,
+  '@embedpdf/engine-services': ENGINE_SETUP,
+  '@embedpdf/engine-runtime': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-darwin-arm64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-darwin-x64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-linux-arm64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-linux-x64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-linuxmusl-arm64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-linuxmusl-x64': ENGINE_SETUP,
+  // The page that says where its file goes when you serve it yourself.
+  '@embedpdf/engine-runtime-wasm32': { near: 'viewer/self-hosting' },
+  '@embedpdf/engine-runtime-win32-arm64': ENGINE_SETUP,
+  '@embedpdf/engine-runtime-win32-x64': ENGINE_SETUP,
+  '@embedpdf/default-fallback-fonts': { near: 'engine/documents/fonts' },
+  '@embedpdf/default-signature-fonts': {
+    page: 'headless/annotations/stamps',
+    framework: 'react',
+    section: 'Handwriting fonts for typed marks',
+  },
   '@embedpdf/default-stamps': INSTALLED_BY_HAND,
 
   // ── cloudpdf ──

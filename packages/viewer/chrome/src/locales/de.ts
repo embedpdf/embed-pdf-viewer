@@ -106,6 +106,7 @@ export const de: Locale = {
         saveFile: 'Datei speichern',
         removeLink: 'Link entfernen',
         delete: 'Löschen',
+        duplicate: 'Duplizieren',
         group: 'Gruppieren',
         ungroup: 'Gruppierung aufheben',
         stampFromSelection: 'Stempel erstellen',
@@ -496,6 +497,7 @@ export const de: Locale = {
       box: 'Kästchen {number}',
       addButton: 'Optionsfeld hinzufügen',
       addBox: 'Kästchen hinzufügen',
+      duplicateGroup: 'Gruppe duplizieren',
     },
     // The style panel's own words around the properties.
     stylePanel: {

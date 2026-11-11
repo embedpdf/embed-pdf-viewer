@@ -1537,7 +1537,7 @@ export class WorkerHost {
     if (req.objectNumberFloor !== undefined) {
       session.raiseLastObjectNumber(req.objectNumberFloor - 1);
     }
-    const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const applier = new ChangeApplier(this.runtime, session, this.fonts, req.limits);
     const space = this.pageSpaceOf(session);
     const records = new Map<string, ChangeRecord | null>();
     const outcomes: ServerChangeOutcome[] = [];

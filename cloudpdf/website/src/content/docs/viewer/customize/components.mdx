@@ -20,7 +20,8 @@ puts a version picker from your app in the toolbar:
 toolbar measures your component like any button, so it fits it in, and when the toolbar runs out of
 room, `command` takes its place in the "More" menu: here, a command of yours that opens the same
 choice in a dialog. Leave `command` out, and your component stays in the toolbar while other items
-make room.
+make room. Without a component for it, the place shows its `command` as a button, so one layout
+works with and without your component.
 
 Here a review status from your app sits at the end of the toolbar, with `{ custom: 'status' }` and
 no `command`:
@@ -119,7 +120,8 @@ Regions are places around the viewer for your own components:
 | `tabs` | In place of the document tabs, for your own |
 | `empty` | Over the pages while no document is open |
 
-A region you don't fill shows nothing, or the viewer's own (the tabs).
+A region you don't fill shows nothing, or the viewer's own (the tabs). A region the layout hides,
+such as the tabs with `tabs('never')`, hides your component for it too.
 
 ## In the menu over selected text
 

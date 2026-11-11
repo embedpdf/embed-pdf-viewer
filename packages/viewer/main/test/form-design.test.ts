@@ -122,6 +122,36 @@ const onScreen = (tab: Page, point: { x: number; y: number }) =>
     return { x: viewport.left + spot.x, y: viewport.top + spot.y };
   }, point);
 
+/** A box of page 1, in page space. */
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Whether a picture (an `<img>`) sits on `box` of page 1, to the pixel. */
+const pictureAt = (tab: Page, box: Box) =>
+  tab.evaluate((at) => {
+    const { viewer } = window.element;
+    const page = viewer.documents.getPage(0);
+    const viewport = (
+      window.element.shadowRoot!.querySelector('[data-float]') as HTMLElement
+    ).offsetParent!.getBoundingClientRect();
+    const rect = viewer.get('stage').pageRectToViewport(page.ref, at);
+    if (!rect) return false;
+    const near = (left: number, right: number) => Math.abs(left - right) < 1.5;
+    return [...window.element.shadowRoot!.querySelectorAll('img')].some((image) => {
+      const frame = image.getBoundingClientRect();
+      return (
+        near(frame.left, viewport.left + rect.x) &&
+        near(frame.top, viewport.top + rect.y) &&
+        near(frame.width, rect.width) &&
+        near(frame.height, rect.height)
+      );
+    });
+  }, box);
+
 describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () => {
   let host: ViewerHost;
   let browser: Browser;
@@ -250,9 +280,18 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
       ].find((each) => each.textContent?.includes(text))!;
       button.click();
     }, label);
+    // The new widget shows at once; the sidebar selects it once the engine has written it.
     await tab.waitForFunction(
-      (called) =>
-        window.element.viewer.get('form').get({ kind: 'fqn', name: called })?.widgets.length === 2,
+      (called) => {
+        const { viewer } = window.element;
+        const widgets = viewer.get('form').get({ kind: 'fqn', name: called })?.widgets ?? [];
+        const selected = viewer.get('annotation').selection.getSelected();
+        return (
+          widgets.length === 2 &&
+          selected.length === 1 &&
+          selected[0].ref.objectNumber === widgets[1].objectNumber
+        );
+      },
       name,
       { timeout: 10_000 },
     );
@@ -296,6 +335,122 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
         .widgets.map((widget: any) => widget.checked),
     );
     expect(checked).toEqual([true, true]);
+  });
+
+  /** A field's widgets and what is selected, as the form and the annotation plugin hold them. */
+  const stateOf = (name: string) =>
+    tab.evaluate((called) => {
+      const { viewer } = window.element;
+      const field = viewer.get('form').get({ kind: 'fqn', name: called });
+      return {
+        numbers: (field?.widgets ?? []).map((widget: any) => widget.objectNumber) as number[],
+        values: (field?.widgets ?? []).map((widget: any) => widget.exportValue) as string[],
+        selected: viewer
+          .get('annotation')
+          .selection.getSelected()
+          .map((record: any) => record.ref.objectNumber) as number[],
+        shown: viewer.get('form').getSelectedField()?.name ?? null,
+      };
+    }, name);
+
+  const selectFirst = (name: string) =>
+    tab.evaluate((called) => {
+      const { viewer } = window.element;
+      const field = viewer.get('form').get({ kind: 'fqn', name: called });
+      viewer.get('annotation').selection.select([field.widgets[0].ref]);
+    }, name);
+
+  const duplicateCommand = () =>
+    tab.evaluate(() => {
+      const command = window.element.viewer.commands.resolveCommand('annotation:duplicate');
+      return { visible: command?.visible, enabled: command?.enabled };
+    });
+
+  it('Duplicate copies a radio button into its group, and any other field as a new field', async () => {
+    // A radio button is one answer of its group: its copy is the group's next choice.
+    await selectFirst('guard-plan');
+    await frames(tab);
+    expect(await duplicateCommand()).toEqual({ visible: true, enabled: true });
+    await execute(tab, 'annotation:duplicate');
+    await tab.waitForFunction(
+      () =>
+        window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-plan' })?.widgets
+          .length === 3,
+      null,
+      { timeout: 10_000 },
+    );
+    const plan = await stateOf('guard-plan');
+    expect(plan.values).toEqual(['Choice1', 'Choice2', 'Choice3']);
+    // The copy is the selection, ready to drag.
+    expect(plan.selected).toEqual([plan.numbers[2]]);
+
+    // A text field is a whole question: its copy is a new field, named after it.
+    await tab.evaluate(async () => {
+      const { viewer } = window.element;
+      const page = viewer.documents.getPage(0);
+      const { field } = await viewer.get('form').create({
+        kind: 'text',
+        name: 'guard-city',
+        widgets: [{ page: page.ref, rect: { x: 72, y: 160, width: 120, height: 20 } }],
+      });
+      viewer.get('annotation').selection.select([field.widgets[0].ref]);
+    });
+    await frames(tab);
+    await execute(tab, 'annotation:duplicate');
+    await tab.waitForFunction(
+      () => !!window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-city_2' }),
+      null,
+      { timeout: 10_000 },
+    );
+    const city = await stateOf('guard-city_2');
+    expect(city.selected).toEqual(city.numbers);
+    expect(city.shown).toBe('guard-city_2');
+    expect((await stateOf('guard-city')).numbers).toHaveLength(1);
+  });
+
+  it('Duplicate group copies the whole radio group as a new group, and selects it', async () => {
+    await selectFirst('guard-plan');
+    await until(
+      tab,
+      () =>
+        window.element
+          .shadowRoot!.querySelector('[data-epdf-panel="form-design"]')
+          ?.textContent?.includes('Duplicate group'),
+      'the Duplicate group button',
+    );
+    await tab.evaluate(() => {
+      const button = [
+        ...window.element.shadowRoot!.querySelectorAll<HTMLButtonElement>(
+          '[data-epdf-panel="form-design"] button',
+        ),
+      ].find((each) => each.textContent?.includes('Duplicate group'))!;
+      button.click();
+    });
+    // The new group shows at once; the sidebar selects it once the engine has written it.
+    await tab.waitForFunction(
+      () => {
+        const { viewer } = window.element;
+        const widgets =
+          viewer.get('form').get({ kind: 'fqn', name: 'guard-plan_2' })?.widgets ?? [];
+        return (
+          widgets.length === 3 &&
+          viewer.get('annotation').selection.getSelected().length === widgets.length
+        );
+      },
+      null,
+      { timeout: 10_000 },
+    );
+    await frames(tab);
+    const copy = await stateOf('guard-plan_2');
+    expect(copy.values).toEqual(['Choice1', 'Choice2', 'Choice3']);
+    // The new group is the selection, so one drag moves it, and the sidebar shows it.
+    expect([...copy.selected].sort()).toEqual([...copy.numbers].sort());
+    expect(copy.shown).toBe('guard-plan_2');
+    expect((await stateOf('guard-plan')).numbers).toHaveLength(3);
+    // A checkbox has no such button: Duplicate copies it whole already.
+    await selectFirst('guard-agree');
+    await frames(tab);
+    expect(await sidebar(tab)).not.toContain('Duplicate group');
   });
 
   it('ends design when Form design is pressed again', async () => {
@@ -346,5 +501,31 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
       () => !window.element.viewer.get('shell').isOpen('form-design'),
       'the sidebar to close',
     );
+  });
+
+  it("draws a moved field's picture where the field is now", async () => {
+    // Design is off: the form layer draws the fields, each as the engine's picture of it.
+    const was: Box = { x: 320, y: 40, width: 120, height: 20 };
+    const now: Box = { ...was, x: 60, y: 90 };
+    const ref = await tab.evaluate(async (rect) => {
+      const { viewer } = window.element;
+      const page = viewer.documents.getPage(0);
+      const { field } = await viewer.get('form').create({
+        kind: 'text',
+        name: 'guard-moved',
+        widgets: [{ page: page.ref, rect }],
+      });
+      return field.widgets[0].ref;
+    }, was);
+    await expect.poll(() => pictureAt(tab, was), { timeout: 10_000 }).toBe(true);
+
+    // A move keeps the field's look, so the engine draws nothing again: the picture the layer
+    // holds goes where the field is.
+    await tab.evaluate(
+      ([widget, rect]) => window.element.viewer.get('form').updateWidget(widget, { rect }),
+      [ref, now] as const,
+    );
+    await expect.poll(() => pictureAt(tab, now), { timeout: 10_000 }).toBe(true);
+    expect(await pictureAt(tab, was)).toBe(false);
   });
 });

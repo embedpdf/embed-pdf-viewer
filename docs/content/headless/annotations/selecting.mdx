@@ -250,6 +250,36 @@ if (annotation.selection.canUngroup()) await annotation.selection.ungroup();
 To bring an annotation to the front or send it to the back, see
 [Change the drawing order](with-code#change-the-drawing-order).
 
+## Duplicate the selection
+
+```ts
+if (annotation.selection.canDuplicate()) await annotation.selection.duplicate();
+```
+
+The copies land 10 points right and down of the originals, and they become the selection, so the
+user can drag them into place. Near the right or bottom edge of the page they go left or up
+instead, to stay on it. It is one step to undo: an undo removes the copies and selects the
+originals again. Pass `{ offset: { x, y } }` to place them yourself.
+
+A selected group is copied as a group of its own. `canDuplicate()` is false when nothing is
+selected, when the user may not create annotations, and when a selected annotation is locked.
+What a copy carries is on [Copy an annotation](with-code#copy-an-annotation).
+
+In [design mode](../forms/building), the selection can hold a form's boxes. They are copied too,
+in the same step, by the form's rule: a radio button's copy joins its group, and any other box
+becomes a new field. `canDuplicate()` then also needs the right to design the form. See
+[Copy fields](../forms/building#copy-fields).
+
+A highlight sits on its words, so a copy beside it helps nobody. `annotation.isMovable(ref)` is
+false for an annotation like that. Use it to leave the button out:
+
+```ts
+const selected = annotation.selection.getSelected();
+const show =
+  selected.length > 0 &&
+  selected.every(({ ref }) => annotation.isMovable(ref));
+```
+
 ## Edit text
 
 A double-click on a text box starts typing in it; a click outside ends it. From code:
@@ -297,7 +327,8 @@ A polygon or a polyline takes a click per point, and a double-click ends it. Whi
 ## Keyboard
 
 The headless plugin doesn't take over any keys, since your app may already use them. Delete and
-Escape are a few lines:
+Escape are a few lines, and so is `Ctrl`/`Cmd`+`D` for
+[`selection.duplicate()`](#duplicate-the-selection):
 
 <Snippet name="annotations/selecting/keyboard" />
 
@@ -321,6 +352,8 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `selection.updateLink(target)`                             | Links the selected annotations to a page or a website, or removes their links with `null`. [A style panel](#a-style-panel) |
 | `selection.getProperties()`                                | What a style panel shows for the selection: `{ properties, values, mixed }`. In a component, use `useAnnotationProperties()`.  |
 | `selection.delete()`                                       | Deletes every selected annotation                                                                                                |
+| `selection.duplicate({ offset? })`                         | Copies the selected annotations beside the originals and selects the copies, as one step to undo. Resolves `{ annotations, dropped }`. [Duplicate the selection](#duplicate-the-selection) |
+| `selection.canDuplicate()`                                 | Whether the selection can be copied: something is selected, the user may create, and nothing selected is locked                  |
 | `selection.rotateBy(degrees)`, `selection.resetRotation()` | Turns the selection a quarter turn (`90` clockwise, `-90` the other way), or back upright. [Turn and group](#turn-and-group)     |
 | `selection.group()`, `selection.ungroup()`                 | Makes the selected annotations one group, saved the way Acrobat saves it, or splits the selected group up again                  |
 | `selection.canGroup()`, `selection.canUngroup()`           | Whether the selection can be grouped, or is a group that can be split                                                            |
@@ -331,6 +364,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |
 | `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words, what's typed next at a caret, or the whole box. [Rich text](../concepts/rich-text#format-from-your-toolbar) |
 | `isEditable(ref)`                                          | Whether people may change this annotation by hand, as the `editable` setting says. [What people may change](#what-people-may-change) |
+| `isMovable(ref)`                                           | Whether this is an annotation people move: false for one that sits on text, such as a highlight. [Duplicate the selection](#duplicate-the-selection) |
 | `cancel()`                                                 | Stops a drag, or a polygon in progress. [Keyboard](#keyboard)                                                                    |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.

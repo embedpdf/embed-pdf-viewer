@@ -5,7 +5,11 @@
  * `annotationImport.ts`.
  */
 import type { AnnotationBundle } from './AnnotationBundle';
-import type { AnnotationDropReason, AnnotationImportDrop } from './annotationImport';
+import {
+  fieldMarkersOf,
+  type AnnotationDropReason,
+  type AnnotationImportDrop,
+} from './annotationImport';
 import { bundlePageMapping, type BundleImportPages, type BundleImportTarget } from './bundle';
 import { mapPageRefs, pageRefsIn } from './pageRefs';
 import {
@@ -16,7 +20,6 @@ import {
 } from '../annotation/kinds';
 import type { KindFields } from '../annotation/declaration';
 import type { AnnotationReplyType } from '../annotation/primitives';
-import type { PdfActionTree } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { annotationKey } from '../identity/annotationKey';
@@ -104,7 +107,10 @@ export function planAnnotationImport(input: {
     }
     const markers = [...fieldMarkersOf(data), ...unwritable];
     if (markers.length > 0) fieldDrops.set(index, markers);
-    drafts.set(index, draftOf(data, markers, mapPage, index));
+    drafts.set(
+      index,
+      draftOf(data, markers, mapPage, { label: `import: item ${index}`, details: { item: index } }),
+    );
   });
 
   const byKey = new Map<string, number>();
@@ -199,32 +205,12 @@ function pagesNamedBy(data: Annotation): PageRef[] {
   return [ref.page, ...pageRefsIn(fields)];
 }
 
-/** The fields of `data` that are markers for something the engine can't write. */
-function fieldMarkersOf(data: Annotation): Array<{ field: string; reason: AnnotationDropReason }> {
-  const markers: Array<{ field: string; reason: AnnotationDropReason }> = [];
-  const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
-  if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
-  if (measure?.subtype === 'unknown') markers.push({ field: 'measure', reason: 'unknown-measure' });
-  const target = data.subtype === 'link' ? data.target : null;
-  const carriedTarget = !!target && isWritableLinkTarget(target);
-  if (target && !carriedTarget) markers.push({ field: 'target', reason: 'unsupported-action' });
-  // `actions` reads `/A` and `/AA`, and no write takes it. A copy has only
-  // the `/A` a link's target writes: one go-to or URI action, without a
-  // chain or an `/IsMap`. A target a write can't make is reported above.
-  const { actions } = data;
-  const lost = Object.entries(actions ?? {}).some(([trigger, tree]) =>
-    data.subtype !== 'link' || trigger !== 'activate' ? true : carriedTarget && !writtenAsIs(tree),
-  );
-  if (lost) markers.push({ field: 'actions', reason: 'unsupported-action' });
-  return markers;
-}
-
 /**
  * The values `data` reads that a write can't make (a `readBack()` field's
  * read-only values), each left out; `'item'` when one is a field every
  * create needs. A link's target is reported by {@link fieldMarkersOf}.
  */
-function unwritableValuesOf(
+export function unwritableValuesOf(
   data: Annotation,
 ): Array<{ field: string; reason: AnnotationDropReason }> | 'item' {
   const unwritable: Array<{ field: string; reason: AnnotationDropReason }> = [];
@@ -240,33 +226,16 @@ function unwritableValuesOf(
   return unwritable;
 }
 
-/** Whether a link's `/A` is what writing its target writes again. */
-function writtenAsIs<Destination>(tree: PdfActionTree<Destination> | undefined): boolean {
-  const root = tree?.root;
-  if (!tree || tree.incomplete || !root || root.next.length > 0) return false;
-  return !(root.type === 'uri' && root.isMap);
-}
-
-/** Whether a write can make a link's target; the others read as markers. */
-function isWritableLinkTarget(target: { kind: string; name?: string }): boolean {
-  return target.kind === 'named'
-    ? STANDARD_NAMED_ACTIONS.has(target.name ?? '')
-    : target.kind === 'goto' || target.kind === 'uri';
-}
-
-const STANDARD_NAMED_ACTIONS: ReadonlySet<string> = new Set([
-  'NextPage',
-  'PrevPage',
-  'FirstPage',
-  'LastPage',
-]);
-
-/** The create an item becomes, checked against its kind's create schema. */
-function draftOf(
+/**
+ * The create `data` becomes, checked against its kind's create schema.
+ * `where` names it in the refusal: its label, and what the error's details
+ * say of it.
+ */
+export function draftOf(
   data: Annotation,
   markers: ReadonlyArray<{ field: string }>,
   mapPage: (page: PageRef) => PageRef,
-  index: number,
+  where: { readonly label: string; readonly details: Readonly<Record<string, unknown>> },
 ): AnnotationDraft {
   const fields = { ...data } as Record<string, unknown>;
   delete fields.reply;
@@ -285,8 +254,8 @@ function draftOf(
     const path = issue.path.join('.');
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `import: item ${index}${path ? ` field '${path}'` : ''}: ${issue.message}`,
-      { details: { item: index, ...(path ? { field: path } : {}) } },
+      `${where.label}${path ? ` field '${path}'` : ''}: ${issue.message}`,
+      { details: { ...where.details, ...(path ? { field: path } : {}) } },
     );
   }
   // The item's own data, not the schema's output, so nothing a read carries

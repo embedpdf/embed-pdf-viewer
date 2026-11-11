@@ -106,6 +106,7 @@ export const zhCN: Locale = {
         saveFile: '保存文件',
         removeLink: '删除链接',
         delete: '删除',
+        duplicate: '创建副本',
         group: '分组',
         ungroup: '取消分组',
         stampFromSelection: '创建图章',
@@ -494,6 +495,7 @@ export const zhCN: Locale = {
       box: '复选框 {number}',
       addButton: '添加按钮',
       addBox: '添加复选框',
+      duplicateGroup: '创建组副本',
     },
     // The style panel's own words around the properties.
     stylePanel: {

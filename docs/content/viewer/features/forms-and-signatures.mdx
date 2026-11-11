@@ -71,6 +71,17 @@ it's selected so you can drag it. A radio group's new button is a new choice; a 
 checks together with the others. How a field looks, its border, background and font, is in the
 **Style** sidebar, the toolbar's other button.
 
+**Duplicate** (`Ctrl`/`Cmd`+`D`) copies the selected fields beside the originals and selects the
+copies, as one step to undo. What a copy becomes follows from what was selected:
+
+- **A radio button's copy joins its group** as a new choice. Place one button, duplicate it
+  twice, and you have a group of three.
+- **Any other field's copy is a new field,** named after the original: `email` becomes
+  `email_2`. It has the original's settings and no answer.
+
+To copy a whole radio group, select one of its buttons and press **Duplicate group** in the
+sidebar: the copy is a new group with the same buttons and the same values.
+
 For a form people fill in and can't otherwise change, use
 `{ readOnly: { except: ['forms.filling'] } }`: see [Read-only](turning-off#read-only).
 
@@ -117,9 +128,9 @@ What signing does depends on whether you give the viewer a key:
 | `signingKey` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
 | `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
 | `trust` | The certificates you trust, for checking signatures | none |
-| `allowCertify` | Let the first signature be a certification, which sets what may still change | `false` |
+| `allowCertify` | Let the first signature be a certification, which sets what may still change: comments, form filling only, or nothing | `false` |
 | `kinds` | Which marks people keep: `'signature'`, `'initials'` | both |
-| `fonts` | Fonts for typed signatures | three handwriting fonts |
+| `fonts` | Fonts for typed signatures | Allura, Great Vibes and Caveat |
 
 `kinds` and `fonts` are the viewer's; the others are the [signature
 plugin's](/docs/headless/forms/signatures#settings).

@@ -1,6 +1,7 @@
 import {
   EngineError,
   EngineErrorCode,
+  type BundleLimits,
   type Change,
   type ChangeOp,
   type PageCoordinates,
@@ -26,6 +27,8 @@ import type { LayerService } from '../services/LayerService';
 export interface ChangeRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
+  /** The deployment's bundle limits, which a copy stays within; the defaults otherwise. */
+  bundleLimits?: BundleLimits;
 }
 
 type ChangeOpWire = z.infer<typeof ChangeOpWireSchema>;
@@ -43,6 +46,7 @@ interface ChangeRequest {
  * order: applied with its result, or refused with its error. A change asked
  * again under its opId gets the same answer, refusals included. A 4xx refuses
  * the whole request only: authentication, a malformed body, the limits.
+ * A copy past the bundle limits refuses its own change only.
  *
  * A change's bytes travel as multipart `resource:{key}` parts beside a `body`
  * part holding the JSON, which names each part by its key where an op takes
@@ -52,7 +56,7 @@ export async function registerChangeRoutes(
   app: FastifyInstance,
   deps: ChangeRouteDeps,
 ): Promise<void> {
-  const { documentService, layerService } = deps;
+  const { documentService, layerService, bundleLimits } = deps;
 
   app.post(wireTemplates.layerChanges, async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
@@ -84,7 +88,13 @@ export async function registerChangeRoutes(
     setNoStore(reply);
     const answers = await layerService.applyChanges(
       ctx,
-      { docId, layerName, changes, authority: ctx.authority },
+      {
+        docId,
+        layerName,
+        changes,
+        authority: ctx.authority,
+        ...(bundleLimits ? { limits: bundleLimits } : {}),
+      },
       abortSignalOf(reply),
     );
     return { changes: answers };

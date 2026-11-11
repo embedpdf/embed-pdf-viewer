@@ -290,6 +290,48 @@ Widgets are drawn above every annotation, in an order of their own, so a widget 
 neighbour here: `reorder()` refuses one with `InvalidArg`. Restack widgets with
 [`doc.forms.reorderWidgets()`](/docs/engine/forms/authoring#move-and-style-widgets).
 
+## Copy annotations
+
+```ts
+const { annotations, dropped } = await doc.annotations.copy([square.ref, stamp.ref], {
+  offset: { x: 10, y: 10 }, // page points; left out, the copies sit on the originals
+  page: otherPage.ref, // left out, each copy stays on its own page
+});
+```
+
+`copy(refs, options)` makes a copy of each annotation you name, in this document, as one change:
+one undo takes them all away. It resolves the copies in the order of `refs`, `refMap` (each
+original's ref and its copy's), and `dropped`, what was left out.
+
+- **A copy carries** every field of its kind: shape, style, text and flags, `locked` included. A
+  stamp places the original's drawing and an attachment gets the original's file. The bytes stay
+  in the engine, so `doc.download` isn't needed.
+- **A copy is new.** It has its own ref and a fresh `nm`, the session is its author (in the
+  session's group), and its dates are now.
+- **It moves** by `offset`. With `page`, it goes to that page at the same spot from the page's
+  top-left.
+- **Links between copies stay.** A reply to an annotation that is copied too points at that
+  one's copy, so a copied group is a new group. A link to an annotation you didn't name is left
+  out: a group member copied alone stands alone.
+- **Replies and review states don't come** unless you name them. A popup comes only with the
+  annotation it shows.
+- **A ref named twice is copied twice.** A link to it points at its first copy.
+
+`dropped` uses [the reasons an import uses](/docs/engine/annotations/import-export#whats-left-out):
+a kind the engine doesn't know, a widget, a popup without its parent, and, as single fields, an
+action or a value only another app can write. A ref the document doesn't have refuses the change
+with `NotFound`.
+
+A copy stays within the [limits of a bundle](/docs/engine/annotations/import-export#limits): as
+many annotations as a bundle holds, and as many drawings and files, of that size each and
+together. A stamp's drawing counts once however many copies place it, and an attached file counts
+for each copy. Past a limit the change is refused with `PayloadTooLarge`, `err.details.limit`
+names the limit, and nothing is copied. Copy fewer annotations at a time to stay under.
+
+In a change of your own it is the op `annotations.copy`; see
+[Changes & undo](/docs/engine/documents/changes). To copy into another document, use
+[Import & export](/docs/engine/annotations/import-export).
+
 ## Style
 
 Most kinds share the same style fields:
@@ -406,7 +448,8 @@ makes sure people only change the annotations they may change.
 ## More
 
 - [Import & export](/docs/engine/annotations/import-export): copy annotations to another
-  document, or store them apart from the PDF.
+  document, or store them apart from the PDF. Inside one document, use
+  [`copy()`](#copy-annotations).
 - [Drawing annotations yourself](/docs/engine/annotations/appearances): render annotations as
   separate images, bake them into the page, or export them as a PDF.
 - [Refs & identity](/docs/engine/concepts/identity): what a `ref` contains, and why you never

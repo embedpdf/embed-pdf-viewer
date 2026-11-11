@@ -207,6 +207,17 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       },
     ],
   },
+  'annotations.copy': {
+    // The square and the note, each copied beside itself, under the numbers given.
+    ops: ([square, note]) => [
+      {
+        type: 'annotations.copy',
+        refs: [FILE_SQUARE, FILE_NOTE],
+        offset: { x: 12, y: 12 },
+        objectNumbers: [square!, note!],
+      },
+    ],
+  },
   'forms.setValue': {
     ops: () => [{ type: 'forms.setValue', field: NAME, value: { value: 'Bea' } }],
   },
@@ -230,6 +241,17 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
           actions: { calculate: CALCULATE },
           widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 20, width: 140, height: 24 } }],
         },
+      },
+    ],
+  },
+  'forms.copy': {
+    // The name field, copied beside itself, under the numbers given.
+    ops: ([field, widget]) => [
+      {
+        type: 'forms.copy',
+        fields: [NAME],
+        offset: { x: 12, y: 12 },
+        objectNumbers: [field!, widget!],
       },
     ],
   },

@@ -450,7 +450,21 @@ The kernel tests each rule in `packages/core/main/test/changes.test.ts`.
 The annotation plugin is the reference: one change per message
 (`services/store.ts`), its records mirror predicts (`sync/records.ts`), new
 records are named by the object numbers they take, and typing is a hold
-(`write/text-editing.ts`).
+(`write/text-editing.ts`). Copies the engine makes (`annotations.copy`) are
+predicted by the engine's own rule (`planAnnotationCopies`), each under the
+object number the op gives it. That number names the copy whether the view
+could show it before the engine answered or not, so what `duplicate()`
+resolves and selects never depends on the prediction. A copied stamp has no
+live drawing, so it shows its original's picture until the engine has drawn
+the copy; a copy of a copy shows the picture of the first annotation behind
+it that has one (`read/render.ts`). A replayed prediction can't remember what
+a copy copied once the engine has written that copy, so the store notes each
+staged copy's picture source (`services/copy-sources.ts`): a copy that is
+still on its way keeps its picture when the engine writes the one it copies.
+The form plugin predicts a `forms.copy` the same way as an `annotations.copy`,
+by `planFormCopies`, each new field under the numbers the op gives it and its
+widgets, and a copied radio button as the `forms.addWidget` it is
+(`plugin/form/src/sync/predict.ts`).
 
 ### The page list
 

@@ -50,6 +50,7 @@ export {
   hitTest,
   cursorAt,
   isSelectable,
+  isMovable,
   canMove,
   isOnTextBox,
   paintedOf,

@@ -2,7 +2,7 @@
   "name": "@embedpdf/default-fallback-fonts",
   "version": "1.0.0",
   "private": false,
-  "description": "The fonts the EmbedPDF engine fills in Hebrew and Arabic with: Noto Sans Hebrew and Noto Naskh Arabic, regular and bold (Apache License 2.0), as TrueType files and as lazy modules any bundler code-splits.",
+  "description": "The fonts the EmbedPDF engine writes Hebrew and Arabic with: Noto Sans Hebrew and Noto Naskh Arabic, regular and bold.",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -11,7 +11,8 @@
     "modules",
     "library.js",
     "library.d.ts",
-    "README.md"
+    "README.md",
+    "NOTICE.md"
   ],
   "exports": {
     "./fonts/NotoSansHebrew-Regular.ttf": "./fonts/NotoSansHebrew-Regular.ttf",

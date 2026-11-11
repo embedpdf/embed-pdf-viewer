@@ -2,7 +2,8 @@
   The page's fields as they look now. Each widget shows its picture, as the engine draws it (the
   form plugin's, every state loaded, so a check box shows its new state at once), or the painter's
   drawing while its look is pending or its picture is of an older version (`pictureOrPainting`): a
-  value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
+  value, a calculation, a restyle shows at once. Either is drawn at the widget's box: a moved
+  widget keeps its picture and takes it along. Hidden widgets aren't drawn.
 -->
 <script setup lang="ts">
 import { computed, onUnmounted, shallowRef, watch } from 'vue';
@@ -87,15 +88,10 @@ const looks = computed(() =>
       paint: () => form.value?.getWidgetPainting(widget.ref) ?? null,
     });
     if (!look) return [];
+    // Where the widget is now: a move keeps its picture, which comes along with it.
+    const frame = rectInPixels(widget.rect, page.value.transform);
     if (look.kind === 'picture') {
-      return [
-        {
-          kind: 'picture',
-          key,
-          url: look.picture.url,
-          frame: rectInPixels(look.picture.box, page.value.transform),
-        },
-      ];
+      return [{ kind: 'picture', key, url: look.picture.url, frame }];
     }
     const { x, y, width, height } = widget.rect;
     return [
@@ -104,7 +100,7 @@ const looks = computed(() =>
         key,
         viewBox: `${x} ${y} ${width} ${height}`,
         shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
-        frame: rectInPixels(widget.rect, page.value.transform),
+        frame,
       },
     ];
   }),

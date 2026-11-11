@@ -211,13 +211,15 @@ The `await` of the call that made the change rejects with the same error.
 
 ## Copy an annotation
 
-A read passed to `create()` makes the same annotation again, on another page or in another
-document:
+`duplicate()` makes copies of annotations in the same document. It is one change, and one step
+to undo:
 
 ```ts
-const copy = annotation.get(ref)!;
+// beside the original, 10 points right and down
+await annotation.duplicate([ref], { offset: { x: 10, y: 10 } });
 
-await annotation.create(otherPage.ref, copy);
+// onto another page, at the same spot
+await annotation.duplicate([ref], { page: otherPage.ref });
 ```
 
 <Example name="annotation/copy" />
@@ -225,20 +227,33 @@ await annotation.create(otherPage.ref, copy);
 > **Try it:** copy the rectangle, then copy the copy: it moves a page further each time. Select the
 > circle to copy it instead.
 
-Stamps and file attachments also need their bytes. Download them first:
+The copies show at once, and the promise resolves `{ annotations, dropped }`: the copies as the
+engine wrote them, in the order you named the originals, and
+[what it left out](#what-a-copy-cant-carry).
 
-```ts
-const drawing = await annotation.downloadResource(stamp.ref, 'appearance');
-await annotation.create(otherPage.ref, stamp, { appearance: drawing });
+What a copy is:
 
-const file = await annotation.downloadResource(attachment.ref, 'file');
-await annotation.create(otherPage.ref, attachment, { file });
-```
+- **It carries** the original's shape, style, text, flags and link. A stamp keeps its drawing
+  and an attachment its file, with nothing to download.
+- **It is new.** It has its own ref and a fresh name (`nm`), you are its author, and its dates
+  are today's.
+- **It moves** by `offset`, in page points. With `page` it goes to that page, at the same spot
+  from the page's top-left.
+- **Copies keep the links between them.** Copy a whole group and the copies are a group of their
+  own. A link to an annotation you didn't copy is left out.
+- **Replies don't come.** They are about the original. Only the annotations you name are copied.
 
-To copy on the **same page**, clear its unique name first: `{ ...copy, nm: null }`. A name is
-unique per page, so a copy with a taken name is refused.
+| Option   | What it does                                                 | Default            |
+| :------- | :----------------------------------------------------------- | :----------------- |
+| `page`   | The page the copies go on, as a ref or an index.             | each on its own    |
+| `offset` | How far each copy moves: `{ x, y }` in page points.          | `{ x: 0, y: 0 }`   |
+| `select` | Selects the copies as they show.                             | `false`            |
 
-To copy many annotations at once, use [export and import](saving#export-and-import).
+`canDuplicate(refs)` says whether the user may copy them, for a button. For the selection there
+is `selection.duplicate()`; see [Duplicate the selection](selecting#duplicate-the-selection).
+
+To copy into **another document**, use [export and import](saving#export-and-import). A read
+passed to `create()` isn't a copy: it writes that data as it is, its name included.
 
 ## Methods
 
@@ -257,8 +272,10 @@ What `useAnnotation()` gives you directly. Its parts have their own pages: `sele
 | `update(ref, changes, resources?)`                             | Changes only the fields you pass, and `null` removes one. New `resources` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation)                                            |
 | `delete(ref)`                                                  | Deletes an annotation, with its popup and its replies. [Delete an annotation](#delete-an-annotation)                                                                                                                                             |
 | `reorder(refs, position)`                                      | Moves annotations to a new place in their page's drawing order: next to another annotation, or to the back or front. [Change the drawing order](#change-the-drawing-order)                                                                       |
+| `duplicate(refs, { page?, offset?, select? })`                 | Copies annotations in this document, as one step to undo. Resolves `{ annotations, dropped }`. [Copy an annotation](#copy-an-annotation)                                                                                                         |
+| `canDuplicate(refs)`                                           | Whether the user may copy these annotations: false without the right to create, and for a locked one                                                                                                                                             |
 | `export({ refs?, pages? })`, `import(bundle, options?)`        | Takes annotations out as a bundle, with the bytes they carry, or puts a bundle in, as one step to undo. `import` resolves `{ annotations, refMap, dropped }`. [Export and import](saving#export-and-import)                                      |
-| `downloadResource(ref, role)`                                  | Downloads a stamp's drawing (`'appearance'`) or an attachment's file (`'file'`), ready to pass back to `create()`. [Copy an annotation](#copy-an-annotation)                                                                                     |
+| `downloadResource(ref, role)`                                  | Downloads a stamp's drawing (`'appearance'`) or an attachment's file (`'file'`), as bytes `create()` takes. A copy needs neither.                                                                                                                |
 | `links.get(ref)`, `links.set(ref, target)`, `links.clear(ref)` | Where an annotation links to, such as a page or a website: read it, set it, or remove the link                                                                                                                                                   |
 | `refresh()`                                                    | Reads every annotation from the engine again. Changes arrive by themselves, so you rarely need it.                                                                                                                                               |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()`  | Reads `snap`, `chrome` and `afterCreate`, changes them while the app runs, or goes back to what you registered. In a component, use `useAnnotationSettings()`. [Settings](../annotations#settings)                                               |
@@ -291,17 +308,38 @@ The `locked` flag stops people from moving, resizing or deleting an annotation, 
 app: your own code can still change a locked annotation, as the engine can. To stop the code
 too, check the flags first.
 
+A copy of a locked annotation is locked too. So `canDuplicate()` is false for one: a person
+could neither move nor delete the copy. Your code can still `duplicate()` it.
+
 ### What a copy can't carry
 
-A few annotations can't be made again from their read, and `create()` refuses them with
-`invalid-input`:
+A few annotations can't be made again. `duplicate()` leaves them out and lists them in
+`dropped`, each with its `ref` and a `reason`:
+
+- a kind the engine doesn't know (`subtype: 'unsupported'`);
+- a popup copied without the annotation it shows.
+
+Some copies are made without one field, and `dropped` names the `field`:
 
 - a link whose action the engine can't create, such as one that runs JavaScript;
-- a popup whose annotation is gone;
 - a value another app wrote that the engine can't write, such as a beveled border;
-- a kind the engine doesn't know (`subtype: 'unsupported'`).
+- a geospatial measure.
 
-[Import](saving#export-and-import) leaves these out and tells you which ones, and why.
+[Import](saving#export-and-import) leaves the same things out. `create()` with such a read
+refuses it with `invalid-input`.
+
+A form field's box (a widget) belongs to the form, so `duplicate()` doesn't copy one, and
+`canDuplicate()` is false for it. In [design mode](../forms/building), where the form lends its
+boxes to this plugin, the whole call is refused with `invalid-input` and nothing is copied.
+Outside design mode a box isn't one of this plugin's annotations, so the call is refused with
+`not-found`. To copy boxes, use the form's `duplicateWidgets()`
+([Copy fields](../forms/building#copy-fields)), or `selection.duplicate()`, which copies the
+selected boxes with the annotations.
+
+One call copies as much as an [import](saving#export-and-import) brings in: by default 10,000
+annotations, with 50 MB of drawings and files between them. Past a limit the call is refused with
+`invalid-input` and nothing is copied. The engine's
+[Import & export](/docs/engine/annotations/import-export#limits) page has every limit.
 
 ### Changes other people make
 

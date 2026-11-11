@@ -117,9 +117,10 @@ these options. It never tries another location on its own.
 
 The engine's worker and the image-encoder worker are files of your build, next to
 the WebAssembly, so `worker-src 'self'` covers them. To serve them from somewhere
-else, copy `workers/embedpdf-worker.js`, `workers/encoder-worker.js` and
-`embedpdf.wasm` into one directory you serve and say where the worker is; it
-finds the WebAssembly as its own sibling:
+else, copy `workers/embedpdf-worker.js` and `workers/encoder-worker.js` from
+`@embedpdf/engine`, and `lib/embedpdf.wasm` from
+`@embedpdf/engine-runtime-wasm32`, into one directory you serve, and say where
+the worker is; it finds the WebAssembly as its own sibling:
 
 ```js
 {

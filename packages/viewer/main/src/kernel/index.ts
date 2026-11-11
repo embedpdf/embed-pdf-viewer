@@ -36,7 +36,7 @@ export type { MountTarget } from './init';
 // @cloudpdf/viewer), next to the code that can interpret it.
 export type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 
-// The customization vocabulary, verbatim from the chrome (see its README).
+// The customization vocabulary, verbatim from the chrome (docs/conventions/viewer-chrome.md).
 export {
   createLayout,
   defaultCommands,

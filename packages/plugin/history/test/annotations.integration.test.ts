@@ -43,6 +43,28 @@ const PNG_1X1 = Uint8Array.from(
 
 const box = (x: number, y: number, width = 60, height = 40) => ({ x, y, width, height });
 
+/** A one-page file with the annotation given, as another app wrote it. */
+function pdfWith(annotation: string): Uint8Array {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Annots [4 0 R] >>',
+    annotation,
+  ];
+  let text = '%PDF-1.7\n';
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(text.length);
+    text += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const start = text.length;
+  text +=
+    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
+    offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  text += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
+  return new TextEncoder().encode(text);
+}
+
 /**
  * The engine, with a gate in front of `doc.apply`: while it is held, every change waits, in
  * the order it came, and the engine answers them once it is let go.
@@ -124,13 +146,14 @@ afterAll(async () => {
   await engine.destroy();
 });
 
-async function boot(): Promise<Booted> {
+/** `document`: the file to open; the one-page fixture when left out. */
+async function boot(document?: Uint8Array): Promise<Booted> {
   const gate = gated(engine);
   const kernel = createKernel({
     engine: gate.engine,
     plugins: [interactionPlugin(), annotationPlugin(), historyPlugin()],
   });
-  const bytes = new Uint8Array(await readFile(fixture));
+  const bytes = document ?? new Uint8Array(await readFile(fixture));
   await kernel.documents.open({ kind: 'bytes', id: `history-${Math.random()}`, bytes });
   const annotation = kernel.capability(AnnotationToken);
   const history = kernel.capability(HistoryToken);
@@ -310,6 +333,45 @@ const ACTIONS: readonly Action[] = [
       annotation.links.set(ref!, { kind: 'uri', uri: 'https://www.embedpdf.com/' }),
   },
   {
+    name: 'duplicate an annotation',
+    setup: async (annotation) => [await square(annotation)],
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 10, y: 10 } }),
+  },
+  {
+    name: 'duplicate a stamp',
+    setup: async (annotation) => [
+      (
+        await annotation.stamps.place(
+          { source: PNG_1X1, targetWidth: 80 },
+          { page: PAGE, center: { x: 200, y: 200 } },
+        )
+      ).annotation.ref,
+    ],
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 40, y: 0 } }),
+  },
+  {
+    name: 'duplicate a linked annotation',
+    setup: async (annotation) => {
+      const ref = await square(annotation);
+      await annotation.links.set(ref, { kind: 'uri', uri: 'https://www.embedpdf.com/' });
+      return [ref];
+    },
+    act: (annotation, refs) => annotation.duplicate(refs, { offset: { x: 10, y: 10 } }),
+  },
+  {
+    name: 'duplicate a selected group',
+    setup: async (annotation) => {
+      const refs = [await square(annotation, 100), await square(annotation, 200)];
+      annotation.selection.select(refs);
+      await annotation.selection.group();
+      return refs;
+    },
+    act: (annotation, refs) => {
+      annotation.selection.select(refs);
+      return annotation.selection.duplicate();
+    },
+  },
+  {
     name: 'reply to a note',
     setup: async (annotation) => [await note(annotation)],
     act: (annotation, [ref]) => annotation.comments.reply(ref!, 'A reply'),
@@ -421,6 +483,125 @@ describe.each(ACTIONS)('$name', (action) => {
 
       await booted.step('redo');
       expect(await booted.truth()).not.toEqual(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+});
+
+/**
+ * A duplicate is one op the engine makes its copies from. The viewer shows the copies before
+ * the engine answers, by the engine's own rule, so what it shows is what the engine writes.
+ */
+describe('duplicate', () => {
+  /** What a prediction can't know: the engine names a copy and stamps who made it, and when. */
+  const STAMPED = new Set(['nm', 'author', 'createdAt', 'modifiedAt', 'userId', 'createdBy']);
+  const withoutStamps = (annotations: unknown): unknown =>
+    JSON.parse(
+      JSON.stringify(annotations, (name, value: unknown) =>
+        STAMPED.has(name) ? undefined : value,
+      ),
+    );
+
+  it('shows the copies of a linked group at once, as the engine then writes them', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, history, gate } = booted;
+      const refs = [await square(annotation, 100), await square(annotation, 200)];
+      await annotation.links.set(refs[0]!, { kind: 'uri', uri: 'https://www.embedpdf.com/' });
+      annotation.selection.select(refs);
+      await annotation.selection.group();
+      await booted.caughtUp();
+      history.clear();
+      const before = annotation.list().length;
+
+      gate.hold();
+      const duplicated = annotation.selection.duplicate();
+      // Two squares and the link the first one carries, before the engine answers.
+      const shown = booted.view(true);
+      expect(annotation.list()).toHaveLength(before + 3);
+      const copies = annotation.selection.getSelected();
+      expect(copies).toHaveLength(2);
+      expect(copies.every((copy) => annotation.isPending(copy.ref))).toBe(true);
+      expect(annotation.links.get(copies[0]!.ref)).toEqual({
+        kind: 'uri',
+        uri: 'https://www.embedpdf.com/',
+      });
+      gate.release();
+
+      const { annotations, dropped } = await duplicated;
+      await booted.caughtUp();
+      expect(dropped).toEqual([]);
+      expect(annotations.map((copy) => copy.ref)).toEqual(copies.map((copy) => copy.ref));
+      expect(withoutStamps(booted.view(true))).toEqual(withoutStamps(shown));
+      // A copy is new: its own name, and the copies are a group of their own.
+      expect(annotations[0]!.nm).not.toBe(annotation.get(refs[0]!)!.nm);
+      expect(annotations[1]!.reply).toEqual({ to: annotations[0]!.ref, type: 'group' });
+      expect(history.getUndoLabel()).toMatchObject({ key: 'annotation.duplicate' });
+
+      // One step: the copies go, and the originals are selected again.
+      await booted.step('undo');
+      expect(annotation.list()).toHaveLength(before);
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual(refs);
+      await booted.step('redo');
+      expect(annotation.list()).toHaveLength(before + 3);
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual(
+        copies.map((copy) => copy.ref),
+      );
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('copies onto another page, and a locked annotation stays locked', async () => {
+    const booted = await boot();
+    try {
+      const { annotation } = booted;
+      const ref = await square(annotation);
+      await annotation.update(ref, { subtype: 'square', locked: true });
+      await booted.caughtUp();
+      expect(annotation.canDuplicate([ref])).toBe(false);
+
+      const { annotations } = await annotation.duplicate([ref], { offset: { x: 10, y: 10 } });
+      await booted.caughtUp();
+      expect(annotations).toHaveLength(1);
+      expect(annotations[0]).toMatchObject({ subtype: 'square', locked: true });
+      expect((annotations[0] as { box: unknown }).box).toEqual(box(110, 110));
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('shows a copy without the measure the engine can’t write, selected, and resolves it', async () => {
+    // A dimension line another app made, with a geospatial measure: the engine
+    // reads it as a marker and copies the line without it.
+    const line =
+      '<< /Type /Annot /Subtype /Line /IT /LineDimension /Rect [100 300 300 320] ' +
+      '/L [100 310 300 310] /C [1 0 0] /Contents (imported) ' +
+      '/Measure << /Subtype /GEO /Vendor (preserve) >> >>';
+    const booted = await boot(pdfWith(line));
+    try {
+      const { annotation, gate } = booted;
+      const [source] = annotation.list();
+      expect(source).toMatchObject({ subtype: 'line', measure: { subtype: 'geospatial' } });
+      annotation.selection.select([source!.ref]);
+      expect(annotation.selection.canDuplicate()).toBe(true);
+
+      gate.hold();
+      const duplicated = annotation.selection.duplicate();
+      const shown = booted.view(true);
+      const copies = annotation.selection.getSelected();
+      expect(copies).toHaveLength(1);
+      expect(copies[0]).toMatchObject({ subtype: 'line', measure: null });
+      expect(annotation.isPending(copies[0]!.ref)).toBe(true);
+      gate.release();
+
+      const { annotations, dropped } = await duplicated;
+      await booted.caughtUp();
+      expect(dropped).toEqual([{ ref: source!.ref, field: 'measure', reason: 'geospatial' }]);
+      expect(annotations.map((copy) => copy.ref)).toEqual([copies[0]!.ref]);
+      expect(withoutStamps(booted.view(true))).toEqual(withoutStamps(shown));
+      expect(annotation.selection.getSelected().map((each) => each.ref)).toEqual([copies[0]!.ref]);
     } finally {
       await booted.destroy();
     }

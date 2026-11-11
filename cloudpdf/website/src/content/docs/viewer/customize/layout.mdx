@@ -323,6 +323,10 @@ own title, icon and words, so `search` needs no more than its side. Which one to
 - **A whole layout** stays exactly as you wrote it. New features arrive as new ids you add when you
   want them.
 
+The viewer's package exports the default as `defaultLayout`, and `createLayout()`, which gives a
+layout you wrote the same methods. `toJSON()` gives a layout as plain data, so yours can take a
+built-in menu as it is: `menus: { zoom: defaultLayout.toJSON().menus.zoom }`.
+
 ## Good to know
 
 ### Every built-in id

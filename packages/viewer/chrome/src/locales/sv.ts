@@ -107,6 +107,7 @@ export const sv: Locale = {
         saveFile: 'Spara fil',
         removeLink: 'Ta bort länk',
         delete: 'Ta bort',
+        duplicate: 'Duplicera',
         group: 'Gruppera',
         ungroup: 'Dela upp grupp',
         stampFromSelection: 'Skapa stämpel',
@@ -496,6 +497,7 @@ export const sv: Locale = {
       box: 'Ruta {number}',
       addButton: 'Lägg till en knapp',
       addBox: 'Lägg till en ruta',
+      duplicateGroup: 'Duplicera grupp',
     },
     // The style panel's own words around the properties.
     stylePanel: {

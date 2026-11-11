@@ -11,6 +11,7 @@ import {
   type AnnotationImportResult,
   type AnnotationList,
   type AnnotationListOptions,
+  type AnnotationChangeVerb,
   type DocumentAnnotationsService,
   type SessionEventPublisher,
 } from '@embedpdf/engine-core/runtime';
@@ -29,7 +30,10 @@ interface DocClosedView {
  * JobQueue every other local read uses. The worker host reads them with
  * `RawAnnotationReader.list`.
  */
-export class LocalDocumentAnnotationsService implements DocumentAnnotationsService {
+export class LocalDocumentAnnotationsService implements Omit<
+  DocumentAnnotationsService,
+  AnnotationChangeVerb
+> {
   constructor(
     private readonly docId: string,
     private readonly queue: JobQueue,

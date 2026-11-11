@@ -55,6 +55,7 @@ import { AnnotationMutator } from '../../annotations/AnnotationMutator';
 import { resolveAnnotIndexRaw } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { applyReorder, planReorder, readPageStack } from '../../annotations/internal/stackingOrder';
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
+import { FormCopier } from '../../forms/FormCopier';
 import { FormImporter } from '../../forms/FormImporter';
 import { FormMutator } from '../../forms/FormMutator';
 import {
@@ -202,6 +203,41 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
     item: { type: 'forms.create', ...fieldResult(ctx, field), ...orderResult(calculationOrder) },
     reverse: [{ kind: 'field.remove', objectNumber: numberOf(field.ref), left: field }],
   };
+}
+
+/**
+ * `forms.copy`: new fields from fields of this document (see
+ * `FormCopier.copy`). Its reverse deletes each field it made, the last made
+ * first, when nobody changed it since; each takes its widgets and its place
+ * in the calculation order with it.
+ */
+export function copyFields(ctx: ChangeContext, op: Op<'forms.copy'>): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const result = new FormCopier(ctx.runtime, ctx.session, ctx.fonts).copy(
+    {
+      fields: op.fields,
+      ...(op.widgets ? { widgets: op.widgets } : {}),
+      ...(op.page ? { page: op.page } : {}),
+      ...(op.offset ? { offset: op.offset } : {}),
+      values: op.values ?? true,
+      ...(op.objectNumbers ? { objectNumbers: op.objectNumbers } : {}),
+      actor: ctx.authority.identity,
+      mayScript: allowsCapability(ctx.authority, 'doc.forms.script'),
+      // A copy is the caller's own create: it keeps its source's group when
+      // the caller may set it.
+      groupOf: (groupId) => newFieldGroup(ctx, groupId),
+      limits: ctx.limits,
+    },
+    ctx.signal,
+  );
+  const reverse = result.fields.map(
+    (field): FieldRemoveStep => ({
+      kind: 'field.remove',
+      objectNumber: numberOf(field.ref),
+      left: field,
+    }),
+  );
+  return { item: { type: 'forms.copy', ...result }, reverse: reverse.reverse() };
 }
 
 /**

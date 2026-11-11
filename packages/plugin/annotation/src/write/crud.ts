@@ -1,14 +1,15 @@
 /**
- * Create, update, delete and reorder: the public verbs, in the engine's own
- * terms, and the transfers (export, import, a resource's bytes). Each change
- * states itself through `store.apply`, so it shows at once and is sent,
- * answered and refused exactly like a gesture's, and each resolves with what
- * the engine wrote for it: its own change's answer, never another change
- * still on its way. An import is a change too: the engine's own verb makes
- * it, so it is staged on the document's queue as that verb's call.
+ * Create, update, delete, reorder and duplicate: the public verbs, in the
+ * engine's own terms, and the transfers (export, import, a resource's
+ * bytes). Each change states itself through `store.apply`, so it shows at
+ * once and is sent, answered and refused exactly like a gesture's, and each
+ * resolves with what the engine wrote for it: its own change's answer, never
+ * another change still on its way. An import is a change too: the engine's
+ * own verb makes it, so it is staged on the document's queue as that verb's
+ * call.
  */
 import { PluginError, type HistoryOptions, type OperationOptions } from '@embedpdf/core';
-import { defaultsFor } from '@embedpdf/core-annotation';
+import { defaultsFor, linkChildrenOf } from '@embedpdf/core-annotation';
 import {
   ANNOTATION_FIELD_NAMES,
   anchorOf,
@@ -26,14 +27,24 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationExportSelection, AnnotationImportResult } from '../contract';
+import type {
+  AnnotationDuplicateOptions,
+  AnnotationDuplicateResult,
+  AnnotationExportSelection,
+  AnnotationImportResult,
+} from '../contract';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
 export function createCrud(
   ctx: Pick<AnnotationContext, 'doc' | 'pageOf' | 'assertAllowed' | 'cancellable' | 'changes'>,
-  { store, tools, records }: Pick<AnnotationServices, 'store' | 'tools' | 'records'>,
+  {
+    store,
+    tools,
+    records,
+    lending,
+  }: Pick<AnnotationServices, 'store' | 'tools' | 'records' | 'lending'>,
   annotations: Pick<AnnotationReads, 'get' | 'pageOf'>,
   /** Write what is held back (typed text) and wait for every write on its way. */
   settle: () => Promise<void>,
@@ -162,6 +173,90 @@ export function createCrud(
     );
   };
 
+  /**
+   * Copies of annotations in this document, which the engine makes in one
+   * op: they show at once, and it is one step to undo. An annotation's
+   * attached link is a child of it, so it is copied along. A link `refs`
+   * names itself is copied once, as one of the copies named.
+   *
+   * `lent` are the selection's lent records (a form's widgets, in design
+   * mode), which only the selection's own duplicate passes: their lender
+   * says which ops copy them, and those join the same change, so a
+   * selection of both kinds is one step. Their copies are among the
+   * annotations it resolves; what their lender left out is its own to tell.
+   */
+  const duplicate = async (
+    refs: readonly AnnotationRef[],
+    options: AnnotationDuplicateOptions & OperationOptions = {},
+    lent: readonly AnnotationRef[] = [],
+  ): Promise<AnnotationDuplicateResult> => {
+    if (refs.length || !lent.length) {
+      ctx.assertAllowed('annotations:create', 'annotation.duplicate');
+    }
+    if (!refs.length && !lent.length) return { annotations: [], dropped: [] };
+    const page = options.page === undefined ? undefined : ctx.pageOf(options.page).ref;
+    const placement = {
+      ...(page ? { page } : {}),
+      ...(options.offset ? { offset: options.offset } : {}),
+    };
+    const lender = lent.length ? lending.lender() : null;
+    const lentCopy = lender ? await lender.copyOps(lent, placement) : null;
+    const model = store.model();
+    const stated = new Set(refs.map(annotationKey));
+    const along = refs.flatMap((ref) =>
+      linkChildrenOf(model, annotationKey(ref))
+        .map((child) => child.annotation.ref)
+        .filter((child) => !stated.has(annotationKey(child))),
+    );
+    const lentIds = lentCopy?.copies.map(annotationKey) ?? [];
+    const applied = await store.applyWhenNumbered(
+      refs.length ? [{ type: 'copy', refs, ...(along.length ? { along } : {}), ...placement }] : [],
+      {
+        select: options.select,
+        ...(lentCopy
+          ? {
+              lent: { ops: lentCopy.ops, ids: lentIds },
+              label: {
+                key: refs.length ? 'annotation.duplicate' : `${lender!.owner}.duplicate`,
+                count: refs.length + lentIds.length,
+              },
+            }
+          : {}),
+      },
+    );
+    const outcome = await ctx.cancellable(options.signal, appliedOrThrow(applied));
+    const items = outcome.result?.items ?? [];
+    const copied = items.find((item) => item.type === 'annotations.copy');
+    if (refs.length && copied?.type !== 'annotations.copy') {
+      throw new PluginError(
+        'operation-failed',
+        'annotation',
+        'the annotations could not be copied',
+      );
+    }
+    // The copies of the annotations named: a link that came along isn't one.
+    const named = new Set(applied.ids);
+    const own =
+      copied?.type === 'annotations.copy'
+        ? copied.annotations.filter((copy) => named.has(annotationKey(copy.ref)))
+        : [];
+    // A lent record's copy, as the last op that names it left it.
+    const rows = new Map<string, Annotation>();
+    for (const item of items) {
+      const made =
+        item.type === 'forms.copy' || item.type === 'forms.addWidget'
+          ? item.widgets
+          : item.type === 'forms.updateWidget'
+            ? [item.widget]
+            : [];
+      for (const row of made) rows.set(annotationKey(row.ref), row);
+    }
+    return {
+      annotations: [...own, ...lentIds.flatMap((id) => rows.get(id) ?? [])],
+      dropped: copied?.type === 'annotations.copy' ? copied.dropped : [],
+    };
+  };
+
   /** The pages a selection names, as refs: an index becomes its page's ref. */
   const pageRefsOf = (pages: readonly (PageRef | number)[] | undefined): PageRef[] | undefined =>
     pages?.map((page) => ctx.pageOf(page).ref);
@@ -233,12 +328,13 @@ export function createCrud(
     update,
     delete: remove,
     reorder,
+    duplicate,
     export: exportBundle,
     import: importBundle,
     downloadResource,
   };
 
-  return { update, api };
+  return { update, duplicate, api };
 }
 
 export type Crud = ReturnType<typeof createCrud>;

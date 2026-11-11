@@ -161,6 +161,7 @@ export class HttpClient {
   readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
   private readonly engineChangedListeners = new Set<() => void>();
+  private serverVersionSeen: string | null = null;
 
   constructor(private readonly options: HttpClientOptions) {
     this.base = (options.baseUrl ?? CLOUDPDF_SAAS_URL).replace(/\/$/, '');
@@ -184,6 +185,16 @@ export class HttpClient {
   /** Normalized server base URL (no trailing slash). */
   get baseUrl(): string {
     return this.base;
+  }
+
+  /**
+   * The version the server says it is (`EmbedPDF-Server-Version`), from its
+   * last live answer; `null` before one. Only an answer nothing may store is
+   * believed: a cached one names the server that produced it once, which can
+   * be another version. `/head`, read as a document opens, is a live answer.
+   */
+  get serverVersion(): string | null {
+    return this.serverVersionSeen;
   }
 
   /**
@@ -649,6 +660,8 @@ export class HttpClient {
         headers.set('Authorization', `Bearer ${token}`);
         continue;
       }
+      const serverVersion = res.headers.get('EmbedPDF-Server-Version');
+      if (serverVersion !== null && isLiveAnswer(res)) this.serverVersionSeen = serverVersion;
       // The server answered with another engine value than the URL named:
       // its values moved, and `/head` has the new ones.
       if (res.ok && res.headers.has('EmbedPDF-Engine')) {
@@ -799,6 +812,11 @@ function trySerialized(value: unknown): SerializedEngineError | null {
 }
 
 const RETRYABLE_503 = new Set(['EngineBusy', 'EngineRestarting']);
+
+/** Whether nothing may store the answer (`Cache-Control: no-store`): the server gave it just now. */
+function isLiveAnswer(res: Response): boolean {
+  return /(^|,)\s*no-store\s*(,|$)/i.test(res.headers.get('cache-control') ?? '');
+}
 
 function isStreamBody(body: BodyInit | null): boolean {
   return typeof ReadableStream !== 'undefined' && body instanceof ReadableStream;

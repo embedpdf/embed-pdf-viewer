@@ -2,12 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import {
   isSkippedItem,
+  measureFromKnownLength,
   toAttachmentRef,
   type ChangeOp,
   type DocumentEvent,
   type DocumentHandle,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import { API_VERSION } from '@embedpdf/engine-core/wire';
 import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -21,8 +23,9 @@ import {
  * What only the cloud engine does with changes: changes called together go
  * out as one request, one request at a time; another session sees a change's
  * events, an undo naming what it undid; an undo still applies once the layer
- * was saved and opened again; and gate C2, a burst of actions each undone, at
- * +500 ms a request.
+ * was saved and opened again; a kind of op an older server lacks is held
+ * back, alone; and gate C2, a burst of actions each undone, at +500 ms a
+ * request.
  */
 
 const TENANT_ID = 'cloud-changes-tenant';
@@ -118,6 +121,35 @@ function watchingFetch() {
     return response;
   };
   return { fetchFn, answers };
+}
+
+/**
+ * A fetch through which the server says it is `version`, recording the kinds
+ * of op each request of changes holds.
+ */
+function serverSaying(version: string) {
+  const sent: string[][] = [];
+  const fetchFn: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (init?.method === 'POST' && url.endsWith('/changes')) {
+      const body = JSON.parse(String(init.body)) as { changes: { ops?: { type: string }[] }[] };
+      sent.push(body.changes.flatMap((change) => (change.ops ?? []).map((op) => op.type)));
+    }
+    const response = await fetch(input, init);
+    const headers = new Headers(response.headers);
+    headers.set('EmbedPDF-Server-Version', version);
+    return new Response(response.body, { status: response.status, headers });
+  };
+  return { fetchFn, sent };
+}
+
+/** A fetch through which the client says it speaks `version`. */
+function clientSaying(version: string): typeof fetch {
+  return (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set('EmbedPDF-Version', version);
+    return fetch(input, { ...init, headers });
+  };
 }
 
 const waitFor = async (predicate: () => boolean, what: string, timeoutMs = 10_000) => {
@@ -322,6 +354,70 @@ describe('changes on the cloud engine', () => {
     } finally {
       await docA.close();
       await docB.close();
+    }
+  });
+
+  test('a kind of op an older server lacks is held back, alone, naming both versions', async () => {
+    const older = serverSaying('3.0');
+    const doc = await openFresh(older.fetchFn);
+    try {
+      const { page } = await landmarks(doc);
+      // Called together: sent, the two would share a request, and the server
+      // would refuse it whole.
+      const scaled = doc.apply({ ops: [{ type: 'pages.setScale', pages: [page], measure: null }] });
+      const rotated = doc.apply({ ops: [{ type: 'pages.rotate', pages: [page], rotation: 90 }] });
+      await expect(scaled).rejects.toMatchObject({
+        code: 'NotImplemented',
+        details: { kind: 'pages.setScale', needs: '3.1', serverVersion: '3.0' },
+      });
+      const result = await rotated;
+      expect(result.items.map((item) => item.type)).toEqual(['pages.rotate']);
+      expect(older.sent).toEqual([['pages.rotate']]);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('a client older than a kind of change is told to read again, and reads the change', async () => {
+    const docId = `changes-cloud-${++docs}`;
+    await seedDocument(fixture(), TENANT_ID, docId, CHANGE_FIXTURE_PDF);
+    const older = await openAgain(docId, clientSaying('3.0'));
+    const writer = await openAgain(docId);
+    try {
+      const { page } = await landmarks(writer);
+      const events: DocumentEvent[] = [];
+      older.events.subscribe((event) => events.push(event));
+
+      // A page scale arrived in 3.1: the server sends no row of it to a 3.0 client.
+      const measure = measureFromKnownLength(72, { value: 5, unit: 'm' });
+      await writer.apply({ ops: [{ type: 'pages.setScale', pages: [page], measure }] });
+      await waitFor(() => events.length >= 1, 'the desync');
+      expect(events).toEqual([
+        { type: 'stream.desynced', reason: 'unknown-change', at: expect.any(String) },
+      ]);
+      const scaled = (await writer.pages.list()).pages[0]!.viewports;
+      expect(scaled?.some((viewport) => viewport.owned)).toBe(true);
+      expect((await older.pages.list()).pages[0]!.viewports).toEqual(scaled);
+
+      // The next change, of a kind 3.0 has, arrives as its event.
+      await writer.apply({ ops: [{ type: 'pages.rotate', pages: [page], rotation: 90 }] });
+      await waitFor(() => events.length >= 2, 'the rotation');
+      expect(events[1]).toMatchObject({ type: 'pages.rotated', origin: { kind: 'remote' } });
+    } finally {
+      await older.close();
+      await writer.close();
+    }
+  });
+
+  test('a server of this version is sent every kind', async () => {
+    const same = serverSaying(API_VERSION);
+    const doc = await openFresh(same.fetchFn);
+    try {
+      const { page } = await landmarks(doc);
+      await doc.apply({ ops: [{ type: 'pages.setScale', pages: [page], measure: null }] });
+      expect(same.sent).toEqual([['pages.setScale']]);
+    } finally {
+      await doc.close();
     }
   });
 

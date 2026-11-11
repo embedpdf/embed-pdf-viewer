@@ -39,14 +39,18 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       const { type: _type, ...result } = item;
       return [{ type: 'annotations.restored', ...result }];
     }
-    case 'annotations.import': {
+    case 'annotations.import':
+    case 'annotations.copy': {
+      // One `annotations.created` per annotation made, as their creates publish.
       const { type: _type, ...result } = item;
       return annotationImportFacts(result).map((fact) => ({
         type: 'annotations.created' as const,
         ...fact,
       }));
     }
-    case 'forms.import': {
+    case 'forms.import':
+    case 'forms.copy': {
+      // One `forms.created` per field made, as their creates publish.
       const { type: _type, ...result } = item;
       return formImportFacts(result).map((fact) => ({ type: 'forms.created' as const, ...fact }));
     }

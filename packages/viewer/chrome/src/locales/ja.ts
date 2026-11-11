@@ -106,6 +106,7 @@ export const ja: Locale = {
         saveFile: 'ファイルを保存',
         removeLink: 'リンクを削除',
         delete: '削除',
+        duplicate: '複製',
         group: 'グループ化',
         ungroup: 'グループ解除',
         stampFromSelection: 'スタンプを作成',
@@ -495,6 +496,7 @@ export const ja: Locale = {
       box: 'ボックス {number}',
       addButton: 'ボタンを追加',
       addBox: 'ボックスを追加',
+      duplicateGroup: 'グループを複製',
     },
     // The style panel's own words around the properties.
     stylePanel: {

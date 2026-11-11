@@ -106,6 +106,7 @@ export const pt: Locale = {
         saveFile: 'Salvar arquivo',
         removeLink: 'Remover link',
         delete: 'Excluir',
+        duplicate: 'Duplicar',
         group: 'Agrupar',
         ungroup: 'Desagrupar',
         stampFromSelection: 'Criar carimbo',
@@ -499,6 +500,7 @@ export const pt: Locale = {
       box: 'Caixa {number}',
       addButton: 'Adicionar um botão',
       addBox: 'Adicionar uma caixa',
+      duplicateGroup: 'Duplicar grupo',
     },
     // The style panel's own words around the properties.
     stylePanel: {
