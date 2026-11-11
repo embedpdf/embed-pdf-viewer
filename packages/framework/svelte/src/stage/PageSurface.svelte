@@ -37,7 +37,12 @@
     page: VisiblePage;
     /** The bands reserved around the page, in screen pixels; the layout left room for them. */
     frame: PageFrame;
-    stage: StageHostCapability;
+    /**
+     * The lens the page is on. The Stage mounts a page only while it has one; it reads `null`
+     * once the lens is gone (the document closed, or another became the active one), which a
+     * cleanup inside the page still sees.
+     */
+    stage: StageHostCapability | null;
     content: Snippet<[page: PageContextValue]>;
     chrome?: Snippet<[page: PageContextValue]>;
   } = $props();
@@ -62,23 +67,31 @@
    */
   function viewDemand(): PageViewDemand {
     const placed = page;
-    return stagePageDemand(stage, pageRef.objectNumber, placed.transform.deviceWidth);
+    // Without a lens no page is on screen.
+    const lens = stage ?? { listVisiblePages: () => [] };
+    return stagePageDemand(lens, pageRef.objectNumber, placed.transform.deviceWidth);
   }
 
-  const context = $derived(
+  /** The page on `lens`, as the stage places it now. */
+  const contextOn = (lens: StageHostCapability): PageContextValue =>
     makePageContext(
       documentId,
       // The hosting lens: raster planning keys tiles by it, so a thumbnail rail and the main
       // view never fight over one plan.
-      stage.getLensId(),
+      lens.getLensId(),
       pageRef,
       pageIndex,
       frame,
       transform,
       () => contentElement!.getBoundingClientRect(),
       viewDemand,
-    ),
-  );
+    );
+
+  // A layer's cleanup can read the page after the lens is gone, and Svelte computes a `$derived`
+  // again when a cleanup reads it. Without a lens the page stays as it last was, so what a
+  // layer releases as it goes away is what it took.
+  let lastContext = untrack(() => contextOn(stage!));
+  const context = $derived.by(() => (stage ? (lastContext = contextOn(stage)) : lastContext));
   const live = livePageContext(() => context);
   setPageContext(live);
 
