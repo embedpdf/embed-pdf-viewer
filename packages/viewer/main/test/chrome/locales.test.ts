@@ -4,12 +4,13 @@
  * annotation kinds do; Arabic and Hebrew read right to left; readers of Traditional Chinese get
  * the Traditional pack, never Simplified; and the app's `strings` change a language, or add one
  * that reads the way its code says. The keys the Translations page names are the English pack's.
+ * Dates, times and numbers are written in the language shown, in the region of the reader.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { KINDS, propertiesOf } from '@embedpdf/core-annotation';
 import type { Locale, TranslationDictionary } from '@embedpdf/plugin-i18n';
@@ -19,8 +20,10 @@ import {
   directionOf,
   en,
   fallbackCodeOf,
+  formatLocaleOf,
   localeCodeOf,
   localesOf,
+  readerLanguagesOf,
 } from '../../../chrome/src/locales';
 
 /** Every string of a dictionary, by its dotted key. */
@@ -340,5 +343,54 @@ describe('fallbackCodeOf', () => {
     expect(fallbackCodeOf('fi', codes)).toBeNull();
     // A browser language the viewer has no language for shows the fallback language.
     expect(localeCodeOf('fi', codes, 'sv')).toBe('sv');
+  });
+});
+
+describe('formatLocaleOf', () => {
+  const { codes } = localesOf();
+
+  it("writes in the reader's region of the language shown", () => {
+    expect(formatLocaleOf('en', codes, ['en-GB', 'en'])).toBe('en-GB');
+    expect(formatLocaleOf('de', codes, ['de-CH'])).toBe('de-CH');
+    expect(formatLocaleOf('pt', codes, ['pt-BR'])).toBe('pt-BR');
+    expect(formatLocaleOf('zh-TW', codes, ['zh-HK'])).toBe('zh-HK');
+    // A language without a region says nothing about where its reader is: the next one does.
+    expect(formatLocaleOf('en', codes, ['en', 'en-AU', 'en-GB'])).toBe('en-AU');
+    expect(formatLocaleOf('en', codes, ['en-gb'])).toBe('en-GB');
+  });
+
+  it('never writes in another language than the one shown', () => {
+    expect(formatLocaleOf('en', codes, ['de-CH', 'fr-FR'])).toBe('en');
+    expect(formatLocaleOf('de', codes, ['en-US', 'de-AT'])).toBe('de-AT');
+    expect(formatLocaleOf('en', codes, [])).toBe('en');
+    // Simplified Chinese stays Simplified for a reader of Traditional.
+    expect(formatLocaleOf('zh-CN', codes, ['zh-TW'])).toBe('zh-CN');
+    // The fallback language, for a reader the viewer has no language for.
+    expect(formatLocaleOf('en', codes, ['fi-FI'])).toBe('en');
+  });
+
+  it("keeps the region of a language that names one, whatever the reader's", () => {
+    const withBritish = localesOf({ 'en-GB': { 'zoom:in': 'Zoom in' } }).codes;
+    expect(formatLocaleOf('en-GB', withBritish, ['en-US'])).toBe('en-GB');
+    expect(formatLocaleOf('en-GB', withBritish, ['en-GB', 'en-US'])).toBe('en-GB');
+    expect(formatLocaleOf('en', withBritish, ['en-US'])).toBe('en-US');
+  });
+
+  it("is the browser's own formats for a language whose code the browser can't read", () => {
+    const withOdd = localesOf({ en_US: { 'zoom:in': 'Zoom in' } }).codes;
+    const formatLocale = formatLocaleOf('en_US', withOdd, ['en-GB']);
+    expect(formatLocale).toBeUndefined();
+    expect(() => new Intl.DateTimeFormat('en_US')).toThrow(RangeError);
+    expect(() => new Intl.DateTimeFormat(formatLocale)).not.toThrow();
+  });
+});
+
+describe('readerLanguagesOf', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is the browser's languages for 'auto', after the language the app asks for", () => {
+    vi.stubGlobal('navigator', { languages: ['de-CH', 'de'] });
+    expect(readerLanguagesOf('auto')).toEqual(['de-CH', 'de']);
+    expect(readerLanguagesOf('en-GB')).toEqual(['en-GB', 'de-CH', 'de']);
   });
 });

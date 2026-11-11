@@ -58,6 +58,7 @@ import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
 import { resolveViewerCommands, type CommandDefinition } from './config/viewer-commands';
 import { fallbackCodeOf, localeCodeOf, localesOf, type LanguageStrings } from './locales';
+import { FormatLocaleProvider } from './format-locale';
 import {
   ViewerConfigProvider,
   type PanelResizeEvent,
@@ -690,7 +691,9 @@ export function FullViewer({
             onDocumentChange={onDocumentChange}
           />
           <SlottedEdgesProvider value={slottedEdges}>
-            <Shell components={components} />
+            <FormatLocaleProvider locale={locale}>
+              <Shell components={components} />
+            </FormatLocaleProvider>
           </SlottedEdgesProvider>
         </ViewerConfigProvider>
       </HeadlessViewer>

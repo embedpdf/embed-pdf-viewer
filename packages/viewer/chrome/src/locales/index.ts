@@ -44,6 +44,10 @@ export const LOCALE_LOADERS: Readonly<Record<string, LocalePackLoader>> = {
   he: () => import('./he').then((module) => module.he),
 };
 
+/** The browser's languages, the one its user wants most first; none outside a browser. */
+const browserLanguages = (): readonly string[] =>
+  typeof navigator !== 'undefined' ? (navigator.languages ?? []) : [];
+
 /**
  * The language a `locale` value shows, among `codes`: the browser's languages for `'auto'`,
  * else the closest to the one asked for (`'es-MX'` shows `'es'`), else the fallback language.
@@ -52,11 +56,48 @@ export const localeCodeOf = (
   locale: string,
   codes: readonly string[],
   fallback: string = 'en',
-): string =>
-  negotiateLocale(
-    codes,
-    locale !== 'auto' ? [locale] : typeof navigator !== 'undefined' ? navigator.languages : [],
-  ) ?? fallback;
+): string => negotiateLocale(codes, locale !== 'auto' ? [locale] : browserLanguages()) ?? fallback;
+
+/**
+ * The language tags that say where the viewer's reader is, the most telling first: the `locale`
+ * value when it names a language (`'en-GB'`), then the browser's languages.
+ */
+export const readerLanguagesOf = (locale: string): readonly string[] => [
+  ...(locale !== 'auto' ? [locale] : []),
+  ...browserLanguages(),
+];
+
+/** The region a language tag names (`GB` in `en-GB`); `undefined` for none, and for no tag at all. */
+function regionOf(tag: string): string | undefined {
+  try {
+    return new Intl.Locale(tag).region;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The language tag the viewer writes dates, times and numbers in: the language it shows, in the
+ * region of its reader. Of the reader's languages (`readerLanguagesOf`), that's the first one
+ * that names a region and that `shown` is the viewer's language for, among `codes`: English
+ * reads `14 Sept, 17:30` for `en-GB` and `Sep 14, 5:30 PM` for `en-US`, and no reader of German
+ * turns an English viewer's dates German. Without one it's `shown` itself, and `undefined` (the
+ * browser's own formats) when `shown` isn't a tag the browser can read.
+ */
+export function formatLocaleOf(
+  shown: string,
+  codes: readonly string[],
+  readerLanguages: readonly string[],
+): string | undefined {
+  const regional = readerLanguages.find(
+    (tag) => regionOf(tag) !== undefined && negotiateLocale(codes, [tag]) === shown,
+  );
+  try {
+    return Intl.getCanonicalLocales(regional ?? shown)[0];
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * The fallback language among `codes`: the closest to the one asked for (`'sv-SE'` is `'sv'`),
