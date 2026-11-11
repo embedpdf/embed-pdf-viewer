@@ -13,6 +13,7 @@ import type { Attachment, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { CodePointRange, FontResolveRun } from '../dto/DocumentFonts';
+import type { DocumentFileInfo } from '../dto/DocumentFileInfo';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { DocumentOutline } from '../dto/DocumentOutline';
 import type { FontIdentityInfo } from '../dto/FontSpec';
@@ -404,6 +405,25 @@ export interface MetadataUpdateCustomWorkerRequest extends WriteJobFields {
   layerName?: string;
   patch: CustomMetadataPatch;
   artifactPath?: string;
+}
+
+/** Header, trailer and catalog facts (`doc.metadata.file()`). */
+export interface MetadataReadFileWorkerRequest {
+  kind: 'metadata.readFile';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/** The destination a name stands for (`doc.actions.resolveNamedDestination`). */
+export interface ActionsResolveNamedDestinationWorkerRequest {
+  kind: 'actions.resolveNamedDestination';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  name: string;
 }
 
 export interface ActionsReadWorkerRequest {
@@ -1577,6 +1597,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
   | MetadataReadCustomWorkerRequest
+  | MetadataReadFileWorkerRequest
+  | ActionsResolveNamedDestinationWorkerRequest
   | MetadataUpdateCustomWorkerRequest
   | ActionsReadWorkerRequest
   | OutlineReadWorkerRequest
@@ -1729,6 +1751,8 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot<C['destination']> }
+  | { tag: 'actions.resolveNamedDestination'; destination: C['destination'] | null }
+  | { tag: 'metadata.readFile'; file: DocumentFileInfo }
   | { tag: 'outline.read'; outline: DocumentOutline<C['destination']> }
   | ({
       tag: 'metadata.update';

@@ -73,6 +73,8 @@ import {
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
   type MetadataReadCustomWorkerRequest,
+  type MetadataReadFileWorkerRequest,
+  type ActionsResolveNamedDestinationWorkerRequest,
   type MetadataUpdateCustomWorkerRequest,
   type ActionsReadWorkerRequest,
   type OutlineReadWorkerRequest,
@@ -177,6 +179,7 @@ import {
   type StartupFontSpec,
 } from '../features/fonts';
 import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
+import { resolveNamedDestination } from '../features/destinations/namedDestinations';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataReader } from '../features/metadata';
@@ -551,6 +554,12 @@ export class WorkerHost {
           break;
         case 'metadata.updateCustom':
           resultPack = this.handleMetadataUpdateCustom(msg, ctrl.signal);
+          break;
+        case 'metadata.readFile':
+          resultPack = this.handleMetadataReadFile(msg, ctrl.signal);
+          break;
+        case 'actions.resolveNamedDestination':
+          resultPack = this.handleActionsResolveNamedDestination(msg, ctrl.signal);
           break;
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
@@ -1172,6 +1181,24 @@ export class WorkerHost {
       signal,
     );
     return this.finishMutation(session, { tag: 'metadata.updateCustom', result }, req.artifactPath);
+  }
+
+  private handleMetadataReadFile(
+    req: MetadataReadFileWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const file = new MetadataReader(this.runtime, session).readFile(signal);
+    return wirePack({ tag: 'metadata.readFile', file });
+  }
+
+  private handleActionsResolveNamedDestination(
+    req: ActionsResolveNamedDestinationWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const destination = resolveNamedDestination(this.runtime, session, req.name, signal);
+    return wirePack({ tag: 'actions.resolveNamedDestination', destination });
   }
 
   private handleActionsRead(

@@ -10,6 +10,10 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 
 import { outlineActionBudget, readOutlineItem } from './internal/readOutlineItem';
 import { TOP } from './internal/readOutlineTree';
+import {
+  readNamedDestinations,
+  type NamedDestinationEntry,
+} from '../destinations/namedDestinations';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 
@@ -30,6 +34,7 @@ export class OutlineReader {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const budget = outlineActionBudget();
+    const names = this.namedDestinations(docPtr);
     const items: OutlineItem<PdfDestination>[] = [];
     const seen = new Set<number>();
     let incomplete = false;
@@ -56,7 +61,15 @@ export class OutlineReader {
           return false;
         }
         seen.add(objectNumber);
-        const read = readOutlineItem(this.runtime, docPtr, handle, objectNumber, parent, budget);
+        const read = readOutlineItem(
+          this.runtime,
+          docPtr,
+          handle,
+          objectNumber,
+          parent,
+          budget,
+          names,
+        );
         items.push(read.item);
         if (!read.complete) incomplete = true;
         if (fn.FPDFBookmark_GetFirstChild(docPtr, handle) === NULL_PTR) continue;
@@ -88,6 +101,13 @@ export class OutlineReader {
       objectNumber,
       parent,
       outlineActionBudget(),
+      this.namedDestinations(docPtr),
     ).item;
+  }
+
+  /** The document's named destinations, read once, on the first item that has a destination. */
+  private namedDestinations(docPtr: Ptr): () => readonly NamedDestinationEntry[] {
+    let entries: NamedDestinationEntry[] | null = null;
+    return () => (entries ??= readNamedDestinations(this.runtime.fn, this.runtime.mem, docPtr));
   }
 }

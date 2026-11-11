@@ -16,6 +16,10 @@ import { readUtf16String } from '../../../runtime/memory/strings';
 import { F32_BYTES, readF32 } from '../../../runtime/memory/structs';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 import { linkTargetFromActionTree } from '../../destinations/linkTarget';
+import {
+  nameOfDestination,
+  type NamedDestinationEntry,
+} from '../../destinations/namedDestinations';
 import { readDestination } from '../../destinations/readDestination';
 
 /**
@@ -60,6 +64,7 @@ export function readOutlineItem(
   objectNumber: number,
   parent: number,
   budget: ActionReadBudgetTracker,
+  names: () => readonly NamedDestinationEntry[],
 ): ReadOutlineItem {
   const { fn, mem } = runtime;
   const title =
@@ -74,6 +79,8 @@ export function readOutlineItem(
       title,
       target,
       action,
+      destinationName:
+        target?.kind === 'goto' ? destinationNameOf(runtime, docPtr, handle, names) : null,
       open: hasChildren && fn.FPDFBookmark_GetCount(handle) > 0,
       color: readColor(runtime, handle),
       bold: (style & BOLD) !== 0,
@@ -118,6 +125,32 @@ function readTarget(
     target: destination ? { kind: 'goto', destination } : { kind: 'unsupported' },
     complete: true,
   };
+}
+
+/** PDFACTION_GOTO (public/fpdf_doc.h). */
+const ACTION_GOTO = 1;
+
+/**
+ * The name the item's `/Dest`, or its GoTo action's `/D`, goes by: PDFium
+ * resolves a name to the very destination object the name tree holds, so the
+ * pointers compare. `null` for an explicit destination.
+ */
+function destinationNameOf(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  handle: Ptr,
+  names: () => readonly NamedDestinationEntry[],
+): string | null {
+  const { fn } = runtime;
+  const actionPtr = fn.FPDFBookmark_GetAction(handle);
+  const destPtr = actionPtr
+    ? fn.FPDFAction_GetType(actionPtr) === ACTION_GOTO
+      ? fn.FPDFAction_GetDest(docPtr, actionPtr)
+      : NULL_PTR
+    : fn.FPDFBookmark_GetDest(docPtr, handle);
+  if (!destPtr) return null;
+  const entries = names();
+  return entries.length ? nameOfDestination(entries, destPtr) : null;
 }
 
 /** `/C` as `#rrggbb`, or `null` when the item has none. */

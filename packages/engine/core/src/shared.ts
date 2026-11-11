@@ -28,6 +28,7 @@ export type {
 } from './dto/GrantVisitor';
 export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
+export type { DocumentFileInfo, DocumentPageMode } from './dto/DocumentFileInfo';
 export type {
   DocumentOutline,
   OutlineItem,

@@ -14,8 +14,10 @@ import type { OutlineItemRef } from '../identity/OutlineItemRef';
 /** A target as a read returns it: the target, and the `/A` action it is written as. */
 function targetFieldsOf<D>(
   target: PdfLinkTargetWritable<D> | null,
-): Pick<OutlineItem<D>, 'target' | 'action'> {
-  return target ? { target, action: actionTreeOf(target) } : { target: null, action: null };
+): Pick<OutlineItem<D>, 'target' | 'action' | 'destinationName'> {
+  return target
+    ? { target, action: actionTreeOf(target), destinationName: null }
+    : { target: null, action: null, destinationName: null };
 }
 
 /** A colour as a read returns it: `#rrggbb` in lowercase digits, or `null`. */

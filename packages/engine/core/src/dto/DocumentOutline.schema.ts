@@ -18,6 +18,7 @@ export const OutlineItemSchema: z.ZodType<OutlineItem> = z.object({
   title: z.string(),
   target: PdfLinkTargetSchema.nullable(),
   action: PdfActionTreeSchema.nullable(),
+  destinationName: z.string().nullable(),
   open: z.boolean(),
   color: ColorSchema.nullable(),
   bold: z.boolean(),

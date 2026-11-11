@@ -89,6 +89,8 @@ export function resultInPageSpace(
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
     case 'outline.read':
       return { ...payload, outline: pageOutlineOf(payload.outline, boxOf) };
+    case 'actions.resolveNamedDestination':
+      return { ...payload, destination: payload.destination && toPage(payload.destination) };
     case 'annotations.list':
       return {
         ...payload,
