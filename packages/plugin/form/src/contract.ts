@@ -258,6 +258,26 @@ export interface FormWidgetAddResult {
   readonly widget: WidgetAnnotation;
 }
 
+/** How `duplicate()` and `duplicateWidgets()` copy. */
+export interface FormDuplicateOptions {
+  /** The page the copied widgets go on, as a ref or an index. Left out: each on its own page. */
+  readonly page?: PageRef | number;
+  /** How far each copied widget moves, in page points: `x` to the right, `y` down. */
+  readonly offset?: { readonly x: number; readonly y: number };
+  /** Whether a new field gets its original's value. Default `false`: it starts empty. */
+  readonly values?: boolean;
+}
+
+/** What `duplicate()` and `duplicateWidgets()` resolve. */
+export interface FormDuplicateResult {
+  /** The fields that were made, and each field that got a new button, as they are now. */
+  readonly fields: readonly FormField[];
+  /** The new widgets. For `duplicateWidgets()`, in the order their originals were given. */
+  readonly widgets: readonly WidgetAnnotation[];
+  /** What was left out, and why. */
+  readonly dropped: readonly FormImportDrop[];
+}
+
 /** Which fields `export()` takes, each whole. Without either, every field. */
 export interface FormExportSelection {
   readonly fields?: readonly FormFieldRef[];
@@ -418,7 +438,10 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   listWidgets(page: PageRef | number): readonly FormWidgetItem[];
   /** The widget under a point on a page, with its field, or `null`. */
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
-  /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
+  /**
+   * The field whose widgets are selected (in design mode): one widget, or several of the same
+   * field, such as a radio group's buttons. `null` otherwise.
+   */
   getSelectedField(): FormField | null;
   /** The field the cursor is in, or `null`. */
   getFocusedField(): FormField | null;
@@ -543,6 +566,32 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     placement?: Partial<WidgetPlacement>,
     options?: OperationOptions,
   ): Promise<FormWidgetAddResult>;
+  /**
+   * Copy whole fields: each a new field with its original's settings, scripts, default value
+   * and widgets, named after it with the next free number (`email` becomes `email_2`). A
+   * radio group's copy keeps its buttons' values. A copy has no value unless
+   * `options.values` is true, and a signature never comes along. The copies show at once,
+   * it is one step to undo, and it resolves the new fields, their widgets and what was left
+   * out. Fires `onFieldCreated` for each. Rejects `permission-denied` without
+   * `doc.forms.modify`, `not-found` for a field the form doesn't have.
+   */
+  duplicate(
+    fields: readonly FormFieldRef[],
+    options?: FormDuplicateOptions & OperationOptions,
+  ): Promise<FormDuplicateResult>;
+  /**
+   * Copy widgets, as Duplicate does in a form designer. A radio button's copy is another
+   * button of its group, with the next free `Choice<n>` as its value. Any other widget's
+   * copy is a new field, as `duplicate()` makes one, and widgets of one field copied
+   * together become one new field. The copies show at once, it is one step to undo, and it
+   * resolves the fields made or changed, the new widgets in the order of the widgets given,
+   * and what was left out. Rejects `permission-denied` without `doc.forms.modify`,
+   * `not-found` for a widget the form doesn't show.
+   */
+  duplicateWidgets(
+    widgets: readonly AnnotationRef[],
+    options?: FormDuplicateOptions & OperationOptions,
+  ): Promise<FormDuplicateResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
   update(
     ref: FormFieldRef,

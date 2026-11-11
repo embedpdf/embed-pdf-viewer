@@ -503,6 +503,7 @@ export const ar: Locale = {
       box: 'الخانة {number}',
       addButton: 'إضافة زر',
       addBox: 'إضافة خانة',
+      duplicateGroup: 'تكرار المجموعة',
     },
     // The style panel's own words around the properties.
     stylePanel: {

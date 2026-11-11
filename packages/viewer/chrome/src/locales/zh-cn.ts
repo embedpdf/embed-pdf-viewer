@@ -495,6 +495,7 @@ export const zhCN: Locale = {
       box: '复选框 {number}',
       addButton: '添加按钮',
       addBox: '添加复选框',
+      duplicateGroup: '创建组副本',
     },
     // The style panel's own words around the properties.
     stylePanel: {

@@ -230,7 +230,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `fields`        | Every field, with its value                                                                     | `list()`, or `list({ kind, page, name })` for some   |
 | `status`        | Whether the form is read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`           | `getStatus()`                                        |
 | `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
-| `selectedField` | In design mode, the field of the selected box, or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
+| `selectedField` | In design mode, the field whose boxes are selected (one, or several of the same field), or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
 | `focusedField`  | The field the cursor is in, or `null`; see [Move between fields](#move-between-fields)            | `getFocusedField()`                                  |
 
 For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.

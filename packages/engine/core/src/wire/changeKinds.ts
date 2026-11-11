@@ -21,6 +21,7 @@ export type ChangeKind = Exclude<ChangeItemType, AnnotationImportOp['type'] | Fo
 export const CHANGE_KIND_SINCE: Partial<Record<ChangeKind, string>> = {
   'pages.setScale': '3.1',
   'annotations.copy': '3.2',
+  'forms.copy': '3.2',
 };
 
 /** The version every kind without a row in {@link CHANGE_KIND_SINCE} arrived in. */

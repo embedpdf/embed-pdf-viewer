@@ -109,8 +109,26 @@ export interface AnnotationLender {
     refs: readonly AnnotationRef[],
     position: AnnotationPosition,
   ): readonly ChangeOp[];
-  /** Whether this session may change and delete the record. */
-  getAuthority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
+  /**
+   * The ops that copy these records, as the lender copies its own (a form's
+   * widgets: a radio button's copy joins its group, any other widget's is a
+   * new field), each moved by `offset`, on `page` when one is named; and the
+   * copies' refs, in the order of the records given. A record it leaves out
+   * has no copy. Resolves once the object numbers the ops take are there.
+   */
+  copyOps(
+    refs: readonly AnnotationRef[],
+    placement: {
+      readonly page?: PageRef;
+      readonly offset?: { readonly x: number; readonly y: number };
+    },
+  ): Promise<{ readonly ops: readonly ChangeOp[]; readonly copies: readonly AnnotationRef[] }>;
+  /** Whether this session may change, delete and copy the record. */
+  getAuthority(record: Annotation): {
+    readonly update: boolean;
+    readonly delete: boolean;
+    readonly copy: boolean;
+  };
   /** What its records' pictures on a page depend on: a new value means new pictures. */
   getPictureEpoch(page: PageRef): string;
   /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */

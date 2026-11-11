@@ -19,7 +19,14 @@ import type {
   FormValidation,
   WidgetAddress,
 } from '../contract';
-import { canonicalKey, fieldByKey, fieldByRef, fieldForWidget, widgetRowOf } from '../model';
+import {
+  canonicalKey,
+  fieldByKey,
+  fieldByRef,
+  fieldForWidget,
+  fieldKeyOf,
+  widgetRowOf,
+} from '../model';
 import type { FormContext, FormServices } from '../services';
 
 const NO_FIELDS: readonly FormField[] = Object.freeze([]);
@@ -192,13 +199,19 @@ export function createFieldReads(
   );
 
   // The selection belongs to the annotation plugin: a widget is selected in
-  // design mode, where widgets are boxes like any annotation.
+  // design mode, where widgets are boxes like any annotation. Several widgets
+  // of one field (a radio group's buttons) are that field's selection too.
   const getSelectedField = memo(
     () => [fields.view(), siblings.annotation()?.selection.getSelected() ?? NOTHING_SELECTED],
     (index, selected): FormField | null => {
-      const [annotation] = selected;
-      if (selected.length !== 1 || !annotation?.subtype.startsWith('widget')) return null;
-      return fieldForWidget(index, widgetObjectOf(annotation.ref));
+      let found: FormField | null = null;
+      for (const annotation of selected) {
+        if (!annotation.subtype.startsWith('widget')) return null;
+        const field = fieldForWidget(index, widgetObjectOf(annotation.ref));
+        if (!field || (found && fieldKeyOf(found) !== fieldKeyOf(field))) return null;
+        found = field;
+      }
+      return found;
     },
   );
 

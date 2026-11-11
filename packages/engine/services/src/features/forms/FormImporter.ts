@@ -9,12 +9,10 @@ import {
   type FormFieldRef,
   type FormImportResult,
   type FormValuesImportDrop,
-  type FormWidget,
+  fieldNameTaken,
   isNoOpWrite,
   type PdfCoordinates,
-  pdfFormFieldDraftOf,
   toPageRef,
-  type WidgetFlags,
   type WireFormBundle,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -25,20 +23,15 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormMutator } from './FormMutator';
-import { readCalculationOrder, sameOrder } from './internal/calculationOrder';
+import { createPlannedFields } from './internal/createPlannedFields';
 import { restoreFieldCreation, restoreFieldFill } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
-import { formMutationMeta } from './internal/formMutationMeta';
 import { readFieldAt } from './internal/readFormSnapshot';
 import { readFieldLocks } from './internal/signatureLocks';
-import { withWidgetRows } from './internal/widgetRows';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { readUtf16String } from '../../runtime/memory/strings';
 import { throwIfAborted } from '../../shared/abort';
-import { openAnnotRaw } from '../annotations/internal/identity/resolveAnnotIndexRaw';
-import { setAnnotFlags } from '../annotations/internal/write/annotationWritePrimitives';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
-import { visibleBoxReader } from '../pages/PagesReader';
 import { checkWireBundle } from '../transfer/checkWireBundle';
 
 export interface FormImportRequest {
@@ -105,64 +98,44 @@ export class FormImporter {
         page: toPageRef(record.pageObjectNumber),
         position: record.pageIndex,
       })),
-      nameTaken: (name) => nameConflicts(names, name),
+      nameTaken: (name) => fieldNameTaken(names, name),
       mayScript: request.mayScript,
       values: request.values,
     });
 
-    const orderBefore = this.calculationOrder();
-    const boxOf = visibleBoxReader(this.runtime, this.session);
-    const forms = new FormMutator(this.runtime, this.session, this.fonts);
     const docPtr = this.session.requireDocPtr();
     const importedBy = request.actor.userId ?? null;
-    const created = plan.creates.map((planned) => {
-      const source = bundle.fields[planned.field]!.data;
-      const { groupId: bundleGroup, ...draft } = pdfFormFieldDraftOf(planned.draft, boxOf);
-      const groupId = request.groupOf(bundleGroup);
-      const { field } = forms.createField(
-        { ...draft, ...(groupId !== undefined ? { groupId } : {}) },
-        signal,
-        request.actor,
-      );
-      field.widgets.forEach((widget, at) => this.writeFlags(widget, planned.flags[at]!));
-      this.session.invalidateDerived();
-      if (planned.value) forms.setValue(field.ref, planned.value, signal, request.actor);
-      const objectNumber = objectNumberOf(field.ref);
-      if (request.attribution === 'restore') {
-        restoreFieldCreation(this.runtime, docPtr, objectNumber, source, importedBy);
-        if (planned.value) restoreFieldFill(this.runtime, docPtr, objectNumber, source, importedBy);
-      }
-      return objectNumber;
-    });
-    // Each create with a calculate script joined the order at its end; the
-    // bundle's order among them is put back there.
-    const calculating = plan.calculationOrder.map((at) => fieldRef(created[at]!));
-    if (calculating.length > 0) forms.reorderCalculations(calculating, 'end', signal);
-    this.session.invalidateDerived();
-
-    const orderAfter = this.calculationOrder();
-    const fields = created.map((objectNumber) => this.readField(objectNumber));
-    return withWidgetRows(
+    const restores = request.attribution === 'restore';
+    const made = createPlannedFields(
       this.runtime,
       this.session,
-      {
-        fields,
-        refMap: plan.creates.map((planned, at) => ({
-          from: bundle.fields[planned.field]!.data.ref,
-          to: fields[at]!.ref,
-        })),
-        dropped: [...plan.dropped],
-        ...(sameOrder(orderBefore, orderAfter)
-          ? {}
-          : { calculationOrder: orderAfter.map(fieldRef) }),
-        meta: formMutationMeta(
-          this.session.writeStamp(),
-          fields.map((field) => field.ref),
-          fields.flatMap((field) => field.widgets as FormWidget[]),
-        ),
-      },
       this.fonts,
+      plan.creates,
+      plan.calculationOrder,
+      {
+        actor: request.actor,
+        groupOf: request.groupOf,
+        signal,
+        // Who made and filled each field, as the bundle has it.
+        made: (objectNumber, at) => {
+          if (!restores) return;
+          const planned = plan.creates[at]!;
+          const source = bundle.fields[planned.field]!.data;
+          restoreFieldCreation(this.runtime, docPtr, objectNumber, source, importedBy);
+          if (planned.value) {
+            restoreFieldFill(this.runtime, docPtr, objectNumber, source, importedBy);
+          }
+        },
+      },
     );
+    return {
+      ...made,
+      refMap: plan.creates.map((planned, at) => ({
+        from: bundle.fields[planned.field]!.data.ref,
+        to: made.fields[at]!.ref,
+      })),
+      dropped: [...plan.dropped],
+    };
   }
 
   /**
@@ -237,17 +210,6 @@ export class FormImporter {
     return this.readField(objectNumber);
   }
 
-  /** A new widget's flags, as its row in the bundle has them: a create writes none. */
-  private writeFlags(widget: FormWidget, flags: WidgetFlags): void {
-    if (!widget.ref) return;
-    const annotPtr = openAnnotRaw(this.runtime, this.session, widget.ref);
-    try {
-      setAnnotFlags(this.runtime.fn, annotPtr, flags);
-    } finally {
-      this.runtime.fn.FPDFPage_CloseAnnot(annotPtr);
-    }
-  }
-
   /** The full name of every field of the form. */
   private fieldNames(): Set<string> {
     const { fn, mem } = this.runtime;
@@ -277,30 +239,9 @@ export class FormImporter {
     const index = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, objectNumber);
     return readFieldAt(this.runtime, model, index, this.session.requireDocPtr());
   }
-
-  private calculationOrder(): number[] {
-    return readCalculationOrder(this.runtime, acquireFormModel(this.runtime, this.session));
-  }
-}
-
-/**
- * Whether a new field named `name` can't join a form whose fields are
- * `names`: one has that name, one sits under it (`name` would have to be a
- * parent), or one is its parent (it would have to stop being a field).
- */
-function nameConflicts(names: ReadonlySet<string>, name: string): boolean {
-  if (names.has(name)) return true;
-  for (const other of names) {
-    if (other.startsWith(`${name}.`) || name.startsWith(`${other}.`)) return true;
-  }
-  return false;
 }
 
 function objectNumberOf(ref: FormFieldRef): number {
   if (ref.kind !== 'objectNumber') throw new Error('a written field has an object number');
   return ref.objectNumber;
-}
-
-function fieldRef(objectNumber: number): FormFieldRef {
-  return { kind: 'objectNumber', objectNumber };
 }

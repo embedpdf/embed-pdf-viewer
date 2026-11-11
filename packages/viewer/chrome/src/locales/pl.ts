@@ -501,6 +501,7 @@ export const pl: Locale = {
       box: 'Pole wyboru {number}',
       addButton: 'Dodaj przycisk',
       addBox: 'Dodaj pole wyboru',
+      duplicateGroup: 'Duplikuj grupę',
     },
     // The style panel's own words around the properties.
     stylePanel: {

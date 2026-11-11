@@ -9,9 +9,11 @@ import {
   attachmentVerbs,
   outlineVerbs,
   annotationVerbs,
+  formVerbs,
   pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
+  type DocumentFormsService,
   type DocumentAttachmentsService,
   type DocumentActionsService,
   type DocumentEventStream,
@@ -87,7 +89,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly attachments: DocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly outline: DocumentOutlineService;
-  readonly forms: LocalDocumentFormsService;
+  readonly forms: DocumentFormsService;
   readonly fonts: LocalDocumentFontsService;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
@@ -192,7 +194,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       () => readLocalOutline(id, queue, view, guard),
       (change, options) => this.apply(change, options),
     );
-    this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
+    this.forms = formVerbs(
+      new LocalDocumentFormsService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.fonts = new LocalDocumentFontsService(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = pageVerbs(

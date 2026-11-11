@@ -179,6 +179,7 @@ import type {
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
 import type { AnnotationCopyResult } from '../transfer/annotationCopy';
+import type { FormCopyResult } from '../transfer/formCopy';
 import type {
   AnnotationImportBody,
   AnnotationImportOptions,
@@ -1314,7 +1315,8 @@ export const FormResetBodySchema = z
 /** What `updateWidget` takes on the wire: the widget patch (`PATCH …/form/widgets/{p}/{key}`). */
 export const FormWidgetUpdateBodySchema = z.object({ patch: WidgetPatchSchema }).strict();
 
-export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
+/** What a design import and a copy answer: the fields made, where each came from, what was left out. */
+const fieldsMadeShape = {
   fields: z.array(FormFieldDTOSchema),
   widgets: z.array(WidgetDTOSchema),
   refMap: z.array(z.object({ from: FormFieldRefSchema, to: FormFieldRefSchema })),
@@ -1336,7 +1338,15 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
   ),
   calculationOrder: z.array(FormFieldRefSchema).optional(),
   meta: FormMutationMetaSchema,
-}) as unknown as z.ZodType<FormImportResult>;
+};
+
+export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object(
+  fieldsMadeShape,
+) as unknown as z.ZodType<FormImportResult>;
+
+export const FormCopyResultSchema: z.ZodType<FormCopyResult> = z.object(
+  fieldsMadeShape,
+) as unknown as z.ZodType<FormCopyResult>;
 
 export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z.object({
   fields: z.array(FormFieldDTOSchema),

@@ -16,6 +16,7 @@ import {
   EngineErrorSchema,
   FieldPositionSchema,
   FormCalculationsReorderResultSchema,
+  FormCopyResultSchema,
   FormFieldCreateResultSchema,
   FormFieldDeleteResultSchema,
   FormFieldUpdateResultSchema,
@@ -154,6 +155,15 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     draft: FormFieldDraftSchema,
     objectNumber: z.number().int().positive().optional(),
     widgetObjectNumbers: z.array(z.number().int().positive()).optional(),
+  }),
+  op({
+    type: z.literal('forms.copy'),
+    fields: z.array(FormFieldRefSchema).min(1),
+    widgets: z.array(AnnotationRefSchema).min(1).optional(),
+    page: PageRefSchema.optional(),
+    offset: z.object({ x: z.number().finite(), y: z.number().finite() }).strict().optional(),
+    values: z.boolean().optional(),
+    objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
   op({
     type: z.literal('forms.update'),
@@ -377,6 +387,7 @@ export const ChangeItemSchema = closed(
     itemOf('forms.setAppearanceText', FormFieldUpdateResultSchema),
     itemOf('forms.reset', FormResetResultSchema, { skipped: SkippedFieldsSchema }),
     itemOf('forms.create', FormFieldCreateResultSchema),
+    itemOf('forms.copy', FormCopyResultSchema),
     itemOf('forms.update', FormFieldUpdateResultSchema, { skipped: SkippedFieldsSchema }),
     itemOf('forms.delete', FormFieldDeleteResultSchema),
     z.object({

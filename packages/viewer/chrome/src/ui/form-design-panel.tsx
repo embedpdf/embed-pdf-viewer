@@ -2,8 +2,8 @@
  * The form designer's sidebar (`form-design`, which `form:design` opens): what the form's
  * fields are. With no field selected it lists them by page, and a click selects one and
  * scrolls to it; with one selected it shows its settings and, for a radio group or a checkbox,
- * its buttons, with a + that adds one next in line (`form.addWidget`). How a field looks is the
- * style panel's.
+ * its buttons, with a + that adds one next in line (`form.addWidget`) and, for a radio group,
+ * a copy of the whole group (`form.duplicate`). How a field looks is the style panel's.
  */
 import { AnnotationToken, useAnnotationState } from '@embedpdf/react/annotation';
 import {
@@ -57,11 +57,22 @@ function useFormDesign() {
       annotation?.selection.select([widget.ref]);
       stage.reveal(widget.page, { rect: widget.box });
     },
+    /** Several widgets as the selection (a group just copied), so one drag moves them all. */
+    selectAll(widgets: readonly WidgetAnnotation[]) {
+      const [first] = widgets;
+      if (!first) return;
+      if (!isFormDesignTool(activeTool)) interaction?.activateTool(FORM_DESIGN_TOOL);
+      annotation?.selection.select(widgets.map((widget) => widget.ref));
+      stage.reveal(first.page, { rect: first.box });
+    },
     clear() {
       annotation?.selection.select([]);
     },
   };
 }
+
+/** How far a copy lands from its original, in page points: Duplicate's own step. */
+const COPY_STEP = 10;
 
 export function FormDesignPanel() {
   const form = useOptionalCapability(FormToken);
@@ -186,10 +197,30 @@ function Buttons({ field }: { field: FormField & { kind: 'radio' | 'checkbox' } 
       (record) => record.ref.kind === 'objectNumber' && record.ref.objectNumber === numberOf(place),
     );
   const radio = field.kind === 'radio';
+  const pages = usePageList();
   const add = async () => {
     if (!form) return;
     const { widget } = await form.addWidget(field.ref);
     design.select(widget);
+  };
+  // The whole group again, beside this one: right and down, or left or up where that keeps on
+  // its page a button that would leave it, as Duplicate places a copy.
+  const duplicateGroup = async () => {
+    if (!form) return;
+    const sizes = new Map(pages.map((page) => [page.ref.objectNumber, page.size]));
+    const step = (axis: 'x' | 'y', side: 'width' | 'height'): number => {
+      const leaves = places.some((place) => {
+        const size = sizes.get(place.page.objectNumber);
+        return !!size && place.box[axis] + place.box[side] + COPY_STEP > size[side];
+      });
+      return leaves && places.every((place) => place.box[axis] - COPY_STEP >= 0)
+        ? -COPY_STEP
+        : COPY_STEP;
+    };
+    const { widgets } = await form.duplicate([field.ref], {
+      offset: { x: step('x', 'width'), y: step('y', 'height') },
+    });
+    design.selectAll(widgets);
   };
   return (
     <section className="border-border-subtle mt-4 border-t pt-4">
@@ -228,6 +259,16 @@ function Buttons({ field }: { field: FormField & { kind: 'radio' | 'checkbox' } 
         <Icon name="plus" size={14} />
         {t(radio ? 'formDesign.addButton' : 'formDesign.addBox')}
       </button>
+      {radio && (
+        <button
+          type="button"
+          onClick={() => void duplicateGroup().catch(() => undefined)}
+          className="text-accent mt-2 flex items-center gap-1 text-sm"
+        >
+          <Icon name="duplicate" size={14} />
+          {t('formDesign.duplicateGroup')}
+        </button>
+      )}
     </section>
   );
 }

@@ -265,6 +265,11 @@ A selected group is copied as a group of its own. `canDuplicate()` is false when
 selected, when the user may not create annotations, and when a selected annotation is locked.
 What a copy carries is on [Copy an annotation](with-code#copy-an-annotation).
 
+In [design mode](../forms/building), the selection can hold a form's boxes. They are copied too,
+in the same step, by the form's rule: a radio button's copy joins its group, and any other box
+becomes a new field. `canDuplicate()` then also needs the right to design the form. See
+[Copy fields](../forms/building#copy-fields).
+
 A highlight sits on its words, so a copy beside it helps nobody. `annotation.isMovable(ref)` is
 false for an annotation like that. Use it to leave the button out:
 

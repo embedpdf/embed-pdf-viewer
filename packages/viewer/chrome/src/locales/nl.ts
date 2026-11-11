@@ -497,6 +497,7 @@ export const nl: Locale = {
       box: 'Vakje {number}',
       addButton: 'Knop toevoegen',
       addBox: 'Vakje toevoegen',
+      duplicateGroup: 'Groep dupliceren',
     },
     // The style panel's own words around the properties.
     stylePanel: {

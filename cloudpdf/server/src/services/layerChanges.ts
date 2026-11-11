@@ -51,8 +51,8 @@ export function numbersNamedBy(changes: readonly RequestedChange[]): number[] {
  * How many objects a request's changes may make for themselves (appearance
  * streams, fonts, the pages they insert, the files they embed), as the single
  * verbs estimated theirs: form writes regenerate many widget appearances,
- * inserted pages, embedded files and copied annotations need their own
- * objects, every other write few.
+ * inserted pages, embedded files and copied annotations and fields need
+ * their own objects, every other write few.
  */
 export function objectNumberEstimateOf(changes: readonly RequestedChange[]): number {
   const forms = changes.some(
@@ -63,6 +63,7 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
   let pages = 0;
   let files = 0;
   let copies = 0;
+  let fields = 0;
   for (const { change } of changes) {
     if (isUndoChange(change)) continue;
     for (const op of change.ops) {
@@ -76,6 +77,8 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
         files += 1;
       } else if (op.type === 'annotations.copy') {
         copies += op.refs.length;
+      } else if (op.type === 'forms.copy') {
+        fields += op.fields.length;
       }
     }
   }
@@ -83,7 +86,8 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
     (forms || undo ? OBJECT_NUMBER_ESTIMATES.forms : OBJECT_NUMBER_ESTIMATES.default) +
     pages +
     OBJECT_NUMBER_ESTIMATES.embeddedFiles(files) +
-    OBJECT_NUMBER_ESTIMATES.copiedAnnotations(copies)
+    OBJECT_NUMBER_ESTIMATES.copiedAnnotations(copies) +
+    OBJECT_NUMBER_ESTIMATES.copiedFields(fields)
   );
 }
 

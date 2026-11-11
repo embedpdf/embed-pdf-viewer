@@ -24,7 +24,8 @@ export interface ChangeContext {
   readonly signal: AbortSignal;
   /**
    * The deployment's bundle limits. An op that copies inside the document
-   * (`annotations.copy`) carries what a bundle may, and is refused past them.
+   * (`annotations.copy`, `forms.copy`) carries what a bundle may, and is
+   * refused past them.
    */
   readonly limits: BundleLimits;
   /**

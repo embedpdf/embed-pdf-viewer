@@ -13,6 +13,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsSetAppearanceText
     | CloudPDF.ChangeOp.FormsReset
     | CloudPDF.ChangeOp.FormsCreate
+    | CloudPDF.ChangeOp.FormsCopy
     | CloudPDF.ChangeOp.FormsUpdate
     | CloudPDF.ChangeOp.FormsDelete
     | CloudPDF.ChangeOp.FormsAddWidget
@@ -136,6 +137,23 @@ export namespace ChangeOp {
         draft: CloudPDF.FormFieldDraft;
         objectNumber?: number | undefined;
         widgetObjectNumbers?: number[] | undefined;
+    }
+
+    export interface FormsCopy {
+        type: "forms.copy";
+        fields: CloudPDF.FormFieldRef[];
+        widgets?: CloudPDF.AnnotationRef[] | undefined;
+        page?: CloudPDF.PageRef | undefined;
+        offset?: ChangeOpFormsCopy.Offset | undefined;
+        values?: boolean | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpFormsCopy {
+        export interface Offset {
+            x: number;
+            y: number;
+        }
     }
 
     export interface FormsUpdate {

@@ -18,6 +18,7 @@ export type { AnnotationImportPlan, PlannedAnnotation } from './transfer/planAnn
 export { planAnnotationCopy } from './transfer/planAnnotationCopy';
 export type { AnnotationCopyCreates, PlannedCopyCreate } from './transfer/planAnnotationCopy';
 export { planFormImport, planFormValuesImport } from './transfer/planFormImport';
+export { planFormCopy } from './transfer/planFormCopy';
 export type {
   FormImportPlan,
   FormValuesImportTarget,

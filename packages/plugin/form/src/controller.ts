@@ -80,6 +80,6 @@ export function createFormController(ctx: FormContext) {
 
   return {
     api,
-    connect: () => connectForm(ctx, api, createWidgetLender(ctx, services)),
+    connect: () => connectForm(ctx, api, createWidgetLender(ctx, services, design.copyOps)),
   };
 }

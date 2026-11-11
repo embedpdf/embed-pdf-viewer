@@ -332,7 +332,9 @@ A form field's box (a widget) belongs to the form, so `duplicate()` doesn't copy
 `canDuplicate()` is false for it. In [design mode](../forms/building), where the form lends its
 boxes to this plugin, the whole call is refused with `invalid-input` and nothing is copied.
 Outside design mode a box isn't one of this plugin's annotations, so the call is refused with
-`not-found`.
+`not-found`. To copy boxes, use the form's `duplicateWidgets()`
+([Copy fields](../forms/building#copy-fields)), or `selection.duplicate()`, which copies the
+selected boxes with the annotations.
 
 One call copies as much as an [import](saving#export-and-import) brings in: by default 10,000
 annotations, with 50 MB of drawings and files between them. Past a limit the call is refused with

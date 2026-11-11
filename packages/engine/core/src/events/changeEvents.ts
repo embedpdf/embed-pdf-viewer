@@ -48,7 +48,9 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
         ...fact,
       }));
     }
-    case 'forms.import': {
+    case 'forms.import':
+    case 'forms.copy': {
+      // One `forms.created` per field made, as their creates publish.
       const { type: _type, ...result } = item;
       return formImportFacts(result).map((fact) => ({ type: 'forms.created' as const, ...fact }));
     }

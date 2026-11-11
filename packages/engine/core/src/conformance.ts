@@ -26,6 +26,7 @@ export { runAnnotationResourceConformance } from './conformance/runAnnotationRes
 export { runAnnotationExportConformance } from './conformance/runAnnotationExportConformance';
 export { runAnnotationImportConformance } from './conformance/runAnnotationImportConformance';
 export { runAnnotationCopyConformance } from './conformance/runAnnotationCopyConformance';
+export { runFormCopyConformance } from './conformance/runFormCopyConformance';
 export { runAnnotationTransferConformance } from './conformance/runAnnotationTransferConformance';
 export type { AnnotationTransferConformanceOptions } from './conformance/runAnnotationTransferConformance';
 export { creatables, iconRect, type Creatable } from './conformance/creatables';

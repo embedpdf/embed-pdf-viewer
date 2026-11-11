@@ -29,6 +29,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { visibleBoxReader } from '../pages/PagesReader';
+import { assertCopyWithinLimit } from '../transfer/copyLimits';
 
 export interface AnnotationCopyRequest {
   readonly refs: readonly AnnotationRef[];
@@ -48,17 +49,6 @@ export interface AnnotationCopyRequest {
   readonly authorizeCreate: (draft: AnnotationDraft<PdfCoordinates>) => AnnotationActor | undefined;
   /** What the copy may carry: what a bundle of the same annotations may. */
   readonly limits: BundleLimits;
-}
-
-/** Refuses the copy when `value` is past the limit named `limit`, as a bundle past it is refused. */
-function assertCarries(limits: BundleLimits, limit: keyof BundleLimits, value: number): void {
-  const max = limits[limit];
-  if (value <= max) return;
-  throw new EngineError(
-    EngineErrorCode.PayloadTooLarge,
-    `copy: past the ${limit} limit: ${value} > ${max}`,
-    { details: { limit, max, value } },
-  );
 }
 
 /**
@@ -98,7 +88,7 @@ export class AnnotationCopier {
       );
     }
     // Counted as asked, before anything is read.
-    assertCarries(limits, 'items', refs.length);
+    assertCopyWithinLimit(limits, 'items', refs.length);
     // A page the document doesn't have refuses the copy before anything is read.
     if (request.page) this.session.resolvePageRef(request.page);
 
@@ -169,11 +159,11 @@ export class AnnotationCopier {
     let count = 0;
     let total = 0;
     const counted = (bytes: ArrayBuffer): ArrayBuffer => {
-      assertCarries(limits, 'resourceBytes', bytes.byteLength);
+      assertCopyWithinLimit(limits, 'resourceBytes', bytes.byteLength);
       count += 1;
-      assertCarries(limits, 'resources', count);
+      assertCopyWithinLimit(limits, 'resources', count);
       total += bytes.byteLength;
-      assertCarries(limits, 'bundleBytes', total);
+      assertCopyWithinLimit(limits, 'bundleBytes', total);
       return bytes;
     };
     return (source) => {

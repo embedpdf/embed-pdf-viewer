@@ -39,7 +39,12 @@ import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
 export function createCrud(
   ctx: Pick<AnnotationContext, 'doc' | 'pageOf' | 'assertAllowed' | 'cancellable' | 'changes'>,
-  { store, tools, records }: Pick<AnnotationServices, 'store' | 'tools' | 'records'>,
+  {
+    store,
+    tools,
+    records,
+    lending,
+  }: Pick<AnnotationServices, 'store' | 'tools' | 'records' | 'lending'>,
   annotations: Pick<AnnotationReads, 'get' | 'pageOf'>,
   /** Write what is held back (typed text) and wait for every write on its way. */
   settle: () => Promise<void>,
@@ -173,14 +178,29 @@ export function createCrud(
    * op: they show at once, and it is one step to undo. An annotation's
    * attached link is a child of it, so it is copied along. A link `refs`
    * names itself is copied once, as one of the copies named.
+   *
+   * `lent` are the selection's lent records (a form's widgets, in design
+   * mode), which only the selection's own duplicate passes: their lender
+   * says which ops copy them, and those join the same change, so a
+   * selection of both kinds is one step. Their copies are among the
+   * annotations it resolves; what their lender left out is its own to tell.
    */
   const duplicate = async (
     refs: readonly AnnotationRef[],
     options: AnnotationDuplicateOptions & OperationOptions = {},
+    lent: readonly AnnotationRef[] = [],
   ): Promise<AnnotationDuplicateResult> => {
-    ctx.assertAllowed('annotations:create', 'annotation.duplicate');
-    if (!refs.length) return { annotations: [], dropped: [] };
+    if (refs.length || !lent.length) {
+      ctx.assertAllowed('annotations:create', 'annotation.duplicate');
+    }
+    if (!refs.length && !lent.length) return { annotations: [], dropped: [] };
     const page = options.page === undefined ? undefined : ctx.pageOf(options.page).ref;
+    const placement = {
+      ...(page ? { page } : {}),
+      ...(options.offset ? { offset: options.offset } : {}),
+    };
+    const lender = lent.length ? lending.lender() : null;
+    const lentCopy = lender ? await lender.copyOps(lent, placement) : null;
     const model = store.model();
     const stated = new Set(refs.map(annotationKey));
     const along = refs.flatMap((ref) =>
@@ -188,21 +208,26 @@ export function createCrud(
         .map((child) => child.annotation.ref)
         .filter((child) => !stated.has(annotationKey(child))),
     );
+    const lentIds = lentCopy?.copies.map(annotationKey) ?? [];
     const applied = await store.applyWhenNumbered(
-      [
-        {
-          type: 'copy',
-          refs,
-          ...(along.length ? { along } : {}),
-          ...(page ? { page } : {}),
-          ...(options.offset ? { offset: options.offset } : {}),
-        },
-      ],
-      { select: options.select },
+      refs.length ? [{ type: 'copy', refs, ...(along.length ? { along } : {}), ...placement }] : [],
+      {
+        select: options.select,
+        ...(lentCopy
+          ? {
+              lent: { ops: lentCopy.ops, ids: lentIds },
+              label: {
+                key: refs.length ? 'annotation.duplicate' : `${lender!.owner}.duplicate`,
+                count: refs.length + lentIds.length,
+              },
+            }
+          : {}),
+      },
     );
     const outcome = await ctx.cancellable(options.signal, appliedOrThrow(applied));
-    const copied = outcome.result?.items[0];
-    if (copied?.type !== 'annotations.copy') {
+    const items = outcome.result?.items ?? [];
+    const copied = items.find((item) => item.type === 'annotations.copy');
+    if (refs.length && copied?.type !== 'annotations.copy') {
       throw new PluginError(
         'operation-failed',
         'annotation',
@@ -211,9 +236,24 @@ export function createCrud(
     }
     // The copies of the annotations named: a link that came along isn't one.
     const named = new Set(applied.ids);
+    const own =
+      copied?.type === 'annotations.copy'
+        ? copied.annotations.filter((copy) => named.has(annotationKey(copy.ref)))
+        : [];
+    // A lent record's copy, as the last op that names it left it.
+    const rows = new Map<string, Annotation>();
+    for (const item of items) {
+      const made =
+        item.type === 'forms.copy' || item.type === 'forms.addWidget'
+          ? item.widgets
+          : item.type === 'forms.updateWidget'
+            ? [item.widget]
+            : [];
+      for (const row of made) rows.set(annotationKey(row.ref), row);
+    }
     return {
-      annotations: copied.annotations.filter((copy) => named.has(annotationKey(copy.ref))),
-      dropped: copied.dropped,
+      annotations: [...own, ...lentIds.flatMap((id) => rows.get(id) ?? [])],
+      dropped: copied?.type === 'annotations.copy' ? copied.dropped : [],
     };
   };
 

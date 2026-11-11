@@ -496,6 +496,7 @@ export const ja: Locale = {
       box: 'ボックス {number}',
       addButton: 'ボタンを追加',
       addBox: 'ボックスを追加',
+      duplicateGroup: 'グループを複製',
     },
     // The style panel's own words around the properties.
     stylePanel: {

@@ -500,6 +500,7 @@ export const it: Locale = {
       box: 'Casella {number}',
       addButton: 'Aggiungi pulsante',
       addBox: 'Aggiungi casella',
+      duplicateGroup: 'Duplica gruppo',
     },
     // The style panel's own words around the properties.
     stylePanel: {
