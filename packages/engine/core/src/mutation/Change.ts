@@ -80,6 +80,7 @@ import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationCopyResult } from '../transfer/annotationCopy';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
 import type { WireFormBundle } from '../transfer/FormBundle';
+import type { FormCopyResult } from '../transfer/formCopy';
 import type { FormImportResult, FormValuesImportResult } from '../transfer/formImport';
 import type { BundleImportPages } from '../transfer/bundle';
 import type { BundleLimits } from '../transfer/bundleLimits';
@@ -180,6 +181,24 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly objectNumber?: number;
       /** The object numbers its widgets get, in `draft.widgets` order. */
       readonly widgetObjectNumbers?: readonly number[];
+    }
+  | {
+      /**
+       * Copies of fields of this document (`doc.forms.copy`): each a new
+       * field with its source's widgets, on their own pages or on `page`,
+       * moved by `offset`, which is in page points from the top-left in
+       * either space. `widgets` names the widgets to copy when it isn't
+       * every one of the fields'. `values` (default `true`) gives each copy
+       * its source's value. `objectNumbers` names the copies: for each field
+       * in order, its own number, then one for each of its widgets copied.
+       */
+      readonly type: 'forms.copy';
+      readonly fields: readonly FormFieldRef[];
+      readonly widgets?: readonly AnnotationRef[];
+      readonly page?: PageRef;
+      readonly offset?: { readonly x: number; readonly y: number };
+      readonly values?: boolean;
+      readonly objectNumbers?: readonly number[];
     }
   | {
       readonly type: 'forms.update';
@@ -471,6 +490,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
       skipped?: readonly string[];
     } & FormResetResult<C>)
   | ({ type: 'forms.create' } & FormFieldCreateResult<C>)
+  | ({ type: 'forms.copy' } & FormCopyResult<C>)
   | ({
       type: 'forms.update';
       /** The properties an undo left alone: they no longer showed what the change had set. */
@@ -554,7 +574,7 @@ export function isSkippedItem<C extends Coordinates>(
 /**
  * Whether an item wrote to the document: not an op an undo left alone, nor
  * an import that left every row of its bundle out, nor a copy that left
- * every annotation out.
+ * every annotation or field out.
  */
 export function itemWrote<C extends Coordinates>(item: ChangeItem<C>): boolean {
   switch (item.type) {
@@ -565,6 +585,7 @@ export function itemWrote<C extends Coordinates>(item: ChangeItem<C>): boolean {
       return item.annotations.length > 0;
     case 'forms.import':
     case 'forms.importValues':
+    case 'forms.copy':
       return item.fields.length > 0;
     default:
       return true;
@@ -619,6 +640,9 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
       case 'forms.create':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);
         named.push(...(op.widgetObjectNumbers ?? []));
+        break;
+      case 'forms.copy':
+        named.push(...(op.objectNumbers ?? []));
         break;
       case 'forms.addWidget':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);

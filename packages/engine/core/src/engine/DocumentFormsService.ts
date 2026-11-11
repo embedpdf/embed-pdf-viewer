@@ -9,6 +9,7 @@ import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/subm
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { SignatureAppearanceInput } from '../signature/types';
 import type { FormBundle } from '../transfer/FormBundle';
+import type { FormCopyOptions, FormCopyResult } from '../transfer/formCopy';
 import type { FormExportSelection } from '../transfer/formExport';
 import type {
   FormImportOptions,
@@ -135,6 +136,24 @@ export interface DocumentFormsService {
    * scripts, submits and links. Emits one `forms.created` per field.
    */
   import(bundle: FormBundle, options?: FormImportOptions): AbortablePromise<FormImportResult>;
+
+  /**
+   * Copy fields of this document, as one change: a new field for each, in
+   * the order of `fields`, with its source's settings, scripts and widgets,
+   * each widget on its own page or on `options.page`, moved by
+   * `options.offset`. A copy is named after its source with the next free
+   * number (`email_2`), and has its source's value unless `options.values`
+   * is `false`; a signature never comes along. What can't be carried is
+   * left out and reported in `dropped`, as an import's. It is the op
+   * `forms.copy` through `doc.apply`, so its `opId` undoes it. Emits one
+   * `forms.created` per field, sharing `origin.tx`. Refused with `NotFound`
+   * for a field the form doesn't have. Needs `doc.forms.modify`;
+   * `doc.forms.script` to keep scripts, submits and links.
+   */
+  copy(
+    fields: readonly FormFieldRef[],
+    options?: FormCopyOptions,
+  ): AbortablePromise<FormCopyResult>;
 
   /**
    * Fill this document's fields from a bundle, by full name, as one change.

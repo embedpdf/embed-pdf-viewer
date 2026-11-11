@@ -502,6 +502,7 @@ export const fr: Locale = {
       box: 'Case {number}',
       addButton: 'Ajouter un bouton',
       addBox: 'Ajouter une case',
+      duplicateGroup: 'Dupliquer le groupe',
     },
     // The style panel's own words around the properties.
     stylePanel: {

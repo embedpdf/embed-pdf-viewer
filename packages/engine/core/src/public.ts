@@ -218,6 +218,8 @@ export type {
   FormBundle,
   FormImportResult,
   FormValuesImportResult,
+  FormCopyOptions,
+  FormCopyResult,
   Attachment,
   AttachmentList,
   AttachmentRef,

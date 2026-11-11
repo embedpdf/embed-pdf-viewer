@@ -15,6 +15,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.FormsSetAppearanceText
     | CloudPDF.ChangeItem.FormsReset
     | CloudPDF.ChangeItem.FormsCreate
+    | CloudPDF.ChangeItem.FormsCopy
     | CloudPDF.ChangeItem.FormsUpdate
     | CloudPDF.ChangeItem.FormsDelete
     | CloudPDF.ChangeItem.FormsRestore
@@ -64,6 +65,7 @@ export namespace ChangeItem {
             FormsSetAppearanceText: "forms.setAppearanceText",
             FormsReset: "forms.reset",
             FormsCreate: "forms.create",
+            FormsCopy: "forms.copy",
             FormsUpdate: "forms.update",
             FormsDelete: "forms.delete",
             FormsAddWidget: "forms.addWidget",
@@ -233,6 +235,49 @@ export namespace ChangeItem {
         widgets: CloudPDF.WidgetAnnotation[];
         calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsCopy {
+        type: "forms.copy";
+        fields: CloudPDF.FormField[];
+        widgets: CloudPDF.WidgetAnnotation[];
+        refMap: ChangeItemFormsCopy.RefMap.Item[];
+        dropped: ChangeItemFormsCopy.Dropped.Item[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export namespace ChangeItemFormsCopy {
+        export type RefMap = RefMap.Item[];
+
+        export namespace RefMap {
+            export interface Item {
+                from: CloudPDF.FormFieldRef;
+                to: CloudPDF.FormFieldRef;
+            }
+        }
+
+        export type Dropped = Dropped.Item[];
+
+        export namespace Dropped {
+            export interface Item {
+                ref: CloudPDF.FormFieldRef | null;
+                widget?: CloudPDF.AnnotationRef | undefined;
+                field?: string | undefined;
+                reason: Item.Reason;
+            }
+
+            export namespace Item {
+                export const Reason = {
+                    NameConflict: "name-conflict",
+                    NoField: "no-field",
+                    UnsupportedKind: "unsupported-kind",
+                    ScriptNotAllowed: "script-not-allowed",
+                    UnsupportedAction: "unsupported-action",
+                } as const;
+                export type Reason = (typeof Reason)[keyof typeof Reason];
+            }
+        }
     }
 
     export interface FormsUpdate {

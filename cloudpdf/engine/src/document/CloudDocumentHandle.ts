@@ -10,6 +10,7 @@ import {
   isPluginId,
   outlineVerbs,
   annotationVerbs,
+  formVerbs,
   pageVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
@@ -377,15 +378,18 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
-    this.forms = new CloudDocumentFormsService(
-      http,
-      id,
-      layerName,
-      () => this.closed,
-      this.manifestAccessor,
-      this.publisher,
-      this.writes,
-      importLimits,
+    this.forms = formVerbs(
+      new CloudDocumentFormsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+        this.publisher,
+        this.writes,
+        importLimits,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.search = new CloudDocumentSearchService(
       http,

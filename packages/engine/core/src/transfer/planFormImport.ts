@@ -8,24 +8,20 @@ import { bundlePageMapping, type BundleImportPages, type BundleImportTarget } fr
 import type { FormBundle } from './FormBundle';
 import { fieldMatches } from './formExport';
 import {
-  WIDGET_FLAG_NAMES,
-  type FormImportDrop,
-  type FormImportDropReason,
-  type FormValuesImportDrop,
-  type FormValuesImportDropReason,
-  type WidgetFlags,
+  fieldActionsOf,
+  fieldDraftOf,
+  holdsValue,
+  widgetFlagsOf,
+  widgetPlacementOf,
+} from './formFieldCreates';
+import type {
+  FormImportDrop,
+  FormValuesImportDrop,
+  FormValuesImportDropReason,
+  WidgetFlags,
 } from './formImport';
-import { mapPageRefs, pageRefsIn } from './pageRefs';
-import type { WidgetAnnotation } from '../annotation/kinds/widget';
-import {
-  actionWriteOf,
-  fieldScriptOf,
-  needsScriptRight,
-  WIDGET_ACTION_EVENTS,
-  type FieldActionsPatch,
-  type FieldScriptEvent,
-  type WidgetActionsPatch,
-} from '../dto/PdfAction';
+import { pageRefsIn } from './pageRefs';
+import type { FieldActionsPatch } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
@@ -34,7 +30,6 @@ import { FormFieldDraftSchema } from '../forms/schema';
 import { fieldValueOf, type FormFieldValue } from '../forms/value';
 import { annotationKey } from '../identity/annotationKey';
 import { encodeFieldRefKey, type FormFieldRef } from '../identity/FormFieldRef';
-import type { PageRef } from '../identity/PageRef';
 
 /** One field a design import creates. */
 export interface PlannedFormField {
@@ -115,7 +110,7 @@ export function planFormImport(input: {
     claimed.add(field.name);
     const actions = fieldActionsOf(field, mayScript, dropped);
     const placements = rows.map((row) =>
-      placementOf(field, bundle.widgets[row]!.data, mapPage, mayScript, dropped),
+      widgetPlacementOf(field, bundle.widgets[row]!.data, mapPage, mayScript, dropped),
     );
     const draft = draftOf(field, actions, placements, index);
     const value = input.values && holdsValue(field) ? fieldValueOf(field) : null;
@@ -123,7 +118,7 @@ export function planFormImport(input: {
       field: index,
       draft,
       widgets: rows,
-      flags: rows.map((row) => flagsOf(bundle.widgets[row]!.data)),
+      flags: rows.map((row) => widgetFlagsOf(bundle.widgets[row]!.data)),
       ...(value ? { value } : {}),
     });
   });
@@ -206,82 +201,26 @@ export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
   return { writes, dropped };
 }
 
-/** Whether a field read holds a value a write can set. */
-function holdsValue(field: FormField): boolean {
-  return field.valueEntry.kind === 'scalar' || field.valueEntry.kind === 'array';
-}
-
-/** A field's scripts as a create writes them; each left out is reported. */
-function fieldActionsOf(
-  field: FormField,
-  mayScript: boolean,
-  dropped: FormImportDrop[],
-): FieldActionsPatch {
-  const actions: FieldActionsPatch = {};
-  for (const [event, tree] of Object.entries(field.actions ?? {}) as [
-    FieldScriptEvent,
-    NonNullable<FormField['actions']>[FieldScriptEvent],
-  ][]) {
-    if (!tree) continue;
-    const script = fieldScriptOf(tree);
-    const member = `actions.${event}`;
-    if (!script) dropped.push({ ref: field.ref, field: member, reason: 'unsupported-action' });
-    else if (!mayScript)
-      dropped.push({ ref: field.ref, field: member, reason: 'script-not-allowed' });
-    else actions[event] = script;
+/**
+ * `draft`, checked against the create schema. `label` names it in the
+ * refusal (`import: field 2`), and `details` is what the error says of it.
+ */
+export function checkedFieldDraft(
+  draft: FormFieldDraft,
+  label: string,
+  details: Readonly<Record<string, unknown>>,
+): FormFieldDraft {
+  const checked = FormFieldDraftSchema.safeParse(draft);
+  if (!checked.success) {
+    const issue = checked.error.issues[0]!;
+    const path = issue.path.join('.');
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${label}${path ? ` member '${path}'` : ''}: ${issue.message}`,
+      { details: { ...details, ...(path ? { field: path } : {}) } },
+    );
   }
-  return actions;
-}
-
-/** A widget row as a create places it: on its mapped page, with its look and actions. */
-function placementOf(
-  field: FormField,
-  row: WidgetAnnotation,
-  mapPage: (page: PageRef) => PageRef,
-  mayScript: boolean,
-  dropped: FormImportDrop[],
-): WidgetPlacement {
-  const actions: WidgetActionsPatch = {};
-  for (const event of WIDGET_ACTION_EVENTS) {
-    const tree = row.actions?.[event];
-    if (!tree) continue;
-    const write = actionWriteOf(tree);
-    const drop = (reason: FormImportDropReason) =>
-      dropped.push({ ref: field.ref, widget: row.ref, field: `actions.${event}`, reason });
-    if (!write) drop('unsupported-action');
-    else if (!mayScript && needsScriptRight(write)) drop('script-not-allowed');
-    else actions[event] = mapPageRefs(write, mapPage);
-  }
-  const toggle =
-    field.kind === 'checkbox' || field.kind === 'radio'
-      ? field.widgets.find(
-          (widget) => widget.ref && annotationKey(widget.ref) === annotationKey(row.ref),
-        )
-      : undefined;
-  const look = {
-    color: row.color,
-    interiorColor: row.interiorColor,
-    fontFamily: row.fontFamily,
-    fontSize: row.fontSize,
-    fontColor: row.fontColor,
-    caption: field.kind === 'pushbutton' ? row.caption : null,
-  };
-  return {
-    page: mapPage(row.page),
-    rect: row.rect,
-    ...(row.rotation ? { rotation: row.rotation } : {}),
-    strokeWidth: row.strokeWidth,
-    borderStyle: row.borderStyle,
-    textAlign: row.textAlign,
-    // A new widget has none of these: only what the row has is written.
-    ...Object.fromEntries(Object.entries(look).filter(([, value]) => value != null)),
-    ...(toggle && 'exportValue' in toggle ? { exportValue: toggle.exportValue } : {}),
-    ...(Object.keys(actions).length > 0 ? { actions } : {}),
-  };
-}
-
-function flagsOf(row: WidgetAnnotation): WidgetFlags {
-  return Object.fromEntries(WIDGET_FLAG_NAMES.map((name) => [name, row[name]])) as WidgetFlags;
+  return draft;
 }
 
 /** The create a field row becomes, checked against the create schema. */
@@ -291,77 +230,8 @@ function draftOf(
   widgets: WidgetPlacement[],
   index: number,
 ): FormFieldDraft {
-  const base = {
-    name: field.name,
-    readOnly: field.readOnly,
-    required: field.required,
-    noExport: field.noExport,
-    ...(field.alternateName !== null ? { alternateName: field.alternateName } : {}),
-    ...(field.mappingName !== null ? { mappingName: field.mappingName } : {}),
-    // The group the field was in; the import decides whether it keeps it.
-    ...(field.groupId !== null ? { groupId: field.groupId } : {}),
-    ...(Object.keys(actions).length > 0 ? { actions } : {}),
-    widgets,
-  };
-  const hasDefault = field.defaultValueEntry.kind !== 'none';
-  const options = (list: readonly { label: string; value: string }[]) =>
-    list.map(({ label, value }) => ({ label, value }));
-  let draft: FormFieldDraft;
-  switch (field.kind) {
-    case 'text':
-      draft = {
-        ...base,
-        kind: 'text',
-        ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
-        ...(field.maxLength !== null ? { maxLength: field.maxLength } : {}),
-        multiline: field.multiline,
-        password: field.password,
-        comb: field.comb,
-      };
-      break;
-    case 'radio':
-      draft = {
-        ...base,
-        kind: 'radio',
-        radiosInUnison: field.radiosInUnison,
-        noToggleToOff: field.noToggleToOff,
-      };
-      break;
-    case 'combobox':
-      draft = {
-        ...base,
-        kind: 'combobox',
-        edit: field.edit,
-        options: options(field.options),
-        ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
-      };
-      break;
-    case 'listbox':
-      draft = {
-        ...base,
-        kind: 'listbox',
-        multiSelect: field.multiSelect,
-        options: options(field.options),
-        ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
-      };
-      break;
-    case 'checkbox':
-    case 'pushbutton':
-    case 'signature':
-      draft = { ...base, kind: field.kind };
-      break;
-    default:
-      throw new EngineError(EngineErrorCode.InvalidArg, `import: field ${index} has no family`);
-  }
-  const checked = FormFieldDraftSchema.safeParse(draft);
-  if (!checked.success) {
-    const issue = checked.error.issues[0]!;
-    const path = issue.path.join('.');
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `import: field ${index}${path ? ` member '${path}'` : ''}: ${issue.message}`,
-      { details: { item: index, ...(path ? { field: path } : {}) } },
-    );
-  }
-  return draft;
+  const label = `import: field ${index}`;
+  return checkedFieldDraft(fieldDraftOf(field, field.name, actions, widgets, label), label, {
+    item: index,
+  });
 }

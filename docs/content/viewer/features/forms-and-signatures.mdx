@@ -71,6 +71,17 @@ it's selected so you can drag it. A radio group's new button is a new choice; a 
 checks together with the others. How a field looks, its border, background and font, is in the
 **Style** sidebar, the toolbar's other button.
 
+**Duplicate** (`Ctrl`/`Cmd`+`D`) copies the selected fields beside the originals and selects the
+copies, as one step to undo. What a copy becomes follows from what was selected:
+
+- **A radio button's copy joins its group** as a new choice. Place one button, duplicate it
+  twice, and you have a group of three.
+- **Any other field's copy is a new field,** named after the original: `email` becomes
+  `email_2`. It has the original's settings and no answer.
+
+To copy a whole radio group, select one of its buttons and press **Duplicate group** in the
+sidebar: the copy is a new group with the same buttons and the same values.
+
 For a form people fill in and can't otherwise change, use
 `{ readOnly: { except: ['forms.filling'] } }`: see [Read-only](turning-off#read-only).
 

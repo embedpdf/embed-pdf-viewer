@@ -30,6 +30,7 @@ import {
 import type { ChangeContext, Done } from './internal/changeContext';
 import {
   addWidget,
+  copyFields,
   createField,
   deleteField,
   deleteRestoredWidget,
@@ -247,6 +248,8 @@ function runOp(
       return reset(ctx, op);
     case 'forms.create':
       return createField(ctx, op);
+    case 'forms.copy':
+      return copyFields(ctx, op);
     case 'forms.update':
       return updateField(ctx, op, at);
     case 'forms.delete':

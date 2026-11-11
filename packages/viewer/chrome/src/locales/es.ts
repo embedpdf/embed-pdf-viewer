@@ -500,6 +500,7 @@ export const es: Locale = {
       box: 'Casilla {number}',
       addButton: 'Añadir botón',
       addBox: 'Añadir casilla',
+      duplicateGroup: 'Duplicar grupo',
     },
     // The style panel's own words around the properties.
     stylePanel: {

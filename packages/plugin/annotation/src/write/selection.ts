@@ -63,6 +63,16 @@ export function createSelectionWrites(
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
+  /** `refs` as this plugin's own records and the lent ones (a form's widgets, in design mode). */
+  const byOwner = (
+    refs: readonly AnnotationRef[],
+  ): { own: AnnotationRef[]; lent: AnnotationRef[] } => {
+    const own: AnnotationRef[] = [];
+    const lent: AnnotationRef[] = [];
+    for (const ref of refs) (lending.owns(annotationKey(ref)) ? lent : own).push(ref);
+    return { own, lent };
+  };
+
   /**
    * Where copies of the selection land: right and down of the originals, or
    * left or up where that keeps on its page a copy that would leave it.
@@ -281,15 +291,38 @@ export function createSelectionWrites(
     },
     // The selection holds every member of a selected group, so its copies
     // are a group of their own.
+    // A lent record (a form's widget) is its lender's to copy, in the same
+    // change: what a person does to the selection goes to each record's owner.
     duplicate: (
       options: OperationOptions & { offset?: { readonly x: number; readonly y: number } } = {},
-    ) =>
-      crud.duplicate(selectedRefs(), {
-        offset: options.offset ?? beside(),
-        select: true,
-        ...(options.signal ? { signal: options.signal } : {}),
-      }),
-    canDuplicate: (): boolean => authority.canDuplicate(selectedRefs()),
+    ) => {
+      const { own, lent } = byOwner(selectedRefs());
+      return crud.duplicate(
+        own,
+        {
+          offset: options.offset ?? beside(),
+          select: true,
+          ...(options.signal ? { signal: options.signal } : {}),
+        },
+        lent,
+      );
+    },
+    canDuplicate: (): boolean => {
+      const { own, lent } = byOwner(selectedRefs());
+      if (!own.length && !lent.length) return false;
+      if (own.length && !authority.canDuplicate(own)) return false;
+      const lender = lending.lender();
+      const model = store.model();
+      // A locked copy could neither be moved nor deleted by hand, whoever owns it.
+      return lent.every((ref) => {
+        const record = model.byId[annotationKey(ref)];
+        return (
+          !!record &&
+          !record.annotation.locked &&
+          (lender?.getAuthority(record.annotation).copy ?? false)
+        );
+      });
+    },
   };
 
   /** One relationship (`/IRT` + `/RT`) written onto every record, as one change. */

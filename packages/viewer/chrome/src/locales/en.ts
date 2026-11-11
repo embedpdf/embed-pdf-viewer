@@ -506,6 +506,7 @@ export const en: Locale = {
       box: 'Box {number}',
       addButton: 'Add a button',
       addBox: 'Add a box',
+      duplicateGroup: 'Duplicate group',
     },
     // The style panel's own words around the properties.
     stylePanel: {

@@ -49,6 +49,12 @@ export const OBJECT_NUMBER_ESTIMATES = {
    * stamp places the drawing its source places. Twice the most, each.
    */
   copiedAnnotations: (count: number) => 8 * count,
+  /**
+   * Copies of the document's form fields. A copy makes its field, and for
+   * each widget the widget and its appearances: a text field four objects, a
+   * checkbox six, a radio group about five a button. Room for a group of six.
+   */
+  copiedFields: (count: number) => 32 * count,
 } as const;
 
 /**

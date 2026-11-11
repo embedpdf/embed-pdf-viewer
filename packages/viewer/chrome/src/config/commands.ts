@@ -1065,21 +1065,31 @@ export const defaultCommands: CommandDefinition[] = [
     icon: 'duplicate',
     shortcut: 'Mod+D',
     categories: ['annotations'],
-    ...CREATES_ANNOTATIONS,
+    // Creating annotations, for the annotations selected. A form field's box
+    // needs the form's own right instead, which `canDuplicate()` checks.
+    allowed: (commandContext) => {
+      const annotation = anno(commandContext);
+      const own = (annotation?.selection.getSelected() ?? []).some(
+        ({ subtype }) => subtype !== 'widget',
+      );
+      return own ? (annotation?.canCreate() ?? true) : true;
+    },
+    notAllowedKey: CREATES_ANNOTATIONS.notAllowedKey,
     // A refusal reaches the user as any failed write does (`onWriteFailed`).
     run: (commandContext) =>
       void anno(commandContext)
         ?.selection.duplicate()
         .catch(() => {}),
-    // For what people place and drag: an annotation that sits on text (a
-    // highlight) stays there, and a form field's box is the form's to copy.
+    // For what people place and drag, a form field's box among them (the form
+    // copies it, in the same step): an annotation that sits on text (a
+    // highlight) stays there.
     visible: (commandContext) => {
       const annotation = anno(commandContext);
       const selected = annotation?.selection.getSelected() ?? [];
       return (
         selected.length > 0 &&
         selectionEditable(commandContext) &&
-        selected.every(({ ref, subtype }) => subtype !== 'widget' && annotation!.isMovable(ref))
+        selected.every(({ ref }) => annotation!.isMovable(ref))
       );
     },
     // A copy of a locked annotation would be locked too: nobody could move

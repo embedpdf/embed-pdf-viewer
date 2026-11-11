@@ -24521,6 +24521,58 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["forms.copy"]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                },
+                "minItems": 1
+              },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationRef"
+                },
+                "minItems": 1
+              },
+              "page": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "values": {
+                "type": "boolean"
+              },
+              "objectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              }
+            },
+            "required": ["type", "fields"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.update"]
               },
               "field": {
@@ -24927,48 +24979,48 @@
                   "y": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items"
                     }
                   },
                   "distance": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items"
                     }
                   },
                   "area": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items"
                     }
                   },
                   "angle": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items"
                     }
                   },
                   "slope": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items"
                     }
                   },
                   "origin": {
                     "type": "object",
                     "properties": {
                       "x": {
-                        "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items/properties/conversion"
                       },
                       "y": {
-                        "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items/properties/conversion"
                       }
                     },
                     "required": ["x", "y"],
                     "additionalProperties": false
                   },
                   "cyx": {
-                    "$ref": "#/components/schemas/ChangeOp/anyOf/26/properties/measure/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/ChangeOp/anyOf/27/properties/measure/properties/x/items/properties/conversion"
                   }
                 },
                 "required": ["subtype", "x", "distance", "area"],
@@ -25192,6 +25244,7 @@
                   "forms.setAppearanceText",
                   "forms.reset",
                   "forms.create",
+                  "forms.copy",
                   "forms.update",
                   "forms.delete",
                   "forms.addWidget",
@@ -25559,6 +25612,88 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["forms.copy"]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormField"
+                }
+              },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
+              "refMap": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "$ref": "#/components/schemas/FormFieldRef"
+                    },
+                    "to": {
+                      "$ref": "#/components/schemas/FormFieldRef"
+                    }
+                  },
+                  "required": ["from", "to"],
+                  "additionalProperties": false
+                }
+              },
+              "dropped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/FormFieldRef"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "widget": {
+                      "$ref": "#/components/schemas/AnnotationRef"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "name-conflict",
+                        "no-field",
+                        "unsupported-kind",
+                        "script-not-allowed",
+                        "unsupported-action"
+                      ]
+                    }
+                  },
+                  "required": ["ref", "reason"],
+                  "additionalProperties": false
+                }
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "fields", "widgets", "refMap", "dropped", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.update"]
               },
               "skipped": {
@@ -25680,7 +25815,7 @@
                 "$ref": "#/components/schemas/FormField"
               },
               "widgets": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/16/properties/widgets"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/17/properties/widgets"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -26048,48 +26183,48 @@
                   "y": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items"
                     }
                   },
                   "distance": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items"
                     }
                   },
                   "area": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items"
                     }
                   },
                   "angle": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items"
                     }
                   },
                   "slope": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items"
+                      "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items"
                     }
                   },
                   "origin": {
                     "type": "object",
                     "properties": {
                       "x": {
-                        "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items/properties/conversion"
                       },
                       "y": {
-                        "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
+                        "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items/properties/conversion"
                       }
                     },
                     "required": ["x", "y"],
                     "additionalProperties": false
                   },
                   "cyx": {
-                    "$ref": "#/components/schemas/ChangeItem/anyOf/31/properties/measure/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/measure/properties/x/items/properties/conversion"
                   }
                 },
                 "required": ["subtype", "x", "distance", "area"],
@@ -26186,7 +26321,7 @@
                 "enum": ["pages.insert"]
               },
               "insertedPages": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/34/properties/insertedPages"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/35/properties/insertedPages"
               },
               "layout": {
                 "$ref": "#/components/schemas/PageListSnapshot"
@@ -26206,7 +26341,7 @@
                 "enum": ["pages.copy"]
               },
               "insertedPages": {
-                "$ref": "#/components/schemas/ChangeItem/anyOf/34/properties/insertedPages"
+                "$ref": "#/components/schemas/ChangeItem/anyOf/35/properties/insertedPages"
               },
               "layout": {
                 "$ref": "#/components/schemas/PageListSnapshot"

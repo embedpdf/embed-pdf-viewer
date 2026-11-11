@@ -244,6 +244,17 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       },
     ],
   },
+  'forms.copy': {
+    // The name field, copied beside itself, under the numbers given.
+    ops: ([field, widget]) => [
+      {
+        type: 'forms.copy',
+        fields: [NAME],
+        offset: { x: 12, y: 12 },
+        objectNumbers: [field!, widget!],
+      },
+    ],
+  },
   'forms.update': {
     ops: () => [
       {

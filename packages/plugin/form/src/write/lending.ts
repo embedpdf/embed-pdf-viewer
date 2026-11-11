@@ -19,6 +19,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationLender } from '@embedpdf/plugin-annotation/contract/host';
 
+import type { DuplicatePlacement } from './duplicate';
 import { fieldForWidget, fieldKeyOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { undoLookOf } from '../sync/predict';
@@ -34,6 +35,12 @@ export function createWidgetLender(
     pictures,
     looks,
   }: Pick<FormServices, 'fields' | 'design' | 'pictures' | 'looks'>,
+  /** The ops that copy widgets by the designer's rule (write/fields.ts). */
+  copyOps: (
+    widgets: readonly AnnotationRef[],
+    placement: DuplicatePlacement,
+    values: boolean,
+  ) => Promise<{ ops: readonly ChangeOp[]; copies: readonly AnnotationRef[] }>,
 ): AnnotationLender {
   const records = memo(
     () => [design.lending(), fields.get().snapshot, fields.view().snapshot] as const,
@@ -98,9 +105,11 @@ export function createWidgetLender(
     reorderOps: (page: PageRef, refs, position) => [
       { type: 'forms.reorderWidgets', page, widgets: [...refs], position },
     ],
+    // By hand, a copy is the question, not what someone filled in.
+    copyOps: (refs, placement) => copyOps(refs, placement, false),
     getAuthority: () => {
       const may = ctx.allows('doc.forms.modify');
-      return { update: may, delete: may };
+      return { update: may, delete: may, copy: may };
     },
     // The pictures the form layer draws too, from one store: switching modes
     // fetches nothing, and a page's pictures change only with its widgets.

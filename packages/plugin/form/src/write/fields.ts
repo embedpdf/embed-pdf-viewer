@@ -14,19 +14,29 @@ import {
 } from '@embedpdf/core';
 import {
   draftWritesScripts,
+  planFormCopies,
   writesScripts,
+  type AnnotationRef,
   type ChangeItem,
   type ChangeOp,
   type FormField,
+  type FormImportDrop,
   type WidgetAnnotation,
   type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 
-import type { FormCapability, FormFieldResult } from '../contract';
-import { fieldByRef, widgetRowOf } from '../model';
+import type {
+  FormCapability,
+  FormDuplicateOptions,
+  FormDuplicateResult,
+  FormFieldResult,
+} from '../contract';
+import { fieldByRef, fieldKeyOf, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { createObjectNumbers } from '../services/object-numbers';
 import { undoLookOf } from '../sync/predict';
+import { widgetDuplicateOf, type DuplicatePlacement } from './duplicate';
+import { isMerged, nextChoiceOf } from './new-widget';
 import { nextInLine } from './next-in-line';
 
 /**
@@ -65,18 +75,8 @@ const lookOf = (widget: WidgetAnnotation | undefined): Partial<WidgetPlacement> 
 function exportValueFor(field: FormField): string | undefined {
   if (field.kind === 'checkbox') return field.exportValue;
   if (field.kind !== 'radio') return undefined;
-  const taken = new Set(field.widgets.map((widget) => widget.exportValue));
-  let n = field.widgets.length + 1;
-  while (taken.has(`Choice${n}`)) n += 1;
-  return `Choice${n}`;
+  return nextChoiceOf(field.widgets.map((widget) => widget.exportValue));
 }
-
-/** Whether the field's dictionary is its only widget's too, which adding a widget splits. */
-const isMerged = (field: FormField): boolean =>
-  field.ref.kind === 'objectNumber' &&
-  field.widgets.some(
-    (widget) => widget.objectNumber === (field.ref as { objectNumber: number }).objectNumber,
-  );
 
 const MODIFY = 'doc.forms.modify';
 const SCRIPT = 'doc.forms.script';
@@ -102,6 +102,14 @@ export function createFieldWrites(
       label: { key: `form.${verb}` } satisfies ChangeLabel,
       ops: [op],
       undo: undoLookOf(fields.view(), [op]),
+    });
+
+  /** Stage the ops of one design verb as one change, one step of the history. */
+  const stageAll = (verb: string, ops: readonly ChangeOp[]): PendingChange =>
+    ctx.changes.stage({
+      label: { key: `form.${verb}` } satisfies ChangeLabel,
+      ops: [...ops],
+      undo: undoLookOf(fields.view(), ops),
     });
 
   /** The engine's answer to a staged design change: its one item. */
@@ -193,10 +201,87 @@ export function createFieldWrites(
     return { field: item.field, widget };
   };
 
+  /** Where a duplicate's copies go, with a page index as that page's ref. */
+  const placementOf = (options: FormDuplicateOptions): DuplicatePlacement => ({
+    ...(options.page === undefined ? {} : { page: ctx.pageOf(options.page).ref }),
+    ...(options.offset ? { offset: options.offset } : {}),
+  });
+
+  /**
+   * The ops that copy these widgets by the designer's rule (write/duplicate.ts),
+   * under the object numbers they take, with each copy's ref and what was
+   * left out before the engine is asked.
+   */
+  const copyOps = async (
+    widgets: readonly AnnotationRef[],
+    placement: DuplicatePlacement,
+    values: boolean,
+  ): Promise<{ ops: ChangeOp[]; copies: AnnotationRef[]; dropped: readonly FormImportDrop[] }> => {
+    let plan;
+    try {
+      plan = widgetDuplicateOf(fields.view(), widgets, placement, {
+        values,
+        mayScript: ctx.allows(SCRIPT),
+      });
+    } catch (error) {
+      throw toPluginError('form', error);
+    }
+    const taken = plan.needs
+      ? (numbers.takeNow(plan.needs) ?? (await numbers.take(plan.needs)))
+      : [];
+    return { ...plan.build(taken), dropped: plan.dropped };
+  };
+
+  const duplicate: FormCapability['duplicate'] = async (refs, options = {}) => {
+    allow('form.duplicate');
+    if (refs.length === 0) return { fields: [], widgets: [], dropped: [] };
+    const placement = placementOf(options);
+    const values = options.values ?? false;
+    const { snapshot } = fields.view();
+    if (!snapshot) throw new PluginError('not-ready', 'form', 'the form is still loading');
+    // The engine's own plan says how many objects the copies are.
+    let count: number;
+    try {
+      const plan = planFormCopies({
+        form: snapshot,
+        fields: refs,
+        placement,
+        values,
+        mayScript: true,
+      });
+      count = plan.creates.reduce((sum, create) => sum + 1 + create.widgets.length, 0);
+    } catch (error) {
+      throw toPluginError('form', error);
+    }
+    const objectNumbers = count ? (numbers.takeNow(count) ?? (await numbers.take(count))) : [];
+    const change = stageAll('duplicate', [
+      { type: 'forms.copy', fields: refs, ...placement, values, objectNumbers },
+    ]);
+    const item = await answer<'forms.copy'>(change, options);
+    return { fields: item.fields, widgets: item.widgets, dropped: item.dropped };
+  };
+
+  const duplicateWidgets: FormCapability['duplicateWidgets'] = async (refs, options = {}) => {
+    allow('form.duplicate');
+    const copy = await copyOps(refs, placementOf(options), options.values ?? false);
+    if (copy.ops.length === 0) return { fields: [], widgets: [], dropped: [...copy.dropped] };
+    const change = stageAll('duplicate', copy.ops);
+    let items: readonly ChangeItem[];
+    try {
+      items = (await ctx.cancellable(options.signal, change.result)).items;
+    } catch (error) {
+      throw toPluginError('form', error);
+    }
+    return duplicateResultOf(items, copy.copies, copy.dropped);
+  };
+
   return {
+    copyOps,
     api: {
       create,
       addWidget,
+      duplicate,
+      duplicateWidgets,
       update: async (ref, patch, options) => {
         allow('form.update', writesScripts(patch.actions));
         const change = stage('update', { type: 'forms.update', field: ref, patch });
@@ -239,5 +324,43 @@ export function createFieldWrites(
         return enqueue(() => ctx.cancellable(signal, run()), options);
       },
     } satisfies Partial<FormCapability>,
+  };
+}
+
+/**
+ * What a duplicate of widgets resolves, read off the engine's answer: the
+ * fields it made and each field that got a new button, as they are after the
+ * last op that named them; the copies' rows, in the order their originals
+ * were given; and what was left out, here and by the engine.
+ */
+function duplicateResultOf(
+  items: readonly ChangeItem[],
+  copies: readonly AnnotationRef[],
+  dropped: readonly FormImportDrop[],
+): FormDuplicateResult {
+  const fields = new Map<string, FormField>();
+  const rows = new Map<number, WidgetAnnotation>();
+  const left: FormImportDrop[] = [...dropped];
+  const hold = (row: WidgetAnnotation): void => {
+    if (row.ref.kind === 'objectNumber') rows.set(row.ref.objectNumber, row);
+  };
+  for (const item of items) {
+    if (item.type === 'forms.copy') {
+      for (const field of item.fields) fields.set(fieldKeyOf(field), field);
+      item.widgets.forEach(hold);
+      left.push(...item.dropped);
+    } else if (item.type === 'forms.addWidget') {
+      fields.set(fieldKeyOf(item.field), item.field);
+      item.widgets.forEach(hold);
+    } else if (item.type === 'forms.updateWidget') {
+      hold(item.widget);
+    }
+  }
+  return {
+    fields: [...fields.values()],
+    widgets: copies.flatMap((copy) =>
+      copy.kind === 'objectNumber' ? (rows.get(copy.objectNumber) ?? []) : [],
+    ),
+    dropped: left,
   };
 }

@@ -77,6 +77,7 @@ export { attachmentVerbs, type AttachmentWriteVerb } from './engine/attachmentVe
 export { outlineVerbs } from './engine/outlineVerbs';
 export { pageVerbs, type PageStructureVerb } from './engine/pageVerbs';
 export { annotationVerbs, type AnnotationChangeVerb } from './engine/annotationVerbs';
+export { formVerbs, type FormChangeVerb } from './engine/formVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';

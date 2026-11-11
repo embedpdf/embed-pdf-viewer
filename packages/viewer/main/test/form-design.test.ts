@@ -298,6 +298,113 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
     expect(checked).toEqual([true, true]);
   });
 
+  /** A field's widgets and what is selected, as the form and the annotation plugin hold them. */
+  const stateOf = (name: string) =>
+    tab.evaluate((called) => {
+      const { viewer } = window.element;
+      const field = viewer.get('form').get({ kind: 'fqn', name: called });
+      return {
+        numbers: (field?.widgets ?? []).map((widget: any) => widget.objectNumber) as number[],
+        values: (field?.widgets ?? []).map((widget: any) => widget.exportValue) as string[],
+        selected: viewer
+          .get('annotation')
+          .selection.getSelected()
+          .map((record: any) => record.ref.objectNumber) as number[],
+        shown: viewer.get('form').getSelectedField()?.name ?? null,
+      };
+    }, name);
+
+  const selectFirst = (name: string) =>
+    tab.evaluate((called) => {
+      const { viewer } = window.element;
+      const field = viewer.get('form').get({ kind: 'fqn', name: called });
+      viewer.get('annotation').selection.select([field.widgets[0].ref]);
+    }, name);
+
+  const duplicateCommand = () =>
+    tab.evaluate(() => {
+      const command = window.element.viewer.commands.resolveCommand('annotation:duplicate');
+      return { visible: command?.visible, enabled: command?.enabled };
+    });
+
+  it('Duplicate copies a radio button into its group, and any other field as a new field', async () => {
+    // A radio button is one answer of its group: its copy is the group's next choice.
+    await selectFirst('guard-plan');
+    await frames(tab);
+    expect(await duplicateCommand()).toEqual({ visible: true, enabled: true });
+    await execute(tab, 'annotation:duplicate');
+    await tab.waitForFunction(
+      () =>
+        window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-plan' })?.widgets
+          .length === 3,
+      null,
+      { timeout: 10_000 },
+    );
+    const plan = await stateOf('guard-plan');
+    expect(plan.values).toEqual(['Choice1', 'Choice2', 'Choice3']);
+    // The copy is the selection, ready to drag.
+    expect(plan.selected).toEqual([plan.numbers[2]]);
+
+    // A text field is a whole question: its copy is a new field, named after it.
+    await tab.evaluate(async () => {
+      const { viewer } = window.element;
+      const page = viewer.documents.getPage(0);
+      const { field } = await viewer.get('form').create({
+        kind: 'text',
+        name: 'guard-city',
+        widgets: [{ page: page.ref, rect: { x: 72, y: 160, width: 120, height: 20 } }],
+      });
+      viewer.get('annotation').selection.select([field.widgets[0].ref]);
+    });
+    await frames(tab);
+    await execute(tab, 'annotation:duplicate');
+    await tab.waitForFunction(
+      () => !!window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-city_2' }),
+      null,
+      { timeout: 10_000 },
+    );
+    const city = await stateOf('guard-city_2');
+    expect(city.selected).toEqual(city.numbers);
+    expect(city.shown).toBe('guard-city_2');
+    expect((await stateOf('guard-city')).numbers).toHaveLength(1);
+  });
+
+  it('Duplicate group copies the whole radio group as a new group, and selects it', async () => {
+    await selectFirst('guard-plan');
+    await until(
+      tab,
+      () =>
+        window.element
+          .shadowRoot!.querySelector('[data-epdf-panel="form-design"]')
+          ?.textContent?.includes('Duplicate group'),
+      'the Duplicate group button',
+    );
+    await tab.evaluate(() => {
+      const button = [
+        ...window.element.shadowRoot!.querySelectorAll<HTMLButtonElement>(
+          '[data-epdf-panel="form-design"] button',
+        ),
+      ].find((each) => each.textContent?.includes('Duplicate group'))!;
+      button.click();
+    });
+    await tab.waitForFunction(
+      () => !!window.element.viewer.get('form').get({ kind: 'fqn', name: 'guard-plan_2' }),
+      null,
+      { timeout: 10_000 },
+    );
+    await frames(tab);
+    const copy = await stateOf('guard-plan_2');
+    expect(copy.values).toEqual(['Choice1', 'Choice2', 'Choice3']);
+    // The new group is the selection, so one drag moves it, and the sidebar shows it.
+    expect([...copy.selected].sort()).toEqual([...copy.numbers].sort());
+    expect(copy.shown).toBe('guard-plan_2');
+    expect((await stateOf('guard-plan')).numbers).toHaveLength(3);
+    // A checkbox has no such button: Duplicate copies it whole already.
+    await selectFirst('guard-agree');
+    await frames(tab);
+    expect(await sidebar(tab)).not.toContain('Duplicate group');
+  });
+
   it('ends design when Form design is pressed again', async () => {
     await execute(tab, 'form:design');
     await frames(tab);

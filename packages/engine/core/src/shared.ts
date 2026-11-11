@@ -430,6 +430,15 @@ export type {
   WidgetFlags,
 } from './transfer/formImport';
 export { formImportFacts, formValuesImportFacts, WIDGET_FLAG_NAMES } from './transfer/formImport';
+export type {
+  FormCopyOptions,
+  FormCopyPlacement,
+  FormCopyPlan,
+  FormCopyResult,
+  PlannedFieldCopy,
+} from './transfer/formCopy';
+export { copyNameOf, fieldNameTaken, planFormCopies } from './transfer/formCopy';
+export { widgetFlagsOf, widgetPlacementOf } from './transfer/formFieldCreates';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level attachments service.

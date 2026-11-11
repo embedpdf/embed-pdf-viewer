@@ -497,6 +497,7 @@ export const zhTW: Locale = {
       box: '核取方塊 {number}',
       addButton: '新增按鈕',
       addBox: '新增核取方塊',
+      duplicateGroup: '建立群組副本',
     },
     // The style panel's own words around the properties.
     stylePanel: {

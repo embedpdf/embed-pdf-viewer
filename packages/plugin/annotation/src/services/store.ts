@@ -150,6 +150,14 @@ export type StoreChange =
 
 export interface ApplyOptions {
   readonly select?: boolean;
+  /**
+   * What the change does to lent records, worked out by their lender (the
+   * copies of a form's widgets): its ops join the change after this
+   * plugin's, and `ids` are the records they make, named with the rest.
+   */
+  readonly lent?: { readonly ops: readonly ChangeOp[]; readonly ids: readonly Id[] };
+  /** What the change is called, when its ops alone don't say (`labelOf`). */
+  readonly label?: ChangeLabel;
 }
 
 /**
@@ -304,13 +312,14 @@ export function createStore(
     ops: readonly ChangeOp[],
     before: AnnotationRecords,
     lent: readonly ChangeOp[] = [],
+    label?: ChangeLabel,
   ): PendingChange => {
     const all = [...ops, ...lent];
     const undo = [
       ...(lent.length ? (lending.lender()?.undoOf(lent) ?? []) : []),
       ...undoOf(before, ops),
     ];
-    const change = ctx.changes.stage({ label: labelOf(all), ops: all, undo });
+    const change = ctx.changes.stage({ label: label ?? labelOf(all), ops: all, undo });
     mine.add(change.opId);
     return change;
   };
@@ -473,6 +482,10 @@ export function createStore(
     } catch (error) {
       throw toPluginError('annotation', error);
     }
+    if (options.lent) {
+      lent.push(...options.lent.ops);
+      ids.push(...options.lent.ids);
+    }
     if (!ops.length && !lent.length) {
       return {
         ids,
@@ -494,7 +507,12 @@ export function createStore(
       }));
     }
     const selected = model().selected;
-    const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown, lent);
+    const change = stage(
+      withoutCoveredDeletes(shown, [...ops, ...following.ops]),
+      shown,
+      lent,
+      options.label,
+    );
     selections.remember(change.opId, selected, options.select ? ids : selected);
     if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
     if (options.select) {

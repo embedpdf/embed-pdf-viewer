@@ -495,6 +495,7 @@ export const ko: Locale = {
       box: '확인란 {number}',
       addButton: '단추 추가',
       addBox: '확인란 추가',
+      duplicateGroup: '그룹 복제',
     },
     // The style panel's own words around the properties.
     stylePanel: {

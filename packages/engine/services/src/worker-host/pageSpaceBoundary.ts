@@ -258,9 +258,10 @@ export function opInFileSpace(
     case 'forms.import':
     case 'forms.importValues':
       return op;
-    // A copy names annotations and a distance in page points: it measures
-    // each source on its page and each copy on the page it goes to.
+    // A copy names annotations, or fields, and a distance in page points: it
+    // measures each source on its page and each copy on the page it goes to.
     case 'annotations.copy':
+    case 'forms.copy':
       return op;
     case 'annotations.create':
       return { ...op, data: pdfAnnotationDraftOf(op.data, boxOf(op.page), boxOf) };
@@ -355,6 +356,7 @@ export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: Visible
     case 'forms.reset':
     case 'forms.import':
     case 'forms.importValues':
+    case 'forms.copy':
       return {
         ...item,
         fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)),
