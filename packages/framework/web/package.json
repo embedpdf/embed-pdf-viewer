@@ -10,6 +10,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./controller": "./src/controller.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -20,6 +21,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./controller": {
+        "import": "./dist/controller.js",
+        "require": "./dist/controller.cjs"
       },
       "./package.json": "./package.json"
     }
@@ -33,11 +38,26 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-link": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*"
+  },
   "devDependencies": {
     "happy-dom": "^20.11.0",
     "typescript": "^5.0.0",
     "vitest": "^2.1.9",
-    "@embedpdf/tooling-build": "workspace:*"
+    "@embedpdf/tooling-build": "workspace:*",
+    "@embedpdf/engine": "workspace:*"
   },
   "license": "Apache-2.0",
   "repository": {

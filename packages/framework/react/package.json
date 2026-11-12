@@ -15,6 +15,7 @@
     "./annotation": "./src/annotation.tsx",
     "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
+    "./controller": "./src/controller.tsx",
     "./fonts": "./src/fonts.ts",
     "./form": "./src/form.tsx",
     "./history": "./src/history.ts",
@@ -67,6 +68,10 @@
       "./commands": {
         "import": "./dist/commands.js",
         "require": "./dist/commands.cjs"
+      },
+      "./controller": {
+        "import": "./dist/controller.js",
+        "require": "./dist/controller.cjs"
       },
       "./fonts": {
         "import": "./dist/fonts.js",
