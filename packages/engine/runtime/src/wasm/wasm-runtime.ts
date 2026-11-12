@@ -292,7 +292,10 @@ function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
         );
       };
 
-    const direct = module[`_${name}`];
+    // The raw wasm export when the glue exposes them: in a build with
+    // assertions, `_name` wraps every call in checks that cost more than a
+    // short native call.
+    const direct = module.wasmExports?.[name] ?? module[`_${name}`];
     const numericOnly =
       typeof direct === 'function' &&
       signature.params.every((p) => p.wasm.cwrap !== 'string' && p.wasm.kind !== 'i64') &&
