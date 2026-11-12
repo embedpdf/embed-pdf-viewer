@@ -4,7 +4,9 @@ import {
   DEFAULT_RICH_TEXT_BODY,
   richTextParagraphsFromPlainText,
   richTextPlainText,
+  textDirectionOf,
   type RichTextBody,
+  type RichTextDocumentInput,
 } from '../../dto/RichText';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { pdfCalloutEnd } from '../calloutEnd';
@@ -38,8 +40,28 @@ export function bodyWithStyle(
   }
   if (style.fontSize !== undefined) body.size = style.fontSize;
   if (style.fontColor != null) body.color = style.fontColor;
-  if (style.textAlign !== undefined) body.align = style.textAlign;
+  // 'auto' is made concrete before a body is built (`autoAlignOf`).
+  if (style.textAlign !== undefined && style.textAlign !== 'auto') body.align = style.textAlign;
   return body;
+}
+
+/**
+ * `textAlign: 'auto'` made concrete for `text`: right-aligned and
+ * right-to-left when its first strong character is right-to-left, else
+ * left-aligned and left-to-right. The direction goes into the body beside
+ * the alignment, so the lines also lay out in that order.
+ */
+function autoAlignOf(text: string): { align: 'left' | 'right'; dir: 'ltr' | 'rtl' } {
+  return textDirectionOf(text) === 'rtl'
+    ? { align: 'right', dir: 'rtl' }
+    : { align: 'left', dir: 'ltr' };
+}
+
+function withBodyDirection(
+  richText: RichTextDocumentInput | undefined,
+  dir: 'ltr' | 'rtl',
+): RichTextDocumentInput | undefined {
+  return richText ? { ...richText, body: { ...richText.body, dir } } : richText;
 }
 
 /** A callout line goes only with the callout intent: another box would draw without it. */
@@ -104,7 +126,25 @@ export function freeTextFollows(
   describe?: DescribeFont,
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype !== 'free-text' || patch.subtype !== 'free-text') return patch;
-  const text = patch as FreeTextPatch;
+  let text = patch as FreeTextPatch;
+  if (text.textAlign === 'auto') {
+    const plain =
+      text.richText !== undefined
+        ? richTextPlainText(text.richText)
+        : text.contents !== undefined
+          ? (text.contents ?? '')
+          : richTextPlainText(current.richText);
+    const auto = autoAlignOf(plain);
+    // The body a patch gives replaces the current one whole; else the current
+    // body stays, now in the text's direction.
+    const body = { ...(text.richText?.body ?? current.richText.body), dir: auto.dir };
+    const paragraphs =
+      text.richText?.paragraphs ??
+      (text.contents !== undefined
+        ? richTextParagraphsFromPlainText(text.contents ?? '')
+        : current.richText.paragraphs);
+    text = { ...text, textAlign: auto.align, richText: { body, paragraphs } };
+  }
   if (text.intent !== undefined || text.calloutLine !== undefined) {
     assertCalloutIntent(
       text.intent ?? current.intent,
@@ -172,6 +212,20 @@ export function freeTextDraftFollows(
   describe?: DescribeFont,
 ): AnnotationDraft<PdfCoordinates> {
   if (draft.subtype !== 'free-text') return draft;
+  if (draft.textAlign === 'auto') {
+    const plain = draft.richText ? richTextPlainText(draft.richText) : (draft.contents ?? '');
+    const auto = autoAlignOf(plain);
+    draft = {
+      ...draft,
+      textAlign: auto.align,
+      richText: withBodyDirection(
+        draft.richText ?? {
+          paragraphs: richTextParagraphsFromPlainText(draft.contents ?? ''),
+        },
+        auto.dir,
+      ),
+    };
+  }
   const intent = draft.intent ?? (draft.calloutLine != null ? 'free-text-callout' : 'free-text');
   assertCalloutIntent(intent, draft.calloutLine);
   const richText = {

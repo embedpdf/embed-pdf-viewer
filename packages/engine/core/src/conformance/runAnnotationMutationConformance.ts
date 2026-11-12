@@ -1037,6 +1037,36 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test("free-text textAlign 'auto' follows the text's direction", async () => {
+      const doc = await openFixture(engine, options);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          contents: 'שלום 12',
+          box: shapeRect,
+          textAlign: 'auto',
+        } satisfies FreeTextDraft);
+        if (created.annotation.subtype !== 'free-text') throw new Error('not a free text');
+        expect(created.annotation.textAlign).toBe('right');
+
+        const updated = await page.annotations.update(created.annotation.ref, {
+          subtype: 'free-text',
+          contents: 'Hello',
+          textAlign: 'auto',
+        });
+        if (updated.annotation.subtype !== 'free-text') throw new Error('not a free text');
+        expect(updated.annotation.textAlign).toBe('left');
+
+        const listed = (await page.annotations.list()).annotations.find(
+          (a) => a.subtype === 'free-text' && a.contents === 'Hello',
+        );
+        expect(listed && listed.subtype === 'free-text' && listed.textAlign).toBe('left');
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('update a free-text patches alignment + colours and is non-structural', async () => {
       const doc = await openFixture(engine, options);
       try {
