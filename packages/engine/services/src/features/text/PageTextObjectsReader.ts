@@ -235,10 +235,11 @@ export class PageTextObjectsReader {
     const { fn, mem } = this.runtime;
     const count = Math.max(fn.FPDFText_CountChars(textPagePtr), 0);
     const lineRtl: boolean[] = new Array(count);
+    const codePoints = new Array<number>(count);
     let lineStart = 0;
     let rtl = false;
     for (let i = 0; i <= count; i++) {
-      const u = i < count ? fn.FPDFText_GetUnicode(textPagePtr, i) : 10;
+      const u = i < count ? (codePoints[i] = fn.FPDFText_GetUnicode(textPagePtr, i)) : 10;
       if (u === 10 || u === 13) {
         for (let j = lineStart; j <= i && j < count; j++) lineRtl[j] = rtl;
         lineStart = i + 1;
@@ -250,13 +251,28 @@ export class PageTextObjectsReader {
     const chars = new Map<number | bigint, TextObjectChar[]>();
     const widthsByFont = new Map<number | bigint, Set<number>>();
     const [xPtr, yPtr, rectPtr, matrixPtr] = [8, 8, 16, 24].map((bytes) => mem.alloc(bytes));
+    // Consecutive characters mostly share a text object: its font and slant are read once.
+    let lastObject: Ptr | undefined;
+    let fontPtr: Ptr = 0n as Ptr;
+    let slant = 0;
     try {
       for (let i = 0; i < count; i++) {
-        if (timer.due) await timer.pause();
+        // Checking the clock per character costs more than the character's own reads.
+        if ((i & 63) === 0 && timer.due) await timer.pause();
         if (fn.FPDFText_IsGenerated(textPagePtr, i) === 1) continue;
         const object = fn.FPDFText_GetTextObject(textPagePtr, i);
         if (!object) continue;
-        const unicode = String.fromCodePoint(fn.FPDFText_GetUnicode(textPagePtr, i));
+        if (object !== lastObject) {
+          lastObject = object;
+          fontPtr = fn.FPDFTextObj_GetFont(object);
+          slant = 0;
+          if (fn.FPDFPageObj_GetMatrix(object, matrixPtr)) {
+            const c = readF32(mem, matrixPtr, 8);
+            const d = readF32(mem, matrixPtr, 12);
+            if (c && d) slant = Math.abs(c / d);
+          }
+        }
+        const unicode = String.fromCodePoint(codePoints[i]);
         fn.FPDFText_GetCharOrigin(textPagePtr, i, xPtr, yPtr);
         fn.FPDFText_GetLooseCharBox(textPagePtr, i, rectPtr);
         // FS_RECTF { left, top, right, bottom }
@@ -265,19 +281,14 @@ export class PageTextObjectsReader {
         const right = readF32(mem, rectPtr, 8);
         const bottom = readF32(mem, rectPtr, 12);
         let width = right - left;
-        const fontSize = fn.FPDFText_GetFontSize(textPagePtr, i) || 1;
-        const fontPtr = fn.FPDFTextObj_GetFont(object);
         if (width > 0 && !isSpace(unicode)) {
+          const fontSize = fn.FPDFText_GetFontSize(textPagePtr, i) || 1;
           const set = widthsByFont.get(fontPtr) ?? new Set<number>();
           set.add(Math.round((width / fontSize) * 1000));
           widthsByFont.set(fontPtr, set);
         }
         // Sheared text: the loose box bounds the slanted cell; remove the slant.
-        if (fn.FPDFPageObj_GetMatrix(object, matrixPtr)) {
-          const c = readF32(mem, matrixPtr, 8);
-          const d = readF32(mem, matrixPtr, 12);
-          if (c && d) width = Math.max(0, width - Math.abs(c / d) * Math.abs(top - bottom));
-        }
+        if (slant) width = Math.max(0, width - slant * Math.abs(top - bottom));
         const entry: TextObjectChar = {
           index: i,
           unicode,
