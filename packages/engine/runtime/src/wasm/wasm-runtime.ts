@@ -252,6 +252,29 @@ function expandI64Args(signature: PdfFunctionSignature, args: unknown[]): unknow
   return expanded;
 }
 
+/** An export called without cwrap: `Ptr` arguments to addresses, the result as cwrap would give it. */
+function directCall(
+  fn: (...args: unknown[]) => unknown,
+  signature: PdfFunctionSignature,
+): (...args: unknown[]) => unknown {
+  const ptrArgs = signature.params.map((p) => p.ts === 'Ptr');
+  const anyPtrArg = ptrArgs.some(Boolean);
+  const result = signature.result;
+  const asBoolean = result?.wasm.cwrap === 'boolean';
+  const convert = !!result && (result.ts === 'Ptr' || result.ts === 'bigint');
+  return (...args: unknown[]) => {
+    if (anyPtrArg) {
+      for (let i = 0; i < args.length; i++) {
+        if (ptrArgs[i] && typeof args[i] === 'bigint') args[i] = Number(args[i]);
+      }
+    }
+    const value = fn(...args);
+    if (!result) return undefined;
+    if (asBoolean) return Boolean(value);
+    return convert ? toJsResult(result, value) : value;
+  };
+}
+
 function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
   const out: Record<string, (...args: unknown[]) => unknown> = {};
   // Read through the general signature type: the table's literal types,
@@ -269,7 +292,17 @@ function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
         );
       };
 
-    if (module.cwrap) {
+    const direct = module[`_${name}`];
+    const numericOnly =
+      typeof direct === 'function' &&
+      signature.params.every((p) => p.wasm.cwrap !== 'string' && p.wasm.kind !== 'i64') &&
+      signature.result?.wasm.cwrap !== 'string';
+    if (numericOnly) {
+      // No string marshalling and no i64 pairs: call the export directly.
+      // cwrap → ccall costs more than many short native calls themselves
+      // (per-glyph text reads), and adds nothing here but a boolean result.
+      out[name] = directCall(direct, signature);
+    } else if (module.cwrap) {
       // `null` only appears for void return; params never carry it.
       // i64 params are legalized (see expandI64Args): two i32 slots each.
       const paramTypes = signature.params.flatMap((p) =>
