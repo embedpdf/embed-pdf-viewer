@@ -19,6 +19,8 @@ import { blobFileName } from '../resource/BinarySource';
  * - `appearance`: what the box shows before the rotation the data describes,
  *   PNG, JPEG or a one-page PDF, scaled into the box as the data's `fit` says.
  *   A stamp requires it; on update it replaces the drawing.
+ *   An ink may take one (a one-page PDF): drawn in place of the generated
+ *   straight segments, fitted into `/Rect`.
  * - `file`: an attached file's exact bytes; its name, MIME type and
  *   description are the data's `file`. A file attachment requires it; on
  *   update it replaces the bytes.

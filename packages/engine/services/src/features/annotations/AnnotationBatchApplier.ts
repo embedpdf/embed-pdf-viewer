@@ -27,7 +27,7 @@ import { readContextFor } from './internal/read/annotationReadContext';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyDraft } from './internal/write/annotationWriterRegistry';
+import { applyDraft, drawAppearanceResource } from './internal/write/annotationWriterRegistry';
 import { generateAppearance } from './internal/write/generateAppearance';
 import {
   restoreAttribution,
@@ -205,6 +205,7 @@ export class AnnotationBatchApplier {
       try {
         labelled(create.label, () => applyDraft(fn, mem, annotPtr, draft, ctx));
         generateAppearance(fn, annotPtr, draft.blendMode);
+        drawAppearanceResource(fn, mem, annotPtr, draft.subtype, ctx);
         objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
         if (objectNumber <= 0) {
           throw new EngineError(

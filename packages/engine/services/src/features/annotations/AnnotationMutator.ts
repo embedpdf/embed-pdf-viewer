@@ -44,7 +44,11 @@ import {
 } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import {
+  applyPatch,
+  drawAppearanceResource,
+  preflightPatch,
+} from './internal/write/annotationWriterRegistry';
 import { settleAnnotationTurn } from './internal/write/writeAnnotationTransformMetadata';
 import { RawAnnotationReader } from './RawAnnotationReader';
 import { generateAppearance } from './internal/write/generateAppearance';
@@ -328,13 +332,21 @@ export class AnnotationMutator {
               // file places it in the moved or resized box.
               !currentDto.hasMark && fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
             : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
-        appearance = ok
-          ? { action: 'regenerated', changed: true }
-          : // Not drawn (a mark kept, a field type with no generator). The
-            // dictionary still changed when the patch was appearance-relevant,
-            // so `changed` stays true in that case — form-layer renderers may
-            // paint differently even though no /AP was written.
-            { action: 'generation-unavailable', changed: impact === 'regenerate' };
+        const drawn = drawAppearanceResource(
+          fn,
+          mem,
+          annotPtr,
+          patch.subtype ?? currentDto.subtype,
+          writeContext,
+        );
+        appearance =
+          ok || drawn
+            ? { action: 'regenerated', changed: true }
+            : // Not drawn (a mark kept, a field type with no generator). The
+              // dictionary still changed when the patch was appearance-relevant,
+              // so `changed` stays true in that case — form-layer renderers may
+              // paint differently even though no /AP was written.
+              { action: 'generation-unavailable', changed: impact === 'regenerate' };
       }
 
       // PDFium caches the parsed appearance form on an annotation context. A
