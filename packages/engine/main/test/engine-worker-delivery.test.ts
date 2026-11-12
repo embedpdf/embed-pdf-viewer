@@ -19,11 +19,12 @@ vi.mock('../src/worker-files', async () => {
       return files.engine;
     },
     findEncoderWorkerFile: () => null,
-    prebundledWithoutFiles: () => files.prebundled,
+    // The dev copy of the wasm, which only a prebundled package in a dev build has.
+    prebundledDevWasm: async () =>
+      files.prebundled ? gzipSync(DEV_WASM).toString('base64') : null,
   };
 });
 vi.mock('@embedpdf/engine/worker-source', () => ({ default: 'self.onmessage = null;' }));
-vi.mock('@embedpdf/engine/dev-wasm', () => ({ default: gzipSync(DEV_WASM).toString('base64') }));
 vi.mock('@embedpdf/engine-runtime-wasm32/wasm-url', () => ({
   default: 'https://app.test/assets/embedpdf-abc.wasm',
 }));
@@ -32,7 +33,7 @@ import { localEngine } from '../src/index';
 import { localEngine as portableLocalEngine } from '../src/portable';
 
 const BUNDLED_FILE = 'https://app.test/assets/embedpdf-worker-abc.js';
-/** What `@embedpdf/engine/dev-wasm` holds in a dev build, unpacked. */
+/** The dev copy of the wasm, unpacked. */
 const DEV_WASM = vi.hoisted(() => new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
 
 /** Records how it was started and the init it got; answers `ready`, or fails to start. */

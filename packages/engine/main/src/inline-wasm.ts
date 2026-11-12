@@ -4,7 +4,7 @@
  *
  * Two builds carry the string. The portable entry (`src/portable.ts`) always does. The default
  * entry does where its export map says `development` (`@embedpdf/engine/dev-wasm`), for a dev
- * server that prebundles the package without `embedpdf.wasm` (see `prebundledWithoutFiles` in
+ * server that prebundles the package without `embedpdf.wasm` (see `prebundledDevWasm` in
  * `src/worker-files.ts`); a production build resolves that subpath to a module that holds
  * nothing, so it never carries the binary twice.
  */

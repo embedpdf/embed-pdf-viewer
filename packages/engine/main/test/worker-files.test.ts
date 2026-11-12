@@ -8,7 +8,7 @@ import {
   findEncoderWorkerFile,
   findEngineWorkerFile,
   movedWithoutFiles,
-  prebundledWithoutFiles,
+  prebundledDevWasm,
   startableFile,
 } from '../src/worker-files';
 
@@ -108,7 +108,16 @@ describe('a package prebundled without its files', () => {
     );
   });
 
-  it('is not this test run, which loads the module from src', () => {
-    expect(prebundledWithoutFiles()).toBe(false);
+  it('looks the same in a production build that emits the worker to workers/ beside its chunks', () => {
+    // `assetFileNames: 'workers/[name][extname]'` with the chunks in `assets/`: the emitted
+    // file is where the expression points as written. The URL can't tell them apart, which is
+    // why a build also has to carry the dev copy (see worker-files-dev-copy.test.ts).
+    const module = 'https://site.test/assets/app.js';
+    const emitted = () => new URL('https://site.test/workers/embedpdf-worker.js');
+    expect(movedWithoutFiles(emitted, () => module)).toBe(true);
+  });
+
+  it('is not this test run, which loads the module from src', async () => {
+    expect(await prebundledDevWasm()).toBeNull();
   });
 });

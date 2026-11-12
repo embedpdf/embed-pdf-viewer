@@ -50,7 +50,7 @@ import {
 import type { EngineWorkerInit } from './worker/bootstrap';
 import { nextJobId } from './worker/jobIds';
 import type { JobId } from './worker/protocol';
-import { findEngineWorkerFile } from './worker-files';
+import { findEngineWorkerFile, prebundledDevWasm } from './worker-files';
 
 // The developer-facing surface both engine packages share (errors, refs,
 // helpers, the document types), from one list in engine-core, so code names
@@ -280,6 +280,9 @@ async function createEngineWorker(
       file: null,
     };
   }
+  // Asked first: a dev server that prebundled the package left the file behind, and
+  // `findEngineWorkerFile` names none once that is known.
+  if (delivery === undefined) await prebundledDevWasm();
   const file = delivery === undefined ? findEngineWorkerFile() : null;
   if (file !== null) {
     return { worker: startWorker(file, { type: 'module' }), destroy: () => {}, file };

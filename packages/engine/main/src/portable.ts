@@ -28,7 +28,7 @@
  * Vite's resolver, which does not apply `es2020`, so it gets the default
  * entry. From Angular 22 that entry finds its files in `node_modules`. In
  * Angular 20 and 21 it starts as this one does, from a blob: worker and the
- * inline wasm (see `prebundledWithoutFiles` in `src/worker-files.ts`).
+ * inline wasm (see `prebundledDevWasm` in `src/worker-files.ts`).
  */
 import {
   localEngine as siblingLocalEngine,
