@@ -229,6 +229,58 @@ const downloadErrorCode = (status: number): PluginErrorCode =>
       ? 'permission-denied'
       : 'operation-failed';
 
+/** wasm `FPDF_FILEACCESS.m_FileLen` is 32-bit. Larger files download whole. */
+const MAX_RANGE_FILE = 0xffffffff;
+
+/** Total length of a `bytes start-end/total` header, or null. */
+function contentRangeTotal(value: string | null): number | null {
+  if (!value) return null;
+  const match = /^bytes\s+\d+-\d+\/(\d+)$/i.exec(value.trim());
+  if (!match) return null;
+  const total = Number(match[1]);
+  return Number.isSafeInteger(total) ? total : null;
+}
+
+/**
+ * A URL the wasm worker can range-read, or the whole file when it cannot.
+ * A caller-supplied `fetch` may add headers the worker cannot replay, so that
+ * path always downloads. A server that ignores `Range` is consumed once here.
+ */
+async function sourceForUrl(
+  source: UrlSource,
+  signal: AbortSignal,
+  hostFetch: HostFetch | undefined,
+): Promise<OpenInput> {
+  if (hostFetch || typeof XMLHttpRequest === 'undefined') {
+    return fetchUrlSource(source, signal, hostFetch);
+  }
+  const fetchFile = globalThis.fetch.bind(globalThis);
+  const response = await fetchFile(source.url, { signal, headers: { Range: 'bytes=0-0' } });
+  if (response.status === 206) {
+    const total = contentRangeTotal(response.headers.get('content-range'));
+    await response.body?.cancel();
+    if (total !== null && total > 0 && total <= MAX_RANGE_FILE) {
+      return {
+        kind: 'url',
+        url: source.url,
+        ...(source.id !== undefined ? { id: source.id } : {}),
+      };
+    }
+  }
+  if (!response.ok) {
+    throw new PluginError(
+      downloadErrorCode(response.status),
+      'documents',
+      `couldn't download ${source.url} (HTTP ${response.status})`,
+    );
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!isPdf(bytes)) {
+    throw new PluginError('invalid-input', 'documents', `${source.url} isn't a PDF`);
+  }
+  return { kind: 'bytes', ...(source.id !== undefined ? { id: source.id } : {}), bytes };
+}
+
 /**
  * Download a URL source's file with the host's `fetch`, or the global one; its tab shows why
  * when the server says no, or answers with something that isn't a PDF.
@@ -1525,7 +1577,7 @@ export function createKernel(config: {
         checkpoint(session);
         // A URL is downloaded here, under the loading tab; closing the tab stops the download.
         const source = isUrlSource(given)
-          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal, config.fetch))
+          ? await engineCall(session, sourceForUrl(given, session.cancel.signal, config.fetch))
           : given;
         checkpoint(session);
         session.grantInput = source.kind === 'grant' ? source : null;

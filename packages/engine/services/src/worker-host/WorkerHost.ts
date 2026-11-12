@@ -535,6 +535,7 @@ export class WorkerHost {
         transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
       }
       switch (msg.kind) {
+        case 'open.httpRange':
         case 'open.fatMem':
         case 'open.layerMemBase':
         case 'open.layerFileBase':
@@ -870,7 +871,10 @@ export class WorkerHost {
   }
 
   private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const key = sessionKey(req.docId, req.kind === 'open.fatMem' ? undefined : req.layerName);
+    const key = sessionKey(
+      req.docId,
+      req.kind === 'open.fatMem' || req.kind === 'open.httpRange' ? undefined : req.layerName,
+    );
     if (this.sessions.has(key)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
     }
@@ -885,6 +889,17 @@ export class WorkerHost {
     if (req.kind === 'open.fatMem') {
       const bytes = new Uint8Array(req.bytes);
       load = (password) => this.openBytesAsLayer(session, bytes, password);
+    } else if (req.kind === 'open.httpRange') {
+      const url = req.url;
+      load = (password) => {
+        const base = this.baseDocuments.acquireHttpBase({
+          key: `http-open:${req.docId}`,
+          url,
+          password,
+        });
+        session.openFromHandle(openLayerDocument(this.runtime, base, { kind: 'fresh' }, password));
+        session.persistLayerArtifact = false;
+      };
     } else if (req.kind === 'open.layerMemBase') {
       const baseBytes = new Uint8Array(req.baseBytes);
       load = (password) => {

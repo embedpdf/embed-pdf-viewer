@@ -103,6 +103,9 @@ function createNativeFileAccess(addon: NativeAddon): PdfRuntimeFileAccess {
   };
 
   return {
+    fromHttpRange() {
+      throw new Error('fromHttpRange() is only available on the wasm runtime');
+    },
     fromMemory(bytes) {
       if (!addon.createMemoryFileAccess) {
         throw new Error('Native runtime does not expose memory file-access helpers');

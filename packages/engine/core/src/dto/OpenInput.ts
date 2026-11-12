@@ -14,6 +14,26 @@ export type TokenSource = string | (() => string | Promise<string>);
  * Rejected by `@cloudpdf/engine` (use `'id'` or `'token'`
  * instead).
  */
+/**
+ * Local-engine open of an HTTP(S) URL. The wasm worker range-reads the file
+ * as PDFium asks for bytes, instead of receiving the whole PDF first. The
+ * server must answer `Range` with `206`. A custom `fetch` that adds headers
+ * cannot be replayed from that synchronous read, so the caller downloads the
+ * file itself in that case.
+ *
+ * Rejected by `@cloudpdf/engine` and by the native Node runtime.
+ */
+export interface OpenInputUrl {
+  kind: 'url';
+  /**
+   * A stable id of your own for the document; doubles as docId at the
+   * engine boundary. Generated when omitted.
+   */
+  id?: string;
+  /** Absolute URL. The worker fetches it with the page's cookies when same-origin. */
+  url: string;
+}
+
 export interface OpenInputBytes {
   kind: 'bytes';
   /**
@@ -159,6 +179,7 @@ export interface OpenInputLayerFile {
 }
 
 export type OpenInput =
+  | OpenInputUrl
   | OpenInputBytes
   | OpenInputLayerBytes
   | OpenInputLayerFile
