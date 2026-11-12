@@ -6,6 +6,9 @@
  * which origins were contacted, every policy violation, what was emitted
  * (JS / wasm bytes). Prints a markdown table and writes results.json.
  *
+ * A dev row (a variant with `dev`) runs the app's dev server instead, on a
+ * copy of the app installed from packs of the packages (see dev-server.mjs).
+ *
  *   node run.mjs                 # every app
  *   node run.mjs --only vite,angular
  *   node run.mjs --script matrix:build:assets --only angular   # a variant
@@ -16,6 +19,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { createPacker, installFromPacks, startDevServer } from './dev-server.mjs';
 import { serve } from './serve.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -90,9 +94,69 @@ function emitted(dir) {
   };
 }
 
+/**
+ * Builds the app for production and serves the output under the strict policy. Fills in the
+ * row's build, sizes and policy; returns null when the build fails.
+ */
+async function serveBuild({ dir, meta, script, csp }, row) {
+  // Sizes are measured on the output directory: start it empty.
+  rmSync(resolve(dir, meta.dist), { recursive: true, force: true });
+  const t0 = Date.now();
+  const build = spawnSync('pnpm', ['run', script], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, CI: '1', NODE_ENV: 'production' },
+  });
+  row.buildMs = Date.now() - t0;
+  if (build.status !== 0) {
+    row.build = 'failed';
+    row.log = (build.stdout + build.stderr).split('\n').filter(Boolean).slice(-15).join('\n');
+    return null;
+  }
+  row.build = 'ok';
+  const dist = resolve(dir, meta.dist);
+  row.emitted = emitted(dist);
+  const scriptHashes = inlineScriptHashes(dist);
+  const policy = strictPolicy({ ...csp, scriptHashes });
+  row.csp = { ...csp, scriptHashes: scriptHashes.length, policy, violations: [] };
+  const { server, origin } = await serve(dist, {
+    headers: { 'content-security-policy': policy },
+  });
+  return { origin, close: () => server.close() };
+}
+
+/**
+ * Installs a copy of the app from packs and starts its dev server. No policy: a dev server
+ * adds scripts of its own to the page. Returns null when the install or the server fails.
+ */
+async function serveDev({ dir, script }, row, packer) {
+  const t0 = Date.now();
+  let app = null;
+  try {
+    app = installFromPacks(dir, packer);
+    const server = await startDevServer(app.folder, script);
+    row.buildMs = Date.now() - t0;
+    row.build = 'ok';
+    return {
+      origin: server.origin,
+      close: () => {
+        server.stop();
+        app.dispose();
+      },
+    };
+  } catch (error) {
+    app?.dispose();
+    row.buildMs = Date.now() - t0;
+    row.build = 'failed';
+    row.log = String(error).split('\n').filter(Boolean).slice(-15).join('\n');
+    return null;
+  }
+}
+
 const kb = (n) => `${Math.round(n / 1024)} kB`;
 const results = [];
 const browser = await launch();
+const packer = createPacker();
 try {
   const apps = readdirSync(join(here, 'apps')).filter((n) =>
     existsSync(join(here, 'apps', n, 'matrix.json')),
@@ -115,44 +179,32 @@ try {
       enforceTrustedTypes: entry.enforceTrustedTypes,
     });
     runs.push({ name, dir, meta, toolchain: meta.toolchain, script, csp: csp(meta) });
-    // Variants: documented opt-ins measured beside the zero-config row.
+    // Variants: documented opt-ins measured beside the zero-config row, and the dev server.
     for (const v of meta.variants ?? [])
-      runs.push({ name: v.name, dir, meta, toolchain: v.toolchain, script: v.script, csp: csp(v) });
+      runs.push(
+        v.dev
+          ? { name: v.name, dir, meta, toolchain: v.toolchain, script: v.dev, dev: true }
+          : { name: v.name, dir, meta, toolchain: v.toolchain, script: v.script, csp: csp(v) },
+      );
   }
   for (const run of runs)
-    if (!run.csp.workerSrc)
+    if (!run.dev && !run.csp.workerSrc)
       throw new Error(`${run.name}: its matrix.json entry must give a workerSrc`);
-  for (const { name, dir, meta, toolchain, script, csp } of runs) {
-    const row = { app: name, toolchain, script, ok: false };
+  for (const run of runs) {
+    const { name, toolchain, script } = run;
+    const row = { app: name, toolchain, script, dev: run.dev === true, ok: false };
     process.stdout.write(`\n▶ ${name} (${toolchain}) — ${script}\n`);
-    // Sizes are measured on the output directory: start it empty.
-    rmSync(resolve(dir, meta.dist), { recursive: true, force: true });
-    const t0 = Date.now();
-    const build = spawnSync('pnpm', ['run', script], {
-      cwd: dir,
-      encoding: 'utf8',
-      env: { ...process.env, CI: '1', NODE_ENV: 'production' },
-    });
-    row.buildMs = Date.now() - t0;
-    if (build.status !== 0) {
-      row.build = 'failed';
-      row.log = (build.stdout + build.stderr).split('\n').filter(Boolean).slice(-15).join('\n');
-      console.log(`  build FAILED\n${row.log}`);
+    const site = run.dev ? await serveDev(run, row, packer) : await serveBuild(run, row);
+    if (site === null) {
+      console.log(`  ${run.dev ? 'dev server' : 'build'} FAILED\n${row.log}`);
       results.push(row);
       continue;
     }
-    row.build = 'ok';
-    const dist = resolve(dir, meta.dist);
-    row.emitted = emitted(dist);
-    const scriptHashes = inlineScriptHashes(dist);
-    const policy = strictPolicy({ ...csp, scriptHashes });
-    row.csp = { ...csp, scriptHashes: scriptHashes.length, policy, violations: [] };
-    const { server, origin } = await serve(dist, {
-      headers: { 'content-security-policy': policy },
-    });
+    const { origin } = site;
+    const violations = row.csp?.violations ?? [];
     const page = await browser.newPage();
     // Heard from the first script on: the init script runs before any of the app's own.
-    await page.exposeFunction('reportViolation', (report) => row.csp.violations.push(report));
+    await page.exposeFunction('reportViolation', (report) => violations.push(report));
     await page.addInitScript(() => {
       document.addEventListener('securitypolicyviolation', (event) =>
         window.reportViolation(
@@ -176,7 +228,7 @@ try {
     page.on('console', (m) => {
       // The browser also logs each violation, including ones inside a worker.
       if (/Content Security Policy|Trusted ?Type|TrustedScript/i.test(m.text()))
-        row.csp.violations.push(m.text());
+        violations.push(m.text());
       (m.type() === 'error' ? consoleErrors : m.type() === 'warning' ? warnings : []).push(
         m.text(),
       );
@@ -202,28 +254,34 @@ try {
       .filter((r) => r.url.endsWith('.wasm'))
       .map((r) => `${r.url.replace(origin, '')} (${r.status})`);
     // The portable entry carries the wasm as a JS chunk: the one JS response
-    // in the megabytes that no emitted asset accounts for.
+    // in the megabytes that no emitted asset accounts for. A dev server sends
+    // no length; there the chunk is the dev copy, by its name.
     const inlineChunk = network.find(
-      (r) => /\.m?js$/.test(r.url.split('?')[0]) && r.bytes > 3_000_000,
+      (r) =>
+        /\.m?js$/.test(r.url.split('?')[0]) &&
+        (r.bytes > 3_000_000 || (run.dev && /\/dev-wasm[^/]*$/.test(r.url.split('?')[0]))),
     );
     const assetOk = network.some((r) => r.url.endsWith('.wasm') && r.status === 200);
     row.delivery = assetOk
-      ? 'emitted asset'
+      ? run.dev
+        ? 'file in node_modules'
+        : 'emitted asset'
       : inlineChunk
-        ? `inline chunk (${kb(inlineChunk.bytes)} JS)`
+        ? `inline chunk${inlineChunk.bytes ? ` (${kb(inlineChunk.bytes)} JS)` : ''}`
         : 'none';
     row.failures = failures;
     row.consoleErrors = consoleErrors;
     row.warnings = warnings.filter((w) => /embedpdf|wasm/i.test(w));
     await page.close();
-    server.close();
+    site.close();
     // An app passes when it boots, stays on its origin, and nothing violates the policy.
-    row.ok = row.probe.ok && row.foreign.length === 0 && row.csp.violations.length === 0;
+    row.ok = row.probe.ok && row.foreign.length === 0 && violations.length === 0;
     console.log(
-      `  build ${Math.round(row.buildMs / 1000)}s · probe ${row.probe.ok ? 'OK' : 'FAILED'} in ${row.probe.ms ?? '?'} ms · CSP ${row.csp.violations.length ? `${row.csp.violations.length} violations` : 'clean'} · wasm ${row.wasmFetched.join(', ') || 'none'} · foreign ${row.foreign.join(', ') || 'none'} · emitted js ${kb(row.emitted.js)} wasm ${kb(row.emitted.wasm)}`,
+      run.dev
+        ? `  install and start ${Math.round(row.buildMs / 1000)}s · probe ${row.probe.ok ? 'OK' : 'FAILED'} in ${row.probe.ms ?? '?'} ms · wasm ${row.delivery} · foreign ${row.foreign.join(', ') || 'none'}`
+        : `  build ${Math.round(row.buildMs / 1000)}s · probe ${row.probe.ok ? 'OK' : 'FAILED'} in ${row.probe.ms ?? '?'} ms · CSP ${violations.length ? `${violations.length} violations` : 'clean'} · wasm ${row.wasmFetched.join(', ') || 'none'} · foreign ${row.foreign.join(', ') || 'none'} · emitted js ${kb(row.emitted.js)} wasm ${kb(row.emitted.wasm)}`,
     );
-    if (row.csp.violations.length)
-      console.log('  ' + row.csp.violations.join('\n  ').slice(0, 1500));
+    if (violations.length) console.log('  ' + violations.join('\n  ').slice(0, 1500));
     if (!row.probe.ok)
       console.log(
         '  ' +
@@ -233,6 +291,7 @@ try {
   }
 } finally {
   await browser.close();
+  packer.dispose();
 }
 
 writeFileSync(join(here, 'results.json'), JSON.stringify(results, null, 2) + '\n');
@@ -262,5 +321,12 @@ if (broken.length) {
   console.error(
     `\n${broken.map((r) => r.app).join(', ')}: a request left the origin or the policy was violated`,
   );
+  process.exitCode = 1;
+}
+
+// A dev row is the app as Setup describes it, with nothing configured: it has to boot.
+const stuck = results.filter((r) => r.dev && !r.ok);
+if (stuck.length) {
+  console.error(`\n${stuck.map((r) => r.app).join(', ')}: the dev server did not show a page`);
   process.exitCode = 1;
 }

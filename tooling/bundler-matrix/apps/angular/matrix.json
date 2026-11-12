@@ -14,6 +14,11 @@
       "toolchain": "Angular CLI 20 + `@embedpdf/engine/portable` (zero config)",
       "workerSrc": "'self' blob:",
       "script": "matrix:build:portable"
+    },
+    {
+      "name": "angular+serve",
+      "toolchain": "Angular CLI 20 dev server (`ng serve`), installed from packs",
+      "dev": "matrix:serve"
     }
   ]
 }
