@@ -12,7 +12,9 @@
  *        the bundler-resolved URL from `@embedpdf/engine-runtime-wasm32/wasm-url`
  *        (the wasm ships inside the consumer's own build). Neither worker has
  *        the wasm beside it (a bundler renames the files; a blob URL has no
- *        location), so the URL is resolved here and must be absolute.
+ *        location), so the URL is resolved here and must be absolute. A dev
+ *        server that prebundled the package without its files has no such
+ *        URL: there the bytes come from `@embedpdf/engine/dev-wasm`.
  *      - a configured worker URL / caller-built worker: nothing is sent, and
  *        the Emscripten glue resolves `embedpdf.wasm` as a sibling of the
  *        worker script. Copying `embedpdf-worker.js` and `embedpdf.wasm` into
@@ -21,13 +23,17 @@
  *        the worker chunk.
  */
 
+import { unpackInlineWasm } from './inline-wasm';
+import { prebundledWithoutFiles } from './worker-files';
+
 /**
  * How to deliver the engine's Web Worker:
  * - omitted (default): this package's `workers/embedpdf-worker.js`, emitted
  *   by the consumer's bundler as a file of their build, so `worker-src 'self'`
  *   covers it. Where the scripts are on another origin than the page (the
  *   viewer from a CDN), a browser refuses that worker, so it starts from a
- *   blob: URL instead (`worker-src blob:`).
+ *   blob: URL instead (`worker-src blob:`). So it does where a dev server
+ *   prebundled the package without the file (Vite 7 and older).
  * - `'inline'`: always the blob: URL, built from the worker source string
  *   shipped inside this package — for toolchains that cannot emit the file
  *   (`@embedpdf/engine/portable` passes it).
@@ -104,6 +110,10 @@ export async function resolveWasmSourceAsync(
  * inside the consumer's own build — served from their origin, compiled
  * streaming by the worker.
  *
+ * One build has no such sibling and still starts: a dev server that
+ * prebundled the package without `embedpdf.wasm` gets the copy its build
+ * carries for that (see {@link loadDevWasm}).
+ *
  * There is deliberately nothing after that. A toolchain that cannot carry
  * the asset (Angular's application builder, plain esbuild) fails here with
  * the two fixes named: `@embedpdf/engine/portable`, which carries the wasm
@@ -117,6 +127,8 @@ export async function resolveDefaultWasmSource(
   const explicit = resolveWasmSource(options);
   if (explicit.wasmUrl !== undefined || explicit.wasmBinary !== undefined) return explicit;
   if (options.wasmLoader) return { wasmBinary: toStandaloneBuffer(await options.wasmLoader()) };
+  // The sibling's URL is wrong where the worker files' are: both were left behind.
+  if (prebundledWithoutFiles()) return { wasmBinary: await loadDevWasm() };
   const sibling = await siblingWasmUrl();
   if (sibling === null) throw new Error(NO_SIBLING_MESSAGE);
   // Not always absolute: webpack's RelativeURL runtime yields a root-relative
@@ -130,6 +142,27 @@ const NO_SIBLING_MESSAGE =
   '`@embedpdf/engine-runtime-wasm32/wasm-url` module is unavailable. Either import ' +
   '`localEngine` from `@embedpdf/engine/portable` (the wasm travels inside your build as ' +
   'a lazy chunk — works with every bundler), or self-host the file and pass `assetsUrl` / ' +
+  '`wasmUrl` / `wasmBinary`. See https://www.embedpdf.com/docs/viewer/self-hosting';
+
+/**
+ * The wasm for a dev server that prebundled the package without `embedpdf.wasm`
+ * (see {@link prebundledWithoutFiles}): the inline binary, which the build
+ * carries where it resolved `@embedpdf/engine/dev-wasm` with the `development`
+ * condition, as such a dev server does. Any other build resolved it to a
+ * module that holds nothing: a production bundle from a bundler that emits no
+ * files (plain esbuild), which is told what to use instead.
+ */
+async function loadDevWasm(): Promise<ArrayBuffer> {
+  const { default: packed } = await import('@embedpdf/engine/dev-wasm');
+  if (packed === null) throw new Error(PREBUNDLED_MESSAGE);
+  return unpackInlineWasm(packed);
+}
+
+const PREBUNDLED_MESSAGE =
+  'this build bundled @embedpdf/engine without its worker files and embedpdf.wasm: its ' +
+  'bundler emits no file for `new URL(…, import.meta.url)`. Either import `localEngine` ' +
+  'from `@embedpdf/engine/portable` (the wasm travels inside your build as a lazy chunk — ' +
+  'works with every bundler), or self-host the files and pass `worker` with `assetsUrl` / ' +
   '`wasmUrl` / `wasmBinary`. See https://www.embedpdf.com/docs/viewer/self-hosting';
 
 /**

@@ -274,6 +274,8 @@ describe('localEngine()', () => {
   });
 
   test('a bad font spec fails the boot: queued jobs reject and the worker is torn down', async () => {
+    // A failed boot is also said in the console (restored after each test).
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
     let worker: FakeWorker | undefined;
     const engine = localEngine({
       worker: () => {
@@ -286,6 +288,7 @@ describe('localEngine()', () => {
     await expect(engine.fonts.clearFallbacks()).rejects.toThrow(/exactly one of `data` or `url`/);
     // The worker spawned during boot must not leak past the failure.
     expect(worker?.terminated).toBe(true);
+    expect(reported).toHaveBeenCalledTimes(1);
 
     // The failure is permanent — later jobs reject instead of hanging.
     await expect(

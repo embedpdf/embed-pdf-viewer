@@ -74,6 +74,13 @@ asset instead, copy the file with one `angular.json` entry and say where it is:
 Under pnpm, add `@embedpdf/engine-runtime-wasm32` to your own dependencies so
 that path exists; npm and yarn hoist it for you.
 
+**A dev server on Vite 7 or older**, which includes `ng serve` in Angular 20
+and 21, serves a package from a cache folder and copies none of its files
+there. The engine sees that and starts as its portable build does: both workers
+from `blob:` URLs, and the WebAssembly from a JavaScript chunk that only a dev
+server loads. Nothing to configure, and your production build stays as
+described above. Vite 8 serves the files from `node_modules`.
+
 **Plain esbuild** emits neither the asset nor the engine's workers, and has no
 condition to route on. Use the engine's portable build, as Angular does: the
 WebAssembly comes as a lazy chunk of your build, and both workers start from

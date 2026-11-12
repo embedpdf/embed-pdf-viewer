@@ -117,6 +117,11 @@ your site: see [Self-hosting](../self-hosting#what-runs-in-the-browser).
 
 </Engine>
 
+A dev server on Vite 7 or older starts the workers from `blob:` URLs too, whatever your build does.
+That includes `ng serve` in Angular 20 and 21. It serves a package from a cache folder and leaves
+the worker files behind, so a policy you also run in development needs `worker-src blob:` there.
+Vite 8 serves the files, and so does `ng serve` from Angular 22.
+
 ## Your bundler's Trusted Types policy
 
 With `require-trusted-types-for 'script'`, the browser also checks how your bundler loads the rest
