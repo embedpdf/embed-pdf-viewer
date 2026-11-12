@@ -1,12 +1,14 @@
 /**
  * Which worker `localEngine()` starts, and what it tells it about the wasm. By default the
  * bundled `workers/embedpdf-worker.js`, as a module worker from the app's own origin; from a
- * blob: URL where the scripts are on another origin than the page; a configured URL as given.
- * Under Trusted Types every URL goes through the `embedpdf` policy.
+ * blob: URL where the scripts are on another origin than the page, or a dev server prebundled
+ * the package without its files; a configured URL as given. Under Trusted Types every URL goes
+ * through the `embedpdf` policy.
  */
+import { gzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const files = vi.hoisted(() => ({ engine: null as string | null }));
+const files = vi.hoisted(() => ({ engine: null as string | null, prebundled: false }));
 
 // Stands in for the bundler: the file it emitted, or none a worker could start from.
 vi.mock('../src/worker-files', async () => {
@@ -17,6 +19,9 @@ vi.mock('../src/worker-files', async () => {
       return files.engine;
     },
     findEncoderWorkerFile: () => null,
+    // The dev copy of the wasm, which only a prebundled package in a dev build has.
+    prebundledDevWasm: async () =>
+      files.prebundled ? gzipSync(DEV_WASM).toString('base64') : null,
   };
 });
 vi.mock('@embedpdf/engine/worker-source', () => ({ default: 'self.onmessage = null;' }));
@@ -28,12 +33,14 @@ import { localEngine } from '../src/index';
 import { localEngine as portableLocalEngine } from '../src/portable';
 
 const BUNDLED_FILE = 'https://app.test/assets/embedpdf-worker-abc.js';
+/** The dev copy of the wasm, unpacked. */
+const DEV_WASM = vi.hoisted(() => new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
 
 /** Records how it was started and the init it got; answers `ready`, or fails to start. */
 class FakeWorker {
   static started: FakeWorker[] = [];
   static failToStart = false;
-  init: { kind: string; wasmUrl?: string } | null = null;
+  init: { kind: string; wasmUrl?: string; wasmBinary?: ArrayBuffer } | null = null;
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>();
 
   constructor(
@@ -50,7 +57,12 @@ class FakeWorker {
   removeEventListener(type: string, listener: (event: unknown) => void): void {
     this.listeners.get(type)?.delete(listener);
   }
-  postMessage(message: { kind: string; wasmUrl?: string; jobId?: unknown }): void {
+  postMessage(message: {
+    kind: string;
+    wasmUrl?: string;
+    wasmBinary?: ArrayBuffer;
+    jobId?: unknown;
+  }): void {
     if (message.jobId !== undefined) {
       // A job (the boot registers the default fallback fonts): done.
       const answer = { kind: 'resolve', jobId: message.jobId, result: { tag: message.kind } };
@@ -85,6 +97,7 @@ beforeEach(() => {
   FakeWorker.started = [];
   FakeWorker.failToStart = false;
   files.engine = BUNDLED_FILE;
+  files.prebundled = false;
   vi.stubGlobal('Worker', FakeWorker);
   vi.stubGlobal('location', { origin: 'https://app.test', href: 'https://app.test/viewer' });
 });
@@ -115,6 +128,19 @@ describe("localEngine()'s worker", () => {
     await engine.destroy();
   });
 
+  it('starts from a blob: URL with the inline wasm where a dev server prebundled the package', async () => {
+    // What `findEngineWorkerFile` answers there: the file was left behind.
+    files.engine = null;
+    files.prebundled = true;
+    const engine = localEngine();
+    const worker = await bootedWorker(engine);
+
+    expect(String(worker.url).startsWith('blob:')).toBe(true);
+    expect(worker.init?.wasmUrl).toBeUndefined();
+    expect(new Uint8Array(worker.init!.wasmBinary!)).toEqual(DEV_WASM);
+    await engine.destroy();
+  });
+
   it('is a configured URL as given, which finds its wasm as its own sibling', async () => {
     const engine = localEngine({ worker: '/vendor/embedpdf/embedpdf-worker.js' });
     const worker = await bootedWorker(engine);
@@ -140,12 +166,36 @@ describe("localEngine()'s worker", () => {
     await engine.destroy();
   });
 
-  it('names the bundled file and the fixes when it never starts', async () => {
+  it('names the bundled file and the fixes when it never starts, in the console too', async () => {
     FakeWorker.failToStart = true;
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
     const engine = localEngine();
-    await expect(engine.fonts.clearFallbacks()).rejects.toThrow(
-      /did not start from https:\/\/app\.test\/assets\/embedpdf-worker-abc\.js.*@embedpdf\/engine\/portable/,
+    const failure =
+      /did not start from https:\/\/app\.test\/assets\/embedpdf-worker-abc\.js.*@embedpdf\/engine\/portable/;
+    await expect(engine.fonts.clearFallbacks()).rejects.toThrow(failure);
+
+    expect(reported).toHaveBeenCalledTimes(1);
+    expect(reported).toHaveBeenCalledWith(
+      '[embedpdf]',
+      expect.objectContaining({ message: expect.stringMatching(failure) }),
     );
+    reported.mockRestore();
+    await engine.destroy();
+  });
+
+  it('names a configured URL when no worker starts from it', async () => {
+    FakeWorker.failToStart = true;
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const engine = localEngine({ worker: '/vendor/embedpdf/embedpdf-worker.js' });
+    const failure =
+      /did not start from https:\/\/app\.test\/vendor\/embedpdf\/embedpdf-worker\.js, the `worker` URL/;
+    await expect(engine.fonts.clearFallbacks()).rejects.toThrow(failure);
+
+    expect(reported).toHaveBeenCalledWith(
+      '[embedpdf]',
+      expect.objectContaining({ message: expect.stringMatching(failure) }),
+    );
+    reported.mockRestore();
     await engine.destroy();
   });
 

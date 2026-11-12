@@ -23,7 +23,10 @@ import type { Transport } from './Transport';
  * failed state and synthesizes a `{ kind: 'reject' }` response for every
  * buffered pack and every future send. The WorkerQueue already handles reject
  * responses, so pending `open()`/`render()` calls reject with a real
- * `EngineError` instead of hanging.
+ * `EngineError` instead of hanging. The failure is also written to the
+ * console, once: an engine that cannot start is a mistake in the setup (a
+ * worker file that isn't served, a blocked wasm), and an app that shows its
+ * loading state for a failed document would otherwise say nothing about it.
  */
 export interface LazyTransportOptions {
   /**
@@ -135,6 +138,7 @@ export class LazyTransport implements Transport {
         `engine failed to boot: ${cause instanceof Error ? cause.message : String(cause)}`,
         { cause },
       );
+      console.error('[embedpdf]', this.bootError);
       const failed = this.pendingPacks.splice(0);
       for (const pack of failed) {
         this.rejectPack(pack, this.bootError);

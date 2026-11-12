@@ -1,6 +1,12 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
+  "cli": {
+    "cache": {
+      "enabled": true,
+      "environment": "all"
+    }
+  },
   "projects": {
     "matrix": {
       "projectType": "application",
@@ -24,6 +30,11 @@
             "production": {
               "outputHashing": "all"
             },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            },
             "assets": {
               "outputHashing": "all",
               "assets": [
@@ -44,6 +55,15 @@
             }
           },
           "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "development": {
+              "buildTarget": "matrix:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
         }
       }
     }

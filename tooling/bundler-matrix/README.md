@@ -40,6 +40,34 @@ The `wasm delivery` column tells the two apart: `emitted asset` or
 `inline chunk`. `Off-origin` must always read `none` — a request that leaves
 the app's origin is a failure of the delivery model, whatever else passed.
 
+## Dev servers
+
+A variant with `dev` in place of `script` runs the app's dev server, not a
+build: `angular+serve` (`ng serve`) and `vite+dev`. Both prebundle packages
+with Vite's optimizer, which up to Vite 7 moves a package into a cache folder
+and leaves its worker files and `embedpdf.wasm` behind. The engine has to see
+that and start from `blob:` workers and its dev copy of the WebAssembly
+(`@embedpdf/engine/dev-wasm`).
+
+A dev server prebundles only what comes from `node_modules`, and inside this
+workspace the packages are links with the workspace `package.json`. So a dev
+row runs on a copy of the app outside the workspace (`dev-server.mjs`): it
+packs every workspace package the app depends on, which writes each one's
+published `package.json`, installs the copy from those packs with npm, and
+starts `npm run <dev> -- --port <port>` there. It needs the registry for the
+app's other dependencies.
+
+The copy starts with neither `NODE_ENV` nor `CI` set, as a developer's shell
+has them, and the Angular app turns its build cache on for every environment:
+the Angular CLI prebundles nothing without that cache, and turns it off where
+`CI` is set.
+
+A dev row has no policy (a dev server adds scripts of its own to the page),
+and no sizes. `wasm delivery` reads `inline chunk` where the engine started
+from its dev copy and `file in node_modules` where the dev server served the
+file, as Vite 8 does. A dev row has to boot: the runner exits non-zero when
+one doesn't.
+
 ## The strict policy
 
 Every app is served with the Content-Security-Policy from
@@ -67,4 +95,4 @@ column shows each row's `worker-src` and these additions.
 
 The runner exits non-zero when a row makes an off-origin request or violates the
 policy: the two guarantees every row keeps, whether or not its zero-config boot
-works.
+works. It also does when a dev row fails to boot.

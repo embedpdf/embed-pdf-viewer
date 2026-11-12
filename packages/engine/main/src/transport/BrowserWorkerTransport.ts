@@ -11,6 +11,12 @@ interface InitErrorMsg {
 }
 
 /**
+ * The worker's script never ran: a URL that isn't served, a policy that blocks it, a syntax
+ * error. Apart from a worker that ran and failed to initialize, which says why itself.
+ */
+export class WorkerStartError extends Error {}
+
+/**
  * Latch a live worker's readiness handshake now, before anything else runs.
  *
  * A dedicated worker starts initializing the moment `new Worker()` executes,
@@ -47,7 +53,7 @@ export function watchWorkerReady(worker: Worker): Promise<void> {
     const onError = (e: ErrorEvent) => {
       settle(() =>
         reject(
-          new Error(
+          new WorkerStartError(
             `worker failed to start: ${
               e.message ||
               'script error — bad worker URL, a Content-Security-Policy that blocks it, or a syntax error in the worker script'

@@ -299,10 +299,10 @@ Vite, and so SvelteKit, needs no configuration, and neither do webpack 5 and Rsp
 
 <Fw only="angular">
 
-The Angular CLI needs no configuration. Its application builder can't copy the WebAssembly as a
-file, so `@embedpdf/engine` gives it its portable build without being asked: the WebAssembly
-travels inside your build as a lazy chunk and is unpacked in the browser, a moment's work when the
-engine starts.
+The Angular CLI needs no configuration, for `ng build` or for `ng serve`. Its application builder
+can't copy the WebAssembly as a file, so `@embedpdf/engine` gives it its portable build without
+being asked: the WebAssembly travels inside your build as a lazy chunk and is unpacked in the
+browser, a moment's work when the engine starts.
 
 </Fw>
 

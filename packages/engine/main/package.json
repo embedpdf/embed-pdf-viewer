@@ -25,6 +25,11 @@
       "types": "./workers/embedpdf-worker.source.d.ts",
       "default": "./workers/embedpdf-worker.source.js"
     },
+    "./dev-wasm": {
+      "types": "./workers/dev-wasm.d.ts",
+      "development": "./workers/dev-wasm.js",
+      "default": "./workers/dev-wasm.none.js"
+    },
     "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
     "./workers/encoder-worker.js": "./workers/encoder-worker.js",
     "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
@@ -105,6 +110,11 @@
         "types": "./workers/embedpdf-worker.source.d.ts",
         "default": "./workers/embedpdf-worker.source.js"
       },
+      "./dev-wasm": {
+        "types": "./workers/dev-wasm.d.ts",
+        "development": "./workers/dev-wasm.js",
+        "default": "./workers/dev-wasm.none.js"
+      },
       "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
       "./workers/encoder-worker.js": "./workers/encoder-worker.js",
       "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
@@ -114,13 +124,15 @@
     "rawExports": [
       "./worker-entry",
       "./worker-source",
+      "./dev-wasm",
       "./workers/embedpdf-worker.js",
       "./workers/encoder-worker.js",
       "./workers/inline-transport.node.js"
     ],
     "devExports": "development",
     "neverBundle": [
-      "#inline-transport"
+      "#inline-transport",
+      "@embedpdf/engine/dev-wasm"
     ],
     "conditions": {
       ".": {

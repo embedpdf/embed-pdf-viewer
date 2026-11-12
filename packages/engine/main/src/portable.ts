@@ -23,12 +23,19 @@
  * is the portable engine under Angular and the streamed asset everywhere
  * else — zero configuration in both, decided by the resolver at build time.
  * The bundler matrix (tooling/bundler-matrix) guards the routing.
+ *
+ * `ng serve` is the exception: its dev server prebundles packages with
+ * Vite's resolver, which does not apply `es2020`, so it gets the default
+ * entry. From Angular 22 that entry finds its files in `node_modules`. In
+ * Angular 20 and 21 it starts as this one does, from a blob: worker and the
+ * inline wasm (see `prebundledDevWasm` in `src/worker-files.ts`).
  */
 import {
   localEngine as siblingLocalEngine,
   type LocalEngine,
   type LocalEngineRecipeOptions,
 } from './index';
+import { unpackInlineWasm } from './inline-wasm';
 
 export type { LocalEngine, LocalEngineRecipeOptions };
 export * from './index';
@@ -36,7 +43,7 @@ export * from './index';
 /** The wasm bytes from the inline module: lazy import, base64 decode, gunzip. */
 export async function loadInlineWasm(): Promise<ArrayBuffer> {
   const { default: packed } = await import('@embedpdf/engine-runtime-wasm32/wasm-inline');
-  return inflate(decodeBase64(packed));
+  return unpackInlineWasm(packed);
 }
 
 /**
@@ -51,25 +58,4 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
 /** Only where there are workers to start: elsewhere the engine and its encoder run in this thread. */
 function inlineWorkers(): Pick<LocalEngineRecipeOptions, 'worker' | 'encoderWorker'> {
   return typeof Worker === 'undefined' ? {} : { worker: 'inline', encoderWorker: 'inline' };
-}
-
-function decodeBase64(text: string): Uint8Array {
-  // atob, not a data: URL fetch — a strict `connect-src` can block the latter.
-  const binary = atob(text);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function inflate(packed: Uint8Array): Promise<ArrayBuffer> {
-  if (typeof DecompressionStream === 'undefined') {
-    throw new Error(
-      '[embedpdf] @embedpdf/engine/portable needs DecompressionStream (Chrome 80, Firefox 113, ' +
-        'Safari 16.4). Use the default `@embedpdf/engine` entry with a self-hosted wasm instead.',
-    );
-  }
-  const stream = new Blob([packed as BlobPart])
-    .stream()
-    .pipeThrough(new DecompressionStream('gzip'));
-  return new Response(stream).arrayBuffer();
 }

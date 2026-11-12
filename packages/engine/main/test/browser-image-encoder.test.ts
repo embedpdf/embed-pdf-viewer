@@ -20,6 +20,7 @@ vi.mock('../src/worker-files', async () => {
       if (files.encoder !== null) allowWorkerUrl(files.encoder);
       return files.encoder;
     },
+    prebundledDevWasm: async () => null,
   };
 });
 

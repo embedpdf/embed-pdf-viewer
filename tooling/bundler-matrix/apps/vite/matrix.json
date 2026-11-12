@@ -1,5 +1,18 @@
 {
   "toolchain": "Vite 6",
   "workerSrc": "'self'",
-  "dist": "dist"
+  "dist": "dist",
+  "variants": [
+    {
+      "name": "vite+workers-folder",
+      "toolchain": "Vite 6, files emitted under their own names in `workers/`",
+      "workerSrc": "'self'",
+      "script": "matrix:build:workers-folder"
+    },
+    {
+      "name": "vite+dev",
+      "toolchain": "Vite 6 dev server, installed from packs",
+      "dev": "matrix:dev"
+    }
+  ]
 }
