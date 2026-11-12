@@ -27,15 +27,21 @@ export async function runViewerProbe(root, EmbedPDF, { src = './sample.pdf' } = 
     const shadow = () => element.shadowRoot;
 
     await step('pages', async () => {
-      const image = await until('a page to show', () => {
-        const text = shadow()?.textContent ?? '';
-        if (!/Page 1 of \d+/.test(text)) return null;
-        return [...shadow().querySelectorAll('img')].find(
-          (each) => each.src.startsWith('blob:') && each.complete && each.naturalWidth > 0,
-        );
+      // Asked of the viewer, which is null until it is ready, not read off its toolbar: the
+      // words there change with the viewer's strings.
+      const opened = await until('the document to open', () => {
+        const first = element.viewer?.documents.list()[0];
+        if (first?.status === 'error')
+          throw new Error(`the document did not open: ${first.error?.message}`);
+        return first?.status === 'ready' ? first : null;
       });
+      const image = await until('a page to show', () =>
+        [...shadow().querySelectorAll('img')].find(
+          (each) => each.src.startsWith('blob:') && each.complete && each.naturalWidth > 0,
+        ),
+      );
       return {
-        pageCount: Number(/Page 1 of (\d+)/.exec(shadow().textContent)[1]),
+        pageCount: opened.pageCount,
         image: `${image.naturalWidth}x${image.naturalHeight}`,
       };
     });

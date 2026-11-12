@@ -20,6 +20,20 @@ table on stdout.
 The apps' build scripts are named `matrix:build` on purpose: turbo's `build`
 task must not pick them up.
 
+## What fails the run
+
+Every row has to pass: build (a dev row: install and start), boot the probe,
+stay on its own origin and keep the policy. The runner exits non-zero when a
+row does not, and names it under the table with what it did.
+
+One row cannot boot, and its `matrix.json` entry says so with `failsByDesign`
+and the reason: plain `esbuild`, the default engine entry under a bundler that
+emits no file for `new URL(…, import.meta.url)`. Its `Result` reads
+`❌ by design`. It still has to build, stay on its origin and keep the policy.
+The run also fails when it boots: its entry is then out of date.
+
+The rule is `unexpected()` in `verdict.mjs`.
+
 ## Variants
 
 Beside every zero-config row, an app may declare documented opt-ins in its
@@ -65,8 +79,7 @@ the Angular CLI prebundles nothing without that cache, and turns it off where
 A dev row has no policy (a dev server adds scripts of its own to the page),
 and no sizes. `wasm delivery` reads `inline chunk` where the engine started
 from its dev copy and `file in node_modules` where the dev server served the
-file, as Vite 8 does. A dev row has to boot: the runner exits non-zero when
-one doesn't.
+file, as Vite 8 does.
 
 ## The strict policy
 
@@ -92,7 +105,3 @@ beside that policy:
 Inline scripts in the build's own `index.html` (Parcel's import map, Next's
 bootstrap) are allowed by their hashes, as a static host lists them. The `CSP`
 column shows each row's `worker-src` and these additions.
-
-The runner exits non-zero when a row makes an off-origin request or violates the
-policy: the two guarantees every row keeps, whether or not its zero-config boot
-works. It also does when a dev row fails to boot.
