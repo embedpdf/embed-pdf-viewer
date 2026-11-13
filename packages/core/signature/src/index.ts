@@ -25,7 +25,15 @@ export {
   type TrustVerdict,
   type ValidationTime,
 } from './trust';
-export { sign, profileFor, type CmsSigner, type SignInput, type SignerPort } from './sign';
+export {
+  completeSignature,
+  sign,
+  profileFor,
+  type CmsSigner,
+  type SignInput,
+  type SignerPort,
+} from './sign';
+export { attachSignatureTimestamp } from './cms/attach';
 export {
   validateSignatures,
   type IntegrityVerdict,
@@ -42,6 +50,7 @@ export {
   type TestTimestampAuthority,
 } from './signers/webcrypto';
 export { remoteSigner } from './signers/remote';
+export { ecdsaRawFromDer } from './signers/ecdsa';
 export {
   indexedDbKeyStore,
   memoryKeyStore,

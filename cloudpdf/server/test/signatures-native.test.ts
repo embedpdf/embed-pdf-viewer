@@ -36,6 +36,13 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { pinOf } from './_helpers/pins';
+// What a signing service might hand over is built from the signature package's own parts.
+import { timestampTokenAttribute } from '../../../packages/core/signature/src/cms/attach';
+import { parseCmsInternal } from '../../../packages/core/signature/src/cms/parse';
+import { addUnsignedAttribute } from '../../../packages/core/signature/src/cms/splice';
+import { signatureValueOf } from '../../../packages/core/signature/src/cms/verify-timestamp';
+import { createTimestampAuthorityIdentity } from '../../../packages/core/signature/test/helpers/pki';
+import { buildTestToken } from '../../../packages/core/signature/test/helpers/tokens';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -836,6 +843,70 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(await store.exists(bobKey)).toBe(false);
     expect(await store.exists(aliceKey)).toBe(true);
     expect(await store.exists(StorageKeys.basePdf(TENANT, docId))).toBe(true);
+  });
+
+  test("a timestamp a CMS carries: one that provably isn't its own is refused, one that can't be checked completes", async () => {
+    const signer = await createTestSigner({ commonName: 'Wire Signer' });
+    const authority = await createTimestampAuthorityIdentity('Wire Authority');
+    const sha256Bytes = async (bytes: Uint8Array) =>
+      new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+
+    /** Prepare a signature on a fresh document, and complete it with what `carry` adds to the CMS. */
+    const completeWith = async (
+      docId: string,
+      carry: (signatureValue: Uint8Array) => Promise<Uint8Array>,
+    ): Promise<Response> => {
+      await seed(docId);
+      const layer = `/v1/docs/${docId}/layers/alice`;
+      const prepared = decodePrepared(
+        SignaturePreparedWireSchema.parse(
+          await json(
+            await call(
+              'POST',
+              `${layer}/signatures/prepare`,
+              docId,
+              'alice',
+              prepareForm({ field: { kind: 'fqn', name: 'sig' }, contentsSizeBytes: 16384 }),
+            ),
+          ),
+        ),
+      );
+      const cms = await buildDetachedCms({
+        digest: prepared.digest,
+        hash: prepared.algorithm,
+        profile: profileFor(prepared.subFilter as SignatureSubFilter),
+        signer,
+      });
+      const token = await carry(signatureValueOf(parseCmsInternal(cms).signerInfo));
+      const carrying = addUnsignedAttribute(cms, timestampTokenAttribute(token));
+      return call(
+        'POST',
+        `${layer}/signatures/${prepared.signingId}/complete`,
+        docId,
+        'alice',
+        JSON.stringify({ cms: toBase64(carrying), expectedVersion: prepared.expectedVersion }),
+        'application/json',
+      );
+    };
+
+    // A token over other bytes than this signature's value: proof it belongs elsewhere.
+    const refused = await completeWith('doc-sign-native-stamp-wrong', () =>
+      buildTestToken({ digest: new Uint8Array(32).fill(7), authority: authority.signer }),
+    );
+    const refusal = await json<{ error: { code: string; message: string } }>(refused, 422);
+    expect(refusal.error.code).toBe('SignatureRefused');
+    expect(refusal.error.message).toContain("the signature's timestamp does not belong to it");
+
+    // A token that stamps this signature but binds its certificate with a hash unknown here: a
+    // signing service may bring one, and what can't be checked isn't proof of anything.
+    const accepted = await completeWith('doc-sign-native-stamp-unknown', async (signatureValue) =>
+      buildTestToken({
+        digest: await sha256Bytes(signatureValue),
+        authority: authority.signer,
+        binding: { version: 2, hashOid: '2.16.840.1.101.3.4.2.8' },
+      }),
+    );
+    expect(await json<{ status: string }>(accepted)).toMatchObject({ status: 'completed' });
   });
 });
 

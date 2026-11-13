@@ -4,7 +4,11 @@ import type { SignatureProfile } from './cms/build';
 import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal } from './cms/parse';
 import { verifyCmsSignature } from './cms/verify';
-import { checkTimestampToken } from './cms/verify-timestamp';
+import { checkTimestampToken, signatureValueOf } from './cms/verify-timestamp';
+
+const RESERVE_STEP = 4096;
+/** The most room `prepare` reserves for a signature: 4 MiB. */
+const LARGEST_RESERVE = 4 * 1024 * 1024;
 
 /**
  * The shape the CMS must have: a PDF signature's (`pkcs7`, `cades-b`), or a
@@ -29,8 +33,9 @@ export type CompletionGate =
  * must fit the reserved room, hash with the prepared algorithm, carry the
  * prepared digest as its message digest, verify with its own certificate,
  * and match the profile the `/SubFilter` promises (CAdES: ESS
- * signing-certificate-v2 present, no CMS signing-time). A bad CMS never
- * reaches the document.
+ * signing-certificate-v2 present, no CMS signing-time). A timestamp it
+ * carries must be its own: one proven to stamp something else is refused. A
+ * bad CMS never reaches the document.
  */
 export async function verifyForCompletion(input: {
   cms: Uint8Array;
@@ -42,7 +47,7 @@ export async function verifyForCompletion(input: {
     return {
       ok: false,
       reason: 'too-large',
-      detail: `the CMS is ${cms.byteLength} bytes; ${prepared.contentsSizeBytes} were reserved`,
+      detail: `the signature is ${cms.byteLength} bytes and ${prepared.contentsSizeBytes} were reserved: ${reserveAdvice(cms.byteLength)}`,
     };
   }
   if (profile === 'timestamp') return verifyDocumentTimestamp(cms, prepared);
@@ -98,7 +103,34 @@ export async function verifyForCompletion(input: {
           : 'the signature does not verify',
     };
   }
+  // A timestamp the CMS carries must belong to it. One that can't be checked passes: a signing
+  // service's token may use what this engine doesn't know, and the gate sees only bytes, so it
+  // can't tell that token from one this signing asked for: `attachSignatureTimestamp` refuses
+  // those.
+  const signatureValue = signatureValueOf(internal.signerInfo);
+  for (const token of internal.timestampTokens) {
+    const check = await checkTimestampToken({
+      token,
+      stamped: { kind: 'bytes', bytes: signatureValue },
+      certificates: internal.certificates,
+    });
+    if (check.verdict === 'invalid') {
+      return {
+        ok: false,
+        reason: check.problem === 'imprint' ? 'digest-mismatch' : 'signature-invalid',
+        detail: `the signature's timestamp does not belong to it: ${check.detail}`,
+      };
+    }
+  }
   return { ok: true };
+}
+
+/** The reserve to prepare with for a signature of `size` bytes, in whole steps of 4096. */
+function reserveAdvice(size: number): string {
+  const reserve = Math.ceil(size / RESERVE_STEP) * RESERVE_STEP;
+  return reserve > LARGEST_RESERVE
+    ? 'that is more than a signature may reserve'
+    : `pass \`contentsSizeBytes: ${reserve}\``;
 }
 
 /**

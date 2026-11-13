@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { OID } from '../src/cms/oids';
-import { verifyForCompletion } from '../src/index';
+import { buildDetachedCms, createTestSigner, verifyForCompletion } from '../src/index';
 import { createOpenSslAuthority, hasOpenSsl } from './helpers/openssl';
 import { createTimestampAuthorityIdentity } from './helpers/pki';
 import { buildTestToken, type TestBinding } from './helpers/tokens';
@@ -100,6 +100,50 @@ describe('completing a document timestamp', () => {
     expect(await complete(new Uint8Array([0x30, 0x03, 0x02, 0x01, 0x05]))).toMatchObject({
       ok: false,
       reason: 'malformed',
+    });
+  });
+});
+
+describe('the room a signature was given', () => {
+  const signaturePrepared = { ...prepared, subFilter: 'ETSI.CAdES.detached' as const };
+
+  test('a CMS that does not fit is refused with the reserve to prepare with', async () => {
+    const signer = await createTestSigner();
+    const cms = await buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer });
+    const tight = { ...signaturePrepared, contentsSizeBytes: cms.byteLength - 1 };
+
+    expect(await verifyForCompletion({ cms, prepared: tight, profile: 'cades-b' })).toEqual({
+      ok: false,
+      reason: 'too-large',
+      detail: `the signature is ${cms.byteLength} bytes and ${cms.byteLength - 1} were reserved: pass \`contentsSizeBytes: 4096\``,
+    });
+    // Whole steps of 4096, and the size itself when it is one.
+    const padded = (size: number) => {
+      const bytes = new Uint8Array(size);
+      bytes.set(cms);
+      return bytes;
+    };
+    const advice = async (size: number) =>
+      (
+        (await verifyForCompletion({
+          cms: padded(size),
+          prepared: { ...signaturePrepared, contentsSizeBytes: 256 },
+          profile: 'cades-b',
+        })) as { detail: string }
+      ).detail;
+    expect(await advice(17210)).toContain('pass `contentsSizeBytes: 20480`');
+    expect(await advice(8192)).toContain('pass `contentsSizeBytes: 8192`');
+    expect(await advice(4 * 1024 * 1024 + 1)).toContain(
+      'that is more than a signature may reserve',
+    );
+  });
+
+  test('a CMS that fits exactly is checked like any other', async () => {
+    const signer = await createTestSigner();
+    const cms = await buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer });
+    const exact = { ...signaturePrepared, contentsSizeBytes: cms.byteLength };
+    expect(await verifyForCompletion({ cms, prepared: exact, profile: 'cades-b' })).toEqual({
+      ok: true,
     });
   });
 });

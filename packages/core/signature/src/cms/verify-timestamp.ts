@@ -20,6 +20,15 @@ import { readTimestampInfo, type TimestampInfo } from './timestamp';
 import { checkCertificateBinding, verifySignerSignature, type CryptographyVerdict } from './verify';
 
 /**
+ * The bytes a signature's timestamp stamps: the contents of the SignerInfo's signature octet
+ * string, without its tag and length (RFC 3161 Appendix A). For ECDSA that is the DER
+ * signature the CMS carries, not the `r || s` a key returns.
+ */
+export function signatureValueOf(signerInfo: pkijs.SignerInfo): Uint8Array {
+  return new Uint8Array(signerInfo.signature.getValue());
+}
+
+/**
  * What a token is expected to stamp: bytes this verifier hashes itself with the token's own
  * algorithm (a signature's value), or a digest made elsewhere under a known algorithm (a
  * document's byte ranges).

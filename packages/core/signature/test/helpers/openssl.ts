@@ -120,6 +120,88 @@ export function createOpenSslAuthority(bindingHash: 'sha1' | 'sha256' | 'sha384'
   };
 }
 
+/**
+ * A signer run by OpenSSL: a CMS from another library, for what must hold whoever made it. Its
+ * signatures are detached, over content this helper is given, with definite lengths or, when
+ * asked, the indefinite ones a streaming encoder writes. Call `dispose()` when done.
+ */
+export function createOpenSslSigner(): {
+  /** A detached CMS over `content`. */
+  sign(content: Uint8Array, options?: { indefinite?: boolean }): Uint8Array;
+  /** Does OpenSSL verify `cms` as a signature over `content`? */
+  verifies(cms: Uint8Array, content: Uint8Array): { ok: boolean; output: string };
+  dispose(): void;
+} {
+  const directory = mkdtempSync(join(tmpdir(), 'epdf-openssl-signer-'));
+  const run = (args: string[]) =>
+    execFileSync('openssl', args, { stdio: 'pipe', cwd: directory, encoding: 'utf8' });
+  run([
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-nodes',
+    '-keyout',
+    'signer.key',
+    '-out',
+    'signer.pem',
+    '-days',
+    '30',
+    '-subj',
+    '/CN=OpenSSL test signer',
+  ]);
+  return {
+    sign(content, options = {}) {
+      writeFileSync(join(directory, 'content.bin'), content);
+      run([
+        'cms',
+        '-sign',
+        '-binary',
+        ...(options.indefinite ? ['-stream'] : []),
+        '-in',
+        'content.bin',
+        '-signer',
+        'signer.pem',
+        '-inkey',
+        'signer.key',
+        '-outform',
+        'DER',
+        '-out',
+        'signature.der',
+      ]);
+      return new Uint8Array(readFileSync(join(directory, 'signature.der')));
+    },
+    verifies(cms, content) {
+      writeFileSync(join(directory, 'content.bin'), content);
+      writeFileSync(join(directory, 'checked.der'), cms);
+      try {
+        // The signer's certificate is self-signed: this checks the signature, not the chain.
+        run([
+          'cms',
+          '-verify',
+          '-binary',
+          '-inform',
+          'DER',
+          '-in',
+          'checked.der',
+          '-content',
+          'content.bin',
+          '-noverify',
+          '-out',
+          'verified.bin',
+        ]);
+        return { ok: true, output: '' };
+      } catch (error) {
+        const failure = error as { stdout?: string; stderr?: string; message: string };
+        return { ok: false, output: `${failure.stdout ?? ''}${failure.stderr ?? failure.message}` };
+      }
+    },
+    dispose() {
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}
+
 function pem(label: string, der: Uint8Array): string {
   const base64 = Buffer.from(der).toString('base64');
   const lines = base64.match(/.{1,64}/g) ?? [];
