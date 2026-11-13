@@ -77,6 +77,14 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
     throw new Error('WASM runtime does not expose malloc/free');
   }
 
+  // The heap's buffer is replaced when memory grows: rebuild the view then.
+  let heapView: DataView | null = null;
+  const view = (): DataView => {
+    const buffer = module.HEAPU8.buffer;
+    if (heapView?.buffer !== buffer) heapView = new DataView(buffer);
+    return heapView;
+  };
+
   return {
     alloc(bytes) {
       return toPtr(malloc(bytes));
@@ -109,7 +117,23 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
       return ptr;
     },
     peek(ptr, kind, byteOffset = 0) {
-      const value = module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      const address = toNumber(ptr) + byteOffset;
+      // Plain numbers straight from the heap: the glue's getValue checks
+      // every access in a build with assertions, which costs more than the
+      // read in per-glyph loops. wasm memory is little-endian.
+      switch (kind) {
+        case 'i8':
+          return view().getInt8(address);
+        case 'i16':
+          return view().getInt16(address, true);
+        case 'i32':
+          return view().getInt32(address, true);
+        case 'f32':
+          return view().getFloat32(address, true);
+        case 'f64':
+          return view().getFloat64(address, true);
+      }
+      const value = module.getValue?.(address, wasmValueKind(kind)) ?? 0;
       // A pointer read from memory is a `Ptr`, as on the native runtime.
       return kind === 'ptr' ? toPtr(value) : value;
     },
