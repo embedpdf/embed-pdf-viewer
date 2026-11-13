@@ -30,12 +30,14 @@ export function signatureValueOf(signerInfo: pkijs.SignerInfo): Uint8Array {
 
 /**
  * What a token is expected to stamp: bytes this verifier hashes itself with the token's own
- * algorithm (a signature's value), or a digest made elsewhere under a known algorithm (a
- * document's byte ranges).
+ * algorithm (a signature's value), a digest made elsewhere under a known algorithm (what a
+ * document was prepared with), or a digest the caller makes under whichever algorithm the
+ * token names (a document's byte ranges, read back).
  */
 export type Stamped =
   | { kind: 'bytes'; bytes: Uint8Array }
-  | { kind: 'digest'; digest: Uint8Array; algorithm: DigestAlgorithm };
+  | { kind: 'digest'; digest: Uint8Array; algorithm: DigestAlgorithm }
+  | { kind: 'digest-with'; digest: (algorithm: DigestAlgorithm) => Promise<Uint8Array> };
 
 /**
  * Why a token isn't `valid`. The first five are proof that the token is wrong, and the only
@@ -116,9 +118,14 @@ export async function checkTimestampToken(input: {
   const expected =
     stamped.kind === 'digest'
       ? stamped.digest
-      : new Uint8Array(
-          await engine.digest(WEBCRYPTO_HASH[info.imprintAlgorithm], toArrayBuffer(stamped.bytes)),
-        );
+      : stamped.kind === 'digest-with'
+        ? await stamped.digest(info.imprintAlgorithm)
+        : new Uint8Array(
+            await engine.digest(
+              WEBCRYPTO_HASH[info.imprintAlgorithm],
+              toArrayBuffer(stamped.bytes),
+            ),
+          );
   if (!bytesEqual(info.imprint, expected)) {
     return failed('invalid', 'imprint', "the token's message imprint is not the stamped digest");
   }

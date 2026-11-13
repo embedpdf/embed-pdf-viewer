@@ -36,9 +36,11 @@ export {
 export { attachSignatureTimestamp } from './cms/attach';
 export {
   validateSignatures,
+  verifyTimestampToken,
   type IntegrityVerdict,
   type ModificationsVerdict,
   type SignatureVerdict,
+  type TimestampVerdict,
   type ValidateSignaturesOptions,
 } from './verdict';
 export {
