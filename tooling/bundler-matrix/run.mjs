@@ -9,6 +9,10 @@
  * A dev row (a variant with `dev`) runs the app's dev server instead, on a
  * copy of the app installed from packs of the packages (see dev-server.mjs).
  *
+ * Exits non-zero when a row is not what its `matrix.json` entry says it is
+ * (see verdict.mjs): every row has to pass, except one whose entry gives
+ * `failsByDesign`.
+ *
  *   node run.mjs                 # every app
  *   node run.mjs --only vite,angular
  *   node run.mjs --script matrix:build:assets --only angular   # a variant
@@ -21,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { createPacker, installFromPacks, startDevServer } from './dev-server.mjs';
 import { serve } from './serve.mjs';
+import { resultCell, unexpected } from './verdict.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -155,6 +160,15 @@ async function serveDev({ dir, script }, row, packer) {
 
 const kb = (n) => `${Math.round(n / 1024)} kB`;
 const results = [];
+
+/** Keeps a finished row, and says at once when it is not what its entry allows. */
+function record(row) {
+  row.unexpected = unexpected(row);
+  if (row.unexpected) console.log(`  ✗ ${row.unexpected}`);
+  else if (row.failsByDesign) console.log(`  fails by design: ${row.failsByDesign}`);
+  results.push(row);
+}
+
 const browser = await launch();
 const packer = createPacker();
 try {
@@ -178,26 +192,37 @@ try {
       trustedTypes: entry.trustedTypes,
       enforceTrustedTypes: entry.enforceTrustedTypes,
     });
-    runs.push({ name, dir, meta, toolchain: meta.toolchain, script, csp: csp(meta) });
+    // What every row takes from its own entry: a variant does not get the app's `failsByDesign`.
+    const common = (entry) => ({
+      dir,
+      meta,
+      toolchain: entry.toolchain,
+      failsByDesign: entry.failsByDesign,
+    });
+    runs.push({ name, ...common(meta), script, csp: csp(meta) });
     // Variants: documented opt-ins measured beside the zero-config row, and the dev server.
     for (const v of meta.variants ?? [])
       runs.push(
         v.dev
-          ? { name: v.name, dir, meta, toolchain: v.toolchain, script: v.dev, dev: true }
-          : { name: v.name, dir, meta, toolchain: v.toolchain, script: v.script, csp: csp(v) },
+          ? { name: v.name, ...common(v), script: v.dev, dev: true }
+          : { name: v.name, ...common(v), script: v.script, csp: csp(v) },
       );
   }
-  for (const run of runs)
+  for (const run of runs) {
     if (!run.dev && !run.csp.workerSrc)
       throw new Error(`${run.name}: its matrix.json entry must give a workerSrc`);
+    if (run.failsByDesign !== undefined && !String(run.failsByDesign).trim())
+      throw new Error(`${run.name}: failsByDesign in its matrix.json entry must say why`);
+  }
   for (const run of runs) {
     const { name, toolchain, script } = run;
     const row = { app: name, toolchain, script, dev: run.dev === true, ok: false };
+    if (run.failsByDesign) row.failsByDesign = run.failsByDesign;
     process.stdout.write(`\n▶ ${name} (${toolchain}) — ${script}\n`);
     const site = run.dev ? await serveDev(run, row, packer) : await serveBuild(run, row);
     if (site === null) {
       console.log(`  ${run.dev ? 'dev server' : 'build'} FAILED\n${row.log}`);
-      results.push(row);
+      record(row);
       continue;
     }
     const { origin } = site;
@@ -287,7 +312,7 @@ try {
         '  ' +
           [...(row.probe.errors ?? []), ...failures, ...consoleErrors].join('\n  ').slice(0, 1500),
       );
-    results.push(row);
+    record(row);
   }
 } finally {
   await browser.close();
@@ -310,23 +335,14 @@ for (const r of results) {
     ? '—'
     : `${r.csp.violations.length ? `❌ ${r.csp.violations.length} violations` : '✅'} (${[r.csp.workerSrc, ...additions].join(', ')})`;
   console.log(
-    `| ${r.toolchain} | ${r.ok ? '✅' : '❌'} | ${r.build === 'ok' ? `✅ ${Math.round(r.buildMs / 1000)}s` : '❌'} | ${probe} | ${csp} | ${r.delivery ?? '—'} | ${(r.wasmFetched ?? []).join('<br>') || '—'} | ${(r.foreign ?? []).join('<br>') || 'none'} | ${r.emitted ? kb(r.emitted.js) : '—'} | ${r.emitted ? kb(r.emitted.wasm) : '—'} |`,
+    `| ${r.toolchain} | ${resultCell(r)} | ${r.build === 'ok' ? `✅ ${Math.round(r.buildMs / 1000)}s` : '❌'} | ${probe} | ${csp} | ${r.delivery ?? '—'} | ${(r.wasmFetched ?? []).join('<br>') || '—'} | ${(r.foreign ?? []).join('<br>') || 'none'} | ${r.emitted ? kb(r.emitted.js) : '—'} | ${r.emitted ? kb(r.emitted.wasm) : '—'} |`,
   );
 }
 
-// What the docs promise of every row, whether or not its zero-config boot works: no request
-// leaves the app's origin, and nothing violates the policy.
-const broken = results.filter((r) => r.foreign?.length || r.csp?.violations.length);
-if (broken.length) {
-  console.error(
-    `\n${broken.map((r) => r.app).join(', ')}: a request left the origin or the policy was violated`,
-  );
-  process.exitCode = 1;
-}
-
-// A dev row is the app as Setup describes it, with nothing configured: it has to boot.
-const stuck = results.filter((r) => r.dev && !r.ok);
-if (stuck.length) {
-  console.error(`\n${stuck.map((r) => r.app).join(', ')}: the dev server did not show a page`);
+// One rule for every row: it does what its matrix.json entry says (see verdict.mjs).
+const wrong = results.filter((r) => r.unexpected);
+if (wrong.length) {
+  console.error(`\n${wrong.length} of ${results.length} rows are not what their entry says:`);
+  for (const r of wrong) console.error(`  ${r.app}: ${r.unexpected}`);
   process.exitCode = 1;
 }

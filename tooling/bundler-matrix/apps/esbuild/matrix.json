@@ -2,6 +2,7 @@
   "toolchain": "esbuild (plain, esm + splitting)",
   "workerSrc": "'self'",
   "dist": "dist",
+  "failsByDesign": "esbuild emits no file for `new URL(…, import.meta.url)`, so the default engine entry gets neither its worker files nor embedpdf.wasm; an esbuild app imports `@embedpdf/engine/portable`",
   "variants": [
     {
       "name": "esbuild+portable",

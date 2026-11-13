@@ -4,9 +4,10 @@
  * ({@link isDev}).
  */
 
-// Module-scoped so the check compiles without Node's ambient types; bundlers
-// still see the literal `process.env.NODE_ENV` and replace it.
-declare const process: { env?: { NODE_ENV?: string } } | undefined;
+// Module-scoped so the check compiles without Node's ambient types. The check reads
+// `process.env.NODE_ENV` exactly as written, the expression every bundler replaces: Parcel
+// takes `process?.env?.NODE_ENV` for a use of Node's `process` and asks for a polyfill of it.
+declare const process: { env: { NODE_ENV?: string } };
 
 const warned = new Set<string>();
 
@@ -18,7 +19,7 @@ const warned = new Set<string>();
  */
 export function isDev(): boolean {
   try {
-    return process?.env?.NODE_ENV !== 'production';
+    return process.env.NODE_ENV !== 'production';
   } catch {
     return true;
   }
