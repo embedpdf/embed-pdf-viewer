@@ -19,7 +19,7 @@ export function signedAttributesDer(signerInfo: pkijs.SignerInfo): Uint8Array {
  * Does the CMS's signature verify with the certificate it names, over the
  * attributes it signed? Says nothing about the content: the message digest
  * is compared by the caller (`validateSignatures`, `verifyForCompletion`).
- * `unsupported` means the algorithm is unknown to this engine, which is
+ * `unsupported` means an algorithm is unknown to this engine, which is
  * never `invalid`.
  */
 export async function verifyCmsSignature(
@@ -31,23 +31,52 @@ export async function verifyCmsSignature(
   } catch (error) {
     return error instanceof CmsError && error.reason === 'unsupported' ? 'unsupported' : 'invalid';
   }
+  const binding = await checkCertificateBinding(internal);
+  if (binding === 'invalid') return 'invalid';
+  const signature = await verifySignerSignature(internal);
+  if (signature !== 'valid') return signature;
+  return binding === 'unsupported' ? 'unsupported' : 'valid';
+}
+
+/**
+ * Does the CMS name the certificate that signed it? Every binding it carries whose hash this
+ * engine knows must be the hash of the signer's certificate: one that isn't is `invalid`.
+ * `absent` when the CMS carries no binding, `unsupported` when it carries only bindings whose
+ * hash is unknown.
+ */
+export async function checkCertificateBinding(
+  internal: ParsedCmsInternal,
+): Promise<CryptographyVerdict | 'absent'> {
+  if (internal.bindings.length === 0) return 'absent';
   const engine = ensureEngine();
-  const { signerInfo, signerCertificate, parsed, essCertHash } = internal;
-
-  if (essCertHash) {
+  let checked = false;
+  for (const binding of internal.bindings) {
+    if (!binding.algorithm) continue;
     const certHash = new Uint8Array(
-      await engine.digest('SHA-256', toArrayBuffer(parsed.signerCertificate)),
+      await engine.digest(
+        WEBCRYPTO_HASH[binding.algorithm],
+        toArrayBuffer(internal.parsed.signerCertificate),
+      ),
     );
-    if (!bytesEqual(certHash, essCertHash)) return 'invalid';
+    if (!bytesEqual(certHash, binding.certHash)) return 'invalid';
+    checked = true;
   }
+  return checked ? 'valid' : 'unsupported';
+}
 
+/** Does the signature verify with the signer's certificate, over the attributes it signed? */
+export async function verifySignerSignature(
+  internal: ParsedCmsInternal,
+): Promise<CryptographyVerdict> {
+  const engine = ensureEngine();
+  const { signerInfo, signerCertificate, digestAlgorithm } = internal;
   try {
     const ok = await engine.verifyWithPublicKey(
       toArrayBuffer(signedAttributesDer(signerInfo)),
       signerInfo.signature,
       signerCertificate.subjectPublicKeyInfo,
       signerInfo.signatureAlgorithm,
-      WEBCRYPTO_HASH[parsed.digestAlgorithm],
+      WEBCRYPTO_HASH[digestAlgorithm],
     );
     return ok ? 'valid' : 'invalid';
   } catch (error) {

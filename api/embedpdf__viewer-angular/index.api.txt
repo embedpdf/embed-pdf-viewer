@@ -112,7 +112,7 @@ ThemeToken [TypeAliasDeclaration] (from packages/viewer/chrome/src/ui/theme.tsx)
 ThemeTokens [TypeAliasDeclaration] (from packages/viewer/chrome/src/ui/theme.tsx): export type ThemeTokens ={ readonly [Name in ThemeToken]?: string} ;
 ToolbarItemContext [InterfaceDeclaration] (from packages/viewer/chrome/src/ui/item-context.ts): export interface ToolbarItemContext{ readonly orientation: 'horizontal' | 'vertical'; readonly edge: ToolbarItemEdge; readonly variant: string | null; readonly size: ViewerSize; }
 ToolbarItemEdge [TypeAliasDeclaration] (from packages/viewer/chrome/src/ui/item-context.ts): export type ToolbarItemEdge = 'top' | 'bottom' | 'start' | 'end' | 'float' | 'selection';
-TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; }
+TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; timestampAnchors?(): Promise<Uint8Array[]>; }
 Unsubscribe [TypeAliasDeclaration] (from packages/core/main/src/types.ts): export type Unsubscribe = () => void;
 Variant [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type Variant = 'icon+label' | 'icon' | 'label';
 Viewer [InterfaceDeclaration] (from packages/viewer/chrome/src/handle.ts): export interface Viewer extends ScopedViewer{ readonly documents: DocumentsCapability; readonly commands: CommandsCapability; forDocument(documentId: string): ScopedViewer; watch<T, Immediate extends boolean = false>( read: () => T, onChange: (value: T, previous: Immediate extends true ? T | undefined : T) => void, options?: WatchOptions<T, Immediate>, ): Unsubscribe; }

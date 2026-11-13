@@ -898,7 +898,7 @@ ToolTouch [TypeAliasDeclaration] (from packages/plugin/interaction/src/contract.
 Translate [TypeAliasDeclaration] (from packages/framework/angular/i18n/src/i18n.ts): export type Translate = (key: string, options?: TranslateOptions) => string;
 TranslateOptions [InterfaceDeclaration] (from packages/plugin/i18n/src/contract.ts): export interface TranslateOptions{ params?: Readonly<Record<string, string | number>>; fallbackKey?: string; fallback?: string; }
 TranslationDictionary [InterfaceDeclaration] (from packages/plugin/i18n/src/contract.ts): export interface TranslationDictionary{ readonly [key: string]: string | TranslationDictionary; }
-TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; }
+TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; timestampAnchors?(): Promise<Uint8Array[]>; }
 UnlockOptions [InterfaceDeclaration] (from packages/core/main/src/types.ts): export interface UnlockOptions extends OperationOptions{ readonly password: string; }
 Unsubscribe [TypeAliasDeclaration] (from packages/core/main/src/types.ts): export type Unsubscribe = () => void;
 UrlSource [InterfaceDeclaration] (from packages/core/main/src/types.ts): export interface UrlSource{ readonly kind: 'url'; readonly url: string; readonly id?: string; }

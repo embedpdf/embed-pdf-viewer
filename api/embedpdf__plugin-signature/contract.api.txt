@@ -41,7 +41,7 @@ SignatureVerdict [InterfaceDeclaration] (from packages/core/signature/src/verdic
 SignerPort [TypeAliasDeclaration] (from packages/core/signature/src/sign.ts): export type SignerPort = CmsSigner | RawSigner;
 SignerRow [InterfaceDeclaration]: export interface SignerRow{ readonly libraryId: string; readonly name: string; readonly library: StampLibrary; readonly signatures: StampAsset[]; readonly initials: StampAsset | null; }
 SigningKey [TypeAliasDeclaration]: export type SigningKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
-TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; }
+TrustPort [InterfaceDeclaration] (from packages/core/signature/src/trust.ts): export interface TrustPort{ anchors(): Promise<Uint8Array[]>; timestampAnchors?(): Promise<Uint8Array[]>; }
 ValidationTime [TypeAliasDeclaration] (from packages/core/signature/src/trust.ts): export type ValidationTime = |{ kind: 'now'} |{ kind: 'timestamp'; genTime: string; tokenVerified: true} ;
 markRoleOf [VariableDeclaration]: markRoleOf = (asset: Pick<StampAsset, 'name'>): MarkRole => asset.name === INITIALS_MARK_NAME ? 'initials' : 'signature'
 signerRowsOf [FunctionDeclaration]: export function signerRowsOf( libraries: readonly StampLibrary[], assets: readonly StampAsset[], ): SignerRow[]{ return libraries .filter((library) => library.kind === SIGNATURES_LIBRARY_KIND) .map((library) =>{ const own = assets.filter((asset) => asset.libraryId === library.id); return{ libraryId: library.id, name: library.name, library, signatures: own.filter((asset) => markRoleOf(asset) === 'signature'), initials: own.find((asset) => markRoleOf(asset) === 'initials') ?? null, } ; } ); }

@@ -20,7 +20,7 @@ export interface ParsedCms {
   signatureAlgorithm: string;
   /** The ESS `signing-certificate-v2` attribute is present (a CAdES requirement). */
   signingCertificateV2: boolean;
-  /** DER of an RFC 3161 timestamp token carried as an unsigned attribute, when present. */
+  /** DER of the first RFC 3161 timestamp token carried as an unsigned attribute, when present. */
   timestampToken: Uint8Array | null;
 }
 
@@ -34,16 +34,44 @@ export class CmsError extends Error {
   }
 }
 
-export interface ParsedCmsInternal {
-  parsed: ParsedCms;
+/**
+ * How a CMS names the certificate that signed it: an ESS certificate identifier, the hash of
+ * that certificate (RFC 5035). `signing-certificate` always hashes with SHA-1;
+ * `signing-certificate-v2` names its hash, SHA-256 when it names none.
+ */
+export interface CertificateBinding {
+  version: 1 | 2;
+  /** The identifier's hash algorithm, or null for one this package doesn't know. */
+  algorithm: DigestAlgorithm | null;
+  /** The hash the attribute gives for the signer's certificate. */
+  certHash: Uint8Array;
+}
+
+/**
+ * A SignedData and its one signer, read without needing the signer's certificate: a timestamp
+ * token may leave its authority's certificate to the signature it sits in.
+ */
+export interface CmsParts {
   signedData: pkijs.SignedData;
   signerInfo: pkijs.SignerInfo;
-  signerCertificate: pkijs.Certificate;
+  digestAlgorithm: DigestAlgorithm;
+  messageDigest: Uint8Array;
+  signingTime: string | null;
+  /** The signer's certificate: one the CMS carries, else one of those offered; null when neither has it. */
+  signerCertificate: pkijs.Certificate | null;
+  /** The signer's certificate when it was found, then the others the CMS carries. */
   certificates: pkijs.Certificate[];
-  /** DER of the signing-certificate-v2 attribute's first certHash, when present. */
-  essCertHash: Uint8Array | null;
+  /** Every binding of the signer's certificate the CMS carries, `signing-certificate-v2` first. */
+  bindings: CertificateBinding[];
+  /** DER of every RFC 3161 token among the unsigned attributes, in the order the CMS carries them. */
+  timestampTokens: Uint8Array[];
   /** A timestamp token's encapsulated TSTInfo (`content: 'tst-info'`); null for a detached CMS. */
   eContent: Uint8Array | null;
+}
+
+export interface ParsedCmsInternal extends CmsParts {
+  parsed: ParsedCms;
+  signerCertificate: pkijs.Certificate;
 }
 
 /**
@@ -53,15 +81,57 @@ export interface ParsedCmsInternal {
  */
 export type CmsContent = 'detached' | 'tst-info';
 
+/** Where to look for a signer's certificate the CMS doesn't carry itself. */
+export interface CmsParseOptions {
+  /** Certificates from outside the CMS: for a timestamp token, those of the signature it sits in. */
+  certificates?: pkijs.Certificate[];
+}
+
 /** Parse a detached CMS SignedData with exactly one signer. Throws `CmsError`. */
 export function parseDetachedCms(cms: Uint8Array): ParsedCms {
   return parseCmsInternal(cms).parsed;
 }
 
+/** {@link readCmsParts}, for a CMS that must carry its signer's certificate. Throws `CmsError`. */
 export function parseCmsInternal(
   cms: Uint8Array,
   content: CmsContent = 'detached',
+  options: CmsParseOptions = {},
 ): ParsedCmsInternal {
+  const parts = readCmsParts(cms, content, options);
+  const internal = withSignerCertificate(parts);
+  if (!internal) {
+    throw new CmsError('malformed', 'the signer certificate is not carried by the CMS');
+  }
+  return internal;
+}
+
+/** The parts as a parsed CMS, or null when the signer's certificate was found nowhere. */
+export function withSignerCertificate(parts: CmsParts): ParsedCmsInternal | null {
+  const signerCertificate = parts.signerCertificate;
+  if (!signerCertificate) return null;
+  return {
+    ...parts,
+    signerCertificate,
+    parsed: {
+      digestAlgorithm: parts.digestAlgorithm,
+      messageDigest: parts.messageDigest,
+      signingTime: parts.signingTime,
+      signerCertificate: certDer(signerCertificate),
+      certificates: parts.certificates.map(certDer),
+      signatureAlgorithm: parts.signerInfo.signatureAlgorithm.algorithmId,
+      signingCertificateV2: parts.bindings.some((binding) => binding.version === 2),
+      timestampToken: parts.timestampTokens[0] ?? null,
+    },
+  };
+}
+
+/** Read a CMS SignedData with exactly one signer. Throws `CmsError`. */
+export function readCmsParts(
+  cms: Uint8Array,
+  content: CmsContent = 'detached',
+  options: CmsParseOptions = {},
+): CmsParts {
   if (cms.byteLength === 0) throw new CmsError('malformed', 'empty CMS');
   const asn1 = asn1js.fromBER(toArrayBuffer(cms));
   if (asn1.offset === -1) throw new CmsError('malformed', 'CMS is not valid BER');
@@ -112,13 +182,13 @@ export function parseCmsInternal(
     throw new CmsError('unsupported', `digest algorithm ${signerInfo.digestAlgorithm.algorithmId}`);
   }
 
-  const certificates = (signedData.certificates ?? []).filter(
+  rememberCertificateBytes(contentInfo, signedData);
+  const carried = (signedData.certificates ?? []).filter(
     (certificate): certificate is pkijs.Certificate => certificate instanceof pkijs.Certificate,
   );
-  const signerCertificate = findSignerCertificate(signerInfo, certificates);
-  if (!signerCertificate) {
-    throw new CmsError('malformed', 'the signer certificate is not carried by the CMS');
-  }
+  const signerCertificate =
+    findSignerCertificate(signerInfo, carried) ??
+    findSignerCertificate(signerInfo, options.certificates ?? []);
 
   const signedAttrs = signerInfo.signedAttrs?.attributes ?? [];
   if (signedAttrs.length === 0) {
@@ -153,71 +223,109 @@ export function parseCmsInternal(
     signingTime = timeValue.toDate().toISOString();
   }
 
-  const essAttr = attr(OID.signingCertificateV2);
-  let essCertHash: Uint8Array | null = null;
-  if (essAttr) {
-    // SigningCertificateV2 ::= sequence { certs sequence of ESSCertIDv2, ... }
-    // ESSCertIDv2 ::= sequence { hashAlgorithm default sha256, certHash octet string, ... }
-    const seq = essAttr.values[0] as asn1js.Sequence | undefined;
-    const certs = seq?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
-    const first = certs?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
-    const members = first?.valueBlock?.value ?? [];
-    // hashAlgorithm is optional (default sha256) and, when present, the
-    // first member: a sequence starting with an OID. issuerSerial is also a
-    // sequence but follows the certHash.
-    let cursor = 0;
-    const head = members[0];
-    if (
-      head instanceof asn1js.Sequence &&
-      head.valueBlock.value[0] instanceof asn1js.ObjectIdentifier
-    ) {
-      const algOid = head.valueBlock.value[0] as asn1js.ObjectIdentifier;
-      if (algOid.valueBlock.toString() !== OID.sha256) {
-        throw new CmsError('unsupported', 'signing-certificate-v2 uses a hash other than SHA-256');
-      }
-      cursor = 1;
-    }
-    const hash = members[cursor];
-    if (!(hash instanceof asn1js.OctetString)) {
-      throw new CmsError('malformed', 'signing-certificate-v2 carries no certHash');
-    }
-    essCertHash = new Uint8Array(hash.valueBlock.valueHexView);
+  const bindings: CertificateBinding[] = [];
+  const bindingV2 = attr(OID.signingCertificateV2);
+  if (bindingV2) bindings.push(readBinding(bindingV2, 2));
+  const bindingV1 = attr(OID.signingCertificate);
+  if (bindingV1) bindings.push(readBinding(bindingV1, 1));
+
+  const timestampTokens: Uint8Array[] = [];
+  for (const attribute of signerInfo.unsignedAttrs?.attributes ?? []) {
+    if (attribute.type !== OID.timestampToken) continue;
+    for (const value of attribute.values) timestampTokens.push(encodingOf(value));
   }
 
-  let timestampToken: Uint8Array | null = null;
-  const tokenAttr = signerInfo.unsignedAttrs?.attributes.find(
-    (attribute) => attribute.type === OID.timestampToken,
-  );
-  if (tokenAttr?.values[0]) {
-    timestampToken = new Uint8Array((tokenAttr.values[0] as asn1js.Sequence).toBER(false));
-  }
-
-  const ordered = [
-    signerCertificate,
-    ...certificates.filter((certificate) => certificate !== signerCertificate),
-  ];
   return {
-    parsed: {
-      digestAlgorithm,
-      messageDigest,
-      signingTime,
-      signerCertificate: certDer(signerCertificate),
-      certificates: ordered.map(certDer),
-      signatureAlgorithm: signerInfo.signatureAlgorithm.algorithmId,
-      signingCertificateV2: essAttr !== undefined,
-      timestampToken,
-    },
     signedData,
     signerInfo,
+    digestAlgorithm,
+    messageDigest,
+    signingTime,
     signerCertificate,
-    certificates: ordered,
-    essCertHash,
+    certificates: signerCertificate
+      ? [signerCertificate, ...carried.filter((certificate) => certificate !== signerCertificate)]
+      : carried,
+    bindings,
+    timestampTokens,
     eContent,
   };
 }
 
+/**
+ * Read an ESS certificate identifier attribute. The first identifier names the signer:
+ *
+ *     SigningCertificate   ::= sequence { certs sequence of ESSCertID, ... }
+ *     ESSCertID            ::= sequence { certHash octet string, ... }
+ *     SigningCertificateV2 ::= sequence { certs sequence of ESSCertIDv2, ... }
+ *     ESSCertIDv2          ::= sequence { hashAlgorithm default sha256, certHash octet string, ... }
+ */
+function readBinding(attribute: pkijs.Attribute, version: 1 | 2): CertificateBinding {
+  const name = version === 2 ? 'signing-certificate-v2' : 'signing-certificate';
+  const seq = attribute.values[0] as asn1js.Sequence | undefined;
+  const certs = seq?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
+  const first = certs?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
+  const members = first?.valueBlock?.value ?? [];
+  let algorithm: DigestAlgorithm | null = version === 2 ? 'sha256' : 'sha1';
+  let cursor = 0;
+  // hashAlgorithm is optional and, when present, the first member: a sequence starting with an
+  // OID. issuerSerial is also a sequence but follows the certHash.
+  const head = members[0];
+  if (
+    version === 2 &&
+    head instanceof asn1js.Sequence &&
+    head.valueBlock.value[0] instanceof asn1js.ObjectIdentifier
+  ) {
+    const oid = (head.valueBlock.value[0] as asn1js.ObjectIdentifier).valueBlock.toString();
+    algorithm = DIGEST_BY_OID[oid] ?? null;
+    cursor = 1;
+  }
+  const hash = members[cursor];
+  if (!(hash instanceof asn1js.OctetString)) {
+    throw new CmsError('malformed', `${name} carries no certHash`);
+  }
+  return { version, algorithm, certHash: new Uint8Array(hash.valueBlock.valueHexView) };
+}
+
+/** The bytes a decoded value was read from, so it is handed on exactly as it was written. */
+function encodingOf(value: asn1js.AsnType): Uint8Array {
+  const written = (value as asn1js.BaseBlock).valueBeforeDecodeView;
+  return written.byteLength > 0
+    ? new Uint8Array(written)
+    : new Uint8Array((value as asn1js.BaseBlock).toBER(false));
+}
+
+/** Each parsed certificate's bytes as its CMS wrote them. */
+const CERTIFICATE_BYTES = new WeakMap<pkijs.Certificate, Uint8Array>();
+
+/**
+ * Keep the bytes of the certificates a SignedData carries. A binding hashes a certificate as it
+ * was written, and writing a parsed certificate out again need not give the same bytes.
+ */
+function rememberCertificateBytes(contentInfo: pkijs.ContentInfo, signedData: pkijs.SignedData) {
+  const members = (contentInfo.content as asn1js.Sequence).valueBlock?.value ?? [];
+  // certificates [0] implicit: the one context-tagged member numbered 0.
+  const set = members.find(
+    (member) => member.idBlock.tagClass === 3 && member.idBlock.tagNumber === 0,
+  ) as asn1js.Constructed | undefined;
+  const written = set?.valueBlock?.value ?? [];
+  (signedData.certificates ?? []).forEach((certificate, index) => {
+    const block = written[index];
+    if (certificate instanceof pkijs.Certificate && block) {
+      CERTIFICATE_BYTES.set(certificate, encodingOf(block));
+    }
+  });
+}
+
+/** DER of a certificate: the bytes it was parsed from, or its encoding when it was built here. */
 export function certDer(cert: pkijs.Certificate): Uint8Array {
-  return new Uint8Array(cert.toSchema(true).toBER(false));
+  return CERTIFICATE_BYTES.get(cert) ?? new Uint8Array(cert.toSchema(true).toBER(false));
+}
+
+/** Parse a DER certificate, keeping its bytes for {@link certDer}. */
+export function certificateFromDer(der: Uint8Array): pkijs.Certificate {
+  const certificate = pkijs.Certificate.fromBER(toArrayBuffer(der));
+  CERTIFICATE_BYTES.set(certificate, der);
+  return certificate;
 }
 
 function findSignerCertificate(
