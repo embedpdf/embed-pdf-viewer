@@ -78,11 +78,20 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
   }
 
   // The heap's buffer is replaced when memory grows: rebuild the view then.
+  // A replaced (non-shared) buffer is detached, so its length turns 0: that
+  // check is cheaper than reading the current buffer on every access.
   let heapView: DataView | null = null;
+  let heapBuffer: ArrayBufferLike | null = null;
+  let shared = false;
   const view = (): DataView => {
+    if (heapView && !shared && heapBuffer!.byteLength !== 0) return heapView;
     const buffer = module.HEAPU8.buffer;
-    if (heapView?.buffer !== buffer) heapView = new DataView(buffer);
-    return heapView;
+    if (heapBuffer !== buffer) {
+      heapBuffer = buffer;
+      shared = typeof SharedArrayBuffer !== 'undefined' && buffer instanceof SharedArrayBuffer;
+      heapView = new DataView(buffer);
+    }
+    return heapView!;
   };
 
   return {
@@ -286,16 +295,48 @@ function directCall(
   const result = signature.result;
   const asBoolean = result?.wasm.cwrap === 'boolean';
   const convert = !!result && (result.ts === 'Ptr' || result.ts === 'bigint');
+  const finish = (value: unknown): unknown => {
+    if (!result) return undefined;
+    if (asBoolean) return Boolean(value);
+    return convert ? toJsResult(result, value) : value;
+  };
+  // Per-glyph loops make millions of these calls: up to four arguments go
+  // without a rest array and spread.
+  const [p0, p1, p2, p3] = ptrArgs;
+  const big = (v: unknown): v is bigint => typeof v === 'bigint';
+  switch (anyPtrArg ? signature.params.length : -1) {
+    case 1:
+      return (a?: unknown) => finish(fn(p0 && big(a) ? Number(a) : a));
+    case 2:
+      return (a?: unknown, b?: unknown) =>
+        finish(fn(p0 && big(a) ? Number(a) : a, p1 && big(b) ? Number(b) : b));
+    case 3:
+      return (a?: unknown, b?: unknown, c?: unknown) =>
+        finish(
+          fn(
+            p0 && big(a) ? Number(a) : a,
+            p1 && big(b) ? Number(b) : b,
+            p2 && big(c) ? Number(c) : c,
+          ),
+        );
+    case 4:
+      return (a?: unknown, b?: unknown, c?: unknown, d?: unknown) =>
+        finish(
+          fn(
+            p0 && big(a) ? Number(a) : a,
+            p1 && big(b) ? Number(b) : b,
+            p2 && big(c) ? Number(c) : c,
+            p3 && big(d) ? Number(d) : d,
+          ),
+        );
+  }
   return (...args: unknown[]) => {
     if (anyPtrArg) {
       for (let i = 0; i < args.length; i++) {
         if (ptrArgs[i] && typeof args[i] === 'bigint') args[i] = Number(args[i]);
       }
     }
-    const value = fn(...args);
-    if (!result) return undefined;
-    if (asBoolean) return Boolean(value);
-    return convert ? toJsResult(result, value) : value;
+    return finish(fn(...args));
   };
 }
 
