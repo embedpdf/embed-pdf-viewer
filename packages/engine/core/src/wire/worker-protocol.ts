@@ -1287,6 +1287,8 @@ export interface DocumentSaveBufferWorkerRequest {
   docId: string;
   layerName?: string;
   mode: PdfSaveMode;
+  /** See `DownloadOptions.mergeLastUpdate`. */
+  mergeLastUpdate?: boolean;
 }
 
 export interface DocumentSaveFileWorkerRequest {

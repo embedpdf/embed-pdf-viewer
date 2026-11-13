@@ -2127,7 +2127,9 @@ export class WorkerHost {
     // nothing was mutated, the fork's save pass otherwise — an annotation
     // added and removed again leaves the document as loaded.
     if (req.mode === 'incremental') {
-      const snap = new DocumentSaver(this.runtime, session).snapshot();
+      const snap = new DocumentSaver(this.runtime, session).snapshot({
+        mergeLastUpdate: req.mergeLastUpdate === true,
+      });
       return wirePack(
         { tag: 'document.saveBuffer', bytes: snap.bytes, size: snap.bytes.byteLength },
         [snap.bytes],

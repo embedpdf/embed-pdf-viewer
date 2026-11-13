@@ -1,6 +1,7 @@
 import { EngineError, EngineErrorCode, type PdfSaveMode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { mergeIntoLastUpdate } from './internal/mergeLastUpdate';
 import { layerSaveError, pdfSaveModeFlags } from './internal/pdfSaveMode';
 import { readSavedBuffer } from './internal/readSavedBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -43,14 +44,31 @@ export class DocumentSaver {
    * answers the second and produces the third, comparing only the objects
    * that were touched. A signed file must come back exactly as sealed, so
    * the loaded bytes are returned verbatim in the first two cases.
+   *
+   * `mergeLastUpdate` folds a real delta into the loaded file's last update
+   * section instead of appending one (see `mergeIntoLastUpdate`).
    */
-  snapshot(): { bytes: ArrayBuffer; source: SaveSource } {
+  snapshot(options: { mergeLastUpdate?: boolean } = {}): {
+    bytes: ArrayBuffer;
+    source: SaveSource;
+  } {
     if (!this.session.hasUnsavedEdits()) {
       return { bytes: this.loadedBytes(), source: 'loaded' };
     }
     const saved = this.saveStandaloneToBufferEx('incremental');
     if (saved.unchangedSinceLoad) {
       return { bytes: this.loadedBytes(), source: 'loaded' };
+    }
+    if (options.mergeLastUpdate) {
+      const merged = mergeIntoLastUpdate(
+        new Uint8Array(this.loadedBytes()),
+        new Uint8Array(saved.bytes),
+      );
+      const bytes =
+        merged.byteOffset === 0 && merged.byteLength === merged.buffer.byteLength
+          ? (merged.buffer as ArrayBuffer)
+          : merged.slice().buffer;
+      return { bytes, source: 'working-copy' };
     }
     return { bytes: saved.bytes, source: 'working-copy' };
   }

@@ -319,6 +319,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
           jobId,
           docId,
           mode,
+          ...(options.mergeLastUpdate ? { mergeLastUpdate: true } : {}),
         }),
     });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
