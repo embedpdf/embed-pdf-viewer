@@ -1,5 +1,7 @@
 # @embedpdf/viewer-chrome
 
+## 3.2.1
+
 ## 3.2.0
 
 ### Minor Changes
