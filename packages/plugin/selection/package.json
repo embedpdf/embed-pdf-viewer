@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-selection",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "private": false,
   "description": "Text selection for EmbedPDF: selecting and copying a document's text.",
   "type": "module",

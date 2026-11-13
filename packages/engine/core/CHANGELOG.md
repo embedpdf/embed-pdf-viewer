@@ -1,5 +1,11 @@
 # @embedpdf/engine-core
 
+## 3.2.1
+
+### Patch Changes
+
+- [#1080](https://github.com/embedpdf/embed-pdf-viewer/pull/1080) by [@bobsingor](https://github.com/bobsingor) – An app that imports `@embedpdf/engine` builds with Parcel again. The check behind the development warnings read `process?.env?.NODE_ENV`, which Parcel does not replace: it took it for a use of Node's `process` and stopped the build with `Node builtin polyfill "process/" is not installed`. The check now reads `process.env.NODE_ENV` as written, the expression every bundler replaces.
+
 ## 3.2.0
 
 ### Minor Changes
