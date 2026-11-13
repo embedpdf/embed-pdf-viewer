@@ -1,6 +1,6 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 
-import { CmsError } from '../cms/parse';
+import { CmsError } from '../cms/error';
 import { childrenOf, readElement } from '../cms/splice';
 
 /** The size in bytes of each of an ECDSA signature's two numbers, by curve. */

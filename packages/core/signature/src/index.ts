@@ -52,6 +52,10 @@ export {
 export { remoteSigner } from './signers/remote';
 export { ecdsaRawFromDer } from './signers/ecdsa';
 export {
+  httpTimestampAuthority,
+  type HttpTimestampAuthorityOptions,
+} from './signers/timestamp-http';
+export {
   indexedDbKeyStore,
   memoryKeyStore,
   personalSigner,

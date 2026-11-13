@@ -29,6 +29,10 @@ export async function buildTestToken(input: {
   /** Whether the token carries the authority's certificate. Default true. */
   carriesCertificate?: boolean;
   genTime?: Date;
+  /** The nonce of the request the token answers; left out, the token carries none. */
+  nonce?: Uint8Array;
+  /** The policy the token is issued under (an OID). */
+  policy?: string;
   /** Replace the TSTInfo after signing with one of another serial number: same imprint, other bytes. */
   swapsContent?: boolean;
 }): Promise<Uint8Array> {
@@ -38,13 +42,16 @@ export async function buildTestToken(input: {
   const tstInfo = (serialByte: number) =>
     new pkijs.TSTInfo({
       version: 1,
-      policy: '1.3.6.1.4.1.57264.1.1',
+      policy: input.policy ?? '1.3.6.1.4.1.57264.1.1',
       messageImprint: new pkijs.MessageImprint({
         hashAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_BY_DIGEST[hash] }),
         hashedMessage: new asn1js.OctetString({ valueHex: toArrayBuffer(input.digest) }),
       }),
       serialNumber: new asn1js.Integer({ valueHex: new Uint8Array([serialByte]).buffer }),
       genTime: input.genTime ?? new Date(),
+      ...(input.nonce
+        ? { nonce: new asn1js.Integer({ valueHex: toArrayBuffer(input.nonce) }) }
+        : {}),
     })
       .toSchema()
       .toBER(false);

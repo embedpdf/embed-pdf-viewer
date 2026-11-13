@@ -29,6 +29,8 @@ export function createOpenSslAuthority(bindingHash: 'sha1' | 'sha256' | 'sha384'
   certificate: Uint8Array;
   /** A token over a SHA-256 digest. */
   stamp(digest: Uint8Array): Uint8Array;
+  /** The response to a request as a client sent it: what the authority's HTTP endpoint returns. */
+  reply(query: Uint8Array): Uint8Array;
   dispose(): void;
 } {
   const directory = mkdtempSync(join(tmpdir(), 'epdf-openssl-tsa-'));
@@ -113,6 +115,25 @@ export function createOpenSslAuthority(bindingHash: 'sha1' | 'sha256' | 'sha384'
         '-token_out',
       ]);
       return new Uint8Array(readFileSync(join(directory, 'token.der')));
+    },
+    reply(query) {
+      writeFileSync(join(directory, 'query.tsq'), query);
+      rmSync(join(directory, 'response.tsr'), { force: true });
+      try {
+        run([
+          'ts',
+          '-reply',
+          '-config',
+          'authority.cnf',
+          '-queryfile',
+          'query.tsq',
+          '-out',
+          'response.tsr',
+        ]);
+      } catch {
+        // OpenSSL exits with an error for a request it rejects, after writing the rejection.
+      }
+      return new Uint8Array(readFileSync(join(directory, 'response.tsr')));
     },
     dispose() {
       rmSync(directory, { recursive: true, force: true });

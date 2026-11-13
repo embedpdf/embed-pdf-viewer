@@ -3,6 +3,7 @@ import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
 import { bytesEqual, toArrayBuffer } from './engine';
+import { CmsError } from './error';
 import { DIGEST_BY_OID, OID } from './oids';
 
 /** What a detached CMS says about itself. Nothing here is verified. */
@@ -24,15 +25,7 @@ export interface ParsedCms {
   timestampToken: Uint8Array | null;
 }
 
-export class CmsError extends Error {
-  constructor(
-    readonly reason: 'malformed' | 'unsupported',
-    message: string,
-  ) {
-    super(message);
-    this.name = 'CmsError';
-  }
-}
+export { CmsError };
 
 /**
  * How a CMS names the certificate that signed it: an ESS certificate identifier, the hash of

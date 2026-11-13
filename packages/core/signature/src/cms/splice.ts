@@ -4,7 +4,7 @@
  * here copies every byte it doesn't change, and only rewrites the length in front of each
  * element the change sits in. A length written as indefinite stays indefinite.
  */
-import { CmsError } from './parse';
+import { CmsError } from './error';
 
 /** One encoded element, by its offsets in the bytes it was read from. */
 export interface BerElement {
