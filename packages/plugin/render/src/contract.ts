@@ -14,6 +14,7 @@ import {
   type EventHook,
   type EventOrigin,
   type OperationOptions,
+  type PageColors,
   type PageImageHandle,
   type PageImageOptions,
   type PageRef,
@@ -63,6 +64,15 @@ export interface RenderSettings {
   readonly debug: boolean;
   /** The `snapshot` tool: how big its pictures are, and how its box looks. */
   readonly snapshot: SnapshotSettings;
+  /**
+   * The colors the pages are drawn in: `'normal'` (as the file has them),
+   * `'dark'`, `'sepia'`, or colors of your own ({@link PageColors}). A change
+   * redraws every page: it fires `onInvalidated` for every page with scope
+   * `'content'`. It is one value: a change replaces it whole.
+   * The local engine draws them; the cloud engine refuses a page in other
+   * colors (`unsupported`).
+   */
+  readonly pageColors: PageColors;
 }
 
 /** The snapshot tool's settings: see {@link RenderSettings.snapshot}. */
@@ -108,6 +118,7 @@ export const RENDER_DEFAULTS: RenderSettings = {
   slowAfterMs: 400,
   debug: false,
   snapshot: { scale: 2, box: { fill: null, stroke: null } },
+  pageColors: 'normal',
 };
 
 /** What `renderPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -131,6 +142,12 @@ export interface PageLayerOptions {
   includeFormFields?: boolean;
 }
 
+/** The colors one picture is drawn in, whatever the `pageColors` setting says. */
+export interface PageColorOptions {
+  /** This picture's colors; `'normal'` is the page as the file has it. Default: the `pageColors` setting. */
+  pageColors?: PageColors;
+}
+
 /**
  * An encoded page image: `source` is bytes or a URL, `format`/`mimeType`
  * say what they are, `width`/`height` its pixel size, and
@@ -138,7 +155,7 @@ export interface PageLayerOptions {
  */
 export type PageImage = PageImageHandle;
 
-export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
+export interface RenderPageOptions extends OperationOptions, PageLayerOptions, PageColorOptions {
   /** Exact output width in device pixels (height keeps the aspect of what is drawn). */
   width?: number;
   /** Device pixels per PDF point; ignored when `width` is given. Default 1. */
@@ -156,7 +173,8 @@ export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
   quality?: number;
 }
 
-export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptions {
+export interface RenderThumbnailOptions
+  extends OperationOptions, PageLayerOptions, PageColorOptions {
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;
@@ -181,7 +199,8 @@ export interface PageRender {
  *                   their pixels.
  *   'fields'      — a form field changed: a fill, a widget's place or look,
  *                   a signing. Pictures without form fields keep their pixels.
- *   'content'     — the page itself changed (redaction applied, flattened).
+ *   'content'     — the page itself changed (redaction applied, flattened),
+ *                   or the colors it is drawn in (the `pageColors` setting).
  *                   Invalidates every picture of the page.
  */
 export type InvalidateScope = 'content' | 'annotations' | 'fields';
@@ -196,13 +215,15 @@ export interface InvalidateOptions {
 // ── events ──────────────────────────────────────────────────────────────────
 
 /** Pixels changed on these pages: a confirmed document mutation (own or
- *  remote) or an `invalidate` call. Anything holding a rendered bitmap refetches. */
+ *  remote), an `invalidate` call or a change of the `pageColors` setting.
+ *  Anything holding a rendered bitmap refetches. */
 export interface RenderInvalidatedEvent {
   readonly pages: readonly PageRef[];
   readonly scope: InvalidateScope;
   /**
    * Where the document mutation came from. Null when a caller requested the
-   * invalidation through {@link RenderCapability.invalidate}.
+   * invalidation through {@link RenderCapability.invalidate}, or the
+   * `pageColors` setting changed.
    */
   readonly origin: EventOrigin | null;
 }
@@ -336,8 +357,10 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
    * matching image. A part of the page (`rect`) or a turned picture is
    * rendered for this call alone, outside the cache. Rejects
    * `permission-denied` without `doc.render`, `not-found` for a page that is
-   * not in this document, `invalid-input` for a `rect` that misses the page,
-   * `operation-cancelled` when `signal` fires.
+   * not in this document, `invalid-input` for a `rect` that misses the page
+   * or a `pageColors` color that is not `#rrggbb`, `unsupported` for page
+   * colors other than `'normal'` on an engine that draws pages only as the
+   * file has them (the cloud engine), `operation-cancelled` when `signal` fires.
    */
   renderPage(page: PageRef | number, options?: RenderPageOptions): Promise<PageImage>;
   /**
@@ -350,8 +373,9 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   /**
    * Render several pages with bounded concurrency; best-effort per page: each
    * rendered page with its image, in the order given, and each page that
-   * failed (as given) with why. Rejects `permission-denied` without
-   * `doc.render`, `operation-cancelled` when `signal` fires.
+   * failed (as given) with why, such as `unsupported` page colors. Rejects
+   * `permission-denied` without `doc.render`, `operation-cancelled` when
+   * `signal` fires.
    */
   renderPages(
     pages: readonly (PageRef | number)[],
@@ -364,7 +388,7 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
    * long-lived render on it: when it bumps, refetch. A picture versions on
    * content facts, plus annotation facts when it draws annotations and form
    * facts when it draws form fields. Bumps only on confirmed mutations —
-   * never optimistically. 0 for a page that isn't in the document.
+   * never optimistically — and on a change of the `pageColors` setting. 0 for a page that isn't in the document.
    */
   getRenderEpoch(page: PageRef | number, layers?: PageLayerOptions): number;
   /**

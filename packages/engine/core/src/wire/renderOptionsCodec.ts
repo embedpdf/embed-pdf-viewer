@@ -35,7 +35,8 @@ export interface RenderVersions {
  * What the picture draws, whether it's a thumbnail, and whether and at which
  * DPI it prints, is never in the token: the caller picks the picture's path
  * (`PAGE_RENDER_FAMILIES`, `PAGE_THUMBNAIL_FAMILIES`, `PAGE_PRINT_FAMILIES`)
- * and passes that family's pins.
+ * and passes that family's pins. Nor are the page colors: the cloud engine
+ * refuses any but `'normal'` before a token is built.
  * Each family's query schema checks its own pins when the URL is decoded
  * server-side. Round-tripping (flatten → encode → decode → unflatten →
  * schema parse) recovers the original SDK options.
@@ -47,6 +48,7 @@ export function renderImageOptionsToWire(
   const {
     includeAnnotations: _inThePath,
     includeFormFields: _alsoInThePath,
+    pageColors: _notOnTheWire,
     usage,
     viewport,
     ...wireOptions
