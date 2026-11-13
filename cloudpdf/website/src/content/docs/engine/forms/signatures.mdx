@@ -1,6 +1,6 @@
 ---
 title: Digital signatures
-description: Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, and certify a document.
+description: Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, timestamp the signature, and certify a document.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -60,7 +60,9 @@ result.signature; // the new signature, as list() returns it
 | `webCryptoSigner({ privateKey, certificateChain })` | You hold a WebCrypto key and its certificates (DER, the signer's first).  |
 | `remoteSigner({ sign })`                            | A signing service or HSM turns a digest into a finished signature (CMS).  |
 | `createTestSigner()`                                | Tests and demos: a throwaway key with a self-signed certificate.          |
-| `createTestTimestampAuthority()`                    | Tests and demos: a throwaway [timestamp authority](#document-timestamps). |
+
+A signing service that holds the key for you fits the first two; see
+[Sign with a signing service](#sign-with-a-signing-service).
 
 After signing, the document is the signed file: `list()` shows the new signature, and
 `doc.download()` returns the signed PDF. When the signature your key returns doesn't match what
@@ -68,7 +70,8 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 
 ### Options
 
-`sign()` and `prepare()` take these options (`sign()` also takes the `key`):
+`sign()` and `prepare()` take these options. `sign()` also takes the `key`, and
+`timestampAuthority` and `timestampTrust` to [timestamp the signature](#timestamp-a-signature):
 
 | Option              | What it is                                                                        | Default                                       |
 | :------------------ | :-------------------------------------------------------------------------------- | :-------------------------------------------- |
@@ -80,28 +83,217 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 | `lock`              | Fields this signature [locks](#lock-fields).                                      | none                                          |
 | `digest`            | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
 | `subFilter`         | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                               | `'ETSI.CAdES.detached'`                       |
-| `contentsSizeBytes` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`                                        |
+| `contentsSizeBytes` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`; `16384` with a `timestampAuthority`   |
 
 The field needs a widget to carry an `appearance`; without one, the call fails with
 `SignatureRefused`. A PDF with more than one page fails with `InvalidArg`, as for a
 [stamp](/docs/engine/annotations/stamps); take the page you want out first with
 `doc.pages.extract()`.
 
+## Timestamp a signature
+
+A signature says when it was made, but that time comes from the signer's own clock, and anyone
+can set a clock. A **timestamp** is a second opinion: a timestamp authority, a service whose
+only job is this, signs a statement that the signature existed by a certain time. With one, a
+reader can show when a document was signed without taking the signer's word for it, and the
+signature can still be judged after the signer's certificate has expired.
+
+Pass `timestampAuthority` to `sign()`:
+
+```ts
+import {
+  httpTimestampAuthority,
+  sign,
+} from '@embedpdf/core-signature';
+
+const timestampAuthority = httpTimestampAuthority({
+  url: '/api/timestamp',
+});
+
+await sign(doc, { field, key, timestampAuthority });
+```
+
+The authority receives a fingerprint of the signature, never the document. Its answer, a
+timestamp token, is stored inside the signature, so the file gains no extra revision.
+
+A timestamp you ask for is part of the signature you ask for. When the authority can't be
+reached, or its token doesn't check out, `sign()` fails and nothing is signed. It never signs
+without the timestamp.
+
+### Reach the authority from a browser
+
+Most timestamp authorities can't be called from a web page: they send no CORS headers. Point
+`url` at a route of your own that passes the request on. In Next.js, for example:
+
+```ts
+// app/api/timestamp/route.ts
+export async function POST(request: Request) {
+  const reply = await fetch('https://tsa.example.com/', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/timestamp-query',
+    },
+    body: await request.arrayBuffer(),
+  });
+  return new Response(reply.body, {
+    status: reply.status,
+    headers: {
+      'content-type': 'application/timestamp-reply',
+    },
+  });
+}
+```
+
+On a server, `url` is the authority's own address. The company that issued your signing
+certificate usually runs a timestamp authority too.
+
+### Authority options
+
+`httpTimestampAuthority()` takes:
+
+| Option      | What it is                                                         | Default    |
+| :---------- | :----------------------------------------------------------------- | :--------- |
+| `url`       | The authority's address, or your own route in front of it.         |            |
+| `hash`      | The hash it stamps with: `'sha256'`, `'sha384'` or `'sha512'`.     | `'sha256'` |
+| `policy`    | The policy to ask for, when the authority offers several (an OID). | none       |
+| `headers`   | Sent with each request, such as an API key.                        | none       |
+| `fetch`     | The `fetch` to use, for what `headers` can't do.                   | the global |
+| `timeoutMs` | How long one attempt may take, in milliseconds.                    | `10000`    |
+| `retries`   | Further attempts when no answer came.                              | `1`        |
+
+It tries again only when no answer came: a network failure, a timeout, or a busy server (a 5xx
+or 429 status). A refusal, or an answer that isn't what was asked for, fails at once. Your key
+signs once either way.
+
+Any service that turns a digest into an RFC 3161 token works as an authority, not only this one:
+a `remoteSigner({ sign })` whose `sign` returns the token for `subFilter: 'ETSI.RFC3161'`.
+
+### Only accept an authority you trust
+
+A timestamp token is sound when it is consistent with itself, and anyone can make one that is.
+Once sealed in, it stays in the signature for good. To seal only a timestamp whose authority
+you trust, pass the same `trust` you [check signatures](#check-the-signatures) with:
+
+```ts
+await sign(doc, {
+  field,
+  key,
+  timestampAuthority,
+  timestampTrust: trust,
+});
+```
+
+A token from an authority `trust` doesn't cover fails the signing, with `SignatureRefused`, and
+nothing is signed. That catches a wrong address before any reader sees the result.
+
+### When it fails
+
+Every error `httpTimestampAuthority()` raises carries the authority's address in
+`details.authority`:
+
+```ts
+import { EngineError, EngineErrorCode } from '@cloudpdf/engine';
+
+try {
+  await sign(doc, { field, key, timestampAuthority });
+} catch (error) {
+  if (error instanceof EngineError && error.details?.authority) {
+    notify(
+      error.code === EngineErrorCode.Network
+        ? 'The timestamp service did not answer. Try again.'
+        : 'The timestamp service refused the request.',
+    );
+  }
+}
+```
+
+- **`Network`: the authority didn't answer**, after its further attempts. From a browser, a
+  missing route of your own is the usual cause, and the message says so.
+- **`SignatureRefused`: the authority said no**, or answered with something other than what was
+  asked for: no token, another digest or hash, a token that doesn't check out, or an authority
+  `timestampTrust` doesn't cover. Trying again won't help.
+- **`SignatureRefused`, with `details.reason: 'too-large'`: the signature doesn't fit** the
+  space reserved for it. The message names the `contentsSizeBytes` to pass.
+- **`InvalidArg`: `timestampAuthority` doesn't belong here.** A
+  [document timestamp](#document-timestamps) is already a timestamp, and so is a signature from
+  a signing service that timestamps it itself. Leave the option out.
+
+To test with a timestamp, use `createTestTimestampAuthority()`: a throwaway authority that needs
+no network. Trust its `certificate` as a [timestamp anchor](#the-timestamp).
+
 ## Sign in two steps
 
 When the key is somewhere else (a signing service, a hardware key, another device), sign in two
-steps. `prepare()` reserves room for the signature and returns the digest to sign; `complete()`
-writes it in:
+steps. `prepare()` reserves room for the signature and returns the digest to sign;
+`completeSignature()` checks what your key returned and writes it in:
 
 ```ts
+import { completeSignature } from '@embedpdf/core-signature';
+
 const prepared = await doc.signatures.prepare({
   field,
   signer: { name: 'Ada Lovelace', reason: 'Approved' },
 });
 
-// prepared.digest is the fingerprint to sign, with prepared.algorithm ('sha256').
-const cms = await mySigningService.sign(prepared.digest, prepared.algorithm);
+// prepared.digest is the fingerprint to sign,
+// with prepared.algorithm ('sha256').
+const cms = await mySigningService.sign(
+  prepared.digest,
+  prepared.algorithm,
+);
 
+const result = await completeSignature(doc, { prepared, cms });
+```
+
+`cms` is a detached CMS signature (PKCS #7 or CAdES) over the digest: what signing services
+return. To build one from a raw key yourself, use `buildDetachedCms()` from
+`@embedpdf/core-signature`.
+
+`completeSignature()` is the second half of `sign()`. It checks that `cms` signs the digest
+that was prepared and fits the space reserved for it, then writes it into the document. A `cms`
+that doesn't pass fails with `SignatureRefused`, and nothing is written.
+
+To [timestamp the signature](#timestamp-a-signature), reserve room for the token when you
+prepare, and pass the authority when you complete:
+
+```ts
+const prepared = await doc.signatures.prepare({
+  field,
+  contentsSizeBytes: 16384,
+});
+const cms = await mySigningService.sign(
+  prepared.digest,
+  prepared.algorithm,
+);
+
+await completeSignature(doc, {
+  prepared,
+  cms,
+  timestampAuthority,
+});
+```
+
+Between the two steps:
+
+- **The document is locked.** Every other change fails with `SigningPending` until you complete or
+  cancel; reading still works.
+- **To give up**, call `doc.signatures.cancel(prepared.signingId)`. It returns
+  `status: 'cancelled'`, and completing that signing afterwards fails with `NotFound`.
+
+When `completeSignature()` fails, nothing is written and the signing stays prepared, so your key
+doesn't have to sign again for a problem that passes:
+
+- **`Network`: the timestamp authority didn't answer.** Call `completeSignature()` again with
+  the same `cms`.
+- **`SignatureRefused`: the same `cms` will be refused again.** Cancel, then prepare and sign
+  again. When the signature didn't fit, the message names the `contentsSizeBytes` to prepare
+  with.
+
+### The engine's own `complete()`
+
+`completeSignature()` ends in a call to the engine, which you can also make yourself:
+
+```ts
 const result = await doc.signatures.complete({
   signingId: prepared.signingId,
   cms,
@@ -109,24 +301,14 @@ const result = await doc.signatures.complete({
 });
 ```
 
-`cms` is a detached CMS signature (PKCS #7 or CAdES) over the digest: what signing services
-return. To build one from a raw key yourself, use `buildDetachedCms()` from
-`@embedpdf/core-signature`.
-
-Between the two steps:
-
-- **The document is locked.** Every other change fails with `SigningPending` until you complete or
-  cancel; reading still works.
-- **To give up**, call `doc.signatures.cancel(prepared.signingId)`. It returns
-  `status: 'cancelled'`, and a `complete()` for that signing fails with `NotFound`.
 - **Pass `expectedVersion` back as it is.** It ties the signature to the version it was made
   for; a different one fails with `SigningVersionMismatch`, and you prepare again.
-
-`complete()` checks that `cms` is one signature that fits the space `prepare()` reserved
-(`contentsSizeBytes`); if not, it fails with `SignatureRefused`. It doesn't check the cryptography:
-`sign()` does that before it calls `complete()`, and `validateSignatures()` does it afterwards.
-Calling `complete()` again with the same `cms` returns the same result, with
-`status: 'already-completed'`; a different `cms` fails with `SignatureRefused`.
+- **It checks less.** `complete()` checks that `cms` is one signature that fits the space
+  `prepare()` reserved (`contentsSizeBytes`); if not, it fails with `SignatureRefused`. It doesn't
+  check the cryptography, and it adds no timestamp: `completeSignature()` and `sign()` do that
+  before they call it. To check a `cms` yourself first, use `verifyForCompletion()`.
+- **Calling it again with the same `cms`** returns the same result, with
+  `status: 'already-completed'`; a different `cms` fails with `SignatureRefused`.
 
 A signature can't be undone, and completing one ends undo for every change made before it; see
 [Changes & undo](/docs/engine/documents/changes#what-cant-be-undone).
@@ -140,9 +322,69 @@ A prepared signature waits until you complete or cancel it: `prepared.expiresAt`
 <Engine cloud>
 
 A prepared signature waits 15 minutes for its CMS, until `prepared.expiresAt` (your server can
-change the time). After that, `complete()` fails with `SigningExpired`.
+change the time). After that, completing it fails with `SigningExpired`.
 
 </Engine>
+
+## Sign with a signing service
+
+A certificate that PDF apps such as Acrobat trust out of the box usually comes with a rule: the
+key stays in the provider's certified hardware. So the provider signs for you, and what leaves
+your app is only a fingerprint. Services answer in one of two ways, and each fits a `key`.
+
+**The service returns a finished signature** (a CMS). That is a `remoteSigner`:
+
+```ts
+import { remoteSigner, sign } from '@embedpdf/core-signature';
+
+const key = remoteSigner({
+  sign: ({ digest, algorithm, subFilter }) =>
+    signingService.sign(digest, algorithm, subFilter),
+});
+
+await sign(doc, { field, key });
+```
+
+When the service takes its time, for example because a person approves on their phone, sign in
+[two steps](#sign-in-two-steps) instead. When its signature already carries a timestamp, leave
+`timestampAuthority` out: the engine checks the timestamp that is there.
+
+**The service signs a hash and returns the bare signature** (the Cloud Signature Consortium
+API's `signHash` works this way). That is a key you describe yourself:
+
+```ts
+import {
+  ecdsaRawFromDer,
+  sign,
+  type RawSigner,
+} from '@embedpdf/core-signature';
+
+const key: RawSigner = {
+  kind: 'raw',
+  // DER certificates from the service, the signer's first.
+  certificateChain,
+  algorithm: 'ECDSA',
+  hash: 'sha256',
+  async sign(signedAttributes) {
+    const hash = new Uint8Array(
+      await crypto.subtle.digest('SHA-256', signedAttributes),
+    );
+    const der = await signingService.signHash(hash);
+    return ecdsaRawFromDer(der, 'P-256');
+  },
+};
+
+await sign(doc, { field, key, timestampAuthority });
+```
+
+- **`sign` receives the bytes to sign, not the document's digest.** Hash them with the key's
+  `hash` and send that hash to the service.
+- **An ECDSA signature goes back as `r || s`**, the two numbers side by side, as WebCrypto
+  makes it. Most services return DER instead: convert it with `ecdsaRawFromDer()`, or the
+  signature is encoded twice and no reader can check it. An RSA signature goes back as it is.
+- **`algorithm`** is `'RSA-PKCS1-v1_5'`, `'RSA-PSS'` or `'ECDSA'`, as the service signs.
+
+The service's timestamp authority is an `httpTimestampAuthority()` with its address.
 
 ## Certify a document
 
@@ -221,6 +463,9 @@ Once a field is signed, its look is part of what the signature seals, so
   file.
 - **Every layer can sign,** over its own version. Signing again in the same layer signs over the
   layer's previous signature.
+- **The server checks what it completes.** A signature that doesn't sign the prepared digest is
+  refused with `SignatureRefused`, whoever calls `complete()`, and so is one whose timestamp
+  provably doesn't belong to it.
 - **Signed bytes never change.** `getContents()`, `getDigest()` and `downloadRevision()` read a
   version, and a version is never changed, so the server lets browsers and CDNs cache them.
 
@@ -284,14 +529,102 @@ for (const result of results) {
 | `trust`                 | Does the certificate lead to one you trust?    | `'trusted'`, `'untrusted'`, `'unknown'`                        |
 | `modifications.verdict` | What changed after signing, and is it allowed? | See [What changed](#what-changed-since-a-signature)            |
 | `summary`               | All of the above together.                     | `'valid'`, `'valid-untrusted'`, `'invalid'`, `'indeterminate'` |
+| `timestamp`             | When was it signed, by a clock you trust?      | See [The timestamp](#the-timestamp); `null` without one        |
 
 `summary` is `'invalid'` only on proof: bytes that changed, a signature that doesn't match, or a
 change the signature forbids. When something can't be established, it's `'indeterminate'`.
 Without `trust`, a good signature is `'valid-untrusted'` at best.
 
+`'trusted'` means the certificate is within its dates and leads to one of your anchors. It
+doesn't mean "not revoked": the engine doesn't ask whether a certificate was withdrawn.
+
 By default the check looks at the saved file. Pass `until: 'working-copy'` to include the changes
 you haven't saved yet: the answer is what the file will say once you save it. A viewer uses this
 to warn before a change breaks a signature.
+
+### The timestamp
+
+A signature that carries a [timestamp](#timestamp-a-signature) has a verdict of its own for it,
+in `timestamp`:
+
+```ts
+import {
+  certificateCommonName,
+  validateSignatures,
+} from '@embedpdf/core-signature';
+
+const results = await validateSignatures(doc, {
+  trust: {
+    anchors: async () => [companyRoot],
+    timestampAnchors: async () => [authorityRoot],
+  },
+});
+
+for (const result of results) {
+  const stamp = result.timestamp;
+  if (stamp?.summary === 'valid') {
+    const authority = certificateCommonName(
+      stamp.authorityCertificate,
+    );
+    console.log(`Signed by ${stamp.genTime}, says ${authority}`);
+  } else {
+    const claimed = result.signature.signer.signedAt;
+    console.log(`Signed at ${claimed}, by the signer's clock`);
+  }
+}
+```
+
+| Field                  | What it is                                                                                              |
+| :--------------------- | :------------------------------------------------------------------------------------------------------ |
+| `summary`              | `'valid'`, `'valid-untrusted'`, `'invalid'` or `'indeterminate'`, as for a signature.                   |
+| `genTime`              | The time the authority vouches for: the signature existed by then. `null` when the token can't be read. |
+| `authorityCertificate` | The authority's certificate (DER), or `null` when it can't be found.                                    |
+| `cryptography`         | Whether the token checks out and stamps this signature.                                                 |
+| `trust`, `trustReason` | Whether the authority's certificate leads to one you trust and may issue timestamps, and why not.       |
+| `validationTime`       | When the authority's certificate was judged.                                                            |
+
+`timestampAnchors` returns the certificates you trust to say what time it was, apart from
+`anchors`, the ones you trust to say who signed. Keep an authority's root out of `anchors`:
+there it would vouch for every signer certificate under that root. A `trust` without
+`timestampAnchors` uses `anchors` for both, which is right when one root of your own issues
+both.
+
+An authority's certificate must be made for timestamping and nothing else, or `trust` is
+`'untrusted'` and `trustReason` says why. A certificate that is itself one of your timestamp
+anchors is trusted as it is.
+
+A timestamp's verdict never changes the signature's `summary`. A valid signature with a broken
+timestamp is still valid: you know who signed, and only the time is the signer's word again.
+
+The timestamp proves the signature existed **by** that time, not that it was made at that
+moment. It is the latest the document can have been signed.
+
+### Judge a signature at its timestamp
+
+By default every certificate is judged as of now, so a signature whose signer's certificate has
+expired since reads `'valid-untrusted'`. A trusted timestamp proves the signature existed while
+the certificate was still good. To judge it then, pass `validationTime`:
+
+```ts
+const results = await validateSignatures(doc, {
+  trust,
+  validationTime: { kind: 'earliest-timestamp' },
+});
+```
+
+Each certificate is then judged at the earliest trusted timestamp that covers what it signed:
+
+- **A signer's certificate**, at the signature's own timestamp or at a
+  [document timestamp](#document-timestamps) added after it, whichever is earlier.
+- **A timestamp authority's certificate**, at a document timestamp added after its token. The
+  last timestamp in the file has nothing after it, so its authority is judged now.
+- **With no trusted timestamp to go by**, now, as without the option.
+
+`result.validationTime` says which it was: its `kind` is `'timestamp'`, with the timestamp's
+`genTime`, or `'now'`.
+
+**This looks at dates only.** A certificate that was withdrawn before the timestamp still
+passes, because the engine doesn't check revocation.
 
 ## What changed since a signature
 
@@ -436,16 +769,54 @@ don't need to save before you sign.
 
 ### Document timestamps
 
-`kind: 'timestamp'` makes a document timestamp instead of a signature. With `sign()`, the `key` is
-your timestamp authority: a `remoteSigner` whose `sign` sends the digest to the authority and
-returns its timestamp token (`subFilter` is `'ETSI.RFC3161'`). A key you hold can't make one, so
-`sign()` fails with `InvalidArg`. With `prepare()` and `complete()`, the `cms` is the token over
-`prepared.digest`.
+A [signature's timestamp](#timestamp-a-signature) vouches for one signature. A **document
+timestamp** vouches for the whole file as it stands: every signature in it, and everything
+added since. It takes a signature field of its own and adds a revision, as a signature does.
+
+`kind: 'timestamp'` makes one. With `sign()`, the `key` is your timestamp authority, the same
+object you pass as `timestampAuthority`:
 
 ```ts
-const result = await sign(doc, { field, kind: 'timestamp', key: myTimestampAuthority });
+const result = await sign(doc, {
+  field,
+  kind: 'timestamp',
+  key: timestampAuthority,
+});
 result.signature.kind; // 'timestamp'
 ```
+
+A key you hold can't make one, so `sign()` fails with `InvalidArg`. In two steps, the `cms` is
+the authority's token over `prepared.digest`.
+
+`validateSignatures()` reads a document timestamp like a signature: `integrity` says whether the
+file it stamped is intact, and `timestamp` holds [the same verdict](#the-timestamp) a
+signature's timestamp gets, with its `genTime` and authority.
+
+### Timestamp something else
+
+An authority stamps any digest, not only a PDF's: the daily hash of an audit log, say. Ask it
+directly, and check the token later with `verifyTimestampToken()`:
+
+```ts
+import { verifyTimestampToken } from '@embedpdf/core-signature';
+
+const token = await timestampAuthority.sign({
+  digest: logHash,
+  algorithm: 'sha256',
+  subFilter: 'ETSI.RFC3161',
+});
+
+const stamp = await verifyTimestampToken({
+  token,
+  digest: logHash,
+  algorithm: 'sha256',
+  trust,
+});
+stamp.summary; // 'valid'
+```
+
+It returns [a timestamp's verdict](#the-timestamp). A token that stamps another digest, or the
+same bytes under another hash, is `'invalid'`.
 
 <Engine local>
 

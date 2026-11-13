@@ -113,6 +113,56 @@ await signature.completeSignature(signingId, cms);
 While a signature is prepared, the document can't be changed, so nothing can slip in between.
 `signature.cancelPending()` gives up.
 
+`completeSignature()` checks what the key returned before it seals anything. When it fails,
+nothing is written and the signature stays prepared:
+
+- **The timestamp authority didn't answer** (`Network`): call `completeSignature()` again with the
+  same `cms`. The key doesn't sign twice.
+- **The `cms` was refused** (`SignatureRefused`), for example because it signs another
+  fingerprint: it will be refused again. Call `cancelPending()` and start over.
+
+### A timestamp with every signature
+
+A signature says when it was made, by the signer's own clock. A timestamp authority vouches for
+that time, so a reader doesn't have to take the signer's word for it, and the signature can still
+be checked after the signer's certificate expires. Set one when you register the plugin, and every
+signature it seals carries a timestamp:
+
+```ts
+signaturePlugin({
+  signingKey,
+  timestampAuthority: httpTimestampAuthority({
+    url: '/api/timestamp',
+  }),
+});
+```
+
+`httpTimestampAuthority()` comes from the same place as the signers. Most authorities can't be
+called from a web page, so `url` is a route of your own that passes the request on;
+[Reach the authority from a browser](/docs/engine/forms/signatures#reach-the-authority-from-a-browser)
+has one.
+
+- **A timestamp is never skipped.** When the authority can't be reached or its answer doesn't
+  check out, the signing fails and nothing is signed.
+- **One signature without a timestamp:** pass `timestampAuthority: null` to that `sign()` or
+  `prepareSignature()`. Pass another authority to use that one instead.
+- **In two steps**, `prepareSignature()` reserves room for the timestamp and
+  `completeSignature()` adds it.
+- **With `trust` set, the authority must be one you trust.** The plugin won't seal a timestamp
+  from an authority your `trust` doesn't cover, so a wrong address fails at the first signature
+  and not at the first reader. List the authority's root under `timestampAnchors`:
+
+```ts
+signaturePlugin({
+  signingKey,
+  timestampAuthority,
+  trust: {
+    anchors: async () => [companyRoot],
+    timestampAnchors: async () => [authorityRoot],
+  },
+});
+```
+
 ## Check the signatures
 
 <Snippet name="forms/signature-list" />
@@ -128,6 +178,39 @@ A verdict's `summary` is:
 
 The plugin checks the signatures when the document opens, and again after every change. For a
 detailed report of what changed since a signature, rule by rule, use `signature.analyzeChanges()`.
+
+`'valid'` means the signer's certificate is within its dates and leads to one you trust. It
+doesn't mean "not revoked": whether a certificate was withdrawn isn't checked.
+
+### When it was signed
+
+A signature with a timestamp has a second verdict, in `verdict.timestamp`: `null` when the
+signature has none. Show the time the authority vouches for when you trust it, and the signer's
+own claim otherwise:
+
+```ts
+const stamp = verdict.timestamp;
+const when =
+  stamp?.summary === 'valid'
+    ? `${stamp.genTime}, confirmed by a timestamp`
+    : `${verdict.signature.signer.signedAt}, the signer's clock`;
+```
+
+A timestamp's verdict never changes the signature's `summary`: a valid signature with a broken
+timestamp is still valid.
+
+By default every certificate is judged as of now, so a signature whose signer's certificate has
+expired since reads `'valid-untrusted'`. To judge each signature at its trusted timestamp, when
+the certificate was still good:
+
+```ts
+await signature.validate({
+  validationTime: { kind: 'earliest-timestamp' },
+});
+```
+
+[The timestamp](/docs/engine/forms/signatures#the-timestamp) has every field of the verdict, and
+what this option does and doesn't check.
 
 ## Warn before an edit breaks a signature
 
@@ -187,12 +270,12 @@ Everything `useSignature()` gives you.
 
 | Method                                                    | What it does                                                                                                                              |
 | :-------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
+| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey` and `timestampAuthority`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
 | `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
 | `fillField(field, mark)`, `clearField(field)`             | Draws a mark into a field without signing, or takes it out again. Refused on a signed field. [Fill a field without signing](#fill-a-field-without-signing) |
-| `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second seals the document with what the key returned. [Signing in two steps](#signing-in-two-steps) |
+| `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second checks what the key returned, adds the timestamp when an authority is set, and seals the document. [Signing in two steps](#signing-in-two-steps) |
 | `cancelPending()`                                         | Gives up a signature prepared in two steps, so the document can be changed again                                                          |
-| `validate({ until? })`                                    | Checks every signature again and resolves the verdicts. `until: 'persisted'` checks the file as it was opened. [Which bytes are checked](#which-bytes-are-checked) |
+| `validate({ until?, validationTime? })`                   | Checks every signature again and resolves the verdicts. `until: 'persisted'` checks the file as it was opened; `validationTime` judges each signature at its timestamp. [Which bytes are checked](#which-bytes-are-checked), [When it was signed](#when-it-was-signed) |
 | `validateField(field)`                                    | Checks one signed field and resolves its verdict                                                                                          |
 | `getVerdict(field)`, `listVerdicts()`                     | One signed field's verdict from the last check, or every verdict; `null` before the first check. [Check the signatures](#check-the-signatures) |
 | `getSignature(field)`                                     | One signature field's facts, signed or not, such as `fieldName`, `signed` and `signer`, or `null`                                         |
@@ -234,7 +317,7 @@ Set them when you register the plugin, and change them while the app runs with
 | :------------- | :--------------------------------------------------------------------- | :------------------------------ |
 | `signingKey`   | The signer, or a function that returns one when someone signs          | none                            |
 | `mode`         | What a mark does in a field: `'sign'`, `'visual'` or `'ask'`           | `'sign'` with a key, else `'visual'` |
-| `trust`        | The certificates you trust, for checking signatures                    | none                            |
+| `trust`        | The certificates you trust: for checking signatures, and for the timestamps you seal | none              |
 | `allowCertify` | Let a first signature be a certification, which sets what stays allowed | `false`                        |
 
 ## Events
