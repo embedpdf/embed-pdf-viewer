@@ -78,6 +78,12 @@ describe('deriveProtection: enforced vs judged', () => {
     expect(protectedCapabilities(p1).has('doc.forms.fill')).toBe(true);
     // Restoring who filled the fields in is still filling them.
     expect(protectedCapabilities(p1).has('doc.forms.import')).toBe(true);
+    // Nothing may follow a no-changes certification: Acrobat reports it as altered for a
+    // metadata change and for a document timestamp alike.
+    expect(protectedCapabilities(p1).has('doc.metadata.modify')).toBe(true);
+    expect(protectedCapabilities(p1).has('doc.sign')).toBe(true);
+    expect(protectedCapabilities(p2).has('doc.metadata.modify')).toBe(false);
+    expect(protectedCapabilities(p2).has('doc.sign')).toBe(false);
   });
 
   test('a signed field lock with /P tightens; a later approval never loosens a certification', () => {
@@ -104,7 +110,8 @@ describe('deriveProtection: enforced vs judged', () => {
     );
     expect(isProtectableCapability('doc.forms.fill')).toBe(true);
     expect(isProtectableCapability('doc.forms.read')).toBe(false);
-    expect(isProtectableCapability('doc.sign')).toBe(false);
+    expect(isProtectableCapability('doc.sign')).toBe(true);
+    expect(isProtectableCapability('doc.sign.certify')).toBe(false);
   });
 
   test('a refusal names the certification and the capability', () => {

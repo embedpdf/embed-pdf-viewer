@@ -1,0 +1,1958 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": 5,
+  "recordedAt": "2026-11-15",
+  "about": "The engine's answer on every signed file of the diagnostic sets: the folders of Acrobat reports that are not part of the role-probe corpus. Where Acrobat's verdict for a signature is recorded in the folder's own result file, it is copied here with how the engine's answer relates to it. A rule change that moves any of these answers must edit this file on purpose.",
+  "relationships": {
+    "agrees": "Acrobat valid and the engine finds no forbidden change, or Acrobat invalid and the engine forbids.",
+    "no-verdict": "The engine answers indeterminate rather than contradict Acrobat (a signed revision Acrobat cannot verify later changes against).",
+    "more-lenient": "Acrobat reports the signature invalid and the engine does not. A known difference: inline annotations in the signed revision (see signed-inline-pages and weak-annotations).",
+    "stricter": "Acrobat valid, the engine forbids."
+  },
+  "files": [
+    {
+      "file": "morning-variants-2/morning-B2-page-only-corpus-append.pdf",
+      "sha256": "25770114ea575d9e068ce7fd98761f2be2f61141d298c3c6948c49eeba69e44d",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-C2-widget-only-corpus-append.pdf",
+      "sha256": "345dff7fca8c460eb1b41b95fdfa6764b407298020230626787462d837a95d6a",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-D2-page-and-widget-corpus-append.pdf",
+      "sha256": "7d857fd01eb6d158b4ee69f1a0bedd2671eb2b76c9aeddbf2737b7900efcf785",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-E2-font-dict-only-corpus-append.pdf",
+      "sha256": "877fff34479f214476cd7e26da06e1ae9bc72aae53ed29943dd24532409f5bc8",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-F2-orphan-object-corpus-append-style.pdf",
+      "sha256": "ed93a47c1473c76f0e0a670680cd5cabe760a0a471cc8158e2ad8f1d08937154",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-H-ebook-signed-with-corpus-key.pdf",
+      "sha256": "99de7179d0deab496efa0e076bbafe1324c0678fe013a82c3f56d238e944529c",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-2/morning-I2-corpus-key-signed-plus-orphan-corpus-append.pdf",
+      "sha256": "ab4a80a3259dd608f0b6ef1b06674d15e2dee6598568ca66a17d6bd5292eea8c",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S1-dense-xref-signed-plus-orphan.pdf",
+      "sha256": "0ce928f818374ad84d7f5f6d2d62a3b9a9095fb4feb25174ecdae3fddfbf91c8",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S2-16-byte-id-signed-plus-orphan.pdf",
+      "sha256": "c44167daf3cde63f7918f64818431381872ec224deaeef017b09dcf04163644a",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S3-info-in-trailer-signed-plus-orphan.pdf",
+      "sha256": "78f26a34661398e297c5b94ee1c7547cece59b5a4033c56295ce376dd11e266e",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S4-header-lf-signed-plus-orphan.pdf",
+      "sha256": "270ef049f5f25412a80bb9111ae9369d5e7bbd9f5e3c2d940fcec4c6361b0445",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S5-qpdf-rewrite-signed-plus-orphan.pdf",
+      "sha256": "1a5ca892f968d3a9ddf7a28f50d279599935ac9370c6a32efdc9d4df9c6d8f03",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-3/morning-S6-dense-id-info-lf-signed-plus-orphan.pdf",
+      "sha256": "2a4df57424f6cef55378a722625a16d3f6dce181484f279be55f1719c7de7aec",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-3/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T1-dense+lf-signed-plus-orphan.pdf",
+      "sha256": "f62044c320a9f46f5a233adade99d3fe489141e495f3f13aebe7113a7acdcca7",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T2-id+info+lf-signed-plus-orphan.pdf",
+      "sha256": "29d205eac8563a464abbf6adf34c1fafc4c8687a4ac4f8622ec9830f78b68f2f",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T3-dense+id+info-signed-plus-orphan.pdf",
+      "sha256": "5efc895aa24f99fdbcfec8b83d26f9dde8ff87b8d7e187ddeff4fa3496b59558",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T4-dense+id-signed-plus-orphan.pdf",
+      "sha256": "47563a4189e29ca764d8a88bfe783ab01541cfac336abffa7b194c03010d2989",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T5-dense+info-signed-plus-orphan.pdf",
+      "sha256": "31b8ee089761ba0fb2259e9d5aac096e9bf75688906fe99165870eac8a0426e2",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T6-id+lf-signed-plus-orphan.pdf",
+      "sha256": "3f00770ca2c376cd293b943ed9b160808ee98abe4d2cd0ac410b060aeaa5f80a",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T7-info+lf-signed-plus-orphan.pdf",
+      "sha256": "55e04793f812825dfabf34b439bd507528499c062fd855633b86825b6e01b82b",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-4/morning-T8-dense+true-lf-signed-plus-orphan.pdf",
+      "sha256": "6fcfcaa3dc3c79593fc3ba3a86d6d2ac276618f9c0ba3c78a31bd1093d2d0a05",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-4/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-5/morning-U1-dense+977-fixed-signed-plus-orphan.pdf",
+      "sha256": "896ecbc91dc088050c246d73c5619ed86f390c8777413bfba2d3c05e1e9819c1",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-5/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-5/morning-U2-dense+catalog-info-removed-signed-plus-orphan.pdf",
+      "sha256": "1e097ee935efae3422069f653af41748251558d4bb5ecd684245cce4bd3c4769",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-5/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-5/morning-U3-sparse+977-fixed-signed-plus-orphan.pdf",
+      "sha256": "cdac3ae4c5b33c642c02251cf8f0db41acaa25fa048a7022f4cca698cbee12e4",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-5/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-5/morning-U4-sparse+catalog-info-removed-signed-plus-orphan.pdf",
+      "sha256": "70e9eb1526513900d05320ce79287dfc908b2ed4a538c3266cd7ae719ff7a8c4",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-5/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants-5/morning-U5-sparse-rebuilt-control-signed-plus-orphan.pdf",
+      "sha256": "21bc94b570bd821dd429e337acc490efa3318f1f9a98d3747785672f44b632a1",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-5/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-A-original-rejected.pdf",
+      "sha256": "7ee5dad113f2a8844286a890a3b4409538bf586f7a7430e5a4e05c69d896e8e5",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-B-page-only.pdf",
+      "sha256": "0508a97cf1981855960203d9e038b9922464db815e4ae2368e5f31616e44ac37",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-C-widget-only.pdf",
+      "sha256": "33daaa50d3006883568d6937e4de645aa8e518a1180fc8e904b80e7cb2a7ea94",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-D-page-and-widget-same-size-and-id.pdf",
+      "sha256": "9680d1a99be597c097b9a86932ae49a600e4d65b97da59dba24ef2aea3a5f742",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-E-font-dict-only.pdf",
+      "sha256": "25462b52b12138ab0726c5cd2fcec34c2b23263a3baef980532cf3fd8fa8a846",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-F-new-orphan-object-only.pdf",
+      "sha256": "3ed6e0ebb94de43d43d4d9470b16343bcf86c72f11e4a7c151b42b17cf3bbff3",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "indeterminate",
+          "acrobat": "invalid",
+          "relationship": "no-verdict",
+          "recordedIn": "morning-variants/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "morning-variants/morning-G-valid-control.pdf",
+      "sha256": "5037574407fdf7c778a69f5dbf9c33316f87866b5c8cc7035accd12889e2de35",
+      "signatures": [
+        {
+          "field": "signature_1",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "morning-variants-2/ACROBAT-RESULTS-2026-09-14.json"
+        }
+      ]
+    },
+    {
+      "file": "shared-font-amount-v1/pdfs/01-signed-visible-1000-copy-9000.pdf",
+      "sha256": "7cf1bf982f6f04aabefedfd6896bcd2b79846f7e8c245b08a4420deec32a34cc",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "shared-font-amount-v1/pdfs/02-updated-visible-9000-form-appearance.pdf",
+      "sha256": "a674ecda395caab4e22f0fd36a85041dd4b635a9aa4c9120c77fe8dbacbad7d2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "shared-font-amount-v1/pdfs/03-control-visible-9000-font-only.pdf",
+      "sha256": "71a3010a7c0e69b9e3ed316d8c0966ab123e87374457464786b65f98fdb81696",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S01-approval-control.pdf",
+      "sha256": "92fa0251eb879a09790d78ef5734ca711d5afdc17f8a9976cb0d2a38df44f14f",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S02-approval-recolour-object-annotation-p1.pdf",
+      "sha256": "60fadb769a277c2984a2da7c2dbaf10c6b6021f3bb6af391c9c2a57091d4a083",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S03-approval-retext-object-annotation-p1.pdf",
+      "sha256": "8af85e116a95b338e83e2d1204151e5d2433f1841b0ff69c8d2a90bd06f42e74",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S04-approval-retext-inline-annotation-p1.pdf",
+      "sha256": "fa86b59645a840830d691f6576b5c4450b7d721dae1c55c6ba392e7b338de558",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S05-approval-fill-field-p1.pdf",
+      "sha256": "5c59de729925505e78e78026bf49968a6bc00a9758a8d100e0c20f8f6ed0f2fa",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S06-approval-fill-field-p2.pdf",
+      "sha256": "a4cfcdfcd68b3b17f1c0bcd80051fda3cea96a7ec9b145eb93797d6157e11b05",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S07-approval-sign-empty-field-p1.pdf",
+      "sha256": "2df465bda0e281f7626dca8b46d24d1ada29f1d8bd4fcd95b98644ec27a3e292",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S08-approval-sign-empty-field-p2.pdf",
+      "sha256": "37503ddf1f30a272c3cb04cf839f5dfa88cbeff9999abfa4ebb5304d91c616c5",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        },
+        {
+          "field": "SignatureThree",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S09-approval-comment-p2.pdf",
+      "sha256": "11243d97aee01b02091898281e271f0286699c192175ff7766380815a4ca9619",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S10-approval-comment-p1.pdf",
+      "sha256": "f57a26396d7ff61f49f2ccb919a2a9b955f2601e4a92ca03c8feca5ef8ea5e5e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S11-approval-delete-object-annotation-p1.pdf",
+      "sha256": "54ead1f34ac4d1d8f9566a0f2a0b4336e90b31d0ecb6adaa7381a49371ddb24c",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S12-promoted-control.pdf",
+      "sha256": "f5403e76e02916a6fc0dfae4e249507c907b3faf9763233c89209baf05ba037c",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S13-promoted-comment-p1.pdf",
+      "sha256": "bf2d74fd2edb7bed64e7834284acea8f10f0a848f5b4fcc11157d94721c727d3",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S14-promoted-recolour-annotation-p1.pdf",
+      "sha256": "085bd2effa495eb9b6f46f31428cc552a2c4659d7a45b226dadce4b92f291f00",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S15-promoted-delete-annotation-p1.pdf",
+      "sha256": "533187171701b05183ffb7134d3a4a43c269d02ea1775c8fc9838ddb063aec5d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S16-promoted-reply-p1.pdf",
+      "sha256": "622c350180a7547d9d0b729f81307821f0b8d30c8a95dd0f050bf348ca621c9d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S17-p3-control.pdf",
+      "sha256": "9a7f630b2912c16c38cd52bd6960e0b2b2ff92865c4e7811b0036e9b72a6e276",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S18-p3-recolour-object-annotation-p1.pdf",
+      "sha256": "c098f11a4f110be73008e05b62bb8ee10c337cba809507538b416b1b9f38e620",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S19-p3-promoted-control.pdf",
+      "sha256": "50768aaa3066b4ce238d3313d81daf72b37576d49aae9e5fb0589a079b99a593",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "signed-inline-pages/v1/pdfs/S20-p3-promoted-comment-p1.pdf",
+      "sha256": "86f5e775175ea66a13184b09d1b3c579ce3f85c18c78f86c19a30bb4b1d0fe86",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-direct-control.pdf",
+      "sha256": "fbc61cc9d7cd92e46ba81eedf2f7376b445c8897ea4873e6ed459342e37255dd",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-direct-delete-names.pdf",
+      "sha256": "15f0486b4793d5966ac49bc22a828be6e68e9161d89e783c5b67f4f76fffb051",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-direct-delete.pdf",
+      "sha256": "bf1ba8137dac30d0ded59542f6211396d39af1c05eb7d2c4a76fcd9506785ce3",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-direct-names.pdf",
+      "sha256": "f1b68664985d6e380bbcb306bc8ab09ebd9429c414c6f18a91cccb00c9029749",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-direct-rewrite.pdf",
+      "sha256": "81ab2475e3c70a4dcfe5f7dbe45a6a1a85e901c9fbd5a12b1353664f68a95db2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-indirect-control.pdf",
+      "sha256": "56c17597c1a4c7f151dd81b49a1fc3837c1f351bec5a77c27e8e6ad2d42e901a",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "signed-inline-pages/v1/acrobat-results.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-indirect-delete-names.pdf",
+      "sha256": "5e89d3420783b530d97f0184a962045d5843b966322fe86bf4be87d1347ab83b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-indirect-delete.pdf",
+      "sha256": "0ea428d2d6eed0f9a438a980417e348775bcbc99183bc41113b9d66041159c56",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-indirect-names.pdf",
+      "sha256": "3674242266ed671e965a36e2ddf79b561cabf0b23830dc26b4cc66fa6a1116f1",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/p3-matched/p3-indirect-rewrite.pdf",
+      "sha256": "fceb6c42a06d12afb76330d8341a5f5cd9f2c50c9947e5818cc1766d622d6e5b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-control.pdf",
+      "sha256": "7578011b3766235fea418b19e8febd5859e9740aed1ab1b7a79e13c6e4494804",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-delete-names.pdf",
+      "sha256": "f8df1b2c5f3757c315f939300c8a227d986e1e10d2d481142457526dadb08596",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-delete.pdf",
+      "sha256": "196b775dd5f9c1943eb7b480c915bd69726a5010d79bb983668b9238699d2b39",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-names.pdf",
+      "sha256": "a7df233bd8a6ee048057cd54437d47dcdaa31cdf99e8e598c5a9161b5281268d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-reorder-names.pdf",
+      "sha256": "3caab5b9c4630b59381a319110355e6806651cc3cb793536d257895b8f0a2126",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-indirect-array-reorder.pdf",
+      "sha256": "5d5b829597dae024a1287f40db1e4b33e69e38319c222611e43f8c76e1642921",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-control.pdf",
+      "sha256": "6ca67fa9b008d4d0e3fb142b57122b871367c163f805ac07f1a611f9a839d940",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-delete-names.pdf",
+      "sha256": "04c5f6e0664797f7a1404e2b8015e65d02e7eb3bedb102e5846b21475b07c797",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-delete.pdf",
+      "sha256": "cba60f1427b3b6c59941915a15e910f80fceca386a5f715253a59a8b7e916fab",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-names.pdf",
+      "sha256": "50356d25c243f01a06b3941928c40c247d767a15eb8881576ba333b8b517cb77",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-reorder-names.pdf",
+      "sha256": "b2bbbde3bed3cf7ae4fb9c4b148cd7cb9011afbc0f1158c1b5d81e329db81b8c",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/approval-inline-reorder.pdf",
+      "sha256": "dd9eaf3291e8b898d60a6ca0e1f91c5fdd1baa747f42df2d291e25dcae0efe6e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-control.pdf",
+      "sha256": "d6bcafa1807762565c576ad4cec01d59399a87c6682cf8014c8d5d27f6f6af99",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-delete-names.pdf",
+      "sha256": "3f97bb72dd1a7bc66794d3f745b8596a48381847d7efd453aad0c875a1ca7ab2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-delete.pdf",
+      "sha256": "0702c9946e792ace7c27ea61858270b9fba3701e156ba438f4a47ac62d7f6544",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-names.pdf",
+      "sha256": "5d13a8f39aec40d7b51d2dd1329b7f96d9aa168debb155b1b20fce80e6e36ad5",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-reorder-names.pdf",
+      "sha256": "694012f3cc60fc14a326afeb26fb71b4ad5a6dcbdcedee5acd11a9205526cf6b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-indirect-array-reorder.pdf",
+      "sha256": "e4acef4cf3fc0de52943f9c6903648c23327811ee64b6be435afafb06ec56c1a",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-control.pdf",
+      "sha256": "c99d9458bd62cc985b2e055c274503a67237c88f415543794b96a4d47a7d5a09",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-delete-names.pdf",
+      "sha256": "956ea29536635053e9b8fbd5068e814db4602731ed1d1d10f4b67dea04fd37d4",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-delete.pdf",
+      "sha256": "6840dfc576b1557dab25888d17f89b1f37dbe0ca0023b6693135355c56e8d518",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-names.pdf",
+      "sha256": "f0403caecdb7047cc2dec0729c84cd9382842d797057ab803d7d400494dc2fd2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-reorder-names.pdf",
+      "sha256": "99319e33e93f3d8698e9f94d2fd2dba5b1613365ca7a963bd4e30f1252473d27",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/fieldmdp-inline-reorder.pdf",
+      "sha256": "66de07bd664bba99f098d7ab980984beda9fcb67c10756792b38a5cec9cc91ae",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-control.pdf",
+      "sha256": "7a95e0751de8d8fdab18dfc887dc62693d54233ea69abfb91c2ae85326e4f782",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-delete-names.pdf",
+      "sha256": "dfb84b6d5a5b2749a308ea728f748716f83512037921f155c6f9538fe498e808",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-delete.pdf",
+      "sha256": "3cabf1125a1ced003db46e5c033b404dc045acd8ea2b960e1f381e31c6c77fcf",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-names.pdf",
+      "sha256": "a114ef91140575b1d6f7931c44c97090fb4bedf229c4a9d22f7b527f733efe3b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-reorder-names.pdf",
+      "sha256": "d691c8a32c8a63d91d569ab66657cd749807a8c7312be19a0df00388469d7908",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-indirect-array-reorder.pdf",
+      "sha256": "89d2c496417e169ba1e5b0de245205ab2938fa63906ed2b3732ca48c175c3f4e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-control.pdf",
+      "sha256": "20fe34f3eb83f10c30692a59a199a8e8481c23f479f711cc268b4662634f2c34",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-delete-names.pdf",
+      "sha256": "4bdaf4b8a5b0b74eea821c8ebfd3e146c29f8de8583eca9b737d482a6033d794",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-delete.pdf",
+      "sha256": "7734624578c5d175620d80eef0db937f6bf0612a4ff84c6d6f5970ec6baf8a82",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-names.pdf",
+      "sha256": "f8ba3c73eaf5d2a4076a476485681b3ebb02995de3313aa32050a10a2e0056b6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-reorder-names.pdf",
+      "sha256": "ba480e3b308ab9894d69f79680dd83454b6e7dbda77339d42d6ea80727ef762e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/locked-markup-inline-reorder.pdf",
+      "sha256": "86209531da1c0e768b69a5c7080bc531e775e088a1de7a51b60edd30d7fa021f",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-control.pdf",
+      "sha256": "777cbcd7682dabcc8fd97cf06275d80dfe7ae0ec8aa20760d51ad664980bbba7",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-delete-names.pdf",
+      "sha256": "6f72c11a651f058f32eb7cb7ae85d2e983cb7c89e8247b7e7767abb1c45cd75e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-delete.pdf",
+      "sha256": "966ae95d41859a68432ff299f676fab52fc9c33b323d31c6800f2dbec9765c62",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-names.pdf",
+      "sha256": "9e8824ba5f497a34060e8bb62105e8327f47e99952d7f13218c0815e67e6052f",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-reorder-names.pdf",
+      "sha256": "bc2890a0bf209caad23590d77da50f661891459dbab0521657fe5ce08bd04686",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-indirect-array-reorder.pdf",
+      "sha256": "4e73e24ffcaca53994e7b285483d375e9adb446f60e0c868765289aa097cb4b3",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-control.pdf",
+      "sha256": "7d772fae7622294184de9e14c848aadfc8a4f9165fed9e89f1443a9089092804",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-delete-names.pdf",
+      "sha256": "c9b567a410888a1d8a5d257a7342575eadcb514047b0d6ab1ec169d81ff89738",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-delete.pdf",
+      "sha256": "3952f861b2c6a1654e4f83b233fcdce2e8561e4e0ab040153254b3eb5dac7378",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-names.pdf",
+      "sha256": "5c80d5573dd0eb7f0776fb17a987e49831039b79ab20289551ec016a89a000a3",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-reorder-names.pdf",
+      "sha256": "b911e3bdcd9185493cad0cb6893b169b0ddb68338b924bfa9d18afb493e5deb4",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/lockp2-inline-reorder.pdf",
+      "sha256": "eb413032bf1364596ac7f04f87c8359dfec6b6e9f4f10519f6763e7de38d9d79",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-control.pdf",
+      "sha256": "5f1e9422be018bdb23a4ed559fdc4a53ba6605812e7e69a601a96454c55dc471",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-delete-names.pdf",
+      "sha256": "010fe2e88bb5599d67274552bed0e6c5d0cb13e51f332ad32d31e7e0ae986ea3",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-delete.pdf",
+      "sha256": "f99db29e4c857a817328069a751d37d8a6cbd66b933cb06fde920f58c63dc004",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-names.pdf",
+      "sha256": "225f52985c5ba3f8a9f8f406dab013f7f8071d0762a155817ee12e569532c230",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-reorder-names.pdf",
+      "sha256": "849f6aee2c26963ae4d6a422fda5e0d76a4d0a6f677000aaa0fe9c65ee55115b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-indirect-array-reorder.pdf",
+      "sha256": "c6001a1f7a68cdd627361822369efd24a755b04a100a66dda3ab0975e2770a3e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-control.pdf",
+      "sha256": "08bbe682ea23c2c3b8232e0ba420dbe7ce508d2ea30bbc5f1777be60c19a753f",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-delete-names.pdf",
+      "sha256": "a3dcb286fea7420304bb7c81fedeb9472be6f995b07bfeb31217eb3861d22176",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-delete.pdf",
+      "sha256": "06180daf385bb2ef2573cf0f9e198b832f0cbf2d02379136c89a79a7b576bc27",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-names.pdf",
+      "sha256": "e1723ae7af7fa63ecf1469a54f8e57b18a81b55461114e6681812274a0f1ec60",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-reorder-names.pdf",
+      "sha256": "066a7165bbbe66feab702d9cb711e486782ad0f9150bc101c290f2dd1c429ab6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p2-inline-reorder.pdf",
+      "sha256": "14b55850d87857f3b70af7b1404a41b0d676dc334f7cdd89cf9f00be8e06ab4e",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-control.pdf",
+      "sha256": "82a603e47ffe0b3753b4871fc2761cb46f940da994300316bf5b87fb66521715",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-delete-names.pdf",
+      "sha256": "7b96ad062fea769130d07d8b297ca08aab221b84ede22f4d6324e97dec2e1ec9",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-delete.pdf",
+      "sha256": "67192f80560ade1aa321b13e2e41c2af1fe482a453f5d5000b0213a45ebc4314",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-names.pdf",
+      "sha256": "cce7f8dbe9e2ea3c7bf13d93e3b2067a68f1f060d27eba8408e4521bee1651b9",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-reorder-names.pdf",
+      "sha256": "cd7d4584713e8aacca13e89fb5301101e03e0788ca9a6a2b206294beb38ce219",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-indirect-array-reorder.pdf",
+      "sha256": "9a1b8d5d709a624aebe291af3f0dfe0bb3ba3736c85bc02ebd32c4e173b617ae",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "forbidden"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-control.pdf",
+      "sha256": "fbc61cc9d7cd92e46ba81eedf2f7376b445c8897ea4873e6ed459342e37255dd",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-delete-names.pdf",
+      "sha256": "70156ece31ab032b891d46a55c21f0e9c3fcf2d5bab1377c2e8e20e83f4d0b29",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-delete.pdf",
+      "sha256": "b8f7b9318382ceee86bf2af4a55df89413f501573e0cbf3a18858ac53d46d2ab",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-names.pdf",
+      "sha256": "00410e34164df1b099a6179919e77f5e6a47f14f69081cf9509628f0c3d3c655",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-reorder-names.pdf",
+      "sha256": "2fe7ffec880f9e8ae9af626611b3b04cfd2bb62f875b1a106fa78cf0786d8ab9",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/pdfs/p3-inline-reorder.pdf",
+      "sha256": "de7515a9097662cff5cf75c7c9946421afdd7847b74819fd12852219541acc6c",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "permitted"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/reference/54-identical-page-widget-control.pdf",
+      "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/supplemental/approval-indirect-annotations-control.pdf",
+      "sha256": "fc1211ef4d5ee07f7cd874052e813b4f5ae95998223ea6b9295d06fa2a108d2a",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/supplemental/approval-indirect-annotations-rewrite-reference-writer.pdf",
+      "sha256": "4877c44fef6699c2517ae5205bb2695532fa1b2d7205ab7d673979ec575828c2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "valid",
+          "relationship": "agrees",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/supplemental/approval-inline-rewrite-reference-writer.pdf",
+      "sha256": "041f93ec7bd679c7f3b52911dfc8cb706682b8bc50473da562c153ada781e5a6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/supplemental/approval-inline-rewrite-size-preserved.pdf",
+      "sha256": "9700fc7d16c1a5899f1d6e120829c0ba204be099243ec22b1f5dd8166ed78f2d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    },
+    {
+      "file": "weak-annotations/supplemental/approval-inline-rewrite-unchanged.pdf",
+      "sha256": "eeae59c97273d478dd907ab9683b0f355ec272387ea35865ab9b63bafa697b36",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "changes": "unchanged",
+          "acrobat": "invalid",
+          "relationship": "more-lenient",
+          "recordedIn": "weak-annotations/acrobat-observations.json"
+        }
+      ]
+    }
+  ]
+}

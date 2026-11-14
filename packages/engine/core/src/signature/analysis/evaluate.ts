@@ -135,18 +135,23 @@ export function evaluateStep(input: StepInput): RevisionAnalysis {
   ruleRevisionHealth(ctx);
   ruleXrefContainer(ctx);
   ruleIdenticalRewrite(ctx);
-  // Locks first: a frozen object is condemned before any rule could vouch for it.
-  ruleFieldLock(ctx);
-  ruleTrailer(ctx);
-  ruleInfo(ctx);
-  ruleMetadata(ctx);
-  ruleCatalog(ctx);
-  ruleAcroForm(ctx);
-  ruleDss(ctx);
-  ruleSignatureFieldAdded(ctx);
-  ruleSignatureAdded(ctx);
-  ruleFormFill(ctx);
-  ruleAnnotation(ctx);
+  if (ctx.allows('fill')) {
+    // Locks first: a frozen object is condemned before any rule could vouch for it.
+    ruleFieldLock(ctx);
+    ruleTrailer(ctx);
+    ruleInfo(ctx);
+    ruleMetadata(ctx);
+    ruleCatalog(ctx);
+    ruleAcroForm(ctx);
+    ruleDss(ctx);
+    ruleSignatureFieldAdded(ctx);
+    ruleSignatureAdded(ctx);
+    ruleFormFill(ctx);
+    ruleAnnotation(ctx);
+  } else {
+    ruleTrailer(ctx);
+    ruleNoChangesCertification(ctx);
+  }
   ruleUnexplained(ctx);
 
   const verdict: StepVerdict = conclude(
@@ -471,6 +476,31 @@ function ruleIdenticalRewrite(ctx: StepContext): void {
   }
 }
 
+/**
+ * After a certification that allows no changes, nothing may follow. ISO
+ * 32000-2 lets validation data and document timestamps through, and pyHanko
+ * follows it. Acrobat does not: it reports the certification as altered for
+ * validation data alone, for a document information dictionary alone and for
+ * a document timestamp alone, in a PDF 1.7 file and in a PDF 2.0 file
+ * (fixtures `signature-long-term`). Acrobat is the validator recipients use,
+ * so every object such a revision writes is forbidden. The trailer and the
+ * cross-reference containers are the revision's own bookkeeping, and an
+ * object written again unchanged is judged by its own rule.
+ */
+function ruleNoChangesCertification(ctx: StepContext): void {
+  const rule = 'no-changes-certification';
+  for (const c of ctx.changes) {
+    if (c.objectNumber === 0 || c.kind === 'xref' || c.kind === 'objstm') continue;
+    if (ctx.isIdentical(c)) continue;
+    ctx.claimAll(c, rule, false);
+    ctx.forbidden(
+      c,
+      rule,
+      `${c.change} after a certification that allows no changes: Acrobat reports the certification as altered (ISO 32000-2 allows validation data and document timestamps here, Acrobat does not)`,
+    );
+  }
+}
+
 function ruleTrailer(ctx: StepContext): void {
   const c = ctx.byNum.get(0);
   if (!c) return;
@@ -632,6 +662,42 @@ function appendedRefs(c: ObjectChange, key: string): number[] | null {
   return newRefs.slice(oldRefs.length);
 }
 
+/**
+ * What a page's /Annots gained when it only grew: in place, or moved out of
+ * the page into a new array object that holds the old entries first.
+ * Acrobat does the second when it adds a document timestamp to a page whose
+ * /Annots was an array inside the page (fixture
+ * `signature-long-term/acrobat-lta.pdf`: the earlier signature stays valid).
+ * `holder` is that new object, to claim with the page.
+ */
+function grownAnnots(
+  ctx: StepContext,
+  page: ObjectChange,
+): { appended: number[]; holder: ObjectChange | null } | null {
+  const inPlace = appendedRefs(page, 'Annots');
+  if (inPlace) return { appended: inPlace, holder: null };
+  const oldItems = dictEntries(page.value.old)?.Annots;
+  const moved = dictEntries(page.value.new)?.Annots;
+  if (oldItems && oldItems.t !== 'array') return null;
+  if (!moved || moved.t !== 'ref') return null;
+  const holder = ctx.byNum.get(moved.num);
+  if (!holder || holder.change !== 'added' || holder.value.truncated) return null;
+  const list = holder.value.new;
+  if (!list || list.t !== 'array') return null;
+  // The new object is this page's list and nothing else.
+  if (!holder.usage.new.every((e) => e.parent === page.objectNumber && e.label === 'Annots')) {
+    return null;
+  }
+  const oldRefs = refsOf(oldItems);
+  const newRefs = refsOf(list);
+  // Every entry is a reference: an annotation written inside either array is not one we can follow.
+  if (oldItems && oldRefs.length !== oldItems.items.length) return null;
+  if (newRefs.length !== list.items.length) return null;
+  if (oldRefs.length >= newRefs.length) return null;
+  for (let i = 0; i < oldRefs.length; i++) if (oldRefs[i] !== newRefs[i]) return null;
+  return { appended: newRefs.slice(oldRefs.length), holder };
+}
+
 function newSignatureFields(ctx: StepContext): Set<number> {
   const out = new Set<number>();
   for (const n of ctx.after.sigFields) if (!ctx.before.fieldByObj.has(n)) out.add(n);
@@ -688,10 +754,18 @@ function ruleSignatureFieldAdded(ctx: StepContext): void {
     if (!c || ctx.isIdentical(c)) continue;
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size !== 1 || !changed.has('Annots')) continue;
-    const appended = appendedRefs(c, 'Annots');
-    if (appended && appended.every((n) => newWidgets.has(n))) {
+    const grown = grownAnnots(ctx, c);
+    if (grown && grown.appended.every((n) => newWidgets.has(n))) {
       ctx.claimAll(c, rule);
       ctx.permitted(c, rule, 'page /Annots gained the new signature widget');
+      if (grown.holder) {
+        ctx.claimAll(grown.holder, rule);
+        ctx.permitted(
+          grown.holder,
+          rule,
+          'page /Annots moved into an object of its own, with the new signature widget',
+        );
+      }
     }
   }
   // A parent field whose /Kids gained the new field.
@@ -979,6 +1053,15 @@ function ruleAnnotation(ctx: StepContext): void {
   for (const p of pages) {
     const c = ctx.byNum.get(p);
     if (!c || ctx.isIdentical(c)) continue;
+    // A page whose /Annots a new signature field explains is already judged.
+    if (
+      ctx.findings.some(
+        (f) =>
+          f.objectNumber === p && f.rule === 'signature-field-added' && f.verdict === 'permitted',
+      )
+    ) {
+      continue;
+    }
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size === 1 && changed.has('Annots')) {
       const removed = refsOf(dictEntries(c.value.old)?.Annots).filter(

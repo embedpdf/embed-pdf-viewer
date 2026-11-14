@@ -185,7 +185,7 @@ const SQUARE =
 // ---------------------------------------------------------------------------
 
 describe('analysis: evidence must never fail open', () => {
-  test('a changed /OpenAction under P=1 is forbidden alone AND next to a DSS update', async () => {
+  test('a changed /OpenAction is forbidden alone AND next to a DSS update', async () => {
     const base = document(
       {
         3: page([30]),
@@ -196,13 +196,16 @@ describe('analysis: evidence must never fail open', () => {
       },
       ' /OpenAction 9 0 R /DSS 50 0 R',
     );
-    const signed = await sign(base, { permission: 1 });
     const changed: Objects = { 9: '<< /S /JavaScript /JS (var example = 2;) >>' };
+    const dss: Objects = { 50: '<< /Certs [] /VRI <<>> >>' };
 
+    // After a certification that allows form filling, a DSS update is allowed, and it must
+    // not vouch for the action changed beside it.
+    const signed = await sign(base, { permission: 2 });
     const alone = await analyze(append(signed, changed));
     expect(alone.verdict).toBe('forbidden');
 
-    const withDss = await analyze(append(signed, { ...changed, 50: '<< /Certs [] /VRI <<>> >>' }));
+    const withDss = await analyze(append(signed, { ...changed, ...dss }));
     expect(withDss.verdict).toBe('forbidden');
     expect(
       findings(withDss).some(
@@ -212,6 +215,23 @@ describe('analysis: evidence must never fail open', () => {
     expect(findings(withDss).some((f) => f.objectNumber === 9 && f.verdict === 'forbidden')).toBe(
       true,
     );
+
+    // After a certification that allows no changes, nothing may follow: the DSS update is
+    // forbidden too, as Acrobat judges it.
+    const strict = await sign(base, { permission: 1 });
+    const onlyDss = await analyze(append(strict, dss));
+    expect(onlyDss.verdict).toBe('forbidden');
+    expect(findings(onlyDss).find((f) => f.objectNumber === 50)).toMatchObject({
+      rule: 'no-changes-certification',
+      verdict: 'forbidden',
+    });
+    const both = await analyze(append(strict, { ...changed, ...dss }));
+    expect(
+      findings(both)
+        .filter((f) => f.verdict === 'forbidden')
+        .map((f) => f.objectNumber)
+        .sort((a, b) => a - b),
+    ).toEqual([9, 50]);
   });
 
   test('a catalog too large to inspect is indeterminate, never permitted', async () => {

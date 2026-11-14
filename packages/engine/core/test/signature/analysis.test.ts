@@ -3,6 +3,7 @@ import {
   changedKeys,
   evaluateStep,
   parsePdfValue,
+  restrictionsFor,
   restrictionsOf,
   stableStringify,
   type ObjectChange,
@@ -416,9 +417,10 @@ describe('evaluateStep: the edge-claim law', () => {
     });
     const forbidden = evaluateStep({ older: 1, newer: 2, changes: fill, before: lta, after: lta });
     expect(forbidden.verdict).toBe('forbidden');
-    expect(
-      forbidden.findings.some((f) => f.rule === 'form-fill' && f.verdict === 'forbidden'),
-    ).toBe(true);
+    // One cause, named once per object: nothing may follow such a certification.
+    const refused = forbidden.findings.filter((f) => f.verdict === 'forbidden');
+    expect(refused.map((f) => f.objectNumber).sort((a, b) => a - b)).toEqual([20, 21, 22, 40, 41]);
+    expect(new Set(refused.map((f) => f.rule))).toEqual(new Set(['no-changes-certification']));
   });
 
   test('a shared resource keeps its other reference unexplained', () => {
@@ -499,7 +501,10 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(del.verdict).toBe('forbidden');
   });
 
-  test('metadata, info, trailer housekeeping and DSS are permitted even under lta', () => {
+  test('metadata, info, trailer housekeeping and DSS: permitted after a P=2 certification, forbidden after P=1', () => {
+    const fill = structure({
+      signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true })],
+    });
     const lta = structure({
       signatures: [signature(0, 30, { docMdp: 1, catalogCertification: true })],
     });
@@ -542,9 +547,22 @@ describe('evaluateStep: the edge-claim law', () => {
         {},
       ),
     ];
-    const step = evaluateStep({ older: 1, newer: 2, changes, before: lta, after: lta });
+    const step = evaluateStep({ older: 1, newer: 2, changes, before: fill, after: fill });
     expect(step.findings.filter((f) => f.verdict === 'forbidden')).toEqual([]);
     expect(step.verdict).toBe('permitted');
+
+    // Acrobat reports a no-changes certification as altered for each of these alone
+    // (fixtures signature-long-term), so none is housekeeping there. The trailer is the
+    // revision's own bookkeeping and stays so.
+    const strict = evaluateStep({ older: 1, newer: 2, changes, before: lta, after: lta });
+    expect(strict.verdict).toBe('forbidden');
+    const refused = strict.findings.filter((f) => f.verdict === 'forbidden');
+    expect(refused.map((f) => f.objectNumber).sort((a, b) => a - b)).toEqual([1, 6, 7, 8, 50, 51]);
+    expect(new Set(refused.map((f) => f.rule))).toEqual(new Set(['no-changes-certification']));
+    expect(strict.findings.find((f) => f.objectNumber === 0)).toMatchObject({
+      rule: 'trailer',
+      verdict: 'permitted',
+    });
   });
 
   test('a second signature with a FieldMDP lock is permitted; touching the locked field afterwards is not', () => {
@@ -905,12 +923,16 @@ describe('evaluateStep: hardening', () => {
         { old: [edge(1, 'DSS')], new: [edge(1, 'DSS')] },
       ),
     ];
+    // After a certification that allows form filling: the level at which a DSS update is allowed.
+    const certifiedFill = structure({
+      signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true })],
+    });
     const step = evaluateStep({
       older: 1,
       newer: 2,
       changes,
-      before: certifiedLta,
-      after: certifiedLta,
+      before: certifiedFill,
+      after: certifiedFill,
     });
     expect(step.verdict).toBe('forbidden');
     expect(step.findings.some((f) => f.objectNumber === 9 && f.verdict === 'forbidden')).toBe(true);
@@ -1123,5 +1145,131 @@ describe('evaluateStep: appearance regeneration', () => {
         (f) => f.objectNumber === 23 && f.verdict === 'forbidden' && f.edge === '40:AP/N',
       ),
     ).toBe(true);
+  });
+});
+
+describe('evaluateStep: a signature field added by Acrobat', () => {
+  /**
+   * What Acrobat writes when it adds a document timestamp to a page whose /Annots was an array
+   * inside the page: a new field that is its own widget, the AcroForm's list grown, and the
+   * page's /Annots moved into a new object that holds the old entry and the new widget.
+   */
+  const moved = (
+    holder: string,
+    holderUsage: ObjectReferrer[] = [edge(3, 'Annots')],
+  ): ObjectChange[] => [
+    change(
+      3,
+      {
+        old: '<</Annots [30 0 R]/Parent 2 0 R/Type /Page>>',
+        new: '<</Annots 60 0 R/Parent 2 0 R/Type /Page>>',
+      },
+      {
+        old: [edge(2, 'Kids/[0]'), edge(30, 'P')],
+        new: [edge(2, 'Kids/[0]'), edge(30, 'P'), edge(31, 'P')],
+      },
+    ),
+    change(60, { old: null, new: holder }, { new: holderUsage }),
+    change(
+      31,
+      {
+        old: null,
+        new: '<</F 132/FT /Sig/P 3 0 R/Rect [0 0 0 0]/Subtype /Widget/T (Signature3)/V 32 0 R>>',
+      },
+      { new: [edge(10, 'Fields/[2]'), edge(60, '[1]')] },
+    ),
+    change(
+      32,
+      { old: null, new: '<</SubFilter /ETSI.RFC3161/Type /DocTimeStamp>>' },
+      { new: [edge(31, 'V')] },
+    ),
+    change(
+      10,
+      {
+        old: '<</Fields [20 0 R 30 0 R]/SigFlags 3>>',
+        new: '<</Fields [20 0 R 30 0 R 31 0 R]/SigFlags 3>>',
+      },
+      { old: [edge(1, 'AcroForm')], new: [edge(1, 'AcroForm')] },
+    ),
+    change(0, { old: '<</Root 1 0 R/Size 60>>', new: '<</Prev 999/Root 1 0 R/Size 61>>' }, {}),
+  ];
+  const before = structure();
+  const after = structure({
+    fields: [
+      ...structure().fields,
+      { objectNumber: 31, name: 'Signature3', kind: 'signature', widgets: [31] },
+    ],
+    signatures: [
+      signature(0, 30),
+      signature(1, 31, {
+        kind: 'timestamp',
+        subFilter: 'ETSI.RFC3161',
+        fieldName: 'Signature3',
+        revisionIndex: 2,
+      }),
+    ],
+  });
+  const judge = (changes: ObjectChange[]) =>
+    evaluateStep({ older: 1, newer: 2, changes, before, after });
+
+  test('/Annots moved into an object of its own, with the new widget: permitted', () => {
+    const step = judge(moved('[30 0 R 31 0 R]'));
+    expect(step.findings.filter((f) => f.verdict !== 'permitted')).toEqual([]);
+    expect(step.verdict).toBe('permitted');
+    expect(step.findings.find((f) => f.objectNumber === 60)).toMatchObject({
+      rule: 'signature-field-added',
+      verdict: 'permitted',
+    });
+  });
+
+  test.each([
+    ['drops the old entry', '[31 0 R]'],
+    ['puts the new widget first', '[31 0 R 30 0 R]'],
+    ['brings another annotation with it', '[30 0 R 31 0 R 70 0 R]'],
+    ['holds an annotation written in place', '[30 0 R 31 0 R <</Subtype /Link>>]'],
+    ['gains nothing', '[30 0 R]'],
+  ])('a moved /Annots that %s is not explained by the new field', (_, holder) => {
+    const step = judge(moved(holder));
+    expect(step.verdict).toBe('forbidden');
+    expect(step.findings.some((f) => f.objectNumber === 60 && f.verdict === 'permitted')).toBe(
+      false,
+    );
+  });
+
+  test("a new array that something else also points at is not the page's list alone", () => {
+    const step = judge(moved('[30 0 R 31 0 R]', [edge(3, 'Annots'), edge(1, 'Names/Extra')]));
+    expect(step.verdict).toBe('forbidden');
+  });
+});
+
+describe('restrictionsFor: a document timestamp after a certification that allows no changes', () => {
+  const timestamp = signature(1, 31, {
+    kind: 'timestamp',
+    subFilter: 'ETSI.RFC3161',
+    fieldName: 'Timestamp',
+    revisionIndex: 2,
+  });
+  const after = (permission: 1 | 2, later: Signature) =>
+    structure({
+      signatures: [signature(0, 30, { docMdp: permission, catalogCertification: true }), later],
+    });
+
+  test('the timestamp is judged on its own, as Acrobat judges it', () => {
+    const own = restrictionsFor(after(1, timestamp), timestamp);
+    expect(own.level).toBe('annotate');
+    expect(own.anchors).toEqual([]);
+  });
+
+  test('the certification itself, and a later approval signature, stay bound by it', () => {
+    const before = after(1, timestamp);
+    expect(restrictionsFor(before, before.signatures[0]).level).toBe('lta');
+    const approval = signature(1, 31, { fieldName: 'second', revisionIndex: 2 });
+    expect(restrictionsFor(after(1, approval), approval).level).toBe('lta');
+    // No signature in particular: every restriction in the file applies.
+    expect(restrictionsFor(before, null).level).toBe('lta');
+  });
+
+  test('a certification that allows form filling still binds a later timestamp', () => {
+    expect(restrictionsFor(after(2, timestamp), timestamp).level).toBe('fill');
   });
 });

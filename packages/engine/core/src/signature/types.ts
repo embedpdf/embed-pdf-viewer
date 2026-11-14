@@ -48,7 +48,9 @@ export type DocMdpPermission = 1 | 2 | 3;
 /**
  * The modification level a signed document allows, as a product policy:
  *   - `none`: no byte change at all (not a DocMDP value)
- *   - `lta`: DSS and document timestamps only (P = 1)
+ *   - `lta`: nothing (P = 1). ISO 32000-2 would let validation data and
+ *     document timestamps follow, which is where the name comes from; Acrobat
+ *     reports the certification as altered, so the engine allows neither
  *   - `fill`: + form fill, signatures, new signature fields (P = 2)
  *   - `annotate`: + annotations (P = 3, and how a validator reads an approval
  *     signature)
