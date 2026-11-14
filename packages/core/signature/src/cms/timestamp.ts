@@ -7,12 +7,16 @@ import { ensureEngine, toArrayBuffer } from './engine';
 import { DIGEST_BY_OID, DIGEST_LENGTH, OID, OID_BY_DIGEST, WEBCRYPTO_HASH } from './oids';
 import { CmsError } from './parse';
 
-/** What a timestamp token's TSTInfo says: which digest it stamped, and when. */
+/** What a timestamp token's TSTInfo says: which digest it stamped, when, and for which request. */
 export interface TimestampInfo {
   imprintAlgorithm: DigestAlgorithm;
   /** The stamped digest: for a document timestamp, the `/ByteRange` digest. */
   imprint: Uint8Array;
   genTime: Date;
+  /** The policy the authority issued the token under (an OID). */
+  policy: string;
+  /** The nonce of the request the token answers, without leading zeros; null when it carries none. */
+  nonce: Uint8Array | null;
 }
 
 /** Read a token's TSTInfo (the encapsulated content of an RFC 3161 token). Throws `CmsError`. */
@@ -36,7 +40,16 @@ export function readTimestampInfo(eContent: Uint8Array): TimestampInfo {
     imprintAlgorithm: algorithm,
     imprint: new Uint8Array(info.messageImprint.hashedMessage.valueBlock.valueHexView),
     genTime: info.genTime,
+    policy: info.policy,
+    nonce: info.nonce ? withoutLeadingZeros(info.nonce.valueBlock.valueHexView) : null,
   };
+}
+
+/** An integer's octets without the zeros DER puts in front: two nonces are equal when these are. */
+export function withoutLeadingZeros(octets: Uint8Array): Uint8Array {
+  let start = 0;
+  while (start < octets.byteLength - 1 && octets[start] === 0) start++;
+  return new Uint8Array(octets.subarray(start));
 }
 
 export interface BuildTimestampTokenInput {

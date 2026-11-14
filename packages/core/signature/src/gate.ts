@@ -1,11 +1,14 @@
 import type { SignaturePrepared } from '@embedpdf/engine-core/runtime';
 
 import type { SignatureProfile } from './cms/build';
-import { bytesEqual, ensureEngine, toArrayBuffer } from './cms/engine';
-import { WEBCRYPTO_HASH } from './cms/oids';
+import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal } from './cms/parse';
-import { readTimestampInfo } from './cms/timestamp';
 import { verifyCmsSignature } from './cms/verify';
+import { checkTimestampToken, signatureValueOf } from './cms/verify-timestamp';
+
+const RESERVE_STEP = 4096;
+/** The most room `prepare` reserves for a signature: 4 MiB. */
+const LARGEST_RESERVE = 4 * 1024 * 1024;
 
 /**
  * The shape the CMS must have: a PDF signature's (`pkcs7`, `cades-b`), or a
@@ -30,8 +33,9 @@ export type CompletionGate =
  * must fit the reserved room, hash with the prepared algorithm, carry the
  * prepared digest as its message digest, verify with its own certificate,
  * and match the profile the `/SubFilter` promises (CAdES: ESS
- * signing-certificate-v2 present, no CMS signing-time). A bad CMS never
- * reaches the document.
+ * signing-certificate-v2 present, no CMS signing-time). A timestamp it
+ * carries must be its own: one proven to stamp something else is refused. A
+ * bad CMS never reaches the document.
  */
 export async function verifyForCompletion(input: {
   cms: Uint8Array;
@@ -43,10 +47,10 @@ export async function verifyForCompletion(input: {
     return {
       ok: false,
       reason: 'too-large',
-      detail: `the CMS is ${cms.byteLength} bytes; ${prepared.contentsSizeBytes} were reserved`,
+      detail: `the signature is ${cms.byteLength} bytes and ${prepared.contentsSizeBytes} were reserved: ${reserveAdvice(cms.byteLength)}`,
     };
   }
-  if (profile === 'timestamp') return verifyTimestampToken(cms, prepared);
+  if (profile === 'timestamp') return verifyDocumentTimestamp(cms, prepared);
   let internal;
   try {
     internal = parseCmsInternal(cms);
@@ -95,71 +99,77 @@ export async function verifyForCompletion(input: {
       reason: 'signature-invalid',
       detail:
         cryptography === 'unsupported'
-          ? 'the signature algorithm is not supported'
+          ? 'the signature or its certificate binding uses an algorithm that is not supported'
           : 'the signature does not verify',
     };
+  }
+  // A timestamp the CMS carries must belong to it. One that can't be checked passes: a signing
+  // service's token may use what this engine doesn't know, and the gate sees only bytes, so it
+  // can't tell that token from one this signing asked for: `attachSignatureTimestamp` refuses
+  // those.
+  const signatureValue = signatureValueOf(internal.signerInfo);
+  for (const token of internal.timestampTokens) {
+    const check = await checkTimestampToken({
+      token,
+      stamped: { kind: 'bytes', bytes: signatureValue },
+      certificates: internal.certificates,
+    });
+    if (check.verdict === 'invalid') {
+      return {
+        ok: false,
+        reason: check.problem === 'imprint' ? 'digest-mismatch' : 'signature-invalid',
+        detail: `the signature's timestamp does not belong to it: ${check.detail}`,
+      };
+    }
   }
   return { ok: true };
 }
 
+/** The reserve to prepare with for a signature of `size` bytes, in whole steps of 4096. */
+function reserveAdvice(size: number): string {
+  const reserve = Math.ceil(size / RESERVE_STEP) * RESERVE_STEP;
+  return reserve > LARGEST_RESERVE
+    ? 'that is more than a signature may reserve'
+    : `pass \`contentsSizeBytes: ${reserve}\``;
+}
+
 /**
  * A document timestamp's token: it must stamp the prepared digest with the
- * prepared algorithm, its own message digest must cover its TSTInfo, and
- * its signature must verify with the authority's certificate.
+ * prepared algorithm and pass {@link checkTimestampToken}. A token that
+ * can't be checked is refused like a wrong one: the caller asked for this
+ * timestamp, and it can't be shown to be one.
  */
-async function verifyTimestampToken(
+async function verifyDocumentTimestamp(
   cms: Uint8Array,
   prepared: SignaturePrepared,
 ): Promise<CompletionGate> {
-  let internal;
-  let info;
-  try {
-    internal = parseCmsInternal(cms, 'tst-info');
-    info = readTimestampInfo(internal.eContent!);
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'malformed',
-      detail: error instanceof CmsError ? error.message : String(error),
-    };
+  const check = await checkTimestampToken({
+    token: cms,
+    stamped: { kind: 'digest', digest: prepared.digest, algorithm: prepared.algorithm },
+  });
+  if (check.verdict === 'valid') return { ok: true };
+  switch (check.problem) {
+    case 'unreadable':
+      return { ok: false, reason: 'malformed', detail: check.detail! };
+    case 'no-certificate':
+      return {
+        ok: false,
+        reason: 'malformed',
+        detail: "the token does not carry its authority's certificate",
+      };
+    case 'imprint-algorithm':
+      return {
+        ok: false,
+        reason: 'algorithm-mismatch',
+        detail: `the token stamps a ${check.info!.imprintAlgorithm} digest, the document was prepared with ${prepared.algorithm}`,
+      };
+    case 'imprint':
+      return {
+        ok: false,
+        reason: 'digest-mismatch',
+        detail: "the token's message imprint is not the prepared digest",
+      };
+    default:
+      return { ok: false, reason: 'signature-invalid', detail: check.detail! };
   }
-  if (info.imprintAlgorithm !== prepared.algorithm) {
-    return {
-      ok: false,
-      reason: 'algorithm-mismatch',
-      detail: `the token stamps a ${info.imprintAlgorithm} digest, the document was prepared with ${prepared.algorithm}`,
-    };
-  }
-  if (!bytesEqual(info.imprint, prepared.digest)) {
-    return {
-      ok: false,
-      reason: 'digest-mismatch',
-      detail: "the token's message imprint is not the prepared digest",
-    };
-  }
-  const contentDigest = new Uint8Array(
-    await ensureEngine().digest(
-      WEBCRYPTO_HASH[internal.parsed.digestAlgorithm],
-      toArrayBuffer(internal.eContent!),
-    ),
-  );
-  if (!bytesEqual(contentDigest, internal.parsed.messageDigest)) {
-    return {
-      ok: false,
-      reason: 'signature-invalid',
-      detail: "the token's message digest does not cover its TSTInfo",
-    };
-  }
-  const cryptography = await verifyCmsSignature(internal);
-  if (cryptography !== 'valid') {
-    return {
-      ok: false,
-      reason: 'signature-invalid',
-      detail:
-        cryptography === 'unsupported'
-          ? 'the signature algorithm is not supported'
-          : 'the token signature does not verify',
-    };
-  }
-  return { ok: true };
 }
