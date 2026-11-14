@@ -11,9 +11,12 @@ import {
   refOf,
   type Id,
   type Message,
+  paragraphsFromPlainText,
+  plainTextOf,
   type Point,
   richDocOf,
   type RichTextStyleDelta,
+  styleAt,
   typeWithStyle,
 } from '@embedpdf/core-annotation';
 import {
@@ -91,14 +94,40 @@ export function createTextEditing(
   /**
    * The paragraphs typed into box `id`, the text typed at the caret in the
    * style chosen there (`typeWithStyle`), and the caret where the typing
-   * leaves it. Any other edit drops the style.
+   * leaves it. Any other edit drops the style. With no style chosen, text
+   * typed over a selection takes the style of its first character, and a
+   * line break carries the style of the text before it on to the new line;
+   * other typing stays as the editor put it.
    */
   const typedInStyle = (id: Id, paragraphs: RichTextParagraph[]): RichTextParagraph[] => {
     const selection = ctx.state.get().textSelection;
     const record = store.model().byId[id];
-    if (!selection?.typing || selection.id !== id || !record) return paragraphs;
+    if (!selection || selection.id !== id || !record) return paragraphs;
     const before = richDocOf(record.annotation, fonts);
-    const typed = typeWithStyle(before, { paragraphs }, selection.start, selection.typing);
+    const was = plainTextOf(before);
+    // The selection is reported after the input, so a range can be out of
+    // date (a drag, or typing right after a delete or an arrow); text that
+    // only grew is an insertion whatever range is held.
+    const replaced =
+      selection.start !== selection.end && !grewAtOnePlace(was, plainTextOf({ paragraphs }));
+    // A replacement is typing at the selection's start into the text without it.
+    const into = replaced
+      ? {
+          paragraphs: paragraphsFromPlainText(
+            was.slice(0, selection.start) + was.slice(selection.end),
+          ),
+        }
+      : before;
+    // A replacement takes its first character's style; a line break has none, so the end of its line's.
+    const styleFrom =
+      replaced && was[selection.start] !== '\n' ? selection.start + 1 : selection.start;
+    const typed = typeWithStyle(
+      into,
+      { paragraphs },
+      selection.start,
+      selection.typing ?? styleAt(before, styleFrom) ?? {},
+    );
+    if (!selection.typing && !(typed && (replaced || typed.style))) return paragraphs;
     const caret: EditorSelection = typed
       ? { id, start: typed.caret, end: typed.caret, ...(typed.style && { typing: typed.style }) }
       : { id, start: selection.start, end: selection.end };
@@ -183,6 +212,13 @@ export function createTextEditing(
   };
 
   return { type, styleTyping, sendTyping, text, api };
+}
+
+/** `is` is `was` with text inserted at one place, as typing at a caret makes it. */
+function grewAtOnePlace(was: string, is: string): boolean {
+  let same = 0;
+  while (same < was.length && was[same] === is[same]) same++;
+  return is.length > was.length && is.endsWith(was.slice(same));
 }
 
 export type TextEditing = ReturnType<typeof createTextEditing>;

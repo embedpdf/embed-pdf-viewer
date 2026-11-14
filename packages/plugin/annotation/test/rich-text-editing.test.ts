@@ -388,6 +388,116 @@ describe('the caret', () => {
   });
 });
 
+describe('typing with no style chosen', () => {
+  const bold = (text: string) => ({ text, style: { weight: 700 } });
+
+  it('text typed over a selection takes the style of what it replaces', async () => {
+    const harness = await loaded(veryGood());
+    harness.capability.text.begin(REF);
+    harness.capability.setTextSelection(REF, { start: 10, end: 14 });
+    // The browser drops the selected word's style with it.
+    harness.capability.draftRichText(REF, {
+      paragraphs: [{ runs: [{ text: 'cheese is so good' }] }],
+    });
+    expect(harness.data().richText.paragraphs).toEqual([
+      { runs: [{ text: 'cheese is ' }, bold('so'), { text: ' good' }] },
+    ]);
+    expect(harness.state().textSelection).toEqual({ id: harness.id, start: 12, end: 12 });
+  });
+
+  it("text typed over a selection from the end of a line takes that line's style", async () => {
+    const harness = await loaded(
+      freeTextDTO('cheese is very\ngood', {}, [
+        { runs: [{ text: 'cheese is ' }, bold('very')] },
+        { runs: [{ text: 'good', style: { italic: true } }] },
+      ]),
+    );
+    harness.capability.text.begin(REF);
+    harness.capability.setTextSelection(REF, { start: 14, end: 19 });
+    harness.capability.draftRichText(REF, {
+      paragraphs: [{ runs: [{ text: 'cheese is ' }, bold('very'), { text: '!' }] }],
+    });
+    expect(harness.data().richText.paragraphs).toEqual([
+      { runs: [{ text: 'cheese is ' }, bold('very!')] },
+    ]);
+  });
+
+  it('a line break at the end of a styled run carries its style to the new line', async () => {
+    const harness = await loaded(veryGood());
+    harness.capability.text.begin(REF);
+    harness.capability.setTextSelection(REF, { start: 14, end: 14 });
+    const broken = { runs: [{ text: 'cheese is ' }, bold('very')] };
+    harness.capability.draftRichText(REF, {
+      paragraphs: [broken, { runs: [{ text: ' good' }] }],
+    });
+    expect(harness.state().textSelection).toEqual({
+      id: harness.id,
+      start: 15,
+      end: 15,
+      typing: { weight: 700 },
+    });
+    harness.capability.setTextSelection(REF, { start: 15, end: 15 });
+    harness.capability.draftRichText(REF, {
+      paragraphs: [broken, { runs: [{ text: 'x good' }] }],
+    });
+    expect(harness.data().richText.paragraphs).toEqual([
+      broken,
+      { runs: [bold('x'), { text: ' good' }] },
+    ]);
+  });
+
+  it('text typed at a caret takes nothing from its neighbour', async () => {
+    const harness = await loaded(veryGood());
+    harness.capability.text.begin(REF);
+    harness.capability.setTextSelection(REF, { start: 14, end: 14 });
+    const typed = [{ runs: [{ text: 'cheese is ' }, bold('very'), { text: 'Z good' }] }];
+    expect(harness.capability.draftRichText(REF, { paragraphs: typed }).paragraphs).toEqual(typed);
+    expect(harness.data().richText.paragraphs).toEqual(typed);
+    expect(harness.state().textSelection).toEqual({ id: harness.id, start: 14, end: 14 });
+  });
+
+  // The editor reports the selection after the input, so these edits arrive
+  // with the range from before them still held.
+  describe('with a selection the editor has not reported moving yet', () => {
+    /** "is " (7 to 10) selected and deleted: "cheese very good". */
+    const deleted = async () => {
+      const harness = await loaded(veryGood());
+      harness.capability.text.begin(REF);
+      harness.capability.setTextSelection(REF, { start: 7, end: 10 });
+      harness.capability.draftRichText(REF, {
+        paragraphs: [{ runs: [{ text: 'cheese ' }, bold('very'), { text: ' good' }] }],
+      });
+      return harness;
+    };
+
+    it('a dragged word and the letters it passes keep their style', async () => {
+      const harness = await deleted();
+      // Dropped inside "very": the browser's delete, then its insert.
+      const dropped = [
+        { runs: [{ text: 'cheese ' }, bold('ve'), { text: 'is ' }, bold('ry'), { text: ' good' }] },
+      ];
+      harness.capability.draftRichText(REF, { paragraphs: dropped });
+      expect(harness.data().richText.paragraphs).toEqual(dropped);
+    });
+
+    it('a letter typed where a selection was deleted keeps its style', async () => {
+      const harness = await deleted();
+      const typed = [{ runs: [{ text: 'cheese X' }, bold('very'), { text: ' good' }] }];
+      harness.capability.draftRichText(REF, { paragraphs: typed });
+      expect(harness.data().richText.paragraphs).toEqual(typed);
+    });
+
+    it('a letter typed after an arrow collapsed the selection keeps its style', async () => {
+      const harness = await loaded(veryGood());
+      harness.capability.text.begin(REF);
+      harness.capability.setTextSelection(REF, { start: 12, end: 17 }); // "ry go"
+      const typed = [{ runs: [{ text: 'cheese is ' }, bold('very'), { text: ' goXod' }] }];
+      harness.capability.draftRichText(REF, { paragraphs: typed });
+      expect(harness.data().richText.paragraphs).toEqual(typed);
+    });
+  });
+});
+
 describe('a selected text box', () => {
   /** "Paid in full", "in full" bold and blue. */
   const paid = () =>
