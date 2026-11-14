@@ -546,10 +546,7 @@ A signature that carries a [timestamp](#timestamp-a-signature) has a verdict of 
 in `timestamp`:
 
 ```ts
-import {
-  certificateCommonName,
-  validateSignatures,
-} from '@embedpdf/core-signature';
+import { validateSignatures } from '@embedpdf/core-signature';
 
 const results = await validateSignatures(doc, {
   trust: {
@@ -561,9 +558,7 @@ const results = await validateSignatures(doc, {
 for (const result of results) {
   const stamp = result.timestamp;
   if (stamp?.summary === 'valid') {
-    const authority = certificateCommonName(
-      stamp.authorityCertificate,
-    );
+    const authority = stamp.authorityName;
     console.log(`Signed by ${stamp.genTime}, says ${authority}`);
   } else {
     const claimed = result.signature.signer.signedAt;
@@ -576,6 +571,7 @@ for (const result of results) {
 | :--------------------- | :------------------------------------------------------------------------------------------------------ |
 | `summary`              | `'valid'`, `'valid-untrusted'`, `'invalid'` or `'indeterminate'`, as for a signature.                   |
 | `genTime`              | The time the authority vouches for: the signature existed by then. `null` when the token can't be read. |
+| `authorityName`        | Who vouches for the time: the name in the authority's certificate, or `null` when it has none.          |
 | `authorityCertificate` | The authority's certificate (DER), or `null` when it can't be found.                                    |
 | `cryptography`         | Whether the token checks out and stamps this signature.                                                 |
 | `trust`, `trustReason` | Whether the authority's certificate leads to one you trust and may issue timestamps, and why not.       |

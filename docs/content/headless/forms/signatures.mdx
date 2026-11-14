@@ -190,7 +190,7 @@ own claim otherwise:
 const stamp = verdict.timestamp;
 const when =
   stamp?.summary === 'valid'
-    ? `${stamp.genTime}, confirmed by a timestamp`
+    ? `${stamp.genTime}, confirmed by ${stamp.authorityName}`
     : `${verdict.signature.signer.signedAt}, the signer's clock`;
 ```
 
@@ -314,6 +314,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting        | What it does                                                           | Default                         |
 | :------------- | :--------------------------------------------------------------------- | :------------------------------ |
 | `signingKey`   | The signer, or a function that returns one when someone signs          | none                            |
+| `timestampAuthority` | The timestamp authority: every signature the plugin seals carries its timestamp | none           |
 | `mode`         | What a mark does in a field: `'sign'`, `'visual'` or `'ask'`           | `'sign'` with a key, else `'visual'` |
 | `trust`        | The certificates you trust: for checking signatures, and for the timestamps you seal | none              |
 | `allowCertify` | Let a first signature be a certification, which sets what stays allowed | `false`                        |

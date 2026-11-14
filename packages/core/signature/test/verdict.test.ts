@@ -138,6 +138,7 @@ describe('reading timestamps', () => {
         });
         const stamp = verdict!.timestamp!;
         expect(Array.from(stamp.authorityCertificate!)).toEqual(Array.from(stamper.certificate));
+        expect(stamp.authorityName).toBe('EmbedPDF test timestamp authority');
         expect(new Date(stamp.genTime!).getTime()).toBeGreaterThanOrEqual(before - 1000);
         expect(new Date(stamp.genTime!).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
 

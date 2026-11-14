@@ -11,6 +11,7 @@ import type {
   SettingsApi,
 } from '@embedpdf/core';
 import type {
+  CmsSigner,
   SignatureVerdict,
   SignerPort,
   TrustPort,
@@ -51,8 +52,11 @@ export type {
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 export type {
+  CmsSigner,
+  HttpTimestampAuthorityOptions,
   SignatureVerdict,
   SignerPort,
+  TimestampVerdict,
   TrustPort,
   ValidationTime,
 } from '@embedpdf/core-signature';
@@ -72,14 +76,23 @@ export type SigningKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
  * The signature plugin's settings. `signaturePlugin(config)` registers them
  * over {@link SIGNATURE_DEFAULTS}, and `updateSettings()` changes them for
  * every document while the app runs. Each is one value: a change replaces a
- * key or a trust port whole.
+ * key, a timestamp authority or a trust port whole.
  */
 export interface SignatureSettings {
   /** The key: a raw signer (the CMS is built here) or a CMS signer (a service builds it); `null` for none. */
   readonly signingKey: SigningKey | null;
   /** What a mark does in a field; `null` is `'sign'` with a key, else `'visual'`. */
   readonly mode: SignatureMode | null;
-  /** The certificates you trust, for checking signatures. Without them a verdict is at best `valid-untrusted`. */
+  /**
+   * The timestamp authority: every signature this plugin seals then carries a timestamp from
+   * it, and a timestamp that can't be had fails the signing. `null` for none.
+   */
+  readonly timestampAuthority: CmsSigner | null;
+  /**
+   * The certificates you trust: for checking signatures, where a verdict without them is at best
+   * `valid-untrusted`, and for sealing, where a timestamp from an authority they don't cover is
+   * refused.
+   */
   readonly trust: TrustPort | null;
   /** Let a first signature be a certification (still needs `doc.sign.certify`). */
   readonly allowCertify: boolean;
@@ -89,6 +102,7 @@ export interface SignatureSettings {
 export const SIGNATURE_DEFAULTS: SignatureSettings = {
   signingKey: null,
   mode: null,
+  timestampAuthority: null,
   trust: null,
   allowCertify: false,
 };
@@ -110,6 +124,8 @@ export interface SignFieldInput {
   mark: Mark;
   /** A per-call key; the `key` setting otherwise. */
   signingKey?: SigningKey;
+  /** A per-call timestamp authority; `null` signs this one without a timestamp. The setting otherwise. */
+  timestampAuthority?: CmsSigner | null;
   /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
   signer?: SignatureSignerInput;
   /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
@@ -128,6 +144,8 @@ export interface PrepareSignatureInput {
   lock?: FieldLockSpec;
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
+  /** A per-call timestamp authority; `null` seals this one without a timestamp. The setting otherwise. */
+  timestampAuthority?: CmsSigner | null;
 }
 
 /** The stamp-library kind that holds people's marks: one library per person. */
@@ -236,8 +254,11 @@ export interface SignatureInspectionRequestedEvent {
 
 /** Options for `validate()` and `validateField()`. */
 export interface SignatureValidateOptions extends OperationOptions {
-  /** The moment the certificates are judged at; now by default. */
-  readonly validationTime?: ValidationTime;
+  /**
+   * The moment the certificates are judged at; now by default. `{ kind: 'earliest-timestamp' }`
+   * judges each one at the earliest trusted timestamp that covers what it signed.
+   */
+  readonly validationTime?: ValidationTime | { readonly kind: 'earliest-timestamp' };
   /** `'persisted'` checks the file as it was opened; `'working-copy'` (the default) counts unsaved changes. */
   readonly until?: 'persisted' | 'working-copy';
 }
@@ -277,11 +298,13 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   // ── signing ──
   /**
    * Sign a field: the mark becomes what it shows, the key seals the document,
-   * and the signed document is a new version. A signal that fires before the
-   * seal leaves nothing signed. Fires `onSigned`. Rejects `permission-denied`
-   * for a field you may not sign (`canSign`), or without `doc.sign.certify`
-   * to certify, `invalid-input` without a key, `not-found`,
-   * `operation-cancelled`.
+   * and the signed document is a new version. With a timestamp authority the
+   * signature carries its timestamp, or nothing is signed. A signal that fires
+   * before the seal leaves nothing signed. Fires `onSigned`. Rejects
+   * `permission-denied` for a field you may not sign (`canSign`), or without
+   * `doc.sign.certify` to certify, `invalid-input` without a key, `not-found`,
+   * `operation-cancelled`, and `operation-failed` when the key's answer or the
+   * timestamp is refused or the authority doesn't answer (`details.authority`).
    */
   sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult>;
   /**
@@ -293,7 +316,15 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
     input: PrepareSignatureInput,
     options?: OperationOptions,
   ): Promise<SignaturePrepared>;
-  /** Signing in two steps, the second: the key's CMS seals the document. Fires `onSigned`. Rejects `not-found` for a signing this session didn't prepare. */
+  /**
+   * Signing in two steps, the second: the key's CMS is checked against what
+   * was prepared, timestamped when a timestamp authority is set, and seals the
+   * document. Fires `onSigned`. When it fails nothing is written and the
+   * signing stays prepared: call it again with the same CMS when the authority
+   * didn't answer, or `cancelPending()`. Rejects `not-found` for a signing this
+   * session didn't prepare, `operation-failed` for a CMS or a timestamp that is
+   * refused.
+   */
   completeSignature(
     signingId: string,
     cms: Uint8Array,

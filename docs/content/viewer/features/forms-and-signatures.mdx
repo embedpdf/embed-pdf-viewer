@@ -113,6 +113,8 @@ What signing does depends on whether you give the viewer a key:
     signature: {
       // your key, a signing service, or one kept in the browser
       signingKey: () => mySigningService.signer(),
+      // a timestamp with every signature, from your timestamp authority
+      timestampAuthority: httpTimestampAuthority({ url: '/api/timestamp' }),
       trust: { anchors: async () => [rootCertificate] },
       mode: 'ask',
       allowCertify: true,
@@ -127,7 +129,8 @@ What signing does depends on whether you give the viewer a key:
 | :-- | :-- | :-- |
 | `signingKey` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
 | `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
-| `trust` | The certificates you trust, for checking signatures | none |
+| `timestampAuthority` | The timestamp authority: every signature the viewer seals carries its timestamp | none |
+| `trust` | The certificates you trust: for checking signatures, and for the timestamps the viewer seals | none |
 | `allowCertify` | Let the first signature be a certification, which sets what may still change: comments, form filling only, or nothing | `false` |
 | `kinds` | Which marks people keep: `'signature'`, `'initials'` | both |
 | `fonts` | Fonts for typed signatures | Allura, Great Vibes and Caveat |
@@ -139,7 +142,9 @@ plugin's](/docs/headless/forms/signatures#settings).
 
 A click on a signed field shows its verdict: whether the document is unchanged since it was
 signed, whether the signature is valid, whether you trust the signer, and what changed since. It
-offers the signed revision as a download. The panel also says what a save would do: after an
+offers the signed revision as a download. For a signature with a timestamp, it shows the time the
+timestamp authority vouches for and the authority's name, beside the time the signer claims. The
+panel also says what a save would do: after an
 unsaved annotation, an approval signature reads "valid; unsaved changes will invalidate it", the
 way Acrobat warns.
 
@@ -154,6 +159,19 @@ way Acrobat warns.
 enough for a signature that proves the document hasn't changed. For a signature people outside
 your app trust, use your own key with `webCryptoSigner()` or a signing service with
 `remoteSigner()`. All three come from your viewer package.
+
+### Timestamps
+
+A signature says when it was made by the signer's own clock. With `timestampAuthority`, a
+timestamp authority vouches for that time, and the signature can still be checked after the
+signer's certificate expires. `httpTimestampAuthority()` comes from your viewer package. Most
+authorities can't be called from a web page, so its `url` is a route of your own that passes the
+request on: see
+[Reach the authority from a browser](/docs/engine/forms/signatures#reach-the-authority-from-a-browser).
+
+A timestamp is never skipped: when the authority can't be reached, the sign dialog says so and
+nothing is signed. With `trust` set, the viewer also refuses a timestamp from an authority your
+`trust` doesn't cover; list the authority's root under `timestampAnchors`.
 
 ### Forms that run scripts
 

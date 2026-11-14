@@ -76,11 +76,14 @@ export { RedactionToken } from '@embedpdf/react/redaction';
 // Stamp libraries are workspace state an embedder seeds: `viewer.get(StampToken)
 // .importLibrary(companyStamps)` puts their own stamps in the stamps sidebar.
 export { StampToken } from '@embedpdf/react/stamp';
-// Signatures: the act (`viewer.get(SignatureToken).sign(…)`) and the
-// signer ports a config names — one import for the whole feature.
+// Signatures: the act (`viewer.get(SignatureToken).sign(…)`), and the
+// signer ports and timestamp authorities a config names — one import for the
+// whole feature.
 export { SignatureToken } from '@embedpdf/react/signature';
 export {
   createTestSigner,
+  createTestTimestampAuthority,
+  httpTimestampAuthority,
   indexedDbKeyStore,
   memoryKeyStore,
   personalSigner,

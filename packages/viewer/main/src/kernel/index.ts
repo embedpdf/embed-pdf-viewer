@@ -70,9 +70,12 @@ export {
 } from '@embedpdf/viewer-chrome';
 // Signatures: the signer ports `plugins.signature.key` names — the same one
 // import as the chrome (`personalSigner` keeps a self-signed identity in the
-// browser; `webCryptoSigner` / `remoteSigner` bring the embedder's key).
+// browser; `webCryptoSigner` / `remoteSigner` bring the embedder's key), and
+// the timestamp authority `plugins.signature.timestampAuthority` names.
 export {
   createTestSigner,
+  createTestTimestampAuthority,
+  httpTimestampAuthority,
   indexedDbKeyStore,
   memoryKeyStore,
   personalSigner,

@@ -10,6 +10,7 @@ import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal, type ParsedCms, type ParsedCmsInternal } from './cms/parse';
 import { verifyCmsSignature, type CryptographyVerdict } from './cms/verify';
 import { checkTimestampToken, signatureValueOf, type TimestampCheck } from './cms/verify-timestamp';
+import { certificateCommonName } from './signers/self-signed';
 import {
   validateChain,
   validateTimestampAuthority,
@@ -29,6 +30,11 @@ interface TimestampFacts {
   readonly trustReason: string | null;
   /** When the authority was judged: now, or at a later document timestamp (`earliest-timestamp`). */
   readonly validationTime: ValidationTime;
+  /**
+   * Who vouches for the time: the common name of the authority's certificate. `null` when the
+   * certificate has none, or wasn't found.
+   */
+  readonly authorityName: string | null;
 }
 
 /**
@@ -41,7 +47,7 @@ export type TimestampVerdict = TimestampFacts &
         readonly summary: 'valid' | 'valid-untrusted';
         /** What the token asserts: the bytes existed by this time (ISO 8601). */
         readonly genTime: string;
-        /** DER of the authority's certificate; `certificateCommonName()` names it. */
+        /** DER of the authority's certificate. */
         readonly authorityCertificate: Uint8Array;
       }
     | {
@@ -402,6 +408,7 @@ async function timestampVerdict(
     trust: status,
     trustReason: reason,
     validationTime: at,
+    authorityName: authorityCertificate ? certificateCommonName(authorityCertificate) : null,
   };
   if (check.verdict === 'valid' && genTime !== null && authorityCertificate !== null) {
     return {
