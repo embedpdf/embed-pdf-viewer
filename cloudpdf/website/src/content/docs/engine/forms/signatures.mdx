@@ -1,6 +1,6 @@
 ---
 title: Digital signatures
-description: Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, timestamp the signature, and certify a document.
+description: Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, timestamp the signature, keep it checkable for years, and certify a document.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -221,6 +221,192 @@ try {
 To test with a timestamp, use `createTestTimestampAuthority()`: a throwaway authority that needs
 no network. Trust its `certificate` as a [timestamp anchor](#the-timestamp).
 
+## Keep a signature checkable for years
+
+A certificate can be withdrawn before its end date, for example when its key is stolen. So a
+reader who checks a signature asks the certificate's issuer whether it was still good when it
+signed. That works today. Some years from now it doesn't: the certificate expires, and its
+issuer stops answering questions about it.
+
+So ask now, and keep the answers in the file. The signature can then be checked for as long as
+the file exists, with no network. Acrobat calls such a signature "LTV enabled".
+
+`addValidationInfo()` does that, once the signature is made:
+
+```ts
+import {
+  addValidationInfo,
+  httpRevocationSource,
+  sign,
+} from '@embedpdf/core-signature';
+
+const revocation = httpRevocationSource({
+  url: '/api/revocation',
+});
+
+await sign(doc, { field, key, timestampAuthority });
+await addValidationInfo(doc, { trust, revocation });
+```
+
+For every signature and timestamp in the document, it:
+
+1. works out which certificates a reader has to ask about: each one between the signer and
+   the certificate you trust, and the same for each timestamp's authority;
+2. takes the answers the file already holds;
+3. asks `revocation` for the rest, at the addresses the certificates name;
+4. checks every answer: that it is about that certificate, that the certificate's issuer
+   signed it, and what it says;
+5. stores what is new, with the certificates a reader needs to follow the same path.
+
+The signature needs a [timestamp](#timestamp-a-signature). An answer says a certificate was good
+at a certain time, and only a timestamp proves the signature existed by then.
+
+What it stores goes into the file as a revision after the signature, so the signature's own
+bytes don't change and it still verifies. Every answer is signed by the issuer that gave it, so
+nobody can forge one, and the store itself needs no signature.
+
+One exception: after a [certification](#certify-a-document) at level `1`, nothing may follow, so
+`addValidationInfo()` fails with `ProtectedDocument`. Certify at level `2` instead.
+
+| Option        | What it is                                                               | Default         |
+| :------------ | :----------------------------------------------------------------------- | :-------------- |
+| `trust`       | The certificates you trust, as for [checking](#check-the-signatures).    |                 |
+| `revocation`  | Where the answers come from.                                             | none            |
+| `known`       | Answers and certificates you already have.                               | none            |
+| `fields`      | The signature fields to cover.                                           | every signature |
+| `partial`     | Store what there is when something is missing.                           | `false`         |
+| `maxCrlBytes` | The largest list of withdrawn certificates to store.                     | 1 MiB           |
+
+It returns what it added and what a reader now sees:
+
+```ts
+const result = await addValidationInfo(doc, {
+  trust,
+  revocation,
+});
+
+result.added; // { certificates: 5, ocspResponses: 1, crls: 1 }
+result.verdicts[0].longTerm.enabled; // true
+```
+
+`verdicts` is what [`validateSignatures()`](#check-the-signatures) says about the result, each
+signature judged at its timestamp. Calling it again asks for nothing the file already holds and
+adds nothing.
+
+### All or nothing
+
+A file that looks finished and isn't would be found out years later, when nobody can repair it.
+So when something is missing, `addValidationInfo()` fails and stores nothing. The signature is
+already in the file, so you can call it again later.
+
+- **`Network`: an address didn't answer.** `details.source` is the address.
+- **`SignatureRefused`: an answer is missing, or it is bad news.** `details.reason` says which,
+  `details.certificate` names the certificate, and `details.field` the signature.
+
+| `reason`         | What happened                                                                                                             |
+| :--------------- | :------------------------------------------------------------------------------------------------------------------------ |
+| `'revoked'`      | A certificate was withdrawn by the time of the signature's timestamp.                                                     |
+| `'no-answer'`    | No answer that checks out: the certificate names no address, its issuer doesn't know it, or its list is over `maxCrlBytes`. |
+| `'no-timestamp'` | The signature has no timestamp you trust.                                                                                 |
+| `'untrusted'`    | The signer doesn't lead to a certificate in `trust`.                                                                      |
+
+With `partial: true` it stores what it could get and doesn't fail for what is missing.
+`verdicts` then says [what each signature lacks](#long-term-validation). Use it for a document
+other people signed, where an issuer may be gone for good.
+
+### Reach the issuers from a browser
+
+A web page can't call a certificate's issuer, for the same reason it can't call a timestamp
+authority. `httpRevocationSource()` sends each question to a route of your own, which passes it
+on. The addresses come from the certificates, so the route must be careful where it goes. Use
+the one the package ships, on any server that speaks the Fetch API:
+
+```ts
+// app/api/revocation/route.ts
+import { revocationRoute } from '@embedpdf/core-signature/server';
+
+export const POST = revocationRoute();
+```
+
+It only calls `http` and `https` addresses, never a private or local one, and limits how large
+and how slow an answer may be. Who may call your route is yours to decide, as for any route.
+
+The route learns which certificate is asked about, and nothing about the document. When you
+always sign with the same certificate, the answers are the same for every document, and the
+route keeps them for as long as they are good.
+
+`httpRevocationSource()` takes the same `url`, `headers`, `fetch`, `timeoutMs` and `retries` as
+[`httpTimestampAuthority()`](#authority-options), and tries again only when no answer came.
+
+### Answers your signing service gave you
+
+Some [signing services](#sign-with-a-signing-service) return the answers with the signature.
+Hand them over as `known`. When they are enough, you need no `revocation` at all:
+
+```ts
+await addValidationInfo(doc, {
+  trust,
+  known: {
+    certificates: service.chain,
+    ocspResponses: [service.ocspResponse],
+  },
+});
+```
+
+`known` takes `certificates`, `ocspResponses` and `crls`, each a list of DER bytes. They are
+checked like any other answer.
+
+### Then timestamp the document
+
+The answers are now in the file, but nothing proves when they were put there. A
+[document timestamp](#document-timestamps) over the file does:
+
+```ts
+await sign(doc, { kind: 'timestamp', key: timestampAuthority });
+```
+
+That is the strongest form a signed PDF has: the signature, the proof of when, the proof that
+its certificates were good, and a timestamp over all of it.
+
+A timestamp is itself signed with a certificate that expires, usually after some years. Until
+then the file proves itself; `longTerm.until` in the [verdict](#long-term-validation) is that
+date. To carry the proof past it, run the same two calls again before it: they store the
+answers for the last timestamp's authority and add a new timestamp over everything. A file
+that is never renewed loses nothing it holds. Only the proof of _when_ gets weaker after that
+date.
+
+### Try it without a certificate authority
+
+`createTestCertificateAuthority()` makes a throwaway one that needs no network. It issues a
+signer, answers for it, and can withdraw it:
+
+```ts
+import {
+  addValidationInfo,
+  createTestCertificateAuthority,
+  createTestTimestampAuthority,
+  sign,
+} from '@embedpdf/core-signature';
+
+const authority = await createTestCertificateAuthority();
+const key = await authority.issueSigner({
+  commonName: 'Ada Lovelace',
+});
+const timestampAuthority = await createTestTimestampAuthority();
+const trust = {
+  anchors: async () => [authority.certificate],
+  timestampAnchors: async () => [timestampAuthority.certificate],
+};
+
+await sign(doc, { field, key, timestampAuthority });
+await addValidationInfo(doc, {
+  trust,
+  revocation: authority.revocation,
+});
+
+await authority.revoke(key);
+```
+
 ## Sign in two steps
 
 When the key is somewhere else (a signing service, a hardware key, another device), sign in two
@@ -396,14 +582,24 @@ await sign(doc, { field, key, certify: { permission: 2 } });
 
 | `permission` | What may change afterwards                                      |
 | :----------- | :-------------------------------------------------------------- |
-| `1`          | Nothing, except adding document timestamps and validation data. |
+| `1`          | Nothing.                                                        |
 | `2`          | Filling in the form and signing.                                |
 | `3`          | Filling in the form, signing and adding or changing comments.   |
 
 From the moment it completes, the engine refuses what the certification forbids, with
 `ProtectedDocument`: every level refuses page changes, new or changed fields, attachments and
-redaction; `1` and `2` also refuse annotations; `1` also refuses filling in. Certifying after a
+redaction; `1` and `2` also refuse annotations; `1` also refuses filling in, changing the
+metadata and signing, a document timestamp included. Certifying after a
 signature already exists fails with `SignatureRefused`.
+
+**Level `1` means no later revision at all.** The PDF standard would let a document timestamp and
+validation data follow such a certification. Acrobat doesn't: once anything is added, it reports
+the certification as invalid. The engine follows Acrobat, because that is where people open the
+file: it refuses those writes, and a file that has them reads as changed after the
+certification. For a document that must stay
+[checkable for years](#keep-a-signature-checkable-for-years), certify at level `2`, where Acrobat
+accepts both. To keep the form as it is, [lock its fields](#lock-fields) with the same
+signature.
 
 ## Lock fields
 
@@ -528,15 +724,17 @@ for (const result of results) {
 | `cryptography`          | Does the signature match its own certificate?  | `'valid'`, `'invalid'`, `'unsupported'`                        |
 | `trust`                 | Does the certificate lead to one you trust?    | `'trusted'`, `'untrusted'`, `'unknown'`                        |
 | `modifications.verdict` | What changed after signing, and is it allowed? | See [What changed](#what-changed-since-a-signature)            |
+| `revocation`            | Was a certificate withdrawn?                   | `'good'`, `'revoked'`, `'unknown'`                             |
 | `summary`               | All of the above together.                     | `'valid'`, `'valid-untrusted'`, `'invalid'`, `'indeterminate'` |
 | `timestamp`             | When was it signed, by a clock you trust?      | See [The timestamp](#the-timestamp); `null` without one        |
+| `longTerm`              | Can it be checked from the file alone?         | See [Long-term validation](#long-term-validation)              |
 
-`summary` is `'invalid'` only on proof: bytes that changed, a signature that doesn't match, or a
-change the signature forbids. When something can't be established, it's `'indeterminate'`.
+`summary` is `'invalid'` only on proof: bytes that changed, a signature that doesn't match, a
+change the signature forbids, or a certificate that was withdrawn. When something can't be established, it's `'indeterminate'`.
 Without `trust`, a good signature is `'valid-untrusted'` at best.
 
-`'trusted'` means the certificate is within its dates and leads to one of your anchors. It
-doesn't mean "not revoked": the engine doesn't ask whether a certificate was withdrawn.
+`'trusted'` means the certificate is within its dates and leads to one of your anchors.
+Whether it was withdrawn is a separate answer, in [`revocation`](#revocation).
 
 By default the check looks at the saved file. Pass `until: 'working-copy'` to include the changes
 you haven't saved yet: the answer is what the file will say once you save it. A viewer uses this
@@ -619,8 +817,75 @@ Each certificate is then judged at the earliest trusted timestamp that covers wh
 `result.validationTime` says which it was: its `kind` is `'timestamp'`, with the timestamp's
 `genTime`, or `'now'`.
 
-**This looks at dates only.** A certificate that was withdrawn before the timestamp still
-passes, because the engine doesn't check revocation.
+[Revocation](#revocation) is judged at the same time: a certificate withdrawn after the
+timestamp was still good when it signed.
+
+### Revocation
+
+`revocation` says whether a certificate between the signer and your anchor was withdrawn, at the
+time the signature is judged:
+
+| Value       | Meaning                                                                                                                                      |
+| :---------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'good'`    | Every certificate has an answer that checks out, and none was withdrawn.                                                                     |
+| `'revoked'` | An answer that checks out says one was withdrawn by then. `summary` is `'invalid'`, and `revocationReason` names the certificate.            |
+| `'unknown'` | Some certificate has no answer, or the signer isn't trusted, so there is no issuer to check an answer against. `summary` stays as it was.    |
+
+The answers come from the file: what
+[`addValidationInfo()`](#keep-a-signature-checkable-for-years) stored, what the signature
+itself carries, and what Acrobat stored in files it signed. Nothing is asked over the network.
+
+An answer speaks for a time. One stored when the document was signed says the certificate was
+good then, and says nothing about today. So judged now, the default, a signature from last year
+reads `'unknown'`, and [judged at its timestamp](#judge-a-signature-at-its-timestamp) it reads
+`'good'`:
+
+```ts
+const results = await validateSignatures(doc, {
+  trust,
+  validationTime: { kind: 'earliest-timestamp' },
+});
+
+results[0].revocation; // 'good', from the file
+```
+
+To ask the issuers what the file doesn't hold, pass a `revocation` source, the same one
+[`addValidationInfo()`](#reach-the-issuers-from-a-browser) takes. That is the only way a
+certificate judged now gets an answer. It stores nothing:
+
+```ts
+const results = await validateSignatures(doc, {
+  trust,
+  revocation,
+});
+```
+
+Asking tells each issuer that someone is checking that signer's signature, and from where. A
+file that holds its answers tells nobody. A timestamp's verdict has a `revocation` of its own,
+for its authority.
+
+### Long-term validation
+
+`longTerm` says whether the file holds everything a reader needs to check the signature without
+a network. It always speaks for the signature's timestamp, whatever `validationTime` is:
+
+```ts
+const { longTerm } = results[0];
+
+longTerm.enabled; // true
+longTerm.at; // '2026-11-14T21:28:37Z'
+longTerm.until; // '2036-01-01T00:00:00Z'
+```
+
+| Field     | What it is                                                                                                                                                       |
+| :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled` | The signature has a timestamp you trust, its signer was trusted then, and the file holds a good answer for every certificate. What Acrobat calls "LTV enabled". |
+| `at`      | The timestamp it was judged at, or `null` when the signature has none you trust.                                                                                 |
+| `until`   | How long the file proves this by itself: the day the certificate of the last timestamp covering the signature expires. `null` when not enabled.                  |
+| `missing` | What stands in the way, one entry per certificate: its name and a `reason`, as in [All or nothing](#all-or-nothing). Empty when enabled.                         |
+
+A document timestamp added later moves `until` to its own certificate's end date. That is all
+[renewing](#then-timestamp-the-document) is.
 
 ## What changed since a signature
 
@@ -649,12 +914,13 @@ that the document was changed after signing. For what `since` and `until` take, 
 
 ## Events
 
-| Event                  | Fired by                                                                                       |
-| :--------------------- | :--------------------------------------------------------------------------------------------- |
-| `signatures.prepared`  | `prepare()`, with the `signingId` and the `field`.                                             |
-| `signatures.completed` | `complete()`, with what it returned.                                                           |
-| `signatures.cancelled` | `cancel()`.                                                                                    |
-| `document.versioned`   | `complete()`: the document is now the signed file. Read revisions, digests and verdicts again. |
+| Event                            | Fired by                                                                                       |
+| :------------------------------- | :--------------------------------------------------------------------------------------------- |
+| `signatures.prepared`            | `prepare()`, with the `signingId` and the `field`.                                             |
+| `signatures.completed`           | `complete()`, with what it returned.                                                           |
+| `signatures.cancelled`           | `cancel()`.                                                                                    |
+| `signatures.validationInfoAdded` | `addValidationInfo()`, with how many of each kind it stored. Read verdicts again.              |
+| `document.versioned`             | `complete()`: the document is now the signed file. Read revisions, digests and verdicts again. |
 
 `sign()` fires the same events. See [Events](/docs/engine/concepts/events).
 
@@ -667,10 +933,11 @@ Everyone else with the document open receives the `signatures.*` events too, wit
 
 ## Permissions
 
-Reading signatures (`list()`, `analyze()`, `getContents()`, `getDigest()`) needs
-`doc.forms.read`; `downloadRevision()` needs `doc.download`. Signing (`prepare()`, `complete()`,
-`cancel()`) needs `doc.sign`, or `fields:sign` for the field's group, and certifying also
-`doc.sign.certify`. See [Permissions](/docs/engine/concepts/permissions).
+Reading signatures (`list()`, `analyze()`, `getContents()`, `getDigest()`,
+`getValidationInfo()`) needs `doc.forms.read`; `downloadRevision()` needs `doc.download`. Signing
+(`prepare()`, `complete()`, `cancel()`) needs `doc.sign`, or `fields:sign` for the field's
+group, and certifying also `doc.sign.certify`. `addValidationInfo()` and a document timestamp
+without a field of its own need `doc.sign`. See [Permissions](/docs/engine/concepts/permissions).
 
 A call the document's own signatures forbid fails with `ProtectedDocument`, whatever the user's
 permissions. A field that can't be signed (already signed, read-only, or locked by an earlier
@@ -689,8 +956,10 @@ signature) fails with `SignatureRefused`; the message says why.
 | `certification` | The certifying signature and its `permission`. | `null` when the document isn't certified.           |
 | `fieldLocks`    | The fields signatures locked.                  | A list, empty when no field is locked.              |
 
-A level is `'lta'` (only document timestamps and validation data), `'fill'` (filling in and
-signing) or `'annotate'` (also comments).
+A level is `'lta'` (nothing: a level `1` certification), `'fill'` (filling in and signing) or
+`'annotate'` (also comments). `'lta'` is named after what the PDF standard would let follow such
+a certification, document timestamps and validation data; Acrobat lets nothing follow, and so
+does the engine.
 
 `enforced` is what the engine refuses. Only a certification or a field lock sets it; the calls it
 refuses fail with `ProtectedDocument`. A plain approval signature sets nothing, so every change
@@ -767,19 +1036,24 @@ don't need to save before you sign.
 
 A [signature's timestamp](#timestamp-a-signature) vouches for one signature. A **document
 timestamp** vouches for the whole file as it stands: every signature in it, and everything
-added since. It takes a signature field of its own and adds a revision, as a signature does.
+added since. It adds a revision, as a signature does.
 
 `kind: 'timestamp'` makes one. With `sign()`, the `key` is your timestamp authority, the same
 object you pass as `timestampAuthority`:
 
 ```ts
 const result = await sign(doc, {
-  field,
   kind: 'timestamp',
   key: timestampAuthority,
 });
 result.signature.kind; // 'timestamp'
 ```
+
+A document timestamp lives in a signature field. Without a `field` the engine makes one for
+it, with no size, so it shows nowhere on the page. Pass `field` to use one of your own.
+
+After a [certification](#certify-a-document) at level `1` a document timestamp is refused, with
+`ProtectedDocument`, like every other change.
 
 A key you hold can't make one, so `sign()` fails with `InvalidArg`. In two steps, the `cms` is
 the authority's token over `prepared.digest`.
@@ -787,6 +1061,26 @@ the authority's token over `prepared.digest`.
 `validateSignatures()` reads a document timestamp like a signature: `integrity` says whether the
 file it stamped is intact, and `timestamp` holds [the same verdict](#the-timestamp) a
 signature's timestamp gets, with its `genTime` and authority.
+
+### The validation data in the file
+
+[`addValidationInfo()`](#keep-a-signature-checkable-for-years) decides which answers are worth
+keeping. Underneath, the engine reads and stores them as they are:
+
+```ts
+const stored = await doc.signatures.getValidationInfo();
+stored.certificates; // DER bytes, one per certificate
+stored.ocspResponses;
+stored.crls;
+
+await doc.signatures.addValidationInfo({
+  ocspResponses: [answer],
+});
+```
+
+`doc.signatures.addValidationInfo()` checks only that each entry is well-formed, and stores
+nothing the file already holds. It is a change like any other: it is in the file you next save,
+as a revision after the signatures, and a signature or timestamp made after it seals it in.
 
 ### Timestamp something else
 
@@ -821,5 +1115,8 @@ same bytes under another hash, is `'invalid'`.
 For tools that must produce or test invalid files, create the engine with
 `localEngine({ signedDocumentPolicy: 'permit' })`: the engine then refuses nothing a signature
 forbids. `judged` and every verdict stay the same.
+
+It is also how to add a document timestamp or validation data after a level `1` certification,
+as the PDF standard allows. Acrobat will report that certification as invalid.
 
 </Engine>
