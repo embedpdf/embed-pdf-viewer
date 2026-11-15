@@ -150,6 +150,28 @@ describe('interaction hub', () => {
     await kernel.destroy();
   });
 
+  it('canUseTool asks the tool, and says yes for a tool that does not say', async () => {
+    const { kernel, hub } = await boot();
+    let allowed = false;
+    hub.registerTool({
+      id: 'ink',
+      cursor: 'crosshair',
+      enables: new Set(['draw']),
+      canUse: () => allowed,
+    });
+    expect(hub.canUseTool('ink')).toBe(false);
+    allowed = true;
+    expect(hub.canUseTool('ink')).toBe(true);
+    // The built-in tools need no permission; a tool that isn't there can't be used.
+    expect(hub.canUseTool('pan')).toBe(true);
+    expect(hub.canUseTool('nope')).toBe(false);
+    // Activating doesn't ask: the tool's plugin refuses its own gesture.
+    allowed = false;
+    hub.activateTool('ink');
+    expect(hub.getActiveToolId()).toBe('ink');
+    await kernel.destroy();
+  });
+
   it('wakes readers when a tool is registered and again when it is removed', async () => {
     const { kernel, hub } = await boot();
     const tools = hub.listTools();

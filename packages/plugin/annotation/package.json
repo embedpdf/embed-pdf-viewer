@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./authoring": "./src/authoring.ts",
+    "./commands": "./src/commands.ts",
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
     "./package.json": "./package.json"
@@ -26,6 +27,10 @@
       "./authoring": {
         "import": "./dist/authoring.js",
         "require": "./dist/authoring.cjs"
+      },
+      "./commands": {
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
       },
       "./contract": {
         "import": "./dist/contract.js",

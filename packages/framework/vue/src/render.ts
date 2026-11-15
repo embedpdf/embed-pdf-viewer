@@ -9,6 +9,8 @@
 
 // One line per feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
+// The snapshot's commands, made with the browser's clipboard and file download.
+export { renderCommands } from './command-lists';
 import { RenderToken } from '@embedpdf/plugin-render';
 import type { PictureState, RenderCapability, Snapshot } from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';

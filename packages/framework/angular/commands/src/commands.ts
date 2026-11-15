@@ -51,15 +51,9 @@ import type {
 } from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import type { CommandsHostCapability } from '@embedpdf/plugin-commands/contract/host';
-import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
-import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
+import { bindCommandShortcuts, isMacPlatform } from '@embedpdf/web';
 
-/**
- * The commands every viewer has: zoom, pages, view rotation, `tool:<id>` for every tool, copy,
- * delete, download and print, with shortcuts and labels in EmbedPDF's eight languages. Spread
- * them into `withCommands({ commands })`.
- */
-export const standardCommands = /* @__PURE__ */ createStandardCommands(standardCommandsBrowser);
+export { standardCommands } from './standard';
 
 /** A shortcut as a tooltip shows it, for this platform: `'⌘K'` on a Mac, `'Ctrl+K'` elsewhere. */
 export function formatShortcut(shortcut: string, options: { isMac?: boolean } = {}): string {

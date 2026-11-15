@@ -52,6 +52,7 @@ import { createPageMirror } from './page-mirror';
 import { createPageView, layoutFromEvent, NO_PENDING_PAGES } from './page-view';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
+import type { CommandContext } from './command-types';
 import { findPage, pageOf } from './page-of';
 import { runWrapped, type DownloadWrap, type PrintWrap } from './context';
 import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
@@ -227,6 +228,32 @@ function testDocuments(metaOf: () => DocumentMeta): DocumentsCapability {
     onPagesChanged: never,
     onUnsavedChangesChanged: never,
   } satisfies DocumentsCapability;
+}
+
+/**
+ * A command context over stand-in capabilities, for the tests of a plugin's
+ * commands (its `/commands` entry), for the document `doc`:
+ *
+ *   const context = createTestCommandContext([[StageToken, { canZoomIn: () => false }]]);
+ *   expect(zoomIn.enabled?.(context)).toBe(false);
+ */
+export function createTestCommandContext(
+  capabilities: Iterable<readonly [CapabilityToken<any>, unknown]> = [],
+  options: { documentId?: string | null; appState?: unknown } = {},
+): CommandContext {
+  const byToken = new Map<CapabilityToken<unknown>, unknown>(capabilities);
+  const tryGet = <C>(token: CapabilityToken<C>): C | null =>
+    (byToken.get(token as CapabilityToken<unknown>) as C | undefined) ?? null;
+  return {
+    documentId: options.documentId === undefined ? 'doc' : options.documentId,
+    appState: options.appState,
+    tryGet,
+    get: <C>(token: CapabilityToken<C>): C => {
+      const capability = tryGet(token);
+      if (!capability) throw new Error(`no ${token.name}`);
+      return capability;
+    },
+  };
 }
 
 export function createTestContext<S = void, T extends object = NoSettings>(

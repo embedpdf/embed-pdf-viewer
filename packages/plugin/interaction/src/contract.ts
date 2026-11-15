@@ -59,6 +59,12 @@ export interface Tool {
   /** What one finger does on a touch screen. Default `'tap'`. */
   readonly touch?: ToolTouch;
   /**
+   * Whether the user may use the tool now, for a tool that needs a permission:
+   * one that draws annotations needs permission to create them. A button for
+   * the tool reads it through `canUseTool(id)`. Default: always.
+   */
+  canUse?(): boolean;
+  /**
    * A press on a page. Return `true` to take the gesture: its moves and its
    * release then come to `onPointerMove` and `onPointerUp`, and nothing else
    * acts on it.
@@ -151,6 +157,12 @@ export interface InteractionCapability extends SettingsApi<InteractionSettings> 
   listTools(): readonly Tool[];
   getTool(id: ToolId): Tool | null;
   hasTool(id: ToolId): boolean;
+  /**
+   * Whether the user may use a tool: what its `canUse()` says, and `true` for
+   * a tool without one. `false` for an id that isn't registered. Activating a
+   * tool doesn't ask: the plugin that owns the tool refuses its own gesture.
+   */
+  canUseTool(id: ToolId): boolean;
   /**
    * Make a tool the active one, and forget the tools `pushTool` saved. Fires
    * `onToolChanged`. Throws `not-found` for an id that isn't registered.

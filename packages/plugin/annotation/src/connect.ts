@@ -49,6 +49,8 @@ export function connectAnnotation(
         enables: tool.enables,
         // Drag-create tools own single-finger touch; click-place tools do not.
         touch: toolTouchOf(tool.enables),
+        // Every tool here makes an annotation, so it needs that permission.
+        canUse: () => annotation.canCreate(),
       }),
     );
   }

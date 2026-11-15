@@ -131,6 +131,38 @@ test('rejects implementation modules reachable from a contract entry', (t) => {
   assert.match(violations[0].message, /contract runtime graph reaches implementation module/);
 });
 
+test('rejects implementation modules reachable from a commands entry', (t) => {
+  const manifest = JSON.stringify({
+    name: '@embedpdf/plugin-alpha',
+    exports: {
+      '.': './src/index.ts',
+      './commands': './src/commands.ts',
+      './contract': './src/contract.ts',
+    },
+  });
+  const clean = fixture({
+    ...pluginFiles('alpha', {
+      'packages/plugin/alpha/package.json': manifest,
+      'packages/plugin/alpha/src/commands.ts': `import { alphaToken } from './contract';\nexport const alphaCommands = [alphaToken];\n`,
+    }),
+  });
+  const reaching = fixture({
+    ...pluginFiles('alpha', {
+      'packages/plugin/alpha/package.json': manifest,
+      'packages/plugin/alpha/src/commands.ts': `import { createAlphaController } from './controller';\nexport const alphaCommands = [createAlphaController];\n`,
+      'packages/plugin/alpha/src/controller.ts': `export const createAlphaController = () => {};\n`,
+    }),
+  });
+  t.after(() => {
+    fs.rmSync(clean, { recursive: true, force: true });
+    fs.rmSync(reaching, { recursive: true, force: true });
+  });
+  assert.deepEqual(checkPluginBoundaries({ repoRoot: clean }), []);
+  const violations = checkPluginBoundaries({ repoRoot: reaching });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0].message, /commands runtime graph reaches implementation module/);
+});
+
 /** A plugin in CloudPDF's tree: `cloudpdf/plugin/<name>`, `@cloudpdf/plugin-<name>`. */
 function cloudPluginFiles(name, extra = {}) {
   const files = {};

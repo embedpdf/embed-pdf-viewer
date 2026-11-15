@@ -68,6 +68,7 @@ interaction.activateTool('pin');
 | `onPointerMove`, `onPointerUp` | The rest of a gesture you took                      |
 | `onHover`       | The pointer moving over a page, with no button pressed             |
 | `touch`         | `'draw'`: one finger drives the tool; `'tap'` (default): a tap is a click, a drag scrolls |
+| `canUse`        | Whether the user may use the tool now, for a tool that needs a permission. Its [command](commands#the-standard-commands) shows disabled while it says no. Default: always |
 
 `registerTool()` returns a function that removes the tool again. A tool you drag with takes the press and
 follows the gesture:
@@ -145,6 +146,7 @@ Everything `useInteraction()` gives you.
 | `pushTool(id)`, `popTool()`        | Switches to a tool and remembers the one before; goes back to it. [Hold a tool for a moment](#hold-a-tool-for-a-moment)                                  |
 | `activateDefaultTool()`            | Goes back to the default tool                                                                                                                             |
 | `getDefaultToolId()`               | The tool a document opens with, `pointer` unless you set another                                                                                          |
+| `canUseTool(id)`                   | Whether the user may use a tool: one that draws annotations needs permission to create them. `false` for an id that isn't registered. Switching to a tool doesn't ask; the tool's plugin refuses its own gesture. |
 | `registerTool(tool, { replace? })` | Adds a tool of your own, and returns a function that removes it. An id that's taken is refused unless you pass `replace: true`. [Your own tool](#your-own-tool) |
 | `setToolCursor(id, cursors)`       | Replaces a tool's cursors by name while the app runs; `null` brings its own back. In a component, use `useToolCursor()`, which undoes it when the component goes. [Cursors](#cursors) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useInteractionSettings()`. [Settings](#settings) |

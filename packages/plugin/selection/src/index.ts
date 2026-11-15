@@ -15,6 +15,7 @@
 export { selectionPlugin } from './selection.plugin';
 export { selectionState, type SelectionState } from './state';
 export * from './contract';
+export * from './commands';
 // Selection-handle policy (the touch affordance): pure geometry + the drag
 // session, consumed by the framework adapters' handle views.
 export {

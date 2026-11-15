@@ -18,6 +18,8 @@ export * from '@embedpdf/plugin-selection';
 // The clipboard side effect lives in @embedpdf/web (the plugin is DOM-free);
 // re-exported here so app code has one import for the whole feature.
 export { copySelection } from '@embedpdf/web';
+// The selection's commands, made with the browser's clipboard.
+export { selectionCommands } from './command-lists';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';

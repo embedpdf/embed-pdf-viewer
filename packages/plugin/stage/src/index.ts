@@ -8,6 +8,7 @@
 export { stagePlugin } from './stage.plugin';
 export { stageState, type StageState } from './state';
 export * from './contract';
+export * from './commands';
 export { createScrollHandler } from './scroll-handler';
 export type { ScrollHandlerOptions } from './scroll-handler';
 export { createZoomDragHandler } from './zoom-drag-handler';

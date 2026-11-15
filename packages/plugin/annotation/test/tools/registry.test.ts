@@ -1,3 +1,4 @@
+import type { Tool } from '@embedpdf/plugin-interaction/contract';
 import { describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness } from '../harness';
@@ -38,6 +39,17 @@ describe('tools.register', () => {
       expect.objectContaining({ id: 'ink', cursor: 'crosshair' }),
       { replace: true },
     );
+  });
+
+  it('a tool it puts on the hub may be used only by a user who may create annotations', () => {
+    const harness = annotationHarness();
+    const hub = vi.spyOn(harness.interaction, 'registerTool');
+    harness.capability.tools.register({ id: 'check', subtype: 'square' });
+    // The harness's hub takes no arguments by type; the registry hands it the tool.
+    const [tool] = hub.mock.lastCall as unknown as [Tool];
+    expect(tool.canUse?.()).toBe(true);
+    harness.allowsAnnotationCreate.mockReturnValue(false);
+    expect(tool.canUse?.()).toBe(false);
   });
 
   it('removals in any order end with the tool the first change replaced', () => {

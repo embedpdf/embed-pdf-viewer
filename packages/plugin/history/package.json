@@ -9,6 +9,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./commands": "./src/commands.ts",
     "./contract": "./src/contract.ts",
     "./package.json": "./package.json"
   },
@@ -20,6 +21,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./commands": {
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
       },
       "./contract": {
         "import": "./dist/contract.js",

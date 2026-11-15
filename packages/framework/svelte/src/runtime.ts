@@ -13,6 +13,8 @@ export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
 // an image to the clipboard, and a font the engine draws with, for text you draw yourself.
 export { copyImage, saveFile } from '@embedpdf/web';
+// Download and print as commands, made with the browser's file download.
+export { documentCommands } from './command-lists';
 
 export { default as Viewer } from './runtime/Viewer.svelte';
 export { default as KernelProvider } from './runtime/KernelProvider.svelte';

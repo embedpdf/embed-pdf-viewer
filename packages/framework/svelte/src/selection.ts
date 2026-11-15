@@ -12,6 +12,8 @@ export * from '@embedpdf/plugin-selection';
 // The clipboard write lives in @embedpdf/web (the plugin has no DOM); it's here too, so app code
 // has one import for the feature.
 export { copySelection } from '@embedpdf/web';
+// The selection's commands, made with the browser's clipboard.
+export { selectionCommands } from './command-lists';
 
 export { default as SelectionLayer } from './selection/SelectionLayer.svelte';
 export { default as SelectionMenu } from './selection/SelectionMenu.svelte';

@@ -6,3 +6,4 @@
 export { historyPlugin } from './history.plugin';
 export { historyState, type HistoryState } from './state';
 export * from './contract';
+export * from './commands';

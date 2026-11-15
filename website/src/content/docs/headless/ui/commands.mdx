@@ -51,7 +51,8 @@ and says `null` for an id it doesn't have.
 
 ## The standard commands
 
-`standardCommands` covers what every viewer has, with labels in [every language you load](translations):
+Each plugin ships the commands for what it does, as a list. `standardCommands` joins the lists of the
+plugins every viewer has, with labels in [every language you load](translations):
 
 | Command                                              | Does                                         | Shortcut         |
 | :--------------------------------------------------- | :------------------------------------------- | :--------------- |
@@ -74,6 +75,31 @@ Each one is enabled only when it can run: `selection:copy` needs a selection and
 `history:undo` and `history:redo` a change to undo or redo, and <Fw only={['react', 'vue', 'svelte']}>`historyPlugin()` among your
 plugins</Fw><Fw only="angular">`withHistory()` in `provideEmbedPdf()`</Fw>. Without
 [`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not allowed.
+
+### The lists
+
+`standardCommands` is these lists, joined in this order. Each comes from the same import as its plugin:
+
+| List                  | Import from    | Commands                                             |
+| :-------------------- | :------------- | :--------------------------------------------------- |
+| `stageCommands`       | `/stage`       | `zoom:*`, `page:*`, `view:rotate-*`                  |
+| `interactionCommands` | `/interaction` | `tool:pointer`, `tool:pan`, `tool:zoom`, `tool:<id>` |
+| `selectionCommands`   | `/selection`   | `selection:copy`                                     |
+| `annotationCommands`  | `/annotation`  | `annotation:delete`                                  |
+| `historyCommands`     | `/history`     | `history:undo`, `history:redo`                       |
+| `renderCommands`      | `/render`      | `tool:snapshot`, `snapshot:*`                        |
+| `documentCommands`    | `/runtime`     | `document:download`, `document:print`                |
+
+To leave some out, spread the lists you want in place of `standardCommands`:
+
+<Snippet name="ui/command-lists" />
+
+`standardCommands` brings no plugin into your app. A command whose plugin you didn't register is
+disabled, or hidden when it's a tool.
+
+`toolCommand(id)`, from `/interaction`, is the command behind `tool:<id>`. Build on it to give a
+[tool of your own](tools#your-own-tool) a shortcut:
+`{ ...toolCommand('ruler'), id: 'tool:ruler', label: 'Ruler', shortcut: 'R' }`.
 
 ## Keyboard shortcuts
 
