@@ -2,10 +2,16 @@ import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
-import { cmsSignatureValue, signatureAlgorithmFor, type RawSigner } from './build';
+import {
+  cmsSignatureValue,
+  signatureAlgorithmFor,
+  signedAttributesOf,
+  type RawSigner,
+} from './build';
 import { ensureEngine, toArrayBuffer } from './engine';
 import { DIGEST_BY_OID, DIGEST_LENGTH, OID, OID_BY_DIGEST, WEBCRYPTO_HASH } from './oids';
 import { CmsError } from './parse';
+import { signedAttributesDer } from './verify';
 
 /** What a timestamp token's TSTInfo says: which digest it stamped, when, and for which request. */
 export interface TimestampInfo {
@@ -138,13 +144,10 @@ export async function buildTimestampToken(input: BuildTimestampTokenInput): Prom
       serialNumber: authorityCert.serialNumber,
     }),
     digestAlgorithm,
-    signedAttrs: new pkijs.SignedAndUnsignedAttributes({ type: 0, attributes }),
+    signedAttrs: signedAttributesOf(attributes),
     signatureAlgorithm: signatureAlgorithmFor(input.authority.algorithm, input.authority.hash),
   });
-  const toSign = new asn1js.Set({
-    value: attributes.map((attribute) => attribute.toSchema()),
-  }).toBER(false);
-  const raw = await input.authority.sign(new Uint8Array(toSign));
+  const raw = await input.authority.sign(signedAttributesDer(signerInfo));
   signerInfo.signature = new asn1js.OctetString({
     valueHex: cmsSignatureValue(input.authority.algorithm, raw),
   });
