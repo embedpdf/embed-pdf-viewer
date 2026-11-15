@@ -312,6 +312,34 @@ describe('signing with a timestamp', () => {
     });
   });
 
+  test('timestampTrust judges the authority of a document timestamp too', async () => {
+    const trusted = {
+      anchors: async () => [],
+      timestampAnchors: async () => [authority.certificate],
+    };
+    await withDocument(async (doc) => {
+      await sign(doc, { field, kind: 'timestamp', key: authority, timestampTrust: trusted });
+      expect(await isSigned(doc)).toBe(true);
+    });
+    await withDocument(async (doc) => {
+      const stranger = await createTestTimestampAuthority({ commonName: 'a stranger' });
+      const refusal = sign(doc, {
+        field,
+        kind: 'timestamp',
+        key: stranger,
+        timestampTrust: trusted,
+      });
+      await expect(refusal).rejects.toMatchObject({
+        code: EngineErrorCode.SignatureRefused,
+        details: { trust: 'untrusted' },
+      });
+      await expect(refusal).rejects.toThrow(/"a stranger"/);
+      expect(await isSigned(doc)).toBe(false);
+      // Nothing stays prepared: the document can be signed again at once.
+      await sign(doc, { field, kind: 'timestamp', key: authority, timestampTrust: trusted });
+    });
+  });
+
   describe('in two steps', () => {
     const prepareAndSign = async (
       doc: DocumentHandle,

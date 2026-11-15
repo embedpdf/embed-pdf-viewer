@@ -57,6 +57,11 @@ export function createAuthority(ctx: SignatureContext, { form }: Pick<SignatureS
     canFill: (field: FormFieldRef) => allowsField('fill', field),
     canCertify: () => settings.get().allowCertify && ctx.allows('doc.sign.certify'),
     canReadRevision: () => ctx.allows('doc.download'),
+    /** Whether validation data can be added: someone to ask, someone to trust, and `doc.sign`. */
+    canAddValidationInfo: () => {
+      const { revocation, trust } = settings.get();
+      return revocation !== null && trust !== null && ctx.allows('doc.sign');
+    },
   };
 }
 export type SignatureAuthority = ReturnType<typeof createAuthority>;

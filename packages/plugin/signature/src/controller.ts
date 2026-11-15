@@ -16,6 +16,7 @@ import { createValidation } from './sync/validation';
 import { createFills } from './write/fill';
 import { createPlacement, createTarget } from './write/place';
 import { createSigning } from './write/sign';
+import { createValidationInfo } from './write/validation-info';
 
 export function createSignatureController(ctx: SignatureContext) {
   const services = createServices(ctx);
@@ -30,9 +31,10 @@ export function createSignatureController(ctx: SignatureContext) {
   const reads = createSignatureReads(ctx, services, signatures.mirror);
   const judging = createJudging(ctx, services, validation, signatures.mirror, reads);
 
-  // Writes: the sign-here target, sealing, visual fills, the destination rule.
+  // Writes: the sign-here target, validation data, sealing, visual fills, the destination rule.
   const target = createTarget(ctx, services, reads);
-  const signing = createSigning(ctx, services, reads, target, signatures);
+  const validationInfo = createValidationInfo(ctx, services, reads, validation);
+  const signing = createSigning(ctx, services, reads, target, signatures, validationInfo);
   const fills = createFills(ctx, services, reads, target);
   const placement = createPlacement(ctx, services, reads, signing, fills);
 
@@ -42,6 +44,7 @@ export function createSignatureController(ctx: SignatureContext) {
     judging.api,
     target.api,
     signing.api,
+    validationInfo.api,
     fills.api,
     placement.api,
     {
@@ -50,6 +53,7 @@ export function createSignatureController(ctx: SignatureContext) {
       canFill: authority.canFill,
       canCertify: authority.canCertify,
       canReadRevision: authority.canReadRevision,
+      canAddValidationInfo: authority.canAddValidationInfo,
       onSigned: events.signed.on,
       onFilled: events.filled.on,
       onCleared: events.cleared.on,

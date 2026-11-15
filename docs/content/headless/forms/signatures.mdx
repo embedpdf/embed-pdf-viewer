@@ -161,6 +161,57 @@ signaturePlugin({
 });
 ```
 
+### Keep a signature checkable for years
+
+A timestamp proves when a signature was made. To check the signature years later, a reader also
+has to know that the signer's certificate had not been withdrawn by then, and its issuer may no
+longer answer that question. Set `revocation`, and every signature the plugin seals gets those
+answers right after, stored in the file. Acrobat shows such a signature as "LTV enabled":
+
+```ts
+signaturePlugin({
+  signingKey,
+  timestampAuthority: httpTimestampAuthority({ url: '/api/timestamp' }),
+  revocation: httpRevocationSource({ url: '/api/revocation' }),
+  documentTimestamp: true,
+  trust,
+});
+```
+
+`httpRevocationSource()` comes from the same place as the signers. A web page can't call a
+certificate's issuer, so `url` is a route of your own that passes the question on;
+[Reach the issuers from a browser](/docs/engine/forms/signatures#reach-the-issuers-from-a-browser)
+has one.
+
+- **It needs `trust` and a timestamp.** The answers kept are the ones for the certificates
+  between the signer and a certificate you trust, at the time the timestamp proves.
+- **`documentTimestamp: true` adds a document timestamp after the answers**, from
+  `timestampAuthority`. It proves the answers were in the file by then, which a strict validator
+  asks for.
+- **The signature is sealed first.** The answers go into the file after the signature, so a
+  failure there can't undo it: `sign()` still resolves, and its result says what happened.
+
+```ts
+const result = await signature.sign({ field, mark });
+
+result.validationInfo;
+// { added: { certificates: 3, ocspResponses: 2, crls: 0 },
+//   documentTimestamp: { kind: 'fqn', name: 'Timestamp1' } }
+
+if (result.validationInfoError) {
+  // Signed, but the file doesn't hold the answers yet. Try again later:
+  await signature.addValidationInfo(result.signature.field);
+}
+```
+
+- **Only the signature just made is covered.** Other people's signatures may name issuers that
+  no longer answer. `signature.addValidationInfo()` with no field covers every signature, and
+  rejects when one can't be covered.
+- **It takes the `doc.sign` permission.** Someone who may only sign their own group's fields
+  signs without it, and `result.validationInfo` is `null`. Whoever finishes the document then
+  calls `signature.addValidationInfo()` once, for everyone.
+- **`completeSignature()` and `placeMark()` do the same** as `sign()`.
+
 ## Check the signatures
 
 <Snippet name="forms/signature-list" />
@@ -177,8 +228,38 @@ A verdict's `summary` is:
 The plugin checks the signatures when the document opens, and again after every change. For a
 detailed report of what changed since a signature, rule by rule, use `signature.analyzeChanges()`.
 
-`'valid'` means the signer's certificate is within its dates and leads to one you trust. It
-doesn't mean "not revoked": whether a certificate was withdrawn isn't checked.
+`'valid'` means the signer's certificate is within its dates and leads to one you trust.
+Whether it was withdrawn is in `verdict.revocation`: `'good'`, `'revoked'` or `'unknown'`, read
+from the answers the file holds. Proof of a withdrawal makes the summary `'invalid'`, and
+`'unknown'` never changes it. The plugin asks nobody when it checks, so opening a document
+doesn't tell a certificate authority who is reading it.
+
+### Whether it can be checked for years
+
+`verdict.longTerm` says whether the file holds everything a reader needs, with no network:
+
+```ts
+const { longTerm } = verdict;
+
+longTerm.enabled; // true: what Acrobat calls "LTV enabled"
+longTerm.expiresAt; // the day that proof runs out, or null
+longTerm.missing; // what stands in the way: [{ certificate, reason }]
+```
+
+For a signature that isn't there yet, offer to add what is missing:
+
+```ts
+if (!verdict.longTerm.enabled && signature.canAddValidationInfo()) {
+  await signature.addValidationInfo(verdict.signature.field);
+}
+```
+
+`addValidationInfo()` asks through the `revocation` setting, stores the answers, and adds a
+document timestamp when `documentTimestamp` is set and the answers aren't covered by one yet. It
+rejects, and stores nothing, when an answer is missing: `error.details.reason` says why
+(`'no-timestamp'`, `'untrusted'`, `'no-answer'` or `'revoked'`), and `error.details.source` names
+an address that didn't answer. [Long-term validation](/docs/engine/forms/signatures#long-term-validation)
+has every field.
 
 ### When it was signed
 
@@ -190,20 +271,20 @@ own claim otherwise:
 const stamp = verdict.timestamp;
 const when =
   stamp?.summary === 'valid'
-    ? `${stamp.genTime}, confirmed by ${stamp.authorityName}`
+    ? `${stamp.stampedAt}, confirmed by ${stamp.authorityName}`
     : `${verdict.signature.signer.signedAt}, the signer's clock`;
 ```
 
 A timestamp's verdict never changes the signature's `summary`: a valid signature with a broken
 timestamp is still valid.
 
-By default every certificate is judged as of now, so a signature whose signer's certificate has
-expired since reads `'valid-untrusted'`. To judge each signature at its trusted timestamp, when
-the certificate was still good:
+Each certificate is judged at the signature's trusted timestamp, when it has one, so a
+signature whose signer's certificate has expired since still reads `'valid'`. To judge every
+certificate as of now:
 
 ```ts
 await signature.validate({
-  validationTime: { kind: 'earliest-timestamp' },
+  validationTime: { kind: 'now' },
 });
 ```
 
@@ -268,13 +349,14 @@ Everything `useSignature()` gives you.
 
 | Method                                                    | What it does                                                                                                                              |
 | :-------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey` and `timestampAuthority`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
+| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey` and `timestampAuthority`, `certify` and `lock`, and resolves `{ signature, version, protection, validationInfo, validationInfoError }`. [Sign a field](#sign-a-field) |
 | `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
 | `fillField(field, mark)`, `clearField(field)`             | Draws a mark into a field without signing, or takes it out again. Refused on a signed field. [Fill a field without signing](#fill-a-field-without-signing) |
 | `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second checks what the key returned, adds the timestamp when an authority is set, and seals the document. [Signing in two steps](#signing-in-two-steps) |
 | `cancelPending()`                                         | Gives up a signature prepared in two steps, so the document can be changed again                                                          |
 | `validate({ until?, validationTime? })`                   | Checks every signature again and resolves the verdicts. `until: 'persisted'` checks the file as it was opened; `validationTime` judges each signature at its timestamp. [Which bytes are checked](#which-bytes-are-checked), [When it was signed](#when-it-was-signed) |
 | `validateField(field)`                                    | Checks one signed field and resolves its verdict                                                                                          |
+| `addValidationInfo(field?)`                               | Asks whether a signed field's certificates were good at its timestamp, stores the answers in the file, and adds a document timestamp when `documentTimestamp` is set. Without `field`, for every signature. Resolves `{ added, documentTimestamp }`. [Whether it can be checked for years](#whether-it-can-be-checked-for-years) |
 | `getVerdict(field)`, `listVerdicts()`                     | One signed field's verdict from the last check, or every verdict; `null` before the first check. [Check the signatures](#check-the-signatures) |
 | `getSignature(field)`                                     | One signature field's facts, signed or not, such as `fieldName`, `signed` and `signer`, or `null`                                         |
 | `listUnsignedFields()`                                    | The signature fields still to sign, in document order                                                                                     |
@@ -285,7 +367,7 @@ Everything `useSignature()` gives you.
 | `getMode()`                                               | The mode in effect: the `mode` setting, or its default. [Settings](#settings)                                                            |
 | `getSnapshot()`                                           | Everything at once, as the engine reads it: every signature field, signed or not, the file's versions, and `protection`                   |
 | `refresh()`                                               | Reads the signatures again. You rarely need it: the plugin reads and checks them again after every change.                                |
-| `canSign(field)`, `canCertify()`, `canFill(field)`, `canReadRevision()` | Whether signing a field, certifying, drawing a mark into a field without signing, and reading the signed bytes are allowed. [Permissions](#permissions) |
+| `canSign(field)`, `canCertify()`, `canFill(field)`, `canReadRevision()`, `canAddValidationInfo()` | Whether signing a field, certifying, drawing a mark into a field without signing, reading the signed bytes, and adding validation data are allowed. [Permissions](#permissions) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSignatureSettings()`. [Settings](#settings) |
 
 `field` is a field's ref, such as `toFieldRef('approval')`; the methods that only read also take the
@@ -315,6 +397,8 @@ Set them when you register the plugin, and change them while the app runs with
 | :------------- | :--------------------------------------------------------------------- | :------------------------------ |
 | `signingKey`   | The signer, or a function that returns one when someone signs          | none                            |
 | `timestampAuthority` | The timestamp authority: every signature the plugin seals carries its timestamp | none           |
+| `revocation`   | Where revocation answers come from: every signature the plugin seals gets its validation data right after. Needs `trust` | none |
+| `documentTimestamp` | Add a document timestamp after the validation data. Needs `timestampAuthority` | `false`           |
 | `mode`         | What a mark does in a field: `'sign'`, `'visual'` or `'ask'`           | `'sign'` with a key, else `'visual'` |
 | `trust`        | The certificates you trust: for checking signatures, and for the timestamps you seal | none              |
 | `allowCertify` | Let a first signature be a certification, which sets what stays allowed | `false`                        |
@@ -335,7 +419,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `onInspectionRequested`   | A signed field was clicked                           | `field`                     |
 | `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
-`result` is what `sign()` resolves. ["Sign here" in a form](#sign-here-in-a-form) says what to show
+`result` is the `{ signature, version, protection }` that `sign()` resolves. ["Sign here" in a form](#sign-here-in-a-form) says what to show
 for the last three.
 
 ## Permissions
@@ -343,6 +427,7 @@ for the last three.
 | Permission         | What it allows                              | Check                         |
 | :----------------- | :------------------------------------------ | :---------------------------- |
 | `doc.sign`         | Signing                                     | `signature.canSign(field)`    |
+| `doc.sign`         | Adding validation data and a document timestamp | `signature.canAddValidationInfo()` |
 | `doc.sign.certify` | Signing a certification                     | `signature.canCertify()`      |
 | `doc.forms.fill`   | Drawing a mark into a field without signing | `signature.canFill(field)`    |
 | `doc.download`     | Reading the exact bytes a signature covers  | `signature.canReadRevision()` |

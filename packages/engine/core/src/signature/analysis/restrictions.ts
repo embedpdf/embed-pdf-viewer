@@ -12,7 +12,13 @@ import type { RestrictionAnchor, RevisionStructure } from './types';
  *     /Lock bind the window; other signatures' locks do not (corpus v3/85:
  *     a second signature is valid with a fill of a field the first locked).
  *     Every certification's level, own or earlier, applies (inherited:
- *     conservative until observed otherwise), as does a /Lock's /P.
+ *     conservative until observed otherwise), as does a /Lock's /P. One
+ *     case is observed otherwise: a document timestamp added after a
+ *     certification that allows no changes. The timestamp breaks that
+ *     certification, and Acrobat still judges the timestamp on its own, valid
+ *     with validation data and unchanged objects written after it (fixtures
+ *     `signature-long-term`). So that certification doesn't bind the
+ *     timestamp's window.
  *   - no `judged` (a revision-anchored analysis): every signed signature's
  *     locks and levels apply.
  */
@@ -28,7 +34,9 @@ export function restrictionsFor(
     if (!sig.signed || sig.revisionIndex === null) continue;
     signed = true;
     const own = judged !== null && sig.index === judged.index;
-    if (sig.catalogCertification && sig.docMdp !== null) {
+    const timestampAfterNoChanges =
+      judged !== null && !own && judged.kind === 'timestamp' && sig.docMdp === 1;
+    if (sig.catalogCertification && sig.docMdp !== null && !timestampAfterNoChanges) {
       anchors.push({
         signatureIndex: sig.index,
         revisionIndex: sig.revisionIndex,

@@ -389,8 +389,19 @@ export interface PageWidget {
 /** One page's widgets: widget annotation object number → where it is and how it looks. */
 export type PageWidgets = Readonly<Record<number, PageWidget>>;
 
-/** Whether a widget shows on screen: its `hidden` and `noView` flags hide it. */
-export const shownOnScreen = (row: WidgetAnnotation): boolean => !row.hidden && !row.noView;
+/**
+ * Whether a widget's box has an area. One of no size is how a PDF keeps a field that shows
+ * nowhere: the field of a document timestamp, an invisible signature.
+ */
+export const hasArea = (row: WidgetAnnotation): boolean =>
+  row.rect.width > 0 && row.rect.height > 0;
+
+/**
+ * Whether a widget shows on screen: its `hidden` and `noView` flags hide it, and a box of no
+ * size has nothing to show. What doesn't show gets no control, and Tab doesn't stop at it.
+ */
+export const shownOnScreen = (row: WidgetAnnotation): boolean =>
+  !row.hidden && !row.noView && hasArea(row);
 
 /** The widgets one page shows, from the form's widget rows. */
 export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): PageWidgets {

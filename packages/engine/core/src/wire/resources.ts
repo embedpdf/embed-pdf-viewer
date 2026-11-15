@@ -113,6 +113,7 @@ export type DocResourceId =
   // layer's versions). The versions list is origin-only.
   | 'layer-signatures'
   | 'layer-signatures-analysis'
+  | 'layer-signatures-validation-info'
   | 'layer-versions'
   | 'layer-version-signatures'
   | 'layer-version-analysis'
@@ -816,6 +817,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/signatures/analysis@',
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/signatures/analysis@`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-signatures-validation-info': {
+    id: 'layer-signatures-validation-info',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/signatures/validation-info@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/signatures/validation-info@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/signatures/validation-info@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/signatures/validation-info@`,
     requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

@@ -925,6 +925,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'signatures.cancelled':
         // Moves no pin a read uses, as an own cancel absorbs nothing.
         return;
+      case 'signatures.validationInfoAdded':
+        // Only the document version moved: no page and no list a page shows.
+        this.absorbMutation(event.meta, []);
+        return;
       case 'fonts.changed':
         // Ends a row whose own events, or its withheld pins, absorbed the
         // font list's pin already.

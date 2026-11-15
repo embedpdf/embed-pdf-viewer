@@ -87,6 +87,7 @@ import type {
   SignaturePrepared,
   SignatureSnapshot,
   SignedDocumentPolicy,
+  ValidationInfoAddResult,
 } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
@@ -336,6 +337,27 @@ export interface SignaturesCancelWorkerRequest {
   docId: string;
   layerName?: string;
   signingId: string;
+}
+
+export interface SignaturesValidationInfoWorkerRequest {
+  kind: 'signatures.validationInfo';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/** Store validation data; see `DocumentSignaturesService.addValidationInfo`. */
+export interface SignaturesAddValidationInfoWorkerRequest extends WriteJobFields {
+  kind: 'signatures.addValidationInfo';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  certificates: ArrayBuffer[];
+  ocspResponses: ArrayBuffer[];
+  crls: ArrayBuffer[];
+  artifactPath?: string;
 }
 
 export interface SignaturesAnalyzeWorkerRequest {
@@ -1648,6 +1670,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | SignaturesPrepareWorkerRequest
   | SignaturesCompleteWorkerRequest
   | SignaturesCancelWorkerRequest
+  | SignaturesValidationInfoWorkerRequest
+  | SignaturesAddValidationInfoWorkerRequest
   | SignaturesAnalyzeWorkerRequest
   | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
@@ -1708,12 +1732,28 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.digest'; digest: ArrayBuffer }
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.version'; version: BaseVersionInfo }
-  | { tag: 'signatures.prepare'; result: SignaturePrepared }
+  | {
+      tag: 'signatures.prepare';
+      result: SignaturePrepared;
+      /**
+       * The object number of the field the signing goes in, on the candidate:
+       * the one asked for, or the one the engine made for a document
+       * timestamp prepared with no field.
+       */
+      fieldObjectNumber: number;
+    }
   | ({
       tag: 'signatures.complete';
       result: SignatureCompleteResult;
     } & WritePayloadFacts)
   | { tag: 'signatures.cancel'; result: SignatureCancelResult }
+  | {
+      tag: 'signatures.validationInfo';
+      certificates: ArrayBuffer[];
+      ocspResponses: ArrayBuffer[];
+      crls: ArrayBuffer[];
+    }
+  | { tag: 'signatures.addValidationInfo'; result: ValidationInfoAddResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';

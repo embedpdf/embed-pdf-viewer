@@ -8,8 +8,9 @@ import type {
   SignatureSubFilter,
 } from '@embedpdf/engine-core/runtime';
 
-import { attachSignatureTimestamp } from './cms/attach';
+import { attachSignatureTimestamp, requireTrustedAuthority } from './cms/attach';
 import { buildDetachedCms, type RawSigner, type SignatureProfile } from './cms/build';
+import { checkTimestampToken } from './cms/verify-timestamp';
 import { verifyForCompletion, type CompletionProfile } from './gate';
 import { signingRefused } from './refusal';
 import type { TrustPort } from './trust';
@@ -45,7 +46,10 @@ export type SignInput = SignaturePrepareInput & {
   key: SignerPort;
   /** Timestamp the signature: the authority stamps its signature value. Not for `kind: 'timestamp'`. */
   timestampAuthority?: CmsSigner;
-  /** Who may timestamp: a token from an authority this port doesn't trust fails the signing. */
+  /**
+   * Who may timestamp: a token from an authority this port doesn't trust fails the signing.
+   * For `kind: 'timestamp'` it judges the key, which is the authority.
+   */
   timestampTrust?: TrustPort;
 };
 
@@ -177,7 +181,7 @@ function assertTimestampOptions(
       { details: { field: 'timestampAuthority' } },
     );
   }
-  if (timestampTrust && !timestampAuthority) {
+  if (timestampTrust && !timestampAuthority && !documentTimestamp) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       "`timestampTrust` judges a timestamp's authority; pass `timestampAuthority` too",
@@ -208,6 +212,15 @@ async function completePrepared(
   };
   let cms = input.cms;
   await check(cms);
+  if (profile === 'timestamp' && input.timestampTrust) {
+    // A document timestamp is its token: the authority to judge is the one that made it.
+    const token = await checkTimestampToken({
+      token: cms,
+      stamped: { kind: 'digest', digest: prepared.digest, algorithm: prepared.algorithm },
+    });
+    if (token.verdict !== 'valid') throw signingRefused('malformed', 'the timestamp token');
+    await requireTrustedAuthority(token, input.timestampTrust);
+  }
   if (timestampAuthority) {
     cms = await attachSignatureTimestamp({
       cms,

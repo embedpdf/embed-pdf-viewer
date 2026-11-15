@@ -759,7 +759,16 @@ export type {
   SignatureSnapshot,
   SignatureSubFilter,
   SignedDocumentPolicy,
+  ValidationInfo,
+  ValidationInfoAddResult,
+  ValidationInfoCounts,
+  ValidationInfoKind,
 } from './signature/types';
+export {
+  VALIDATION_INFO_KINDS,
+  VALIDATION_INFO_LIMITS,
+  validationInfoEntryProblem,
+} from './signature/validationInfo';
 export type {
   AnalyzeInput,
   ChangeAnalysis,
@@ -778,6 +787,7 @@ export type {
   RevisionStructure,
   StepInput,
   StepVerdict,
+  UnwrittenObject,
 } from './signature/analysis/types';
 export {
   changedKeys,
@@ -794,6 +804,7 @@ export {
   refsOf,
   restrictionsOf,
   stableStringify,
+  unwrittenObjectsToRead,
   worstVerdict,
   EdgeResolver,
   DEFAULT_EDGE_RESOLVER_BUDGET,

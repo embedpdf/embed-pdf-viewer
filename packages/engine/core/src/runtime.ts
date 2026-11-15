@@ -168,6 +168,8 @@ export type {
   SignaturesPrepareWorkerRequest,
   SignaturesCompleteWorkerRequest,
   SignaturesCancelWorkerRequest,
+  SignaturesValidationInfoWorkerRequest,
+  SignaturesAddValidationInfoWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
   AnnotationsFlattenWorkerRequest,

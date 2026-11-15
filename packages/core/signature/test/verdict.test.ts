@@ -139,8 +139,8 @@ describe('reading timestamps', () => {
         const stamp = verdict!.timestamp!;
         expect(Array.from(stamp.authorityCertificate!)).toEqual(Array.from(stamper.certificate));
         expect(stamp.authorityName).toBe('EmbedPDF test timestamp authority');
-        expect(new Date(stamp.genTime!).getTime()).toBeGreaterThanOrEqual(before - 1000);
-        expect(new Date(stamp.genTime!).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(new Date(stamp.stampedAt!).getTime()).toBeGreaterThanOrEqual(before - 1000);
+        expect(new Date(stamp.stampedAt!).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
 
         // Trust in the signer says nothing about the authority, and the other way round.
         const [signerOnly] = await validateSignatures(doc, {
@@ -181,7 +181,7 @@ describe('reading timestamps', () => {
         });
         expect(verdict!.timestamp).toMatchObject({ summary: 'invalid', cryptography: 'invalid' });
         // What the token says is still there to show.
-        expect(verdict!.timestamp!.genTime).not.toBeNull();
+        expect(verdict!.timestamp!.stampedAt).not.toBeNull();
       });
     });
 
@@ -259,7 +259,7 @@ describe('reading timestamps', () => {
         });
         // The oldest token stamps something else; of the two that hold, the earlier one counts.
         expect(verdict!.timestamp!.summary).toBe('valid');
-        const age = Date.now() - new Date(verdict!.timestamp!.genTime!).getTime();
+        const age = Date.now() - new Date(verdict!.timestamp!.stampedAt!).getTime();
         expect(Math.round(age / DAY)).toBe(5);
       });
     });
@@ -325,7 +325,8 @@ describe('reading timestamps', () => {
         });
         const trust = trusting(expiredSigner.certificate, authority.certificate);
 
-        const [now] = await validateSignatures(doc, { trust });
+        // Asked to judge now, the certificate has run out.
+        const [now] = await validateSignatures(doc, { trust, validationTime: { kind: 'now' } });
         expect(now).toMatchObject({
           trust: 'untrusted',
           summary: 'valid-untrusted',
@@ -333,18 +334,23 @@ describe('reading timestamps', () => {
         });
         expect(now!.timestamp!.summary).toBe('valid');
 
-        const [then] = await validateSignatures(doc, { trust, validationTime: earliest });
-        expect(then).toMatchObject({
-          trust: 'trusted',
-          summary: 'valid',
-          validationTime: {
+        // With nothing asked for, and when asked for by name: at the timestamp.
+        for (const options of [{ trust }, { trust, validationTime: earliest }]) {
+          const [then] = await validateSignatures(doc, options);
+          expect(then).toMatchObject({
+            trust: 'trusted',
+            summary: 'valid',
+          });
+          // The time is under both of its names: `genTime` is what 3.2 called it.
+          expect(then!.validationTime).toEqual({
             kind: 'timestamp',
+            stampedAt: stamped.toISOString(),
             genTime: stamped.toISOString(),
             tokenVerified: true,
-          },
-        });
-        // The authority has nothing after it to vouch for it: it is judged now.
-        expect(then!.timestamp!.validationTime).toEqual({ kind: 'now' });
+          });
+          // The authority has nothing after it to vouch for it: it is judged now.
+          expect(then!.timestamp!.validationTime).toEqual({ kind: 'now' });
+        }
       });
     });
 
@@ -402,15 +408,21 @@ describe('reading timestamps', () => {
         expect(signature!.timestamp).toBeNull();
         expect(signature).toMatchObject({
           trust: 'trusted',
-          validationTime: { kind: 'timestamp', genTime: stamped.toISOString() },
+          validationTime: { kind: 'timestamp', stampedAt: stamped.toISOString() },
         });
         expect(documentStamp).toMatchObject({
           summary: 'valid',
           validationTime: { kind: 'now' },
         });
 
-        // Without the option nothing is judged in the past.
-        const [now] = await validateSignatures(doc, { trust });
+        // The same with nothing asked for.
+        const [byDefault] = await validateSignatures(doc, { trust });
+        expect(byDefault).toMatchObject({
+          trust: 'trusted',
+          validationTime: { kind: 'timestamp', stampedAt: stamped.toISOString() },
+        });
+        // Asked to judge now, nothing is judged in the past.
+        const [now] = await validateSignatures(doc, { trust, validationTime: { kind: 'now' } });
         expect(now).toMatchObject({ trust: 'untrusted', validationTime: { kind: 'now' } });
       });
     });
@@ -452,13 +464,13 @@ describe('reading timestamps', () => {
         // The token's authority is judged when the document timestamp says the token existed.
         expect(signature!.timestamp).toMatchObject({
           summary: 'valid',
-          validationTime: { kind: 'timestamp', genTime: laterStamp.toISOString() },
+          validationTime: { kind: 'timestamp', stampedAt: laterStamp.toISOString() },
         });
         // The signer is judged at the earlier of the two: its own timestamp.
         expect(signature).toMatchObject({
           trust: 'trusted',
           summary: 'valid',
-          validationTime: { kind: 'timestamp', genTime: ownStamp.toISOString() },
+          validationTime: { kind: 'timestamp', stampedAt: ownStamp.toISOString() },
         });
       });
     });
@@ -483,11 +495,11 @@ describe('reading timestamps', () => {
         expect(secondStamp).toMatchObject({ summary: 'valid', validationTime: { kind: 'now' } });
         expect(firstStamp).toMatchObject({
           summary: 'valid',
-          validationTime: { kind: 'timestamp', genTime: second.toISOString() },
+          validationTime: { kind: 'timestamp', stampedAt: second.toISOString() },
         });
         expect(signature).toMatchObject({
           trust: 'trusted',
-          validationTime: { kind: 'timestamp', genTime: first.toISOString() },
+          validationTime: { kind: 'timestamp', stampedAt: first.toISOString() },
         });
       });
     });
@@ -499,17 +511,45 @@ describe('reading timestamps', () => {
           key: expiredSigner.signer,
           timestampAuthority: authorityOf(authority, { genTime: daysAgo(20) }),
         });
-        const named = {
+        const trust = trusting(expiredSigner.certificate, authority.certificate);
+        const then = daysAgo(25).toISOString();
+        const reported = {
           kind: 'timestamp',
-          genTime: daysAgo(25).toISOString(),
+          stampedAt: then,
+          genTime: then,
           tokenVerified: true,
         } as const;
-        const [verdict] = await validateSignatures(doc, {
-          trust: trusting(expiredSigner.certificate, authority.certificate),
-          validationTime: named,
+
+        const named = [
+          { kind: 'timestamp', stampedAt: then, tokenVerified: true },
+          // The name the time had in 3.2 is still read.
+          { kind: 'timestamp', genTime: then, tokenVerified: true },
+          // What a verdict reports can be passed back as it is.
+          reported,
+          // Given both, `stampedAt` is the one used: the signer's certificate ran out 10 days ago.
+          {
+            kind: 'timestamp',
+            stampedAt: then,
+            genTime: daysAgo(5).toISOString(),
+            tokenVerified: true,
+          },
+        ] as const;
+        for (const validationTime of named) {
+          const [verdict] = await validateSignatures(doc, { trust, validationTime });
+          expect(verdict!.trust).toBe('trusted');
+          expect(verdict!.validationTime).toEqual(reported);
+          expect(verdict!.timestamp!.validationTime).toEqual({ kind: 'now' });
+        }
+
+        const [late] = await validateSignatures(doc, {
+          trust,
+          validationTime: {
+            kind: 'timestamp',
+            stampedAt: daysAgo(5).toISOString(),
+            tokenVerified: true,
+          },
         });
-        expect(verdict).toMatchObject({ trust: 'trusted', validationTime: named });
-        expect(verdict!.timestamp!.validationTime).toEqual({ kind: 'now' });
+        expect(late!.trust).toBe('untrusted');
       });
     });
   });
@@ -565,7 +605,7 @@ describe('a timestamp token over any digest', () => {
     expect(verdict).toMatchObject({
       summary: 'indeterminate',
       cryptography: 'unsupported',
-      genTime: null,
+      stampedAt: null,
       authorityCertificate: null,
       trust: 'unknown',
     });

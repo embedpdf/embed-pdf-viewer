@@ -5,4 +5,6 @@ export default {
   complete: 'Complete',
   analysis: 'Analysis',
   prepare: 'Prepare',
+  'validation-info': 'Validation Info',
+  'add-validation-info': 'Add Validation Info',
 };

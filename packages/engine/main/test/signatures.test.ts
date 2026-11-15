@@ -48,6 +48,10 @@ const fixtures: SignatureConformanceFixtures = {
     textField: 'group.total',
   },
   artwork: fixture('signature-artwork-pdf', 'signature_artwork.pdf'),
+  certifiedNoChanges: fixture(
+    'signed-certified-no-changes-pdf',
+    'signature-long-term/ours-certified-p1-b-t.pdf',
+  ),
 };
 
 for (const openKind of ['bytes', 'layerBytes'] as const) {

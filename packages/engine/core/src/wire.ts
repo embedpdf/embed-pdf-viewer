@@ -27,6 +27,11 @@ export {
   ModificationLevelSchema,
   SignaturePreparedWireSchema,
   SignatureCompleteBodySchema,
+  ValidationInfoWireSchema,
+  ValidationInfoAddBodySchema,
+  ValidationInfoAddResultSchema,
+  encodeValidationInfo,
+  decodeValidationInfo,
   DocumentVersionRefSchema,
   ByteRangeSchema,
   encodePrepared,
@@ -475,6 +480,7 @@ export {
 } from './wire/cachedReads';
 export {
   API_VERSION,
+  VALIDATION_INFO_SINCE,
   apiVersionOf,
   lacksWhatArrivedIn,
   parseApiVersion,

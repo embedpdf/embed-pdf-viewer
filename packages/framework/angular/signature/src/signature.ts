@@ -25,11 +25,7 @@ import {
   type SignatureConfig,
   type SignerRow,
 } from '@embedpdf/plugin-signature';
-import {
-  StampToken,
-  type StampAsset,
-  type StampLibrary,
-} from '@embedpdf/plugin-stamp/contract';
+import { StampToken, type StampAsset, type StampLibrary } from '@embedpdf/plugin-stamp/contract';
 
 const NO_LIBRARIES: readonly StampLibrary[] = Object.freeze([]);
 const NO_ASSETS: readonly StampAsset[] = Object.freeze([]);
@@ -72,12 +68,14 @@ export class EpdfSignature extends pluginService({
     'refresh',
     'validate',
     'validateField',
+    'addValidationInfo',
     'analyzeChanges',
     'readRevision',
     'canSign',
     'canFill',
     'canCertify',
     'canReadRevision',
+    'canAddValidationInfo',
   ],
   events: [
     'onSigned',

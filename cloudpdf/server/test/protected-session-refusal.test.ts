@@ -78,7 +78,11 @@ const RULES: ReadonlyArray<readonly [method: string, pattern: RegExp, Category]>
   ['GET', /^\/layers\/:layerName\/font-programs\//, 'session'],
   ['GET', /^(\/layers\/:layerName)?\/geometry\/pages\//, 'session'],
   ['GET', /^\/layers\/:layerName\/search\/rects\//, 'session'],
-  ['GET', /^\/layers\/:layerName\/(events|signatures(@:token|\/analysis(@:token)?)?)$/, 'session'],
+  [
+    'GET',
+    /^\/layers\/:layerName\/(events|signatures(@:token|\/(analysis|validation-info)(@:token)?)?)$/,
+    'session',
+  ],
   ['GET', /^\/layers\/:layerName\/versions(\/signatures\/|\/analysis\/|$)/, 'session'],
   ['GET', /^\/layers\/:layerName\/pages\/:pageKey\/viewports$/, 'session'],
   ['POST', /^\/layers\/:layerName\/object-numbers$/, 'session'],

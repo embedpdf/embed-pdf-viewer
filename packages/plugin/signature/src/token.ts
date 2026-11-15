@@ -18,6 +18,7 @@ export const SignatureToken = createCapabilityToken<SignatureCapability>('signat
     refresh: true,
     validate: true,
     validateField: true,
+    addValidationInfo: true,
     analyzeChanges: true,
     readRevision: true,
   },

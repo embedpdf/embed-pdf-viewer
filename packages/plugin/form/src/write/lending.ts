@@ -5,7 +5,8 @@
  * its records and edits them with its tools: select, move, resize, restyle,
  * reorder, delete. Each edit comes back here as the form's ops, in the same
  * change as the rest of it. While the tool fills, nothing is lent, and the
- * form layer draws and fills every widget.
+ * form layer draws and fills every widget. A widget of no size is never lent:
+ * nobody can see it, so nobody should be able to select it by hand.
  */
 import { memo } from '@embedpdf/core';
 import { refOf, type Effect, type Model } from '@embedpdf/core-annotation';
@@ -20,7 +21,7 @@ import {
 import type { AnnotationLender } from '@embedpdf/plugin-annotation/contract/host';
 
 import type { DuplicatePlacement } from './duplicate';
-import { fieldForWidget, fieldKeyOf } from '../model';
+import { fieldForWidget, fieldKeyOf, hasArea } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { undoLookOf } from '../sync/predict';
 
@@ -45,7 +46,9 @@ export function createWidgetLender(
   const records = memo(
     () => [design.lending(), fields.get().snapshot, fields.view().snapshot] as const,
     (lending, confirmed, shown) =>
-      lending && confirmed && shown ? { confirmed: confirmed.widgets, shown: shown.widgets } : null,
+      lending && confirmed && shown
+        ? { confirmed: confirmed.widgets.filter(hasArea), shown: shown.widgets.filter(hasArea) }
+        : null,
   );
 
   /**

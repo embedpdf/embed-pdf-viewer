@@ -65,6 +65,8 @@ const NAME = text(1, 'name', 11, P1);
 const EMAIL = text(2, 'email', 12, P1, 'ada@example.com');
 const LOCKED = { ...text(3, 'id', 13, P1), readOnly: true } as FormField;
 const CITY = text(4, 'city', 14, P2);
+// A field whose only box has no size: it shows nowhere, as a document timestamp's field does.
+const GHOST = text(6, 'ghost', 17, P2);
 const PLAN = {
   ...base,
   ref: fieldRef(5),
@@ -108,8 +110,9 @@ const snapshot: FormSnapshot = {
     row(14, P2, 100),
     row(15, P2, 200),
     row(16, P2, 250),
+    { ...row(17, P2, 400), rect: { x: 0, y: 792, width: 0, height: 0 } } as WidgetAnnotation,
   ],
-  fields: [NAME, EMAIL, LOCKED, CITY, PLAN],
+  fields: [NAME, EMAIL, LOCKED, CITY, PLAN, GHOST],
   calculationOrder: [],
 };
 
@@ -241,6 +244,20 @@ describe('focusNext()', () => {
     expect(capability.focusNext()).toBe(false);
     expect(capability.focusNext({ wrap: true })).toBe(true);
     expect(focused.at(-1)).toBe(11);
+  });
+
+  it('passes over a box of no size, which shows nowhere', async () => {
+    const { capability, focused, show } = await form();
+    show(14, P2);
+    show(15, P2);
+    show(16, P2);
+    show(17, P2);
+    for (let stop = 0; stop < 4; stop++) capability.focusNext();
+    expect(focused).toEqual([11, 12, 14, 16]);
+    // The field after the radio group has a box of no size: Tab leaves the form.
+    expect(capability.focusNext()).toBe(false);
+    expect(capability.focus(GHOST.ref)).toBe(false);
+    expect(focused).toEqual([11, 12, 14, 16]);
   });
 
   it("follows a page's tags when its /Tabs says structure", async () => {

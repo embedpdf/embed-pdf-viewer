@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 1,
+  "observer": {
+    "application": "Adobe Acrobat Pro",
+    "build": "26.002.22031",
+    "os": "macOS",
+    "observedAt": "2026-11-15",
+    "method": "Acrobat JavaScript: signatureValidate(), signatureInfo(), signatureGetModifications(). The test root was trusted for signed and certified documents. Files with validation data were judged with the test authority stopped.",
+    "status": {
+      "4": "valid and trusted",
+      "3": "validity unknown: the signer could not be checked",
+      "2": "invalid"
+    }
+  },
+  "cases": [
+    {
+      "file": "ours-b-t.pdf",
+      "sha256": "97ea2955117b2eaf53018e991096bb3f39d695a43541185fb3c0e5af1dc81bb6",
+      "byteLength": 34101,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. An approval signature.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2029/01/01 02:00:00 +02'00'",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "ours-b-t+lt-no-vri.pdf",
+      "sha256": "84edb652158f577b5fc5a68767d84cba1496dd7d3797ac87e776e981234073c0",
+      "byteLength": 41714,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. Then pyHanko 0.38.1 added validation data (/DSS, no /VRI) and a document information dictionary.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "ours-b-t+lt-no-vri+lta.pdf",
+      "sha256": "2e31e9d84b328a40cdeab9a973581546c5d67dd42e9e80f743e52cd4c709e1ff",
+      "byteLength": 48688,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. Then pyHanko 0.38.1 added validation data, a document timestamp, and validation data for that timestamp.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Timestamp-1d32e352-fb7c-4801-857c-9fbedc7642ba",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "ours-certified-p1-b-t.pdf",
+      "sha256": "2b66863495e8f83c325763463bbdf96795b53d796125c387b7176c4d1361cbc3",
+      "byteLength": 34227,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. A certification that allows no changes (P=1).",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Document certification is valid, signed by EmbedPDF Test Signer. The Document has not been modified since it was certified. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2029/01/01 02:00:00 +02'00'",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValTrue"
+        }
+      ]
+    },
+    {
+      "file": "ours-certified-p1-b-t+lt-no-vri+lta.pdf",
+      "sha256": "e32050703cb95903d6dc54f73705b9bdc6552d037d761e6153fec15f57e9b6b7",
+      "byteLength": 48868,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. A certification that allows no changes (P=1). Then pyHanko 0.38.1 added validation data, a document timestamp, and validation data for that timestamp.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        },
+        {
+          "field": "Timestamp-45d62278-22b7-4f34-85dc-0d66bd2fea68",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "pyhanko-certified-p1-b-lta.pdf",
+      "sha256": "80d445e3932314f8e52de03dc45fd0f08b21c3396fdb52b9c7e484a84633f1d3",
+      "byteLength": 31987,
+      "made": "pyHanko 0.38.1: a certification that allows no changes (P=1), taken to B-LTA. Its later revisions write the metadata stream and the catalog again unchanged.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        },
+        {
+          "field": "Timestamp-6215747e-0f14-4d94-8b67-aff33d258c62",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lt.pdf",
+      "sha256": "c91c27effbacec7e00df3fb36deb84a6665e8779597c3b29f68f73f45367013a",
+      "byteLength": 46396,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. An approval signature. Then Acrobat added validation data (signatureAddLTV).",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lta.pdf",
+      "sha256": "e0093943a32cb2414bda234494aa30712d41c04c515b669267fd62eabb01e64f",
+      "byteLength": 63206,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. An approval signature. Then Acrobat added validation data and a document timestamp (timestampSign), moving the page /Annots array into an object of its own.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1+store-only.pdf",
+      "sha256": "1f74b3312ea6ee929f36f7b16b252e8e3943950b68f8e7fa02c94782d47107a4",
+      "byteLength": 41732,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. P=1. Then one revision holding validation data (/DSS) and nothing else.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1+information-only.pdf",
+      "sha256": "7783278568bc46250a5c38f233f9489d3bca8f2e0325f60b0a2f93b43c672e2b",
+      "byteLength": 34540,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. P=1. Then one revision holding a new document information dictionary and nothing else.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2029/01/01 02:00:00 +02'00'",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1+timestamp-only.pdf",
+      "sha256": "55e7560b0700a119c6dda740c26918aef828315d4a600f163b0e1786309d2216",
+      "byteLength": 40473,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. P=1. Then one revision holding a document timestamp on a new invisible field and nothing else.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2029/01/01 02:00:00 +02'00'",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        },
+        {
+          "field": "Timestamp-e4f1e757-6d96-4cf0-9902-5b269dc334b7",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2036/01/01 02:00:00 +02'00'",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1-pdf20.pdf",
+      "sha256": "11897d51287d4824aa2e5118680170f20dbae53540a4d307485a5c86e1971370",
+      "byteLength": 15965,
+      "made": "pyHanko 0.38.1: a certification that allows no changes (P=1) in a PDF 2.0 file. The control for the next file.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Document certification is valid, signed by EmbedPDF Test Signer. The Document has not been modified since it was certified. The signer's identity is valid.",
+          "longTermText": "Signature is not LTV enabled and will expire after 2029/01/01 02:00:00 +02'00'",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValTrue"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1-pdf20+store-only.pdf",
+      "sha256": "e765ff3d59b8b4ffc788169ec03177306a59e5130fc59aab6988d5f1762758d8",
+      "byteLength": 23782,
+      "made": "pyHanko 0.38.1: P=1 in a PDF 2.0 file. Then one revision holding validation data and nothing else.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 2,
+          "statusText": "Document certification is INVALID. The Document has been altered or corrupted since the Certification was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValFalse"
+        }
+      ]
+    },
+    {
+      "file": "iso-p2+store-only.pdf",
+      "sha256": "aae17218ae26c757bda3705ce28cdc6f701553bf30786b30f09004a13617240a",
+      "byteLength": 41732,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. A certification that allows form filling and signing (P=2). Then one revision holding validation data and nothing else.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Document certification is valid, signed by EmbedPDF Test Signer. The changes that have been made to this document since it was certified are permitted by the Certifying party and do not invalidate the signature.The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "default",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValTrue"
+        }
+      ]
+    },
+    {
+      "file": "iso-p2+store-only+timestamp-only.pdf",
+      "sha256": "3dbd51d42f1780e14b2cc02fc1b73e12c34e76195bfdd65279dbb2037092be6f",
+      "byteLength": 47994,
+      "made": "Signed and timestamped by EmbedPDF (core-signature), ETSI.CAdES.detached. P=2. Then validation data, then a document timestamp on a new invisible field.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Document certification is valid, signed by EmbedPDF Test Signer. The changes that have been made to this document since it was certified are permitted by the Certifying party and do not invalidate the signature.The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "default",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValTrue"
+        },
+        {
+          "field": "Timestamp-84576ded-da88-49ed-b118-7e3d07822b2b",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "iso-p1-answers-in-signature.pdf",
+      "sha256": "fbcf9bee0be1f30f4a98927788017ba9415da6c513d504e79e162320415d94fc",
+      "byteLength": 22100,
+      "made": "pyHanko 0.38.1: a certification that allows no changes (P=1), adbe.pkcs7.detached, with the revocation answers inside the signature. No later revision.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Document certification is valid, signed by EmbedPDF Test Signer. The Document has not been modified since it was certified. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": "allowNone",
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValTrue"
+        }
+      ]
+    },
+    {
+      "file": "grow-acrobat-lta+second-timestamp.pdf",
+      "sha256": "783d62b0d79bd59042c9d942eaabc63a06651a3718d1c11ebb433ce36508568c",
+      "byteLength": 69558,
+      "made": "acrobat-lta.pdf, then pyHanko 0.38.1 added a second document timestamp: the /Annots object grows in place.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Timestamp-ea6fe9a0-e690-472f-a5fb-dbfb922eec2c",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "grow-acrobat-lta+second-signature.pdf",
+      "sha256": "d277f0e7d88ab7e72ac3ae1e4120eafdb475e9f16222ffac482ea0a4a91c7ea7",
+      "byteLength": 78050,
+      "made": "acrobat-lta.pdf, then pyHanko 0.38.1 added an approval signature in a new visible field: the /Annots object grows in place. Acrobat could not check the new signer offline.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Second",
+          "status": 3,
+          "statusText": "Signature validity is UNKNOWN. The document has not been modified since this signature was applied. The signer's identity was valid when it was issued, but no revocation checks could be made to validate the identity at this time.",
+          "longTermText": null,
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lta+acrobat-comment.pdf",
+      "sha256": "9759107dc41ed76a05bf529409c687c738b4f4806ed09b525115734366a5ec45",
+      "byteLength": 67670,
+      "made": "acrobat-lta.pdf, then Acrobat added a square comment: the /Annots object grows in place by the square and its popup.",
+      "judgedCopyKept": false,
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lta+acrobat-timestamp.pdf",
+      "sha256": "4588fca18176e1bdc8954121e676843e6ff9868737aee59e4cce3642f33af925",
+      "byteLength": 80363,
+      "made": "acrobat-lta.pdf, then Acrobat added a second document timestamp: it points the page at a new /Annots object that holds the old widgets and the new one, and leaves the old object in the file.",
+      "judgedCopyKept": false,
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature4",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    }
+  ]
+}

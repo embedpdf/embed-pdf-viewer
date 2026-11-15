@@ -157,7 +157,7 @@ describe('detached CMS: build → parse → verify', () => {
       { anchors: async () => [signer.certificate] },
       {
         kind: 'timestamp',
-        genTime: '2000-01-01T00:00:00.000Z',
+        stampedAt: '2000-01-01T00:00:00.000Z',
         tokenVerified: true,
       },
     );

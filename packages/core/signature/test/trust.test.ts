@@ -97,9 +97,14 @@ describe("a signer's trust is about the certificate that signed", () => {
     const trust = { anchors: async () => [root.certificate] };
 
     expect((await validateChain(cms, trust)).status).toBe('untrusted');
-    // Judged while it was valid, the same chain is trusted.
-    const then = { kind: 'timestamp', genTime: daysAgo(20).toISOString(), tokenVerified: true };
-    expect((await validateChain(cms, trust, then as never)).status).toBe('trusted');
+    // Judged while it was valid, the same chain is trusted, under either name of that time.
+    const then = daysAgo(20).toISOString();
+    for (const at of [
+      { kind: 'timestamp', stampedAt: then, tokenVerified: true },
+      { kind: 'timestamp', genTime: then, tokenVerified: true },
+    ] as const) {
+      expect((await validateChain(cms, trust, at)).status).toBe('trusted');
+    }
   });
 
   test('a signer that is its own anchor is judged itself, with other anchors around', async () => {

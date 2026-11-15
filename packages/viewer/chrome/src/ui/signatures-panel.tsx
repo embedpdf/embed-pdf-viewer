@@ -84,10 +84,22 @@ export function SignaturesPanel() {
   const pick = (asset: StampAsset) => {
     setError(null);
     if (target) {
-      void signature.placeMark({ assetId: asset.id }, { field: target }).catch((error) => {
-        console.error('[embedpdf] placing the mark failed:', error);
-        setError(t('demo.signError'));
-      });
+      void signature
+        .placeMark({ assetId: asset.id }, { field: target })
+        .then((placed) => {
+          // Signed, without the verification information the settings ask for: say so here.
+          if (placed.status === 'signed' && placed.result.validationInfoError) {
+            console.error(
+              '[embedpdf] verification information not added:',
+              placed.result.validationInfoError,
+            );
+            setError(t('demo.signedWithoutValidationInfo'));
+          }
+        })
+        .catch((error) => {
+          console.error('[embedpdf] placing the mark failed:', error);
+          setError(t('demo.signError'));
+        });
       return;
     }
     setArmedId(asset.id);

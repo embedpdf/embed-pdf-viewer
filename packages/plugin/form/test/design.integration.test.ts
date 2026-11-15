@@ -187,6 +187,37 @@ describe('design through lending', () => {
     }
   });
 
+  it('a widget of no size is never lent, so it cannot be selected by hand', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, form, page } = booted;
+      booted.design();
+      // The first create fills the session's pool of object numbers.
+      await form.create({ kind: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
+      // The field of a document timestamp: a signature field whose box shows nowhere.
+      await form.create({
+        kind: 'signature',
+        name: 'stamp',
+        widgets: [{ page, rect: box(0, 0, 0, 0) }],
+      });
+      const stamp = booted.widgetOf({ kind: 'fqn', name: 'stamp' });
+      expect(form.get({ kind: 'fqn', name: 'stamp' })?.kind).toBe('signature');
+      expect(annotation.get(booted.widgetOf({ kind: 'fqn', name: 'warm' }))?.subtype).toBe(
+        'widget',
+      );
+      expect(annotation.get(stamp)).toBeNull();
+      annotation.selection.select([stamp]);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
+      // Filling: the form layer has nothing to draw for it, and no control.
+      booted.interaction.activateDefaultTool();
+      const shown = form.listShownWidgets(page).map((each) => annotationKey(each.ref));
+      expect(shown).toContain(annotationKey(booted.widgetOf({ kind: 'fqn', name: 'warm' })));
+      expect(shown).not.toContain(annotationKey(stamp));
+    } finally {
+      await booted.destroy();
+    }
+  });
+
   it('a placed field shows and is selected at once', async () => {
     const booted = await boot();
     try {

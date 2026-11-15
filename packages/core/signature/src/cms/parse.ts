@@ -60,6 +60,19 @@ export interface CmsParts {
   timestampTokens: Uint8Array[];
   /** A timestamp token's encapsulated TSTInfo (`content: 'tst-info'`); null for a detached CMS. */
   eContent: Uint8Array | null;
+  /** The revocation answers the CMS carries itself; see {@link CarriedRevocation}. */
+  revocation: CarriedRevocation;
+}
+
+/**
+ * Revocation answers a CMS carries, each in DER and none of them checked: the CRLs and OCSP
+ * responses of its `crls` field (RFC 5652 §10.2.1, RFC 5940), and those of Acrobat's
+ * `adbe-revocationInfoArchival` signed attribute, which is how Acrobat kept a signature
+ * checkable before a PDF could hold the answers beside it.
+ */
+export interface CarriedRevocation {
+  ocspResponses: Uint8Array[];
+  crls: Uint8Array[];
 }
 
 export interface ParsedCmsInternal extends CmsParts {
@@ -131,6 +144,7 @@ export function readCmsParts(
 
   let contentInfo: pkijs.ContentInfo;
   let signedData: pkijs.SignedData;
+  let revocation: CarriedRevocation;
   try {
     contentInfo = new pkijs.ContentInfo({ schema: asn1.result });
     if (contentInfo.contentType !== OID.signedData) {
@@ -139,6 +153,9 @@ export function readCmsParts(
         `CMS content type ${contentInfo.contentType} is not SignedData`,
       );
     }
+    // Before PKI.js reads the SignedData: reading it rewrites the tag of every choice in `crls`
+    // that is not a CRL, and an OCSP response would then pass for one.
+    revocation = readRevocationField(contentInfo.content as asn1js.Sequence);
     signedData = new pkijs.SignedData({ schema: contentInfo.content });
   } catch (error) {
     if (error instanceof CmsError) throw error;
@@ -241,7 +258,66 @@ export function readCmsParts(
     bindings,
     timestampTokens,
     eContent,
+    revocation: withArchivedRevocation(revocation, attr(OID.revocationInfoArchival)),
   };
+}
+
+const tagged = (block: asn1js.AsnType, number: number) =>
+  block.idBlock.tagClass === 3 && block.idBlock.tagNumber === number;
+const children = (block: asn1js.AsnType | undefined): asn1js.AsnType[] =>
+  ((block as asn1js.Constructed | undefined)?.valueBlock?.value as asn1js.AsnType[]) ?? [];
+
+/**
+ * Read the revocation answers in a SignedData's `crls` field, as they were written:
+ *
+ *     SignedData                ::= sequence { ..., crls [1] implicit RevocationInfoChoices optional, ... }
+ *     RevocationInfoChoice      ::= choice { crl CertificateList, other [1] implicit OtherRevocationInfoFormat }
+ *     OtherRevocationInfoFormat ::= sequence { otherRevInfoFormat object identifier, otherRevInfo any }
+ *
+ * An `other` choice in a format this package does not know is left out.
+ */
+function readRevocationField(signedData: asn1js.Sequence): CarriedRevocation {
+  const out: CarriedRevocation = { ocspResponses: [], crls: [] };
+  const field = children(signedData).find((member) => tagged(member, 1));
+  for (const choice of children(field)) {
+    if (choice.idBlock.tagClass === 1) {
+      out.crls.push(encodingOf(choice));
+      continue;
+    }
+    if (!tagged(choice, 1)) continue;
+    const [format, info] = children(choice);
+    if (
+      format instanceof asn1js.ObjectIdentifier &&
+      format.valueBlock.toString() === OID.ocspResponseInfo &&
+      info
+    ) {
+      out.ocspResponses.push(encodingOf(info));
+    }
+  }
+  return out;
+}
+
+/**
+ * `carried`, and after it the answers of Acrobat's signed attribute:
+ *
+ *     RevocationInfoArchival ::= sequence { crl [0] explicit sequence of CRL optional,
+ *                                           ocsp [1] explicit sequence of OCSPResponse optional,
+ *                                           otherRevInfo [2] explicit sequence of OtherRevInfo optional }
+ */
+function withArchivedRevocation(
+  carried: CarriedRevocation,
+  archival: pkijs.Attribute | undefined,
+): CarriedRevocation {
+  const out: CarriedRevocation = {
+    ocspResponses: [...carried.ocspResponses],
+    crls: [...carried.crls],
+  };
+  for (const part of children(archival?.values[0])) {
+    const list = children(children(part)[0]);
+    if (tagged(part, 0)) for (const crl of list) out.crls.push(encodingOf(crl));
+    if (tagged(part, 1)) for (const ocsp of list) out.ocspResponses.push(encodingOf(ocsp));
+  }
+  return out;
 }
 
 /**

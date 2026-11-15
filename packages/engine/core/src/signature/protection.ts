@@ -19,8 +19,14 @@ import type {
  * a modification; an approval signature permits commenting; field
  * properties are judged per level; a lock binds only the signature that
  * declares it; a changed shared resource must be allowed by every use.
+ *
+ * Version 5 adds the Acrobat observations in `fixtures/signature-long-term`:
+ * a certification that allows no changes allows no later revision, validation
+ * data and document timestamps included; a document timestamp added after one
+ * is still judged on its own; and a page's /Annots may move into an object of
+ * its own when a signature field is added.
  */
-export const SIGNATURE_POLICY_VERSION = 4;
+export const SIGNATURE_POLICY_VERSION = 5;
 
 /**
  * How a validator reads an approval signature. ISO 32000 defines permitted
@@ -36,7 +42,12 @@ export const APPROVAL_BASELINE: ModificationLevel = 'annotate';
 
 const LEVEL_RANK: Record<ModificationLevel, number> = { none: 0, lta: 1, fill: 2, annotate: 3 };
 
-/** DocMDP `/P` → the modification level it permits. */
+/**
+ * DocMDP `/P` → the modification level it permits. `lta` is named after what
+ * ISO 32000-2 lets follow a `/P 1` certification: validation data and
+ * document timestamps. Acrobat lets nothing follow one, so nothing is judged
+ * permitted and nothing is written at that level.
+ */
 export function levelFromPermission(permission: DocMdpPermission): ModificationLevel {
   return permission === 1 ? 'lta' : permission === 2 ? 'fill' : 'annotate';
 }
@@ -139,6 +150,8 @@ export const PROTECTABLE_CAPABILITIES = [
   'doc.annotate.import',
   'doc.forms.fill',
   'doc.forms.import',
+  'doc.metadata.modify',
+  'doc.sign',
 ] as const satisfies readonly DocCapability[];
 
 export type ProtectableCapability = (typeof PROTECTABLE_CAPABILITIES)[number];
@@ -160,7 +173,10 @@ export function isProtectableCapability(
  * never a guess about a validator. A certification (or a lock with /P)
  * declares what may follow, and everything outside that — page edits,
  * redaction, field authoring, attachments, the outline, and below P=3 annotations, below
- * P=2 form fill — is refused. A plain approval signature declares nothing:
+ * P=2 form fill — is refused. At P=1 that is everything that writes: the
+ * metadata, and signing too, a document timestamp included, because Acrobat
+ * reports such a certification as altered once any revision follows it. A plain
+ * approval signature declares nothing:
  * the same edits stay possible and are then judged, the verdict saying the
  * signature no longer holds, exactly as Acrobat does. The one exception is a
  * rewrite: it does not invalidate signatures, it erases them, so any signed
@@ -185,6 +201,8 @@ export function protectedCapabilities(protection: DocumentProtection | null): Se
   if (!levelAllows(protection.enforced, 'fill')) {
     out.add('doc.forms.fill');
     out.add('doc.forms.import');
+    out.add('doc.metadata.modify');
+    out.add('doc.sign');
   }
   return out;
 }

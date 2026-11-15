@@ -1,0 +1,64 @@
+---
+'@embedpdf/core-signature': minor
+---
+
+Long-term validation: `addValidationInfo()` keeps a signature checkable for years, and `validateSignatures()` says whether a certificate was withdrawn and whether the file holds everything to check a signature with no network.
+
+**`addValidationInfo(doc, { trust, revocation })`.** Once a document is signed and timestamped, it asks the certificate authorities whether each certificate was still good, checks every answer, and stores them in the file with the certificates a reader needs to follow the same paths. Acrobat then calls the signature "LTV enabled", and nobody has to be asked again.
+
+- It asks about each certificate between the signer and the one you trust, and the same for the timestamp's authority: the answers the file holds first, then `known` (answers and certificates you already have), then `revocation`, at the addresses the certificates name, OCSP before the issuer's list. An issuer's certificate that a signature left out is fetched from the address the certificate names, and is only ever a candidate for the path.
+- It returns `{ added, verdicts }`: how many entries of each kind it stored, and what `validateSignatures()` says about the result.
+- All or nothing: when a signature would not read as complete, nothing is stored. It throws `Network`, with the address in `details.source`, when an address didn't answer, and otherwise `SignatureRefused` with `details.reason` (`'no-timestamp'`, `'untrusted'`, `'no-answer'` or `'revoked'`), `details.certificate` and `details.field`. `partial: true` stores what there is instead.
+- `fields` covers some signatures only, and `maxCrlBytes` (1 MiB) is the largest list it stores.
+- Calling it again asks for nothing the file holds and adds nothing.
+
+**`httpRevocationSource({ url })`** is a `RevocationSource` for a web page, which can't ask a certificate authority itself: each question goes to a route of your own. It takes `url`, `headers`, `fetch`, `timeoutMs` and `retries`, as `httpTimestampAuthority()` does, and tries again only when no answer came.
+
+**`@embedpdf/core-signature/server`**, a new entry, has the routes, for any server that speaks the Fetch API:
+
+- `revocationRoute()` answers `httpRevocationSource()`. The addresses it is sent come from certificates, so it decides where it may go: only public `http` and `https` addresses, never a private or local one, a name that leads to one, or a redirect to either. It limits how large and how slow an answer may be, passes on only an OCSP response, a list of withdrawn certificates or a certificate, and keeps answers for as long as their authority's cache headers allow.
+- `timestampRoute({ url })` passes a timestamp request on to the authority you name, with `headers` a page must not hold.
+
+**`validateSignatures(doc, { trust, revocation })`** asks for the answers the file lacks and uses them for that check, without storing anything. An address that doesn't answer leaves `revocation` at `'unknown'`. `longTerm` stays about what the file holds.
+
+**`sign(doc, { kind: 'timestamp', key })` needs no `field`.** The engine makes a field for the document timestamp, so the last step of keeping a file checkable is one call. `result.signature.fieldName` says which field it is.
+
+**A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. The option takes what it took before.
+
+- **What changes for an app that already validates:** a signature whose signer's certificate expired after it was signed, and that carries a timestamp from an authority you trust, reads `'valid'` where it read `'valid-untrusted'`.
+- Judged at its timestamp, a signature reads `revocation: 'good'` from the answers stored when it was signed, and a certificate withdrawn after the timestamp does not make it `'invalid'`. Judged as of now, the same answers read `'unknown'`, and the withdrawal reads `'invalid'`.
+- A signature with no timestamp you trust is judged as of now, as before.
+
+**`validationTime` names a timestamp's time `stampedAt`.** `{ kind: 'timestamp', stampedAt, tokenVerified: true }`: the name the timestamp's own verdict uses, so the time a verdict reports reads the same wherever it appears.
+
+- `genTime`, its name until now, still works until 4.0. A verdict's `validationTime` carries the time under both names, with the same value (`AppliedValidationTime`), and the option takes either. Given both, `stampedAt` is the one used.
+- On a value you type as `ValidationTime` yourself, `genTime` is optional now. A verdict's `validationTime` always has it.
+
+**`revocation` on every verdict.** `'good'`, `'revoked'` or `'unknown'`: whether a certificate between the signer and your anchor was withdrawn by `validationTime`. `revocationReason` names the certificate when it isn't `'good'`. A timestamp's verdict has both too, for its authority.
+
+- The answers come from the file and nothing is asked over a network: the document's validation data (`doc.signatures.getValidationInfo()`), the OCSP responses and CRLs a signature carries in its CMS, and Acrobat's `adbe-revocationInfoArchival` attribute. Each answer is checked by its own signature, wherever it sits.
+- An answer speaks for a time. One stored at signing says the certificate was good then, so a signature judged at its timestamp reads `'good'`, and judged as of now it reads `'unknown'`. A certificate withdrawn after the timestamp reads `'good'` at the timestamp and `'revoked'` as of now.
+- **`summary` is `'invalid'` when a trusted signer's certificate is proven withdrawn by the time it is judged at.** It was `'valid'` before, because nothing was checked. `'unknown'` never changes `summary`. A timestamp whose trusted authority is proven withdrawn is `'invalid'` and no longer counts as a trusted time.
+- A certificate you trust as it is has nobody above it to withdraw it, so it reads `'good'`.
+
+**`longTerm` on every verdict.** `{ enabled, provenAt, expiresAt, documentTimestampedAt, missing }`, always judged at the time a timestamp proves, whatever `validationTime` is.
+
+- `enabled` is what Acrobat calls "LTV enabled": a timestamp you trust covers the signature, the signer was trusted then, and the file holds a good answer for every certificate of the signer's path and of the timestamp authority's.
+- `provenAt` is that time, `expiresAt` the day the certificate of the last covering timestamp expires, and `documentTimestampedAt` the time of the last trusted document timestamp added after the signature. Each is a point in time, named as the API names them everywhere: an ISO 8601 string ending in `At`.
+- `missing` says what stands in the way, one `{ certificate, reason }` per certificate: `'no-timestamp'`, `'untrusted'`, `'no-answer'` or `'revoked'`.
+- It agrees with Acrobat's "LTV enabled" line on each of the 32 signatures Acrobat judged in the repository's fixtures.
+
+**A path may pass through the certificates the file holds.** A signature that leaves an issuer's certificate out of its CMS is `'trusted'` when the document's validation data has it.
+
+`validateChain()`'s verdict has `withoutIssuer`: the certificate whose issuer wasn't found, when that is why a path isn't trusted.
+
+New exported types: `AppliedValidationTime`, `LongTermVerdict`, `LongTermGap`, `LongTermGapReason`, `RevocationVerdict`, `AddValidationInfoOptions`, `AddValidationInfoResult`, `HttpRevocationSourceOptions`, `RevocationRouteRequest`.
+
+**A test certificate authority.** `createTestCertificateAuthority()` is a throwaway authority for tests and demos. `authority.issueSigner()` gives a signer whose certificate chains to `authority.certificate` and names where to ask about it. `authority.revocation` answers those questions from memory, as a real authority answers them over HTTP: an OCSP response signed by a responder the authority certified, and a CRL. `authority.revoke(signer, { at, reason })` withdraws a certificate, and both answers say so from then on. OpenSSL verifies its answers.
+
+**Asking an authority.** `RevocationSource` is where revocation answers come from: one method, `fetch(request)`, that returns the bytes answering a `RevocationRequest` (an OCSP request for a responder, or an address to fetch a CRL or an issuer's certificate from). `RevocationReason` names why a certificate was withdrawn.
+
+**A document timestamp only from an authority you trust.** `sign(doc, { kind: 'timestamp', key, timestampTrust })` refuses a token from an authority `timestampTrust` doesn't cover, as it does for a signature's own timestamp, and leaves nothing signed. Before, `timestampTrust` with a document timestamp failed with `InvalidArg`.
+
+**Certificates that can't be withdrawn.** A signing service that issues a certificate for one signature, valid for minutes, runs no revocation service for it, and the certificate says so in an extension: "validity assured, short term" (ETSI EN 319 412-1) or `noRevAvail` (RFC 9608). Such a certificate needs no answer: `revocation` reads `'good'` when the certificates above it do, `longTerm` counts nothing as missing for it, and `addValidationInfo()` asks nobody about it. The extension counts on a certificate that issues nothing, and `noRevAvail` doesn't count beside an address to ask at. `createTestCertificateAuthority()`'s `issueSigner({ unrevocable })` issues one, with `'validity-assured'` or `'no-rev-avail'` (`Unrevocable`).
+

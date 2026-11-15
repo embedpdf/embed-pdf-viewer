@@ -6,7 +6,11 @@
  * row it can't read goes out as `full-refresh` in the row's place: the client
  * reads the document again, which every 3.x client does.
  */
-import { changeKindsUnknownTo, lacksWhatArrivedIn } from '@embedpdf/engine-core/wire';
+import {
+  VALIDATION_INFO_SINCE,
+  changeKindsUnknownTo,
+  lacksWhatArrivedIn,
+} from '@embedpdf/engine-core/wire';
 
 import type { StreamRow } from './eventVisibility';
 import type { AuditMutationKind } from '../db/repos/audit_log.repo';
@@ -45,6 +49,7 @@ const ROW_KIND_SINCE: Record<AuditMutationKind, string> = {
   'signature.prepare': '3.0',
   'signature.cancel': '3.0',
   'signature.complete': '3.0',
+  'signature.addValidationInfo': VALIDATION_INFO_SINCE,
   change: '3.0',
 };
 

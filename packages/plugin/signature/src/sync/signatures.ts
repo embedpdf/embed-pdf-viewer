@@ -4,8 +4,9 @@
  * signing. They change only by loads and by confirmed document events,
  * whoever caused them, and this is the one place the fact events fire
  * (`onSigned`, `onProtectionChanged`). The judgement reacts here too: a
- * load re-judges at once when anything is signed; a changed snapshot and
- * every edit of the working copy re-judge once the edits pause.
+ * load re-judges at once when anything is signed; a changed snapshot, every
+ * edit of the working copy and validation data added by anyone re-judge once
+ * the edits pause.
  */
 import type { Mirror } from '@embedpdf/core';
 import type { DocumentEvent, DocumentProtection } from '@embedpdf/engine-core/runtime';
@@ -29,6 +30,9 @@ const WORKING_COPY_EDITS: ReadonlySet<DocumentEvent['type']> = new Set([
   'forms.valueSet',
   'forms.updated',
 ]);
+
+/** Changes to what the file holds about its signatures: a verdict's `longTerm` may have changed. */
+const VALIDATION_DATA_ADDED: DocumentEvent['type'] = 'signatures.validationInfoAdded';
 
 const sameProtection = (
   left: DocumentProtection | null,
@@ -91,9 +95,9 @@ export function createSignaturesMirror(
     },
     connect(): void {
       ctx.listen(ctx.doc.events, (event) => {
-        if (WORKING_COPY_EDITS.has(event.type) && hasSignedField(mirror.get().snapshot)) {
-          revalidateSoon();
-        }
+        const judgedAgain =
+          WORKING_COPY_EDITS.has(event.type) || event.type === VALIDATION_DATA_ADDED;
+        if (judgedAgain && hasSignedField(mirror.get().snapshot)) revalidateSoon();
       });
     },
   };

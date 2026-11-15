@@ -4,7 +4,9 @@
  *   Layer reads (versioned `@token` twin + current form, one handler each):
  *     GET  /v1/docs/:docId/layers/:layerName/signatures[@docVersion]
  *     GET  /v1/docs/:docId/layers/:layerName/signatures/analysis[@token]
+ *     GET  /v1/docs/:docId/layers/:layerName/signatures/validation-info[@docVersion]
  *   Mutations (current only; never cached):
+ *     POST   …/signatures/validation-info         JSON { certificates?, ocspResponses?, crls? }, each entry base64
  *     POST   …/signatures/prepare                 multipart (`body`, naming its artwork's `resource:<key>` part)
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
@@ -34,6 +36,7 @@ import {
   type DigestAlgorithm,
   type FormFieldRef,
   type SignaturePrepareInput,
+  type ValidationInfo,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -44,9 +47,11 @@ import {
   LayerAnalysisQuerySchema,
   SignatureCompleteBodySchema,
   SignaturePrepareBodySchema,
+  ValidationInfoAddBodySchema,
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
   encodePrepared,
+  encodeValidationInfo,
   type LayerVersions,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -226,7 +231,114 @@ export async function registerSignatureRoutes(
     );
   });
 
+  // Validation data: the certificates, OCSP responses and CRLs the layer's file
+  // holds for its signatures. It is read from the working copy, like the list.
+  const readValidationInfo = async (
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal: AbortSignal,
+  ) => encodeValidationInfo(await service.readLayerValidationInfo(ctx, docId, layerName, signal));
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/signatures/validation-info@:token',
+    async (req, reply) => {
+      const { docId, layerName, token } = req.params as {
+        docId: string;
+        layerName: string;
+        token: string;
+      };
+      rejectQueryParamsOnTokenUrl(req.query);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-signatures-validation-info',
+        permissionFlags,
+      );
+      const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
+      const info = await readAtPins({
+        documentService: service,
+        reply,
+        docId,
+        layerName,
+        assertCurrent: async () => {
+          const manifest = await service.getLayerManifest(ctx, docId, layerName);
+          if (requested.docVersion === manifest.docVersion) return;
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `validation data version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
+          );
+        },
+        read: () => readValidationInfo(ctx, docId, layerName, abortSignalOf(reply)),
+        token: { kind: 'validationInfo', pin: requested.pin },
+      });
+      setImmutableCache(reply);
+      return info;
+    },
+  );
+
+  app.get('/v1/docs/:docId/layers/:layerName/signatures/validation-info', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-signatures-validation-info',
+      permissionFlags,
+    );
+    setNoStore(reply);
+    return readValidationInfo(ctx, docId, layerName, abortSignalOf(reply));
+  });
+
   // ---- mutations ----------------------------------------------------------
+
+  app.post('/v1/docs/:docId/layers/:layerName/signatures/validation-info', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    // It takes `doc.sign`, the document's own and not a group's, and a certification
+    // that allows no changes forbids it.
+    const protection = await service.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.sign',
+      permissionFlags,
+      protection,
+    );
+    const body = parseOrInvalidArg(
+      ValidationInfoAddBodySchema as unknown as SchemaLike<
+        ReturnType<typeof ValidationInfoAddBodySchema.parse>
+      >,
+      req.body ?? {},
+      'request body',
+    );
+    // What each entry is worth is the worker's to check: one DER object, within the size limit.
+    const info: ValidationInfo = { certificates: [], ocspResponses: [], crls: [] };
+    for (const kind of ['certificates', 'ocspResponses', 'crls'] as const) {
+      (body[kind] ?? []).forEach((entry, index) => {
+        try {
+          info[kind].push(fromBase64(entry));
+        } catch {
+          throw new EngineError(
+            EngineErrorCode.InvalidArg,
+            `${kind}[${index}] is not valid base64`,
+            {
+              details: { field: `${kind}[${index}]` },
+            },
+          );
+        }
+      });
+    }
+    setNoStore(reply);
+    return layerService.addValidationInfo(ctx, { docId, layerName, info }, abortSignalOf(reply));
+  });
 
   app.post('/v1/docs/:docId/layers/:layerName/signatures/prepare', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
@@ -245,6 +357,12 @@ export async function registerSignatureRoutes(
     );
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', permissionFlags);
+    }
+    // No field: a document timestamp the engine makes the field for. That is the
+    // document's to sign, not a group's.
+    if (!parsed.field) {
+      const protection = await service.getProtection(accessCtx, docId, layerName);
+      requireLayerCapability(req, docId, layerName, 'doc.sign', permissionFlags, protection);
     }
     const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };

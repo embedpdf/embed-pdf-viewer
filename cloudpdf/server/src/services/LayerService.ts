@@ -76,6 +76,8 @@ import {
   type PageFlattenUsage,
   type RedactionApplyResult,
   type RedactionApplyScope,
+  type ValidationInfo,
+  type ValidationInfoAddResult,
   type PageListSnapshot,
   type PageReorderResult,
   type PageNameResult,
@@ -830,6 +832,70 @@ export class LayerService {
         }
         if (!payload.wrote) return payload.result;
         return this.persistRedactionApply(ctx, input.docId, input.layerName, layer, {
+          result: payload.result,
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
+  /**
+   * Store validation data in the layer's file: certificates, OCSP responses
+   * and CRLs for its signatures. A write with a route of its own and not a
+   * kind of change, because it has no reverse; it leaves undo for the changes
+   * before it as it was. Entries the file already holds are not stored again,
+   * and when none is new nothing is written.
+   */
+  async addValidationInfo(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      info: Partial<ValidationInfo>;
+    },
+    signal?: AbortSignal,
+  ): Promise<ValidationInfoAddResult> {
+    const opId = writeOpIdOf(ctx);
+    // Each entry in a buffer of its own, for the worker to take.
+    const buffersOf = (entries: readonly Uint8Array[] | undefined): ArrayBuffer[] =>
+      (entries ?? []).map((entry) => new Uint8Array(entry).buffer);
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.runLayerWrite(
+          input.docId,
+          (jobId) => {
+            const certificates = buffersOf(input.info.certificates);
+            const ocspResponses = buffersOf(input.info.ocspResponses);
+            const crls = buffersOf(input.info.crls);
+            return wirePack(
+              {
+                kind: 'signatures.addValidationInfo' as const,
+                effect: 'write' as const,
+                jobId,
+                opId,
+                docId: input.docId,
+                layerName: input.layerName,
+                certificates,
+                ocspResponses,
+                crls,
+                artifactPath,
+              },
+              [...certificates, ...ocspResponses, ...crls],
+            );
+          },
+          signal,
+        );
+        if (payload.tag !== 'signatures.addValidationInfo') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected signatures.addValidationInfo payload: ${payload.tag}`,
+          );
+        }
+        const { added } = payload.result;
+        // The file already held every entry: nothing was written, so no version is made.
+        if (added.certificates + added.ocspResponses + added.crls === 0) return payload.result;
+        return this.persistValidationInfo(ctx, input.docId, input.layerName, layer, {
           result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -2550,6 +2616,93 @@ export class LayerService {
     return committed.result;
   }
 
+  private async persistValidationInfo(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    layer: LayerRow,
+    input: {
+      result: ValidationInfoAddResult;
+      artifact: LayerArtifactInput;
+    },
+  ): Promise<ValidationInfoAddResult> {
+    const nextVersion = layer.currentVersion + 1;
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
+    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
+    const committed = await this.commitValidationInfo({
+      ctx,
+      docId,
+      layerName,
+      layer,
+      raw: input.result,
+      artifactKey,
+      artifactSha: uploaded.sha256,
+      artifactSize: uploaded.size,
+      nextVersion,
+    });
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
+    return committed.result;
+  }
+
+  /**
+   * Commit stored validation data: the layer's document version moves, so
+   * the cached signature list, analysis, validation data and download get new
+   * URLs. No page changes, and no list a page shows.
+   */
+  private async commitValidationInfo(input: {
+    ctx: LayerWriteContext;
+    docId: string;
+    layerName: string;
+    layer: LayerRow;
+    raw: ValidationInfoAddResult;
+    artifactKey: string;
+    artifactSha: string;
+    artifactSize: number;
+    nextVersion: number;
+  }): Promise<{ result: ValidationInfoAddResult; auditId: number }> {
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
+        const previousLayerDocVersion = Number(currentLayer.doc_version);
+        const layerDocVersion = previousLayerDocVersion + 1;
+        const result: ValidationInfoAddResult = {
+          ...input.raw,
+          meta: {
+            ...input.raw.meta,
+            cacheDelta: this.layerState.buildCacheDelta({
+              docId: input.docId,
+              layerName: input.layerName,
+              previousDocVersion: previousLayerDocVersion,
+              docVersion: layerDocVersion,
+              pages: [],
+            }),
+          },
+        };
+
+        // The row says how many entries of each kind were stored, never the entries.
+        const auditEvent = makeAuditEvent({
+          ctx: input.ctx,
+          docId: input.docId,
+          layer: input.layer,
+          layerName: input.layerName,
+          kind: 'signature.addValidationInfo',
+          pageObjectNumber: null,
+          affectedPages: [],
+          artifactVersion: input.nextVersion,
+          artifactKey: input.artifactKey,
+          artifactSha: input.artifactSha,
+          artifactSize: input.artifactSize,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        await this.writeLayerAdvance(trx, input, { doc_version: layerDocVersion }, auditId, now);
+        return { result, auditId };
+      });
+  }
+
   private async uploadLayerArtifact(
     artifactKey: string,
     artifact: LayerArtifactInput,
@@ -3030,6 +3183,7 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
+      /** Without a `field`, for a document timestamp: the engine makes the field on the candidate. */
       input: SignaturePrepareInput;
       /** Who signs and their grants: the worker checks the field is theirs to sign. */
       authority: ChangeAuthority;
@@ -3047,12 +3201,10 @@ export class LayerService {
         baseSha,
         head.sizeBytes,
       );
-      const fieldObjectNumber = await this.resolveSignatureField(
-        input.docId,
-        input.layerName,
-        input.input.field,
-        signal,
-      );
+      // A field that was asked for must exist before anything is prepared.
+      const askedField = input.input.field
+        ? await this.resolveSignatureField(input.docId, input.layerName, input.input.field, signal)
+        : null;
 
       const payload = await this.requirePool().run(
         input.docId,
@@ -3072,6 +3224,8 @@ export class LayerService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
       }
       const prepared = payload.result;
+      // The field the engine made exists on the candidate only: the worker says its number.
+      const fieldObjectNumber = askedField ?? payload.fieldObjectNumber;
       try {
         const tail = await this.uploadSigningTail(
           ctx,
@@ -3108,7 +3262,7 @@ export class LayerService {
                 layerName: input.layerName,
                 kind: 'signature.prepare',
                 artifactVersion: nextVersion,
-                payload: { field: input.input.field, ...encodePrepared(answer) },
+                payload: { ...encodePrepared(answer), field: input.input.field ?? answer.field },
                 ts: now,
               });
               await this.requireSignings().insertPrepared(trx, {

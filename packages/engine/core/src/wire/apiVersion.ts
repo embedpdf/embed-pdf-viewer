@@ -30,6 +30,13 @@ export function apiVersionOf(packageVersion: string): string {
  */
 export const API_VERSION: string = apiVersionOf(version);
 
+/**
+ * The version long-term validation arrived in on the wire: the routes that
+ * read and store a document's validation data, their kind of audit row, and
+ * a prepare with no field. A client uses none of them with an older server.
+ */
+export const VALIDATION_INFO_SINCE = '3.3';
+
 const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
   version.major < than.major || (version.major === than.major && version.minor < than.minor);
 

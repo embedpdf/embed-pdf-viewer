@@ -2,6 +2,7 @@ import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataCon
 import type { FormField } from '../forms/field';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import type { DocumentEvent } from '../events/DocumentEvent';
 import { isLocalDocument, type LocalDocumentHandle } from '../engine/LocalDocumentHandle';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -27,6 +28,11 @@ export interface SignatureConformanceFixtures {
   unsignedSigField: ConformanceFixture & { fieldName: string; textField: string };
   /** Any single-page PDF, used as signature artwork. */
   artwork: ConformanceFixture;
+  /**
+   * A certification signature with permission 1 (no changes allowed). Without
+   * it, the test of what such a certification refuses is skipped.
+   */
+  certifiedNoChanges?: ConformanceFixture;
 }
 
 export interface SignatureConformanceOptions {
@@ -61,6 +67,10 @@ export interface SignatureConformanceOptions {
  *      analysis is unchanged.
  *   3. The same answers come from a plain session and from a layer
  *      session over the same bytes.
+ *   4. Validation data is stored as given and read back as stored, once:
+ *      an entry the document holds is not stored again, a malformed entry
+ *      stores nothing, and the write is a change of the document that no
+ *      undo takes back and no undo of another change removes.
  */
 export function runSignatureConformance(
   runner: ConformanceTestRunner,
@@ -385,6 +395,13 @@ export function runSignatureConformance(
         () => permitEngine,
         () => supported,
       );
+      runValidationInfoTests(
+        runner,
+        options,
+        () => engine,
+        () => permitEngine,
+        () => supported,
+      );
     }
   });
 }
@@ -686,6 +703,169 @@ function runSigningTests(
     }
   });
 
+  test('sign: a document timestamp needs no field; the engine makes one, in the same revision', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await openLocal(engine, opts, fx());
+    const preparedFields: unknown[] = [];
+    const unsubscribe = doc.events.subscribe((event) => {
+      if (event.type === 'signatures.prepared') preparedFields.push(event.field);
+    });
+    const names = async () => (await doc.forms.list()).fields.map((field) => field.name);
+    let reopened: DocumentHandle | null = null;
+    try {
+      const before = await names();
+      const first = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(first.subFilter).toBe('ETSI.RFC3161');
+      expect(first.field).toEqual({ kind: 'fqn', name: 'Timestamp1' });
+      // The field is on the candidate: the live document has none until the signing completes,
+      // and none at all when it is cancelled.
+      expect(await names()).toEqual(before);
+      expect((await doc.signatures.cancel(first.signingId)).status).toBe('cancelled');
+      expect(await names()).toEqual(before);
+
+      const prepared = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(prepared.field).toEqual({ kind: 'fqn', name: 'Timestamp1' });
+      const result = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      expect(result.status).toBe('completed');
+      expect(result.signature.kind).toBe('timestamp');
+      expect(result.signature.fieldName).toBe('Timestamp1');
+      expect(result.signature.coverage).toBe('whole-revision');
+      // One revision holds the field and the timestamp.
+      expect(result.signature.revisionIndex).toBe(1);
+      expect((await doc.signatures.list()).revisions).toHaveLength(2);
+
+      // The field is a signature field with one widget, of no size, on the first page.
+      const form = await doc.forms.list();
+      expect(form.fields.map((field) => field.name)).toEqual([...before, 'Timestamp1']);
+      expect(form.fields.find((field) => field.name === 'Timestamp1')!.kind).toBe('signature');
+      const firstPage = (await doc.pages.list()).pages[0]!.ref;
+      const widget = form.widgets.find(
+        (entry) =>
+          entry.ref.kind === 'objectNumber' &&
+          entry.ref.objectNumber === result.signature.widget!.objectNumber,
+      )!;
+      expect(widget.page).toEqual(firstPage);
+      expect(widget.rect.width).toBe(0);
+      expect(widget.rect.height).toBe(0);
+      expect(widget).toMatchObject({ print: true, locked: true, hidden: false });
+
+      // The next one gets the next name, and the first stays as it was sealed.
+      const next = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(next.field).toEqual({ kind: 'fqn', name: 'Timestamp2' });
+      const second = await doc.signatures.complete({
+        signingId: next.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: next.expectedVersion,
+      });
+      expect(second.signature.fieldName).toBe('Timestamp2');
+      const analysis = await doc.signatures.analyze({
+        since: { signatureIndex: result.signature.index },
+        detail: 'full',
+      });
+      expect(analysis.verdict).toBe('permitted');
+      const findings = analysis.steps.flatMap((step) => step.findings);
+      expect(findings.filter((finding) => finding.verdict !== 'permitted')).toEqual([]);
+      expect(findings.some((finding) => finding.rule === 'signature-field-added')).toBe(true);
+
+      expect(preparedFields).toEqual([
+        { kind: 'fqn', name: 'Timestamp1' },
+        { kind: 'fqn', name: 'Timestamp1' },
+        { kind: 'fqn', name: 'Timestamp2' },
+      ]);
+
+      reopened = await reopen(engine, opts, `${fx().id}-timestamps`, await doc.download());
+      const fresh = await reopened.signatures.list();
+      expect(fresh.revisions).toHaveLength(3);
+      expect(
+        fresh.signatures
+          .filter((signature) => signature.signed)
+          .map((signature) => `${signature.fieldName} ${signature.kind} ${signature.coverage}`),
+      ).toEqual(['Timestamp1 timestamp whole-revision', 'Timestamp2 timestamp whole-revision']);
+    } finally {
+      unsubscribe();
+      if (reopened) await reopened.close();
+      await doc.close();
+    }
+  });
+
+  test('sign: a timestamp field takes a name no other field has', async () => {
+    if (!supported()) return;
+    const doc = await openLocal(engineOf(), opts, fx());
+    try {
+      await doc.forms.create({ kind: 'text', name: 'Timestamp1' });
+      const prepared = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(prepared.field).toEqual({ kind: 'fqn', name: 'Timestamp2' });
+      const result = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      expect(result.signature.fieldName).toBe('Timestamp2');
+      // The text field the name belonged to is as it was.
+      const fields = (await doc.forms.list()).fields;
+      expect(fields.find((field) => field.name === 'Timestamp1')!.kind).toBe('text');
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('sign: only a document timestamp may leave the field out, and it takes doc.sign', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await openLocal(engine, opts, fx());
+    try {
+      // A signature is made in a field someone chose.
+      let caught: unknown;
+      try {
+        await doc.signatures.prepare({});
+      } catch (error) {
+        caught = error;
+      }
+      expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+      expect((caught as EngineError).details).toMatchObject({ field: 'field' });
+      // A field of no size shows nowhere: there is nothing to draw an appearance in.
+      expect(
+        await caughtCode(async () =>
+          doc.signatures.prepare({
+            kind: 'timestamp',
+            appearance: { pdf: await opts.fixtures.artwork.bytes() },
+          }),
+        ),
+      ).toBe(EngineErrorCode.SignatureRefused);
+      expect((await doc.signatures.list()).signatures).toHaveLength(1);
+    } finally {
+      await doc.close();
+    }
+    if (opts.openKind === 'id') return;
+    // The right to sign a group's fields is not the right to add a field to the document.
+    const signer = await engine.open(
+      { kind: 'bytes', id: `${fx().id}-group-timestamp`, bytes: await fx().bytes() },
+      { scope: ['doc.open', 'doc.forms.read', 'fields:sign:group=buyer'], identity: {} },
+    );
+    try {
+      expect(await caughtCode(() => signer.signatures.prepare({ kind: 'timestamp' }))).toBe(
+        EngineErrorCode.Forbidden,
+      );
+    } finally {
+      await signer.close();
+    }
+    const certified = opts.fixtures.certifiedNoChanges;
+    if (!certified) return;
+    const sealed = await open(engine, opts, certified);
+    try {
+      expect(await caughtCode(() => sealed.signatures.prepare({ kind: 'timestamp' }))).toBe(
+        EngineErrorCode.ProtectedDocument,
+      );
+    } finally {
+      await sealed.close();
+    }
+  });
+
   test("sign: unsaved edits are sealed in the signature's own revision (layer session)", async () => {
     if (!supported()) return;
     const doc = await openLocal(engineOf(), opts, fx());
@@ -848,6 +1028,333 @@ function runSigningTests(
       }
     });
   }
+}
+
+/** One DER object, as a store holds them: a sequence around `label` as an octet string. */
+function derEntry(label: string): Uint8Array {
+  const text = new TextEncoder().encode(label);
+  return Uint8Array.from([0x30, text.length + 2, 0x04, text.length, ...text]);
+}
+
+function runValidationInfoTests(
+  runner: ConformanceTestRunner,
+  opts: SignatureConformanceOptions,
+  engineOf: () => Engine,
+  permitEngineOf: () => Engine | null,
+  supported: () => boolean,
+): void {
+  const { test, expect } = runner;
+  const fx = () => opts.fixtures.unsignedSigField;
+  const sigRef = () => ({ kind: 'fqn', name: fx().fieldName }) as const;
+  const CERT_A = derEntry('certificate a');
+  const CERT_B = derEntry('certificate b');
+  const ANSWER = derEntry('ocsp response');
+  const LIST = derEntry('crl one');
+  const LIST_2 = derEntry('crl two');
+  const hexes = (entries: Uint8Array[]) => entries.map(toHex);
+
+  test('validation data: a document without any reads three empty lists', async () => {
+    if (!supported()) return;
+    const doc = await open(engineOf(), opts, fx());
+    try {
+      expect(await doc.signatures.getValidationInfo()).toEqual({
+        certificates: [],
+        ocspResponses: [],
+        crls: [],
+      });
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('validation data: entries read back as given, are in the saved file, and are stored once', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await open(engine, opts, fx());
+    const events: DocumentEvent[] = [];
+    const unsubscribe = doc.events.subscribe((event) => events.push(event));
+    let reopened: DocumentHandle | null = null;
+    try {
+      const revisions = (await doc.signatures.list()).revisions.length;
+      const given = [CERT_A.slice(), CERT_B.slice()];
+      const first = await doc.signatures.addValidationInfo(
+        { certificates: given, ocspResponses: [ANSWER], crls: [LIST] },
+        { opId: 'validation-info-first' },
+      );
+      expect(first.added).toEqual({ certificates: 2, ocspResponses: 1, crls: 1 });
+      expect(first.meta.opId).toBe('validation-info-first');
+      expect(first.meta.undoable).toBe(false);
+      expect(first.meta.affectedPages).toEqual([]);
+      // The caller's bytes stay the caller's.
+      expect(hexes(given)).toEqual(hexes([CERT_A, CERT_B]));
+
+      const stored = await doc.signatures.getValidationInfo();
+      expect(hexes(stored.certificates)).toEqual(hexes([CERT_A, CERT_B]));
+      expect(hexes(stored.ocspResponses)).toEqual(hexes([ANSWER]));
+      expect(hexes(stored.crls)).toEqual(hexes([LIST]));
+      // Byte facts describe the loaded bytes: an unsaved write adds no revision.
+      expect((await doc.signatures.list()).revisions).toHaveLength(revisions);
+
+      // What the document holds is left out, and an entry named twice is stored once.
+      const second = await doc.signatures.addValidationInfo({
+        certificates: [CERT_A],
+        crls: [LIST, LIST_2, LIST_2],
+      });
+      expect(second.added).toEqual({ certificates: 0, ocspResponses: 0, crls: 1 });
+      // Nothing new: nothing is written, and no event says otherwise.
+      const third = await doc.signatures.addValidationInfo({
+        certificates: [CERT_B],
+        ocspResponses: [ANSWER],
+      });
+      expect(third.added).toEqual({ certificates: 0, ocspResponses: 0, crls: 0 });
+      expect(third.meta.undoable).toBe(false);
+      expect((await doc.signatures.addValidationInfo({})).added).toEqual(third.added);
+
+      const added = events.filter((event) => event.type === 'signatures.validationInfoAdded');
+      expect(added).toHaveLength(2);
+      expect(added[0]).toMatchObject({
+        added: first.added,
+        meta: { opId: 'validation-info-first' },
+        origin: { kind: 'local' },
+      });
+      expect(added[1]).toMatchObject({ added: second.added });
+
+      const bytes = await doc.download();
+      reopened = await reopen(engine, opts, `${fx().id}-validation-info`, bytes);
+      const fresh = await reopened.signatures.getValidationInfo();
+      expect(hexes(fresh.certificates)).toEqual(hexes([CERT_A, CERT_B]));
+      expect(hexes(fresh.ocspResponses)).toEqual(hexes([ANSWER]));
+      expect(hexes(fresh.crls)).toEqual(hexes([LIST, LIST_2]));
+      // A document that already has a store gets its entries beside the ones it holds.
+      expect((await reopened.signatures.addValidationInfo({ crls: [LIST, CERT_A] })).added).toEqual(
+        {
+          certificates: 0,
+          ocspResponses: 0,
+          crls: 1,
+        },
+      );
+      expect(hexes((await reopened.signatures.getValidationInfo()).crls)).toEqual(
+        hexes([LIST, LIST_2, CERT_A]),
+      );
+    } finally {
+      unsubscribe();
+      if (reopened) await reopened.close();
+      await doc.close();
+    }
+  });
+
+  test('validation data: a malformed entry stores nothing and says which entry it is', async () => {
+    if (!supported()) return;
+    const doc = await open(engineOf(), opts, fx());
+    const events: string[] = [];
+    const unsubscribe = doc.events.subscribe((event) => events.push(event.type));
+    try {
+      const pem = new TextEncoder().encode('-----BEGIN CERTIFICATE-----');
+      const refusals: [Parameters<typeof doc.signatures.addValidationInfo>[0], string][] = [
+        // The good entries before and after the bad one are not stored either.
+        [{ certificates: [CERT_A, pem], crls: [LIST] }, 'certificates[1]'],
+        [{ certificates: [CERT_A], crls: [LIST.slice(0, LIST.length - 1)] }, 'crls[0]'],
+        [{ ocspResponses: [concat(ANSWER, ANSWER)] }, 'ocspResponses[0]'],
+        [{ ocspResponses: [new Uint8Array()] }, 'ocspResponses[0]'],
+      ];
+      for (const [input, field] of refusals) {
+        let caught: unknown;
+        try {
+          await doc.signatures.addValidationInfo(input);
+        } catch (err) {
+          caught = err;
+        }
+        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+        expect((caught as EngineError).details).toMatchObject({ field });
+      }
+      // A list that is not a list of byte arrays.
+      expect(
+        await caughtCode(() =>
+          doc.signatures.addValidationInfo({
+            certificates: ['MIIB'] as unknown as Uint8Array[],
+          }),
+        ),
+      ).toBe(EngineErrorCode.InvalidArg);
+      expect(await doc.signatures.getValidationInfo()).toEqual({
+        certificates: [],
+        ocspResponses: [],
+        crls: [],
+      });
+      expect(events).toEqual([]);
+    } finally {
+      unsubscribe();
+      await doc.close();
+    }
+  });
+
+  test('validation data: no undo takes it back, and the undo of an earlier change leaves it', async () => {
+    if (!supported()) return;
+    const doc = await open(engineOf(), opts, fx());
+    try {
+      // A change that writes the catalog, as a store does.
+      const attached = await doc.attachments.create({
+        data: new Uint8Array([1, 2, 3]),
+        name: 'notes.bin',
+      });
+      const stored = await doc.signatures.addValidationInfo({ certificates: [CERT_A] });
+      expect(stored.meta.undoable).toBe(false);
+      expect(await caughtCode(() => doc.apply({ undoOf: stored.meta.opId }))).toBe(
+        EngineErrorCode.UndoUnavailable,
+      );
+
+      await doc.apply({ undoOf: attached.meta.opId });
+      expect((await doc.attachments.list()).attachments).toEqual([]);
+      expect(hexes((await doc.signatures.getValidationInfo()).certificates)).toEqual(
+        hexes([CERT_A]),
+      );
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('validation data: a signature made after it seals it in; added after one, it is permitted', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await openLocal(engine, opts, fx());
+    let reopened: DocumentHandle | null = null;
+    try {
+      await doc.signatures.addValidationInfo({ certificates: [CERT_A] });
+      const prepared = await doc.signatures.prepare({ field: sigRef() });
+      // A parked candidate refuses it like any other write.
+      expect(
+        await caughtCode(() => doc.signatures.addValidationInfo({ certificates: [CERT_B] })),
+      ).toBe(EngineErrorCode.SigningPending);
+      const signed = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      expect(signed.status).toBe('completed');
+      // The signed file holds what was added before the signature.
+      expect(hexes((await doc.signatures.getValidationInfo()).certificates)).toEqual(
+        hexes([CERT_A]),
+      );
+
+      // After an approval signature the store may grow: the signature stays as it was.
+      await doc.signatures.addValidationInfo({ ocspResponses: [ANSWER], crls: [LIST] });
+      const working = await doc.signatures.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+        detail: 'full',
+      });
+      expect(working.verdict).toBe('permitted');
+      const findings = working.steps.flatMap((step) => step.findings);
+      expect(findings.filter((finding) => finding.verdict !== 'permitted')).toEqual([]);
+      expect(findings.some((finding) => finding.rule === 'dss')).toBe(true);
+
+      const bytes = await doc.download();
+      // The signature's own bytes did not move: the store is a revision after it.
+      expect(await sha256Hex(bytes.slice(0, signed.version.sizeBytes))).toBe(signed.version.sha256);
+      reopened = await reopen(engine, opts, `${fx().id}-validation-info-signed`, bytes);
+      const snapshot = await reopened.signatures.list();
+      expect(snapshot.revisions).toHaveLength(3);
+      expect(snapshot.signatures[0].coverage).toBe('whole-revision');
+      expect((await reopened.signatures.analyze({ since: { signatureIndex: 0 } })).verdict).toBe(
+        'permitted',
+      );
+      const fresh = await reopened.signatures.getValidationInfo();
+      expect(hexes(fresh.certificates)).toEqual(hexes([CERT_A]));
+      expect(hexes(fresh.ocspResponses)).toEqual(hexes([ANSWER]));
+      expect(hexes(fresh.crls)).toEqual(hexes([LIST]));
+    } finally {
+      if (reopened) await reopened.close();
+      await doc.close();
+    }
+  });
+
+  test('validation data: reading needs doc.forms.read and storing needs doc.sign', async () => {
+    if (!supported() || opts.openKind === 'id') return;
+    const engine = engineOf();
+    const openAs = async (id: string, scope: string[]) =>
+      engine.open(
+        { kind: 'bytes', id: `${fx().id}-${id}`, bytes: await fx().bytes() },
+        { scope, identity: {} },
+      );
+    // Signing the fields of a group is not the right to add validation data.
+    const signer = await openAs('group-signer', [
+      'doc.open',
+      'doc.forms.read',
+      'fields:sign:group=buyer',
+    ]);
+    try {
+      expect(
+        await caughtCode(() => signer.signatures.addValidationInfo({ certificates: [CERT_A] })),
+      ).toBe(EngineErrorCode.Forbidden);
+      expect((await signer.signatures.getValidationInfo()).certificates).toEqual([]);
+    } finally {
+      await signer.close();
+    }
+    const stranger = await openAs('no-forms', ['doc.open', 'doc.sign']);
+    try {
+      expect(await caughtCode(() => stranger.signatures.getValidationInfo())).toBe(
+        EngineErrorCode.Forbidden,
+      );
+      expect(
+        (await stranger.signatures.addValidationInfo({ certificates: [CERT_A] })).added
+          .certificates,
+      ).toBe(1);
+    } finally {
+      await stranger.close();
+    }
+  });
+
+  test('validation data: a certification that allows form filling lets it through', async () => {
+    if (!supported()) return;
+    const doc = await open(engineOf(), opts, opts.fixtures.certified);
+    try {
+      expect((await doc.signatures.list()).protection.enforced).toBe('fill');
+      expect(
+        (await doc.signatures.addValidationInfo({ certificates: [CERT_A] })).added.certificates,
+      ).toBe(1);
+      const analysis = await doc.signatures.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
+      expect(analysis.verdict).toBe('permitted');
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('validation data: a certification that allows no changes refuses it, unless protection is off', async () => {
+    const fixture = opts.fixtures.certifiedNoChanges;
+    if (!supported() || !fixture) return;
+    const doc = await open(engineOf(), opts, fixture);
+    try {
+      expect((await doc.signatures.list()).protection.enforced).toBe('lta');
+      expect(doc.security.allows('doc.sign')).toBe(false);
+      expect(
+        await caughtCode(() => doc.signatures.addValidationInfo({ certificates: [CERT_A] })),
+      ).toBe(EngineErrorCode.ProtectedDocument);
+      // Reading stays possible.
+      await doc.signatures.getValidationInfo();
+    } finally {
+      await doc.close();
+    }
+    const permitEngine = permitEngineOf();
+    if (!permitEngine) return;
+    const permitted = await open(permitEngine, opts, fixture);
+    try {
+      expect(
+        (await permitted.signatures.addValidationInfo({ certificates: [CERT_A] })).added
+          .certificates,
+      ).toBe(1);
+      // The engine wrote it; the judgement is what it was: Acrobat calls this certification
+      // changed.
+      const analysis = await permitted.signatures.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
+      expect(analysis.verdict).toBe('forbidden');
+    } finally {
+      await permitted.close();
+    }
+  });
 }
 
 async function reopen(

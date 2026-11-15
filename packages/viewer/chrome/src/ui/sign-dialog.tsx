@@ -4,7 +4,8 @@
  * the mark as it will sit in the field, takes reason and location, offers
  * a certification when the config allows it, and either seals the field
  * (`sign`) or only draws the mark into it (`fillField`). Escape cancels,
- * unless it's signing.
+ * unless it's signing. A signature that was sealed without the verification
+ * information the settings ask for stays on screen to say so.
  */
 import { useId, useState } from 'react';
 import { isPluginError } from '@embedpdf/react/runtime';
@@ -43,6 +44,8 @@ export function SignDialog() {
   );
   const [busy, setBusy] = useState<'sign' | 'fill' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Signed, and something that should have followed did not: said here, then closed by hand.
+  const [notice, setNotice] = useState<string | null>(null);
   const titleId = useId();
 
   const field = surface.props?.field as FormFieldRef | undefined;
@@ -60,7 +63,7 @@ export function SignDialog() {
     setError(null);
     try {
       if (kind === 'sign') {
-        await signature.sign({
+        const result = await signature.sign({
           field,
           mark,
           signer,
@@ -68,6 +71,14 @@ export function SignDialog() {
             ? { certify: { permission: Number(signKind.slice(-1)) as 1 | 2 | 3 } }
             : {}),
         });
+        if (result.validationInfoError) {
+          console.error(
+            '[embedpdf] verification information not added:',
+            result.validationInfoError,
+          );
+          setNotice(t('demo.signedWithoutValidationInfo'));
+          return;
+        }
       } else {
         await signature.fillField(field, mark);
       }
@@ -87,6 +98,33 @@ export function SignDialog() {
   };
 
   const input = 'border-border bg-surface text-fg w-full rounded border px-2 py-1.5 text-sm';
+  const close = () => {
+    setNotice(null);
+    surface.close();
+  };
+  if (notice) {
+    return (
+      <Dialog
+        labelledBy={titleId}
+        onClose={close}
+        className="border-border bg-surface w-96 rounded-lg border p-4 shadow-xl"
+      >
+        <h2 id={titleId} className="text-fg text-base font-semibold">
+          {t('demo.signTitle')}
+        </h2>
+        <p className="mt-3 text-sm text-amber-600">{notice}</p>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={close}
+            className="bg-accent text-on-accent rounded-md px-3 py-1.5 text-sm"
+          >
+            {t('panel.close')}
+          </button>
+        </div>
+      </Dialog>
+    );
+  }
   return (
     <Dialog
       labelledBy={titleId}

@@ -73,8 +73,10 @@ export {
 // browser; `webCryptoSigner` / `remoteSigner` bring the embedder's key), and
 // the timestamp authority `plugins.signature.timestampAuthority` names.
 export {
+  createTestCertificateAuthority,
   createTestSigner,
   createTestTimestampAuthority,
+  httpRevocationSource,
   httpTimestampAuthority,
   indexedDbKeyStore,
   memoryKeyStore,

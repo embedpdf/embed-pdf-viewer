@@ -15,6 +15,8 @@ import {
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSnapshot,
+  type ValidationInfo,
+  type ValidationInfoAddResult,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -23,7 +25,11 @@ import {
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
   SignatureSnapshotSchema,
+  VALIDATION_INFO_SINCE,
+  ValidationInfoAddResultSchema,
+  ValidationInfoWireSchema,
   decodePrepared,
+  decodeValidationInfo,
   toBase64,
   wirePaths,
   tokenPinOf,
@@ -33,6 +39,7 @@ import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
+import { serverLacks } from '../transport/serverVersion';
 
 /**
  * Cloud-side digital signatures. Two kinds of read, two kinds of URL:
@@ -49,6 +56,12 @@ import type { HttpClient } from '../transport/HttpClient';
  * the local engine uses. `prepare` and `complete` change the manifest in
  * ways no delta carries (a completion moves the layer's `baseSha256`
  * itself), so both refresh it before returning.
+ *
+ * Validation data (the certificates, OCSP responses and CRLs the file holds
+ * for its signatures) is a layer read pinned by `docVersion` and a write
+ * with a route of its own. Both, and a prepare with no field, arrived in
+ * `VALIDATION_INFO_SINCE`: an older server is never sent them
+ * (docs/conventions/api-evolution.md).
  */
 export class CloudDocumentSignaturesService implements DocumentSignaturesService {
   constructor(
@@ -191,6 +204,9 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
   ): AbortablePromise<SignaturePrepared> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
+    // An older server requires the field: it makes none for a document timestamp.
+    const lacking = input.field ? null : this.serverLacks('a document timestamp with no `field`');
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<SignaturePrepared>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
@@ -214,10 +230,18 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         // Prepare is a layer write (layerVersion, working, docVersion moved)
         // that returns no mutation envelope: refresh, don't guess.
         await this.manifest.refresh(signal);
+        // The field asked for, or the one the engine made for a document timestamp.
+        const field = input.field ?? prepared.field;
+        if (!field) {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            'the server prepared a signing and named no field',
+          );
+        }
         this.publisher.publishWrite(opId, {
           type: 'signatures.prepared',
-          field: input.field,
           ...prepared,
+          field,
         });
         return prepared;
       });
@@ -279,6 +303,76 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         return result;
       });
     });
+  }
+
+  getValidationInfo(): AbortablePromise<ValidationInfo> {
+    const rejected = this.closedRejection();
+    if (rejected) return rejected;
+    return AbortablePromise.run<ValidationInfo>(async (signal) => {
+      // The server says its version on `/head`, which the manifest read makes.
+      await this.manifest.get(signal);
+      const lacking = this.serverLacks("reading a document's validation data");
+      if (lacking) throw lacking;
+      return this.http.getJsonWithRefresh(
+        async (s) => {
+          const manifest = await this.manifest.get(s);
+          return wirePaths.layerSignaturesValidationInfo(
+            this.docId,
+            this.layerName,
+            manifest.docVersion,
+            tokenPinOf('validationInfo', manifest.engine),
+          );
+        },
+        (raw) => decodeValidationInfo(ValidationInfoWireSchema.parse(raw)),
+        async (s) => {
+          await this.manifest.refresh(s);
+        },
+        signal,
+      );
+    });
+  }
+
+  addValidationInfo(
+    input: Partial<ValidationInfo>,
+    options?: WriteOptions,
+  ): AbortablePromise<ValidationInfoAddResult> {
+    const rejected = this.closedRejection();
+    if (rejected) return rejected;
+    return AbortablePromise.run<ValidationInfoAddResult>(async (signal) => {
+      await this.manifest.get(signal);
+      const lacking = this.serverLacks("storing a document's validation data");
+      if (lacking) throw lacking;
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        // Each entry as base64, as a completion carries its CMS.
+        const body = {
+          ...(input.certificates ? { certificates: input.certificates.map(toBase64) } : {}),
+          ...(input.ocspResponses ? { ocspResponses: input.ocspResponses.map(toBase64) } : {}),
+          ...(input.crls ? { crls: input.crls.map(toBase64) } : {}),
+        };
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerSignaturesValidationInfoCurrent(this.docId, this.layerName),
+            body,
+            (raw) => ValidationInfoAddResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // The file already held every entry: nothing was written, so nothing moved.
+        const { added } = result;
+        if (added.certificates + added.ocspResponses + added.crls === 0) return result;
+        // Only the document version moves: no page and no list a page shows changed.
+        this.manifest.apply(result.meta, []);
+        this.publisher.publishWrite(opId, { type: 'signatures.validationInfoAdded', ...result });
+        return result;
+      });
+    });
+  }
+
+  /** The refusal of something that arrived with validation data, on a server older than that. */
+  private serverLacks(feature: string): EngineError | null {
+    return serverLacks(this.http.serverVersion, feature, VALIDATION_INFO_SINCE);
   }
 
   /** Version routes address a field by its fully qualified name; an object-number ref is resolved through the snapshot. */

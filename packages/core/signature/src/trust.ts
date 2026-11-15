@@ -1,6 +1,6 @@
 import * as pkijs from 'pkijs';
 
-import { bytesEqual, ensureEngine } from './cms/engine';
+import { bytesEqual, ensureEngine, toHex } from './cms/engine';
 import { OID } from './cms/oids';
 import { certDer, certificateFromDer, parseCmsInternal, type ParsedCmsInternal } from './cms/parse';
 import { certificateCommonName } from './signers/self-signed';
@@ -24,12 +24,42 @@ export interface TrustPort {
 /**
  * When a chain is judged. `now` is the honest default; `timestamp` is only
  * legitimate for a verified RFC 3161 token, which is why it carries the
- * proof flag; its `genTime` is the token's time as an ISO 8601 string. The
+ * proof flag; its `stampedAt` is the token's time as an ISO 8601 string. The
  * signature's own `/M` is a claim and never a validation time.
+ *
+ * The token's time was named `genTime` before 3.3. That name is still read, and
+ * `stampedAt` is the one used when both are given.
  */
 export type ValidationTime =
   | { kind: 'now' }
-  | { kind: 'timestamp'; genTime: string; tokenVerified: true };
+  | {
+      kind: 'timestamp';
+      stampedAt: string;
+      tokenVerified: true;
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      genTime?: string;
+    }
+  | {
+      kind: 'timestamp';
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      genTime: string;
+      tokenVerified: true;
+      stampedAt?: undefined;
+    };
+
+/**
+ * The validation time a verdict reports. A timestamp's time is under both of its names, with
+ * the same value, so code written for either reads it.
+ */
+export type AppliedValidationTime =
+  | { readonly kind: 'now' }
+  | {
+      readonly kind: 'timestamp';
+      readonly stampedAt: string;
+      readonly tokenVerified: true;
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      readonly genTime: string;
+    };
 
 export type TrustStatus = 'trusted' | 'untrusted' | 'unknown';
 
@@ -39,6 +69,11 @@ export interface TrustVerdict {
   reason?: string;
   /** DER certificates of the validated path, anchor last, when trusted. */
   path?: Uint8Array[];
+  /**
+   * DER of the certificate whose issuer was not found among the certificates offered, when
+   * that is why the path is not trusted.
+   */
+  withoutIssuer?: Uint8Array;
 }
 
 /**
@@ -50,6 +85,20 @@ export async function validateChain(
   cms: Uint8Array | ParsedCmsInternal,
   trust: TrustPort | null,
   at: ValidationTime = { kind: 'now' },
+): Promise<TrustVerdict> {
+  return validateChainAmong(cms, trust, at, []);
+}
+
+/**
+ * {@link validateChain}, with more certificates a path may pass through: those a document's
+ * validation data holds, so a path can be built from the file when the CMS leaves an issuer
+ * out. They are candidates and nothing more: a path still has to end at an anchor.
+ */
+export async function validateChainAmong(
+  cms: Uint8Array | ParsedCmsInternal,
+  trust: TrustPort | null,
+  at: ValidationTime,
+  known: readonly pkijs.Certificate[],
 ): Promise<TrustVerdict> {
   if (!trust) return { status: 'unknown', reason: 'no trust anchors configured' };
   const anchors = await trust.anchors();
@@ -63,7 +112,7 @@ export async function validateChain(
   }
   return validatePath({
     target: internal.signerCertificate,
-    candidates: internal.certificates,
+    candidates: [...internal.certificates, ...known],
     anchors,
     at: timeOf(at),
   });
@@ -128,8 +177,21 @@ export async function validateTimestampAuthority(input: {
   });
 }
 
-function timeOf(at: ValidationTime): Date {
-  return at.kind === 'now' ? new Date() : new Date(at.genTime);
+/** The moment a validation time names: now, or the timestamp's time. */
+export function timeOf(at: ValidationTime): Date {
+  return at.kind === 'now' ? new Date() : new Date(stampedAtOf(at));
+}
+
+/** A validation time as a verdict reports it: a timestamp's time under both of its names. */
+export function appliedValidationTime(at: ValidationTime): AppliedValidationTime {
+  if (at.kind === 'now') return { kind: 'now' };
+  const stampedAt = stampedAtOf(at);
+  return { kind: 'timestamp', stampedAt, genTime: stampedAt, tokenVerified: true };
+}
+
+/** A timestamp's time, under whichever name it was given. */
+function stampedAtOf(at: Exclude<ValidationTime, { kind: 'now' }>): string {
+  return at.stampedAt === undefined ? at.genTime : at.stampedAt;
 }
 
 function validAt(certificate: pkijs.Certificate, at: Date): boolean {
@@ -177,7 +239,14 @@ async function validatePath(input: {
   const { target, at } = input;
   const targetDer = certDer(target);
   const isTarget = (der: Uint8Array) => bytesEqual(der, targetDer);
-  const others = input.candidates.filter((candidate) => !isTarget(certDer(candidate)));
+  // A certificate may be offered twice, by the CMS and by the document's validation data.
+  const offered = new Map<string, pkijs.Certificate>();
+  for (const candidate of input.candidates) {
+    const der = certDer(candidate);
+    const key = toHex(der);
+    if (!isTarget(der) && !offered.has(key)) offered.set(key, candidate);
+  }
+  const others = [...offered.values()];
   const targetIsAnchor = input.anchors.some(isTarget);
   try {
     const otherAnchors = input.anchors
@@ -198,6 +267,7 @@ async function validatePath(input: {
         reason: orphan
           ? `no certificate was found that issued "${nameOf(orphan)}"`
           : result.resultMessage || `chain validation code ${result.resultCode}`,
+        ...(orphan ? { withoutIssuer: certDer(orphan) } : {}),
       };
     }
     const path = result.certificatePath ?? [];

@@ -36,6 +36,7 @@ import {
   type AnalyzeInput,
   type ChangeAnalysis,
   type SignatureSnapshot,
+  type ValidationInfo,
   type DocumentProtection,
 } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
@@ -1311,6 +1312,42 @@ export class DocumentService {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${result.tag}`);
     }
     return result.snapshot;
+  }
+
+  /**
+   * The validation data the layer's file holds, as it is now: what
+   * `doc.signatures.getValidationInfo()` answers. Same freshness rule as
+   * {@link readLayerSignatures}.
+   */
+  async readLayerValidationInfo(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal?: AbortSignal,
+  ): Promise<ValidationInfo> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const result = await this.readOnPool(
+      ctx,
+      docId,
+      layerName,
+      (jobId: WorkerJobId) =>
+        wirePack({
+          kind: 'signatures.validationInfo' as const,
+          effect: 'read' as const,
+          jobId,
+          docId,
+          layerName,
+        }),
+      signal,
+    );
+    if (result.tag !== 'signatures.validationInfo') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${result.tag}`);
+    }
+    return {
+      certificates: result.certificates.map((entry) => new Uint8Array(entry)),
+      ocspResponses: result.ocspResponses.map((entry) => new Uint8Array(entry)),
+      crls: result.crls.map((entry) => new Uint8Array(entry)),
+    };
   }
 
   /** The layer's pending edits judged against its base; same freshness rule as {@link readLayerSignatures}. */

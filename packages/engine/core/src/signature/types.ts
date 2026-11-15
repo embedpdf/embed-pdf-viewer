@@ -48,7 +48,9 @@ export type DocMdpPermission = 1 | 2 | 3;
 /**
  * The modification level a signed document allows, as a product policy:
  *   - `none`: no byte change at all (not a DocMDP value)
- *   - `lta`: DSS and document timestamps only (P = 1)
+ *   - `lta`: nothing (P = 1). ISO 32000-2 would let validation data and
+ *     document timestamps follow, which is where the name comes from; Acrobat
+ *     reports the certification as altered, so the engine allows neither
  *   - `fill`: + form fill, signatures, new signature fields (P = 2)
  *   - `annotate`: + annotations (P = 3, and how a validator reads an approval
  *     signature)
@@ -234,7 +236,13 @@ export interface SignatureAppearanceInput {
 }
 
 export interface SignaturePrepareInput {
-  field: FormFieldRef;
+  /**
+   * The signature field to sign. A signature needs one. A document timestamp
+   * (`kind: 'timestamp'`) may leave it out: the engine then makes a field for
+   * it, with a name no other field has and one widget of no size on the first
+   * page, in the same revision as the timestamp.
+   */
+  field?: FormFieldRef;
   kind?: SignatureKind;
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
@@ -263,6 +271,12 @@ export interface SignaturePrepared {
   expectedVersion: DocumentVersionRef;
   /** ISO timestamp after which the candidate is discarded. */
   expiresAt: string | null;
+  /**
+   * The field the engine made for a document timestamp that was prepared
+   * with no `field`, by its name. The field is in the document once the
+   * signing completes. Absent when a `field` was given.
+   */
+  field?: FormFieldRef;
 }
 
 export interface SignatureCompleteInput {
@@ -288,4 +302,27 @@ export interface SignatureCompleteResult {
 
 export interface SignatureCancelResult {
   status: 'cancelled' | 'already-completed' | 'unknown';
+}
+
+/**
+ * What a document holds so that its signatures can be checked later with no
+ * network (the document security store, `/DSS`): certificates, OCSP
+ * responses and CRLs, each entry one DER object.
+ */
+export interface ValidationInfo {
+  certificates: Uint8Array[];
+  ocspResponses: Uint8Array[];
+  crls: Uint8Array[];
+}
+
+/** The lists of a {@link ValidationInfo}. */
+export type ValidationInfoKind = keyof ValidationInfo;
+
+/** How many entries of each kind a write stored. */
+export type ValidationInfoCounts = Record<ValidationInfoKind, number>;
+
+export interface ValidationInfoAddResult {
+  /** The entries that were new: one the document already held is not stored again. */
+  added: ValidationInfoCounts;
+  meta: MutationMeta;
 }

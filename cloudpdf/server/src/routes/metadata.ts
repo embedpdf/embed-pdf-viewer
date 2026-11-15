@@ -173,12 +173,15 @@ export async function registerMetadataRoutes(
         docId,
         layerName,
       );
+      // A certification that allows no changes forbids this one too.
+      const protection = await service.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.metadata.modify',
         permissionFlags,
+        protection,
       );
       setNoStore(reply);
       return half.write(ctx, { docId, layerName, body: req.body }, abortSignalOf(reply));

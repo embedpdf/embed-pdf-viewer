@@ -115,6 +115,9 @@ What signing does depends on whether you give the viewer a key:
       signingKey: () => mySigningService.signer(),
       // a timestamp with every signature, from your timestamp authority
       timestampAuthority: httpTimestampAuthority({ url: '/api/timestamp' }),
+      // keep each signature checkable for years, with no network
+      revocation: httpRevocationSource({ url: '/api/revocation' }),
+      documentTimestamp: true,
       trust: { anchors: async () => [rootCertificate] },
       mode: 'ask',
       allowCertify: true,
@@ -130,6 +133,8 @@ What signing does depends on whether you give the viewer a key:
 | `signingKey` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
 | `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
 | `timestampAuthority` | The timestamp authority: every signature the viewer seals carries its timestamp | none |
+| `revocation` | Where revocation answers come from: every signature the viewer seals gets its validation data right after. Needs `trust` | none |
+| `documentTimestamp` | Add a document timestamp after the validation data. Needs `timestampAuthority` | `false` |
 | `trust` | The certificates you trust: for checking signatures, and for the timestamps the viewer seals | none |
 | `allowCertify` | Let the first signature be a certification, which sets what may still change: comments, form filling only, or nothing | `false` |
 | `kinds` | Which marks people keep: `'signature'`, `'initials'` | both |
@@ -147,6 +152,16 @@ timestamp authority vouches for and the authority's name, beside the time the si
 panel also says what a save would do: after an
 unsaved annotation, an approval signature reads "valid; unsaved changes will invalidate it", the
 way Acrobat warns.
+
+Two more lines say how the signature will hold up:
+
+- **Revocation** says whether the signer's certificate was withdrawn, when the file holds an
+  answer: "Not revoked" or "Revoked".
+- **Long-term validation** says whether the file holds everything a reader needs to check the
+  signature with no network: "Enabled", with the day that proof runs out, or "Not enabled", with
+  what is missing. For a signature that isn't enabled, **Add verification information** asks for
+  the answers and stores them. It shows when `revocation` and `trust` are set and the person may
+  sign.
 
 `viewer.get('signature')` gives you the same from code: see
 [Signatures](/docs/headless/forms/signatures#methods).
@@ -172,6 +187,22 @@ request on: see
 A timestamp is never skipped: when the authority can't be reached, the sign dialog says so and
 nothing is signed. With `trust` set, the viewer also refuses a timestamp from an authority your
 `trust` doesn't cover; list the authority's root under `timestampAnchors`.
+
+### Signatures that last
+
+A certificate can be withdrawn before its end date, and its issuer stops answering questions
+about it once it expires. With `revocation`, the viewer asks while the issuer still answers and
+keeps the answers in the file, right after each signature it seals. Acrobat shows such a
+signature as "LTV enabled". With `documentTimestamp` too, a document timestamp follows, which
+proves the answers were in the file by then.
+
+`httpRevocationSource()` comes from your viewer package, and its `url` is a route of your own:
+see [Reach the issuers from a browser](/docs/engine/forms/signatures#reach-the-issuers-from-a-browser).
+
+The signature is sealed before the answers are asked for. When they can't be had, the document
+is still signed: the sign dialog says "Signed. The verification information could not be added",
+and the signature's details offer to add it later. Opening a document asks nobody: the viewer
+checks signatures with what the file holds.
 
 ### Forms that run scripts
 

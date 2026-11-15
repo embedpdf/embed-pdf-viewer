@@ -17,6 +17,8 @@ import {
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSnapshot,
+  type ValidationInfo,
+  type ValidationInfoAddResult,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -121,9 +123,11 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     input: SignaturePrepareInput,
     options?: WriteOptions,
   ): AbortablePromise<SignaturePrepared> {
-    // The job checks that the handle may sign this field (its group).
+    // The job checks that the handle may sign this field (its group). A timestamp with no
+    // field gets one made for it, which takes the right to sign the document itself.
     const rejected =
-      this.gate('sign-some-field') ?? (input.certify ? this.gate('doc.sign.certify') : null);
+      this.gate(input.field ? 'sign-some-field' : 'doc.sign') ??
+      (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
     const write = this.opIdFor(options);
     if (write.rejected) return write.rejected;
@@ -141,10 +145,15 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
         }),
     });
     return this.await(submission, 'signatures.prepare', (payload) => {
+      // The field that was named, or the one the engine made for a timestamp.
+      const field = input.field ?? payload.result.field;
+      if (!field) {
+        throw new EngineError(EngineErrorCode.Unknown, 'the prepared signing names no field');
+      }
       this.publisher.publishWrite(write.opId, {
         type: 'signatures.prepared',
-        field: input.field,
         ...payload.result,
+        field,
       });
       return payload.result;
     });
@@ -206,6 +215,63 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
+  getValidationInfo(): AbortablePromise<ValidationInfo> {
+    const rejected = this.gate('doc.forms.read');
+    if (rejected) return rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.validationInfo', effect: 'read', jobId, docId }),
+    });
+    return this.await(submission, 'signatures.validationInfo', (payload) => ({
+      certificates: payload.certificates.map((entry) => new Uint8Array(entry)),
+      ocspResponses: payload.ocspResponses.map((entry) => new Uint8Array(entry)),
+      crls: payload.crls.map((entry) => new Uint8Array(entry)),
+    }));
+  }
+
+  addValidationInfo(
+    input: Partial<ValidationInfo>,
+    options?: WriteOptions,
+  ): AbortablePromise<ValidationInfoAddResult> {
+    const rejected = this.gate('doc.sign');
+    if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
+    let entries: Record<keyof ValidationInfo, ArrayBuffer[]>;
+    try {
+      entries = {
+        certificates: entriesOf(input, 'certificates'),
+        ocspResponses: entriesOf(input, 'ocspResponses'),
+        crls: entriesOf(input, 'crls'),
+      };
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'signatures.addValidationInfo',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ...entries,
+        }),
+    });
+    return this.await(submission, 'signatures.addValidationInfo', (payload) => {
+      const result = payload.result;
+      if (Object.values(result.added).some((count) => count > 0)) {
+        this.publisher.publishWrite(write.opId, {
+          type: 'signatures.validationInfoAdded',
+          ...result,
+        });
+      }
+      return result;
+    });
+  }
+
   /** The write's `opId` (the caller's, else a fresh one), or the refusal of an invalid one. */
   private opIdFor(
     options: WriteOptions | undefined,
@@ -223,7 +289,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
    * or a `fields:sign` scope); the job checks the field it signs.
    */
   private gate(
-    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign.certify' | 'sign-some-field',
+    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign' | 'doc.sign.certify' | 'sign-some-field',
   ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -255,4 +321,19 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       return map(payload as Extract<WorkerResultPayload, { tag: Tag }>);
     });
   }
+}
+
+/**
+ * The entries of one list of `input` as the buffers the worker is sent: a
+ * copy of each, so the caller's bytes stay the caller's. `InvalidArg` for a
+ * list that is not an array of byte arrays.
+ */
+function entriesOf(input: Partial<ValidationInfo>, kind: keyof ValidationInfo): ArrayBuffer[] {
+  const list = input[kind] ?? [];
+  if (!Array.isArray(list) || !list.every((entry) => entry instanceof Uint8Array)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, `${kind} must be an array of Uint8Array`, {
+      details: { field: kind },
+    });
+  }
+  return list.map((entry) => entry.slice().buffer as ArrayBuffer);
 }
