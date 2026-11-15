@@ -54,6 +54,10 @@ export const OID = {
   issuingDistributionPoint: '2.5.29.28',
   authorityKeyIdentifier: '2.5.29.35',
   freshestCrl: '2.5.29.46',
+  /** id-ce-noRevAvail (RFC 9608): no revocation information exists for this certificate. */
+  noRevAvail: '2.5.29.56',
+  /** `id-etsi-ext-valassured-ST-certs`, in ETSI's standard 319 412-1: a short-term certificate. */
+  validityAssuredShortTerm: '0.4.0.194121.2.1',
 } as const;
 
 export const DIGEST_BY_OID: Record<string, DigestAlgorithm> = {

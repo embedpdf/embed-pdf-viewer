@@ -75,6 +75,7 @@ export { certificateCommonName, selfSignedCertificate } from './signers/self-sig
 export {
   createTestCertificateAuthority,
   type TestCertificateAuthority,
+  type Unrevocable,
 } from './signers/test-authority';
 export type { RevocationReason } from './revocation/answer';
 export type { RevocationRequest, RevocationSource } from './revocation/source';

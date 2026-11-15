@@ -22,6 +22,13 @@ export interface Issuer {
   privateKey: CryptoKey;
 }
 
+/**
+ * How a certificate says it can't be withdrawn: `'validity-assured'` is ETSI's "validity
+ * assured, short term" extension (its standard 319 412-1), `'no-rev-avail'` is `noRevAvail`
+ * (RFC 9608).
+ */
+export type Unrevocable = 'validity-assured' | 'no-rev-avail';
+
 const REASON_CODES: Record<RevocationReason, number> = {
   unspecified: 0,
   'key-compromise': 1,
@@ -70,6 +77,8 @@ export async function issueCertificate(input: {
   issuer?: Issuer;
   privateKey?: CryptoKey;
   addresses?: { ocsp?: string; crl?: string; issuer?: string };
+  /** The extension by which the certificate says it can't be withdrawn (`cannotBeRevoked`). */
+  unrevocable?: Unrevocable;
   notBefore?: Date;
   notAfter?: Date;
 }): Promise<pkijs.Certificate> {
@@ -116,6 +125,16 @@ export async function issueCertificate(input: {
       }),
       new pkijs.Extension({
         extnID: OID.ocspNoCheck,
+        critical: false,
+        extnValue: new asn1js.Null().toBER(false),
+      }),
+    );
+  }
+  if (input.unrevocable) {
+    certificate.extensions.push(
+      new pkijs.Extension({
+        extnID:
+          input.unrevocable === 'no-rev-avail' ? OID.noRevAvail : OID.validityAssuredShortTerm,
         critical: false,
         extnValue: new asn1js.Null().toBER(false),
       }),
@@ -332,6 +351,12 @@ export interface TestCertificateAuthority {
     commonName?: string;
     algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA';
     hash?: 'sha256' | 'sha384' | 'sha512';
+    /**
+     * Issue a certificate that can't be withdrawn, as a signing service does for one that
+     * lives for minutes: it names no address to ask at, only where its issuer's certificate
+     * is, and says so in an extension. `revoke()` refuses it.
+     */
+    unrevocable?: Unrevocable;
   }): Promise<TestSigner>;
   /** The authority's answers, from memory: what a real one serves at the addresses it names. */
   readonly revocation: RevocationSource;
@@ -383,6 +408,8 @@ export async function createTestCertificateAuthority(
   const rootDer = der(root.certificate);
 
   const issued: pkijs.Certificate[] = [];
+  /** The ones issued as certificates that can't be withdrawn: `revoke()` refuses them. */
+  const unrevocableOnes = new Set<pkijs.Certificate>();
   const revoked = new Map<pkijs.Certificate, { at: Date; reason: RevocationReason | null }>();
   const serialOf = (certificate: pkijs.Certificate) =>
     new Uint8Array(certificate.serialNumber.valueBlock.valueHexView);
@@ -441,14 +468,18 @@ export async function createTestCertificateAuthority(
         hash,
         true,
       );
+      const { unrevocable } = signerOptions;
       const certificate = await issueCertificate({
         kind: 'signer',
         commonName: signerOptions.commonName ?? 'EmbedPDF test signer',
         publicKey: keys.publicKey,
         issuer: root,
-        addresses,
+        // What can't be withdrawn has nowhere to ask about it.
+        addresses: unrevocable ? { issuer: addresses.issuer } : addresses,
+        ...(unrevocable ? { unrevocable } : {}),
       });
       issued.push(certificate);
+      if (unrevocable) unrevocableOnes.add(certificate);
       const leaf = der(certificate);
       const signer = webCryptoSigner({
         privateKey: keys.privateKey,
@@ -463,6 +494,9 @@ export async function createTestCertificateAuthority(
       const certificate = issued.find((candidate) => bytesEqual(der(candidate), bytes));
       if (!certificate) {
         throw new Error('the test certificate authority did not issue this certificate');
+      }
+      if (unrevocableOnes.has(certificate)) {
+        throw new Error('this certificate was issued as one that cannot be withdrawn');
       }
       revoked.set(certificate, {
         at: revokeOptions.at ?? now(),

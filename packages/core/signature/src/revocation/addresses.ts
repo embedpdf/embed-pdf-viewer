@@ -46,6 +46,40 @@ export function revocationAddresses(certificate: pkijs.Certificate): RevocationA
   return out;
 }
 
+/**
+ * Whether a certificate says of itself that it can't be withdrawn, so that nobody needs to be
+ * asked about it. A signing service that issues a certificate for one signature, valid for
+ * minutes, runs no revocation service for it, and the certificate carries one of two
+ * extensions that say so:
+ *
+ * - "validity assured, short term" (ETSI's standard 319 412-1): the issuer assures the
+ *   certificate's validity for its whole, short, life;
+ * - `noRevAvail` (RFC 9608): no revocation information is published for it.
+ *
+ * Either one speaks for the certificate that carries it and for no other, so it counts only
+ * on a certificate that issues nothing: the certificates above it are asked about as ever.
+ * RFC 9608 forbids `noRevAvail` beside an address to ask at. A certificate that has both
+ * contradicts itself, and is asked about like any other.
+ */
+export function cannotBeRevoked(certificate: pkijs.Certificate): boolean {
+  const extension = (id: string) =>
+    certificate.extensions?.find((candidate) => candidate.extnID === id);
+  const constraints = extension(OID.basicConstraints)?.parsedValue as
+    | pkijs.BasicConstraints
+    | undefined;
+  if (constraints?.cA) return false;
+  if (extension(OID.validityAssuredShortTerm)) return true;
+  if (!extension(OID.noRevAvail)) return false;
+  const access = extension(OID.authorityInfoAccess)?.parsedValue as pkijs.InfoAccess | undefined;
+  const namesWhereToAsk =
+    extension(OID.crlDistributionPoints) !== undefined ||
+    extension(OID.freshestCrl) !== undefined ||
+    (access?.accessDescriptions ?? []).some(
+      (description) => description.accessMethod === OID.accessOcsp,
+    );
+  return !namesWhereToAsk;
+}
+
 function webAddress(name: pkijs.GeneralName): string | null {
   if (name.type !== URI || typeof name.value !== 'string') return null;
   return /^https?:\/\//i.test(name.value) ? name.value : null;

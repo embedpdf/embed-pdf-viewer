@@ -429,6 +429,11 @@ await addValidationInfo(doc, {
 authority.revoke(key);
 ```
 
+`issueSigner({ unrevocable: 'validity-assured' })` issues a certificate that
+[can't be withdrawn](#revocation), as a signing service does for one that lives for minutes;
+`'no-rev-avail'` uses the other extension. A signature made with it reads `'good'` and
+long-term validation enabled with no answer in the file.
+
 ## Sign in two steps
 
 When the key is somewhere else (a signing service, a hardware key, another device), sign in two
@@ -880,6 +885,15 @@ Each answer is checked by its own signature, wherever in the file it sits.
 
 Only a certificate that has an issuer above it needs an answer. One you trust as it is, such as
 your own root, has nobody to withdraw it, so a signer you trust directly reads `'good'`.
+
+A certificate that can't be withdrawn needs no answer either. Some signing services issue a
+certificate for one signature, valid for minutes, and run no revocation service for it. Such a
+certificate says so itself, in one of two extensions: "validity assured, short term" (ETSI EN
+319 412-1) or `noRevAvail` (RFC 9608). It is then left out, as the EU's validator leaves it
+out: the signature reads `'good'` when the certificates above it do, and
+[long-term validation](#long-term-validation) needs nothing about it. The extension counts on
+the certificate of a signer or a timestamp authority, never on one that issues others, and
+`noRevAvail` doesn't count on a certificate that also names where to ask about it.
 
 An answer speaks for a time. One stored when the document was signed says the certificate was
 good then, and says nothing about today. A signature is

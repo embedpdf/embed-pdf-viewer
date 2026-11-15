@@ -10,6 +10,7 @@ import type * as pkijs from 'pkijs';
 import { bytesEqual, toHex } from '../cms/engine';
 import { certDer, certificateFromDer, type CarriedRevocation } from '../cms/parse';
 import { certificateCommonName } from '../signers/self-signed';
+import { cannotBeRevoked } from './addresses';
 import { checkRevocationAnswer, type RevocationAnswer, type RevocationAnswerCheck } from './answer';
 import { revocationStatusAt, type RevocationStatus } from './status';
 
@@ -129,7 +130,9 @@ export interface CertificateRevocation extends RevocationStatus {
 /**
  * What the pool's answers say, at `at`, about each certificate of a validated path that can be
  * withdrawn: every one below the last, which is the certificate that is trusted. A path of one
- * certificate, trusted as it is, has nothing to ask about.
+ * certificate, trusted as it is, has nothing to ask about, and neither has a certificate that
+ * says it can't be withdrawn (`cannotBeRevoked`): it has no row, so nothing is asked about it
+ * and nothing about it is missing.
  */
 export async function pathRevocation(
   pool: ValidationPool,
@@ -144,6 +147,7 @@ export async function pathRevocation(
   const certificates = links.map(certificateFromDer);
   const rows: CertificateRevocation[] = [];
   for (let index = 0; index + 1 < certificates.length; index++) {
+    if (cannotBeRevoked(certificates[index]!)) continue;
     const checked = (await pool.checksFor(certificates[index]!, certificates[index + 1]!)).filter(
       (entry) => from === 'anywhere' || entry.answer.inFile,
     );
