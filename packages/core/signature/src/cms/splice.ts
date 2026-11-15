@@ -133,13 +133,16 @@ function withChild(
   );
 }
 
-/** How DER orders the elements of a set: by their encodings, octet by octet. */
-function comesBefore(left: Uint8Array, right: Uint8Array): boolean {
+/**
+ * How DER orders the elements of a set: by their encodings, octet by octet. Negative when
+ * `left` comes first, positive when `right` does, zero for the same bytes.
+ */
+export function derOrder(left: Uint8Array, right: Uint8Array): number {
   const shared = Math.min(left.byteLength, right.byteLength);
   for (let i = 0; i < shared; i++) {
-    if (left[i] !== right[i]) return left[i]! < right[i]!;
+    if (left[i] !== right[i]) return left[i]! - right[i]!;
   }
-  return left.byteLength < right.byteLength;
+  return left.byteLength - right.byteLength;
 }
 
 /**
@@ -173,7 +176,7 @@ export function addUnsignedAttribute(cms: Uint8Array, attribute: Uint8Array): Ui
   if (unsigned) {
     const present = childrenOf(cms, unsigned);
     const next = present.find(
-      (child) => !comesBefore(cms.subarray(child.start, child.end), attribute),
+      (child) => derOrder(cms.subarray(child.start, child.end), attribute) >= 0,
     );
     const at = next ? next.start : unsigned.contentEnd;
     const grownSet = withContent(

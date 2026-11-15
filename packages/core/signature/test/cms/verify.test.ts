@@ -1,10 +1,17 @@
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, test } from 'vitest';
 
 import { OID } from '../../src/cms/oids';
 import { verifyCmsSignature } from '../../src/cms/verify';
 import { verifyForCompletion } from '../../src/index';
+import { derProblem, signedAttributesAsSet } from '../helpers/der';
 import { createIdentity } from '../helpers/pki';
 import { buildTestSignature } from '../helpers/tokens';
+
+const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures');
 
 const digest = new Uint8Array(32).map((_, i) => (i * 7 + 3) & 0xff);
 
@@ -18,6 +25,7 @@ describe("a signature's certificate binding", () => {
     ] as const) {
       const good = await buildTestSignature({ digest, signer: signer.signer, binding });
       expect(await verifyCmsSignature(good)).toBe('valid');
+      expect(derProblem(signedAttributesAsSet(good))).toBeNull();
       const wrong = await buildTestSignature({
         digest,
         signer: signer.signer,
@@ -62,5 +70,22 @@ describe("a signature's certificate binding", () => {
       expiresAt: null,
     };
     expect(await verifyForCompletion({ cms, prepared, profile: 'cades-b' })).toEqual({ ok: true });
+  });
+});
+
+describe('signed attributes that are not in DER order', () => {
+  // Versions 3.0 to 3.2 signed a PKCS#7 signature's attributes in the order they listed them:
+  // content type, message digest, signing time. DER puts the signing time second. Such a
+  // signature is in files already, and it is signed over the order it was written in.
+  test('a PKCS#7 signature written by 3.2 still verifies', async () => {
+    const cms = new Uint8Array(
+      await readFile(resolve(fixtures, 'written-by-3.2/pkcs7-detached.p7s')),
+    );
+    expect(derProblem(signedAttributesAsSet(cms))).toMatch(/set out of order/);
+    expect(await verifyCmsSignature(cms)).toBe('valid');
+
+    const tampered = cms.slice();
+    tampered[tampered.byteLength - 1]! ^= 0x01;
+    expect(await verifyCmsSignature(tampered)).toBe('invalid');
   });
 });

@@ -2,9 +2,15 @@ import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
-import { cmsSignatureValue, signatureAlgorithmFor, type RawSigner } from '../../src/cms/build';
+import {
+  cmsSignatureValue,
+  signatureAlgorithmFor,
+  signedAttributesOf,
+  type RawSigner,
+} from '../../src/cms/build';
 import { ensureEngine, toArrayBuffer } from '../../src/cms/engine';
 import { DIGEST_BY_OID, OID, OID_BY_DIGEST, WEBCRYPTO_HASH } from '../../src/cms/oids';
+import { signedAttributesDer } from '../../src/cms/verify';
 
 /**
  * How a test token binds its authority's certificate. `hashOid` names the hash of a
@@ -120,13 +126,10 @@ async function buildSignedData(input: {
       serialNumber: signerCert.serialNumber,
     }),
     digestAlgorithm,
-    signedAttrs: new pkijs.SignedAndUnsignedAttributes({ type: 0, attributes }),
+    signedAttrs: signedAttributesOf(attributes),
     signatureAlgorithm: signatureAlgorithmFor(input.signer.algorithm, input.signer.hash),
   });
-  const toSign = new asn1js.Set({
-    value: attributes.map((attribute) => attribute.toSchema()),
-  }).toBER(false);
-  const raw = await input.signer.sign(new Uint8Array(toSign));
+  const raw = await input.signer.sign(signedAttributesDer(signerInfo));
   signerInfo.signature = new asn1js.OctetString({
     valueHex: cmsSignatureValue(input.signer.algorithm, raw),
   });

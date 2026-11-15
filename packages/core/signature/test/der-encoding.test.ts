@@ -18,7 +18,7 @@ import {
   createTestTimestampAuthority,
 } from '../src/index';
 import { buildOcspRequest } from '../src/revocation/request';
-import { derProblem } from './helpers/der';
+import { derProblem, signedAttributesAsSet } from './helpers/der';
 
 const digest = new Uint8Array(32).map((_, i) => (i * 11 + 5) & 0xff);
 const AUTHORITY = 'http://test-authority.example';
@@ -65,6 +65,7 @@ describe('what the package writes is DER', () => {
     const token = await authority.sign({ digest, algorithm: 'sha256', subFilter: 'ETSI.RFC3161' });
 
     expect(derProblem(token)).toBeNull();
+    expect(derProblem(signedAttributesAsSet(token))).toBeNull();
     expect(derProblem(readCmsParts(token, 'tst-info').eContent!)).toBeNull();
     expect(derProblem(authority.certificate)).toBeNull();
   });
@@ -89,8 +90,11 @@ describe('what the package writes is DER', () => {
           ...(profile === 'pkcs7' ? { signingTime: '2026-11-15T10:00:00Z' } : {}),
         });
         expect(derProblem(cms), profile).toBeNull();
+        // The signing time of a PKCS#7 signature sorts before its message digest.
+        expect(derProblem(signedAttributesAsSet(cms)), `${profile}: signed attributes`).toBeNull();
         const stamped = await attachSignatureTimestamp({ cms, authority: timestampAuthority });
         expect(derProblem(stamped), `${profile} with a timestamp`).toBeNull();
+        expect(signedAttributesAsSet(stamped)).toEqual(signedAttributesAsSet(cms));
       }
 
       const request = await buildOcspRequest(

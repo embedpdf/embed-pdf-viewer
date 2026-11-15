@@ -7,10 +7,13 @@
  * It checks the encoding rules that have one answer: a definite length in its shortest form,
  * no string or number built of parts, a boolean of `00` or `ff`, an integer with no spare
  * leading byte, and the members of a set in ascending order. It does not look inside an octet
- * string or a bit string: give it what they wrap to check that too.
+ * string or a bit string: give it what they wrap to check that too. It also can't tell that a
+ * signer's signed attributes are a set, since they sit under a tag of their own:
+ * `signedAttributesAsSet()` hands them over as one.
  */
 
 const UNIVERSAL = 0;
+const CONTEXT = 2;
 const BOOLEAN = 1;
 const INTEGER = 2;
 const SEQUENCE = 16;
@@ -120,6 +123,40 @@ function elementProblem(bytes: Uint8Array, element: Element): string | null {
     }
   }
   return null;
+}
+
+function membersOf(bytes: Uint8Array, element: Element): Element[] {
+  const members: Element[] = [];
+  for (let at = element.content; at < element.end; ) {
+    const member = readElement(bytes, at, element.end);
+    if (typeof member === 'string') throw new Error(member);
+    members.push(member);
+    at = member.end;
+  }
+  return members;
+}
+
+/**
+ * The signed attributes of a CMS's one signer as they are written, tagged as the set they are.
+ * In a SignerInfo they sit under `[0]`, so `derProblem()` on the whole CMS never checks their
+ * order. RFC 5652 has them signed as a set in DER.
+ *
+ *     ContentInfo ::= sequence { contentType, content [0] explicit SignedData }
+ *     SignedData  ::= sequence { ..., signerInfos set of SignerInfo }
+ *     SignerInfo  ::= sequence { version, sid, digestAlgorithm, signedAttrs [0] implicit, ... }
+ */
+export function signedAttributesAsSet(cms: Uint8Array): Uint8Array {
+  const contentInfo = readElement(cms, 0, cms.length);
+  if (typeof contentInfo === 'string') throw new Error(contentInfo);
+  const signedData = membersOf(cms, membersOf(cms, contentInfo)[1]!)[0]!;
+  const signerInfo = membersOf(cms, membersOf(cms, signedData).at(-1)!)[0]!;
+  const signed = membersOf(cms, signerInfo).find(
+    (member) => member.tagClass === CONTEXT && member.tagNumber === 0,
+  );
+  if (!signed) throw new Error('the signer has no signed attributes');
+  const set = cms.slice(signed.start, signed.end);
+  set[0] = 0x31;
+  return set;
 }
 
 /** What makes `bytes` not one DER value, or null when it is one. */
