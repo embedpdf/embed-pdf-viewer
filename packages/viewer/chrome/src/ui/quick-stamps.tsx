@@ -1,9 +1,10 @@
 /**
  * Quick marks in the toolbar: a row of stamp thumbnails that arm on click —
  * the checkmark, the cross, whatever the embedder configured
- * (`plugins.stamp.quick`: `library:name`, `standard` for the standard stamps). The hover ghost and
- * the click placement are the annotation plugin's, exactly as from the
- * sidebar; only the picker moved. Renders nothing until the assets exist.
+ * (`plugins.stamp.quick`: `library:name`, `standard` for the standard
+ * stamps, the app's own libraries by their ids). The hover ghost and the
+ * click placement are the annotation plugin's, exactly as from the sidebar;
+ * only the picker moved. Renders nothing until the assets exist.
  * Lives in the workspace toolbar, so it reads the active document's tool.
  */
 import { useEffect } from 'react';
@@ -44,8 +45,8 @@ export function QuickStamps() {
   const ids = (quick ?? []).map(quickStampAssetIdOf);
 
   // A quick mark from the built-in library needs that library loaded — the
-  // one case the toolbar pays for it at boot. The user's own libraries are
-  // restored by the workspace store.
+  // one case the toolbar pays for it at boot. The user's own libraries and
+  // the app's are brought in by the workspace store.
   const wantsDefault = ids.some((id) => id.startsWith(`${DEFAULT_LIBRARY_ID}:`));
   useEffect(() => {
     if (!wantsDefault) return;
@@ -101,7 +102,14 @@ function QuickStampButton({
         className={buttonClass(active, true)}
       >
         {url ? (
-          <img src={url} alt="" className="h-5 w-5 object-contain" draggable={false} />
+          // The stamp at the button's full height and its own width: in an icon's square a
+          // wide stamp shrinks to a few faint pixels.
+          <img
+            src={url}
+            alt=""
+            className="h-[22px] w-auto max-w-24 object-contain"
+            draggable={false}
+          />
         ) : (
           <span className="text-xs">{asset.label}</span>
         )}

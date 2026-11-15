@@ -160,9 +160,14 @@ export function createLibraryWrites(
       );
 
       // Library identity: /Title (Acrobat), then format version 1 PieceInfo, then the caller's fallback.
+      // The id is the caller's word, else the file's.
       const catalogEntries = (await doc.pieceInfo.get(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
       const takenLibraryIds = new Set(Object.keys(ctx.state.get().libraries));
-      const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
+      const libraryId = allocateId(
+        options?.id ?? entryString(catalogEntries, 'Id'),
+        'stamp-lib',
+        takenLibraryIds,
+      );
       const docMeta = await doc.metadata.get();
       const libraryName =
         (docMeta.title && docMeta.title.length > 0 ? docMeta.title : undefined) ??

@@ -12,6 +12,7 @@ import {
 } from '@embedpdf/default-signature-fonts/library';
 import type { StampFont } from '@embedpdf/react/stamp';
 
+import { fileBytes } from '../config/file-bytes';
 import type { SignatureFont } from '../plugin-settings';
 
 /** A font the maker offers: its key, what the picker shows, and its bytes, read once. */
@@ -43,13 +44,7 @@ const DEFAULT_FONTS: readonly MarkFont[] = DEFAULT_SIGNATURE_FONTS.map((font) =>
 }));
 
 /** The bytes of an app's font: its `data`, or its `url` fetched. */
-const bytesOf = (font: SignatureFont) => async (): Promise<Uint8Array> => {
-  if (font.data) return new Uint8Array(font.data);
-  if (!font.url) throw new Error(`[embedpdf] signature font "${font.key}" has no url or data`);
-  const response = await fetch(font.url);
-  if (!response.ok) throw new Error(`${font.url}: HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
-};
+const bytesOf = (font: SignatureFont) => () => fileBytes(font, `signature font "${font.key}"`);
 
 /** Each config's fonts, made once: the maker and the stamp plugin read the same files. */
 const made = new WeakMap<readonly SignatureFont[], readonly MarkFont[]>();

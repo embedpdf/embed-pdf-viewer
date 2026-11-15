@@ -2,9 +2,11 @@
  * The user's stamp libraries live in the browser (IndexedDB): restored once
  * per workspace, written on every change, for as long as the viewer lives —
  * a signature made while the stamps sidebar is closed is persisted exactly
- * like a stamp imported while it is open. The built-in library is never
- * stored (it is fetched again next time, in the locale of that moment); the
- * panels that need it bring it in lazily through `ensureDefaultLibrary`.
+ * like a stamp imported while it is open. The app's own libraries
+ * (`plugins.stamp.libraries`) come in right after the stored ones. Neither
+ * they nor the built-in library are ever stored: they come from the app again
+ * next time, the built-in one in the locale of that moment, brought in lazily
+ * by the panels that need it (`ensureDefaultLibrary`).
  *
  * Mounted once in the Shell, workspace-scoped (the stamp plugin is).
  */
@@ -16,6 +18,8 @@ import {
   useStamp,
   type StampCapability,
 } from '@embedpdf/react/stamp';
+import { useStampSettings } from '../config-context';
+import { ensureAppLibraries } from '../config/app-stamps';
 import { DEFAULT_LIBRARY_ID } from '../config/default-stamps';
 
 const store =
@@ -37,11 +41,15 @@ export const restoreStampLibrariesOnce = (stamp: StampCapability): Promise<unkno
 
 export function StampLibraryStore() {
   const stamp = useStamp();
+  const { libraries } = useStampSettings();
   useEffect(() => {
-    void restoreStampLibrariesOnce(stamp);
-    return store
-      ? persistStampLibraries(stamp, store, { except: [DEFAULT_LIBRARY_ID] })
-      : undefined;
+    restoreStampLibrariesOnce(stamp)
+      .then(() => ensureAppLibraries(stamp, libraries ?? []))
+      .catch((error: unknown) => console.error('[embedpdf] stamp libraries failed:', error));
+    const except = [DEFAULT_LIBRARY_ID, ...(libraries ?? []).map((library) => library.id)];
+    return store ? persistStampLibraries(stamp, store, { except }) : undefined;
+    // `libraries` is read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp]);
   return null;
 }

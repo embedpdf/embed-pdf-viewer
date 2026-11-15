@@ -40,9 +40,12 @@ export interface ViewerHost {
 
 /**
  * Serve `dist` at the root, `/sample.pdf`, `/fonts/brand.ttf` and each page by
- * its path. The files are read once; a request only selects one of them.
+ * its path: HTML given as a string, any other file as its bytes, typed by its
+ * extension. The files are read once; a request only selects one of them.
  */
-export async function serveViewer(pages: Readonly<Record<string, string>>): Promise<ViewerHost> {
+export async function serveViewer(
+  pages: Readonly<Record<string, string | Buffer>>,
+): Promise<ViewerHost> {
   const assets = new Map<string, { body: Buffer | string; type: string }>();
   const walk = (directory: string, prefix: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -57,8 +60,8 @@ export async function serveViewer(pages: Readonly<Record<string, string>>): Prom
   walk(dist, '');
   assets.set('/sample.pdf', { body: readFileSync(samplePdf), type: TYPES['.pdf']! });
   assets.set('/fonts/brand.ttf', { body: readFileSync(fontFile), type: TYPES['.ttf']! });
-  for (const [path, html] of Object.entries(pages)) {
-    assets.set(path, { body: html, type: TYPES['.html']! });
+  for (const [path, body] of Object.entries(pages)) {
+    assets.set(path, { body, type: TYPES[extname(path)] ?? TYPES['.html']! });
   }
   const server: Server = createServer((request, response) => {
     const asset = assets.get((request.url ?? '/').split('?')[0]!);

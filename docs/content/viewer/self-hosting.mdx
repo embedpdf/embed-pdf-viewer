@@ -155,8 +155,11 @@ none:
 { plugins: { stamp: { standard: false } } }
 ```
 
-A URL you give is used exactly as given. Libraries your users create are kept
-in their browser's IndexedDB, never sent anywhere.
+A URL you give is used exactly as given. The file there may be a stamp library
+of your own, Acrobat's or one exported from the stamps panel: its stamps become
+the standard ones (`standard:<name>` in `quick`), and like ours it is never kept
+in the browser. Libraries your users create are kept in their browser's
+IndexedDB, never sent anywhere.
 
 ## The CDN snippet
 

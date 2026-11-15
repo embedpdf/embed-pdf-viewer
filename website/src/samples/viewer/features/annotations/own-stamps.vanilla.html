@@ -1,0 +1,17 @@
+<embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const registration = 'https://www.embedpdf.com/pdfs/registration.pdf';
+
+  document.getElementById('viewer').config = {
+    src: registration,
+    plugins: {
+      stamp: {
+        libraries: [{ id: 'marks', url: 'https://www.embedpdf.com/pdfs/marks.pdf' }],
+        quick: ['marks:Check', 'marks:Cross'],
+      },
+    },
+  };
+</script>
