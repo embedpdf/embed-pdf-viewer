@@ -8,7 +8,12 @@ import { ensureEngine, toArrayBuffer } from './engine';
 import { WEBCRYPTO_HASH } from './oids';
 import { CmsError, readCmsParts, type CmsParts } from './parse';
 import { addUnsignedAttribute, encodeElement } from './splice';
-import { checkTimestampToken, signatureValueOf, type TimestampProblem } from './verify-timestamp';
+import {
+  checkTimestampToken,
+  signatureValueOf,
+  type TimestampCheck,
+  type TimestampProblem,
+} from './verify-timestamp';
 
 /** id-aa-signatureTimeStampToken (1.2.840.113549.1.9.16.2.14), as DER. */
 const TIMESTAMP_TOKEN_OID = new Uint8Array([
@@ -68,28 +73,38 @@ export async function attachSignatureTimestamp(input: {
   if (check.verdict !== 'valid') {
     throw signingRefused(refusalFor(check.problem!), `the timestamp: ${detailFor(check)}`);
   }
-  if (input.trust) {
-    const trust = await validateTimestampAuthority({
-      token: check.token!,
-      certificates: parts.certificates,
-      trust: input.trust,
-      genTime: check.info!.genTime,
-    });
-    if (trust.status !== 'trusted') {
-      const name = certificateCommonName(check.token!.parsed.signerCertificate);
-      throw new EngineError(
-        EngineErrorCode.SignatureRefused,
-        `the timestamp's authority${name ? ` ("${name}")` : ''} isn't trusted: ${trust.reason ?? 'no path to a timestamp anchor'}. Add its root to \`timestampAnchors\``,
-        { details: { trust: trust.status, trustReason: trust.reason ?? null } },
-      );
-    }
-  }
+  if (input.trust) await requireTrustedAuthority(check, input.trust, parts.certificates);
 
   try {
     return addUnsignedAttribute(cms, timestampTokenAttribute(token));
   } catch (error) {
     throw signingRefused('malformed', error instanceof CmsError ? error.message : String(error));
   }
+}
+
+/**
+ * Refuse a timestamp token whose authority `trust` doesn't cover: `SignatureRefused`, with
+ * `details.trust` and `details.trustReason`. `check` is the token's own check, which passed;
+ * `certificates` are more candidates for the authority's path.
+ */
+export async function requireTrustedAuthority(
+  check: TimestampCheck,
+  trust: TrustPort,
+  certificates: CmsParts['certificates'] = [],
+): Promise<void> {
+  const judged = await validateTimestampAuthority({
+    token: check.token!,
+    certificates,
+    trust,
+    genTime: check.info!.genTime,
+  });
+  if (judged.status === 'trusted') return;
+  const name = certificateCommonName(check.token!.parsed.signerCertificate);
+  throw new EngineError(
+    EngineErrorCode.SignatureRefused,
+    `the timestamp's authority${name ? ` ("${name}")` : ''} isn't trusted: ${judged.reason ?? 'no path to a timestamp anchor'}. Add its root to \`timestampAnchors\``,
+    { details: { trust: judged.status, trustReason: judged.reason ?? null } },
+  );
 }
 
 /** The unsigned attribute a signature carries its timestamp token in, as DER. */

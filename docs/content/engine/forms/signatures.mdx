@@ -179,6 +179,9 @@ await sign(doc, {
 A token from an authority `trust` doesn't cover fails the signing, with `SignatureRefused`, and
 nothing is signed. That catches a wrong address before any reader sees the result.
 
+`timestampTrust` judges a [document timestamp](#then-timestamp-the-document) the same way,
+where the key is the authority: `sign(doc, { kind: 'timestamp', key, timestampTrust: trust })`.
+
 ### When it fails
 
 Every error `httpTimestampAuthority()` raises carries the authority's address in
