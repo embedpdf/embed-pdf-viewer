@@ -69,9 +69,9 @@ and says `null` for an id it doesn't have.
 
 Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
 `annotation:delete` a selection the user may delete, the `snapshot:` commands a snapshot, and
-`history:undo` and `history:redo` a change to undo or redo, with `historyPlugin()` among your
-plugins. Without [`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not
-allowed.
+`history:undo` and `history:redo` a change to undo or redo, and <Fw only={['react', 'vue', 'svelte']}>`historyPlugin()` among your
+plugins</Fw><Fw only="angular">`withHistory()` in `provideEmbedPdf()`</Fw>. Without
+[`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not allowed.
 
 ## Keyboard shortcuts
 
