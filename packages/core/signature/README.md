@@ -36,7 +36,7 @@ npm install @embedpdf/core-signature
 
 ## Documentation
 
-- [Digital signatures](https://www.embedpdf.com/docs/engine/forms/signatures): Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, and certify a document.
+- [Digital signatures](https://www.embedpdf.com/docs/engine/forms/signatures): Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, timestamp the signature, and certify a document.
 
 ## License
 

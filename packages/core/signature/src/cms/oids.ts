@@ -6,6 +6,8 @@ export const OID = {
   contentType: '1.2.840.113549.1.9.3',
   messageDigest: '1.2.840.113549.1.9.4',
   signingTime: '1.2.840.113549.1.9.5',
+  /** ESS signing-certificate: binds the signer's certificate by its SHA-1 hash (RFC 2634). */
+  signingCertificate: '1.2.840.113549.1.9.16.2.12',
   signingCertificateV2: '1.2.840.113549.1.9.16.2.47',
   timestampToken: '1.2.840.113549.1.9.16.2.14',
   /** id-ct-TSTInfo: the content of an RFC 3161 timestamp token. */
@@ -26,6 +28,9 @@ export const OID = {
   subjectKeyIdentifier: '2.5.29.14',
   keyUsage: '2.5.29.15',
   basicConstraints: '2.5.29.19',
+  extendedKeyUsage: '2.5.29.37',
+  /** id-kp-timeStamping: the purpose a timestamp authority's certificate carries (RFC 3161 §2.3). */
+  timeStamping: '1.3.6.1.5.5.7.3.8',
   commonName: '2.5.4.3',
 } as const;
 

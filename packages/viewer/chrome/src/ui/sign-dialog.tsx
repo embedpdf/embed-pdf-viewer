@@ -7,11 +7,27 @@
  * unless it's signing.
  */
 import { useId, useState } from 'react';
+import { isPluginError } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { useStampAssetPreviewUrl } from '@embedpdf/react/stamp';
 import { useSignature, type FormFieldRef, type Mark } from '@embedpdf/react/signature';
 import { Dialog } from './dialog';
+
+/**
+ * The words for a signing that failed at its timestamp, or null for any other failure. An
+ * error from the timestamp authority names it in `details.authority`; the engine's `Network`
+ * code underneath means no answer came, anything else that the authority refused.
+ */
+function timestampFailureKey(error: unknown): string | null {
+  if (!isPluginError(error)) return null;
+  const { details, cause } = error as {
+    details?: { authority?: unknown };
+    cause?: { code?: unknown };
+  };
+  if (!details?.authority) return null;
+  return cause?.code === 'Network' ? 'demo.signTimestampUnreachable' : 'demo.signTimestampRefused';
+}
 
 export function SignDialog() {
   const t = useT();
@@ -57,7 +73,14 @@ export function SignDialog() {
       }
       surface.close();
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      const timestampFailure = timestampFailureKey(error);
+      setError(
+        timestampFailure
+          ? t(timestampFailure)
+          : error instanceof Error
+            ? error.message
+            : String(error),
+      );
     } finally {
       setBusy(null);
     }

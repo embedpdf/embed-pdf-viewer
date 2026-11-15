@@ -107,26 +107,36 @@ export async function createTestSigner(
 }
 
 export interface TestTimestampAuthority extends CmsSigner {
-  /** DER of the authority's self-signed certificate. */
+  /** DER of the authority's self-signed certificate, whose only purpose is timestamping. */
   readonly certificate: Uint8Array;
 }
 
 /**
  * A throwaway RFC 3161 timestamp authority for tests and demos: it stamps
  * whatever digest it is given with the current time, signed by a fresh
- * self-signed key. The key for `sign(doc, { kind: 'timestamp', key })`;
- * never use it to stamp a real document.
+ * self-signed key. Its certificate is an authority's, not a signer's: see
+ * {@link timestampAuthorityCertificate}. The key for
+ * `sign(doc, { kind: 'timestamp', key })`; never use it to stamp a real document.
  */
 export async function createTestTimestampAuthority(
   options: { commonName?: string } = {},
 ): Promise<TestTimestampAuthority> {
-  const authority = await createTestSigner({
+  const { timestampAuthorityCertificate } = await import('./self-signed');
+  const keys = await generateSigningKeyPair('RSA-PKCS1-v1_5', 'sha256', true);
+  const certificate = await timestampAuthorityCertificate({
+    publicKey: keys.publicKey,
+    privateKey: keys.privateKey,
     commonName: options.commonName ?? 'EmbedPDF test timestamp authority',
+    hash: 'sha256',
+  });
+  const authority = webCryptoSigner({
+    privateKey: keys.privateKey,
+    certificateChain: [certificate],
   });
   const { buildTimestampToken } = await import('../cms/timestamp');
   return {
     kind: 'cms',
-    certificate: authority.certificate,
+    certificate,
     sign: ({ digest, algorithm }) => buildTimestampToken({ digest, hash: algorithm, authority }),
   };
 }

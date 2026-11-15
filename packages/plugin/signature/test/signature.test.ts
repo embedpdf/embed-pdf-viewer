@@ -15,10 +15,12 @@ import { createTestContext, type TestContext } from '@embedpdf/core/testing';
 import {
   buildDetachedCms,
   createTestSigner,
+  createTestTimestampAuthority,
   memoryKeyStore,
   personalSigner,
   profileFor,
   remoteSigner,
+  type CmsSigner,
 } from '@embedpdf/core-signature';
 import {
   toPageRef,
@@ -139,7 +141,11 @@ function makeSignature(
   const ctx = createTestContext({
     id: 'signature',
     state: initialSignatureModel(),
-    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['signingKey', 'trust'] },
+    settings: {
+      defaults: SIGNATURE_DEFAULTS,
+      registered: config,
+      whole: ['signingKey', 'timestampAuthority', 'trust'],
+    },
     documentId: 'doc-1',
     doc,
     capabilities,
@@ -525,6 +531,244 @@ describe('signing', () => {
       expect((await signature.validate())[0]!.summary).toBe('valid');
     } finally {
       await secondDoc.close();
+    }
+  });
+});
+
+describe('timestamps', () => {
+  const mark = { assetId: 'people:signature' };
+  /** A CAdES signature over what was prepared, as a key elsewhere would return it. */
+  const cmsFor = (
+    prepared: SignaturePrepared,
+    signer: Awaited<ReturnType<typeof createTestSigner>>,
+  ) =>
+    buildDetachedCms({
+      digest: prepared.digest,
+      hash: prepared.algorithm,
+      profile: profileFor('ETSI.CAdES.detached'),
+      signer,
+    });
+  /** The timestamp of the document's one signature, as the plugin reads it; `null` without one. */
+  const timestampOf = async (signature: SignatureCapability) =>
+    (await signature.validate())[0]!.timestamp;
+
+  it('with an authority set, every signature it seals carries a timestamp, in one step and in two', async () => {
+    const signer = await createTestSigner();
+    const timestampAuthority = await createTestTimestampAuthority();
+    for (const steps of ['one', 'two'] as const) {
+      const doc = await openDoc();
+      try {
+        const { signature } = makeSignature(
+          doc,
+          { signingKey: signer, timestampAuthority },
+          { stamp: stampStub(artwork) },
+        );
+        await signature.refresh();
+        if (steps === 'one') {
+          await signature.sign({ field: SIG, mark });
+        } else {
+          const prepared = await signature.prepareSignature({ field: SIG, mark });
+          // Room for the token is reserved when the signing is prepared.
+          expect(prepared.contentsSizeBytes).toBe(16384);
+          await signature.completeSignature(prepared.signingId, await cmsFor(prepared, signer));
+        }
+        expect(await timestampOf(signature), steps).toMatchObject({
+          cryptography: 'valid',
+          summary: 'valid-untrusted',
+        });
+      } finally {
+        await doc.close();
+      }
+    }
+  });
+
+  it('a call can sign without a timestamp, or with another authority', async () => {
+    const signer = await createTestSigner();
+    const timestampAuthority = await createTestTimestampAuthority();
+    const other = await createTestTimestampAuthority({ commonName: 'another authority' });
+
+    const plain = await openDoc();
+    try {
+      const { signature } = makeSignature(
+        plain,
+        { signingKey: signer, timestampAuthority },
+        { stamp: stampStub(artwork) },
+      );
+      await signature.refresh();
+      await signature.sign({ field: SIG, mark, timestampAuthority: null });
+      expect(await timestampOf(signature)).toBeNull();
+    } finally {
+      await plain.close();
+    }
+
+    const twoSteps = await openDoc();
+    try {
+      const { signature } = makeSignature(
+        twoSteps,
+        { signingKey: signer, timestampAuthority },
+        { stamp: stampStub(artwork) },
+      );
+      await signature.refresh();
+      const prepared = await signature.prepareSignature({
+        field: SIG,
+        mark,
+        timestampAuthority: other,
+      });
+      await signature.completeSignature(prepared.signingId, await cmsFor(prepared, signer));
+      const stamp = await timestampOf(signature);
+      expect(Array.from(stamp!.authorityCertificate!)).toEqual(Array.from(other.certificate));
+    } finally {
+      await twoSteps.close();
+    }
+  });
+
+  it('completing checks the CMS first: a wrong one is refused, and the signing stays parked', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    try {
+      const { signature } = makeSignature(doc, {}, { stamp: stampStub(artwork) });
+      await signature.refresh();
+      const prepared = await signature.prepareSignature({ field: SIG, mark });
+      const wrong = await cmsFor({ ...prepared, digest: new Uint8Array(32).fill(4) }, signer);
+
+      await expect(signature.completeSignature(prepared.signingId, wrong)).rejects.toMatchObject({
+        name: 'PluginError',
+        code: 'operation-failed',
+        details: { reason: 'digest-mismatch' },
+      });
+      expect(signature.getSignature(SIG)?.signed).toBe(false);
+      expect(signature.getPending()?.signingId).toBe(prepared.signingId);
+
+      // The same signing completes with the CMS that does sign it.
+      await signature.completeSignature(prepared.signingId, await cmsFor(prepared, signer));
+      expect(signature.getSignature(SIG)?.signed).toBe(true);
+      expect(signature.getPending()).toBeNull();
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('an authority that does not answer leaves a two-step signing parked, to complete again', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    const real = await createTestTimestampAuthority();
+    let asked = 0;
+    const timestampAuthority: CmsSigner = {
+      kind: 'cms',
+      sign: (request) => {
+        if (asked++ === 0) throw new Error('the authority is down');
+        return real.sign(request);
+      },
+    };
+    try {
+      const { signature } = makeSignature(
+        doc,
+        { signingKey: signer, timestampAuthority },
+        { stamp: stampStub(artwork) },
+      );
+      await signature.refresh();
+      const prepared = await signature.prepareSignature({ field: SIG, mark });
+      const cms = await cmsFor(prepared, signer);
+
+      await expect(signature.completeSignature(prepared.signingId, cms)).rejects.toMatchObject({
+        name: 'PluginError',
+        message: 'the authority is down',
+      });
+      expect(signature.getPending()?.signingId).toBe(prepared.signingId);
+
+      await signature.completeSignature(prepared.signingId, cms);
+      expect((await timestampOf(signature))?.cryptography).toBe('valid');
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('with trust set, a timestamp from an authority it does not cover is not sealed', async () => {
+    const signer = await createTestSigner();
+    const timestampAuthority = await createTestTimestampAuthority({ commonName: 'a stranger' });
+    const known = await createTestTimestampAuthority();
+    const trust = {
+      anchors: async () => [signer.certificate],
+      timestampAnchors: async () => [known.certificate],
+    };
+
+    const refusing = await openDoc();
+    try {
+      const { signature } = makeSignature(
+        refusing,
+        { signingKey: signer, timestampAuthority, trust },
+        { stamp: stampStub(artwork) },
+      );
+      await signature.refresh();
+      await expect(signature.sign({ field: SIG, mark })).rejects.toMatchObject({
+        name: 'PluginError',
+        code: 'operation-failed',
+        details: { trust: 'untrusted' },
+      });
+      expect(signature.getSignature(SIG)?.signed).toBe(false);
+
+      const prepared = await signature.prepareSignature({ field: SIG, mark });
+      await expect(
+        signature.completeSignature(prepared.signingId, await cmsFor(prepared, signer)),
+      ).rejects.toMatchObject({ details: { trust: 'untrusted' } });
+      expect(signature.getPending()?.signingId).toBe(prepared.signingId);
+      await signature.cancelPending();
+    } finally {
+      await refusing.close();
+    }
+
+    // The same authority with one that trust covers, and with no trust at all.
+    for (const config of [
+      { timestampAuthority: known, trust },
+      { timestampAuthority, trust: null },
+    ]) {
+      const doc = await openDoc();
+      try {
+        const { signature } = makeSignature(
+          doc,
+          { signingKey: signer, ...config },
+          { stamp: stampStub(artwork) },
+        );
+        await signature.refresh();
+        await signature.sign({ field: SIG, mark });
+        expect(signature.getSignature(SIG)?.signed).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    }
+  });
+
+  it('validate() can judge each signature at its earliest trusted timestamp', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    const timestampAuthority = await createTestTimestampAuthority();
+    try {
+      const { signature } = makeSignature(
+        doc,
+        {
+          signingKey: signer,
+          timestampAuthority,
+          trust: {
+            anchors: async () => [signer.certificate],
+            timestampAnchors: async () => [timestampAuthority.certificate],
+          },
+        },
+        { stamp: stampStub(artwork) },
+      );
+      await signature.refresh();
+      await signature.sign({ field: SIG, mark });
+
+      const [now] = await signature.validate();
+      expect(now).toMatchObject({ summary: 'valid', validationTime: { kind: 'now' } });
+      expect(now!.timestamp!.summary).toBe('valid');
+
+      const [then] = await signature.validate({ validationTime: { kind: 'earliest-timestamp' } });
+      expect(then).toMatchObject({
+        summary: 'valid',
+        validationTime: { kind: 'timestamp', genTime: then!.timestamp!.genTime },
+      });
+    } finally {
+      await doc.close();
     }
   });
 });

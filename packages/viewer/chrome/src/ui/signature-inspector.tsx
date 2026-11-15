@@ -1,7 +1,8 @@
 /**
  * The validation popover (`signature-inspector` surface): what a signed
  * field's signature says and whether it holds — the four independent facts
- * (integrity, cryptography, trust, changes since) and the signer's claims,
+ * (integrity, cryptography, trust, changes since), the signer's claims and
+ * the timestamp an authority vouches for,
  * anchored at the widget when its box is known, plus the signed revision as
  * a download (the exact bytes the signature covers). Mounted in the Stage
  * overlay so `<Anchored>` can project onto the page.
@@ -83,6 +84,9 @@ export function SignatureInspector() {
   };
   const summary = verdict?.summary ?? null;
   const modifications = verdict?.modifications.verdict ?? null;
+  // The time an authority vouches for, beside the one the signer claims: toned by whether the
+  // token holds and its authority is trusted.
+  const timestamp = verdict?.timestamp ?? null;
   const row = (label: string, value: string, className = 'text-fg') => (
     <div className="flex items-baseline justify-between gap-3 text-xs">
       <span className="text-fg-muted">{label}</span>
@@ -113,6 +117,19 @@ export function SignatureInspector() {
         {dto.signer.signedAt
           ? row(t('demo.inspectTime'), dateTime(dto.signer.signedAt, locale))
           : null}
+        {timestamp ? (
+          <div className="flex items-baseline justify-between gap-3 text-xs">
+            <span className="text-fg-muted">{t('demo.inspectTimestamp')}</span>
+            <span className="text-end">
+              <span className={tone(timestamp.summary)}>
+                {timestamp.genTime ? dateTime(timestamp.genTime, locale) : '—'}
+              </span>
+              {timestamp.authorityName ? (
+                <span className="text-fg-muted block">{timestamp.authorityName}</span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
       </div>
       <div className="border-border-subtle mt-2 flex flex-col gap-1 border-t pt-2">
         {row(
