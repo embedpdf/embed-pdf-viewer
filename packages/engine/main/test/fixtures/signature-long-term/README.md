@@ -1,6 +1,6 @@
 # Validation data and document timestamps, judged by Acrobat
 
-Sixteen signed PDFs that carry long-term validation data (a `/DSS` store), document timestamps,
+Twenty signed PDFs that carry long-term validation data (a `/DSS` store), document timestamps,
 or both, each one opened and judged in Acrobat. `observations.json` holds Acrobat's verdict for
 every signature in every file. It was compiled from Acrobat's own output and nothing in it was
 typed by hand.
@@ -10,7 +10,7 @@ Acrobat reports as altered must read `forbidden`, and one Acrobat reports as val
 
 ## How they were observed
 
-- Acrobat Pro 26.002.22031 on macOS, Nov 15 2026.
+- Acrobat Pro 26.002.22031 on macOS, Nov 15 2026, in three rounds.
 - Through Acrobat JavaScript: `signatureValidate()`, `signatureInfo()` and
   `signatureGetModifications()`.
 - The test root was trusted for signed and certified documents. Files with validation data were
@@ -34,7 +34,9 @@ files.
 - `acrobat-lt.pdf` and `acrobat-lta.pdf` are an EmbedPDF approval signature that Acrobat itself
   took further, with Add Verification Information and with a document timestamp.
 
-`made` in `observations.json` says it per file.
+`made` in `observations.json` says it per file. Two entries carry `judgedCopyKept: false`:
+Acrobat judged a fresh copy of the file it had just written, under another name, and that copy
+was not kept. The file here is byte for byte the one Acrobat wrote.
 
 ## What Acrobat showed
 
@@ -54,6 +56,19 @@ Two more things the files hold:
 
 - **Acrobat's own document timestamp** (`acrobat-lta.pdf`) moves the page's `/Annots` from an
   array inside the page into an object of its own. The earlier signature stays valid.
+- **Four files add something to that page afterwards**, where the list already is an object of
+  its own. Acrobat calls every earlier signature in them valid.
+
+  | File                                    | What was added, and how the list changed                                             |
+  | :-------------------------------------- | :----------------------------------------------------------------------------------- |
+  | `grow-acrobat-lta+second-timestamp.pdf` | pyHanko, a document timestamp: the list object grows in place.                       |
+  | `grow-acrobat-lta+second-signature.pdf` | pyHanko, a signature in a new box: the list object grows in place.                   |
+  | `acrobat-lta+acrobat-comment.pdf`       | Acrobat, a square comment and its popup: the list object grows in place.             |
+  | `acrobat-lta+acrobat-timestamp.pdf`     | Acrobat, a second timestamp: the page points at a new list object, the old one stays. |
+
+  The engine agrees on the first three. On the fourth it still reads the first timestamp as
+  changed: the old list was not written in that revision, so the analysis cannot read it to see
+  that the new list kept every entry. The test lists it under `KNOWN_DIFFERENCES`.
 - **Acrobat says "LTV enabled" on a certification it calls invalid.** That line alone says
   nothing about validity.
 

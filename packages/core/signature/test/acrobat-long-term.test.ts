@@ -30,7 +30,10 @@ interface Observation {
   made: string;
   signatures: {
     field: string;
-    /** Acrobat's `signatureValidate()`: 4 is valid and trusted, 2 is invalid. */
+    /**
+     * Acrobat's `signatureValidate()`: 4 is valid and trusted, 3 is unknown (the signer could
+     * not be checked; the document is reported unmodified), 2 is invalid.
+     */
     status: number;
     statusText: string;
   }[];
@@ -39,6 +42,24 @@ interface Observation {
 const observations: { cases: Observation[] } = JSON.parse(
   await readFile(resolve(fixtures, 'observations.json'), 'utf8'),
 );
+
+/**
+ * Where the engine still reads `forbidden` and Acrobat reads valid. Each entry is a debt, not a
+ * policy: when the engine learns to agree, the test below fails and the entry goes.
+ */
+const KNOWN_DIFFERENCES: { file: string; field: string; why: string }[] = [
+  {
+    file: 'acrobat-lta+acrobat-timestamp.pdf',
+    field: 'Signature3',
+    why:
+      'Acrobat pointed the page at a new /Annots object and left the old one in the file ' +
+      'unwritten. The old list is then not among the evidence the analysis gets, so it cannot ' +
+      'show that the new list kept every entry. It needs the engine to read an object a ' +
+      'revision did not write.',
+  },
+];
+const knownDifference = (file: string, field: string) =>
+  KNOWN_DIFFERENCES.some((entry) => entry.file === file && entry.field === field);
 
 describe('validation data and document timestamps, as Acrobat judges them', () => {
   let engine: Engine;
@@ -94,9 +115,16 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
           expect(signature.statusText).toMatch(/altered/i);
           expect(verdict.modifications.verdict, where).toBe('forbidden');
         } else {
-          expect(signature.status, where).toBe(4);
-          expect(verdict.modifications.verdict, where).not.toBe('forbidden');
-          expect(verdict.modifications.verdict, where).not.toBe('indeterminate');
+          // Valid, or unknown only because the signer could not be checked offline: either
+          // way Acrobat reports nothing altered.
+          expect([3, 4], where).toContain(signature.status);
+          expect(signature.statusText, where).not.toMatch(/INVALID|has been altered|corrupted/);
+          if (knownDifference(observed.file, signature.field)) {
+            expect(verdict.modifications.verdict, where).toBe('forbidden');
+          } else {
+            expect(verdict.modifications.verdict, where).not.toBe('forbidden');
+            expect(verdict.modifications.verdict, where).not.toBe('indeterminate');
+          }
         }
       }
     });
@@ -113,6 +141,60 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
             /moved into an object of its own/.test(finding.detail ?? ''),
         ),
       ).toBe(true);
+    });
+  });
+
+  test('a list that is an object of its own grows there: a new signature field', async () => {
+    for (const file of [
+      'grow-acrobat-lta+second-timestamp.pdf',
+      'grow-acrobat-lta+second-signature.pdf',
+    ]) {
+      await withDocument(file, async (doc) => {
+        // The first timestamp sealed the revision in which the list already was object 30.
+        const all = await findings(doc, 'Signature3');
+        expect(all.filter((finding) => finding.verdict !== 'permitted')).toEqual([]);
+        expect(all.find((finding) => finding.objectNumber === 30)).toMatchObject({
+          rule: 'signature-field-added',
+          verdict: 'permitted',
+        });
+      });
+    }
+  });
+
+  test('a list that is an object of its own grows there: a comment, as Acrobat adds it', async () => {
+    for (const file of ['acrobat-lta+acrobat-comment.pdf']) {
+      await withDocument(file, async (doc) => {
+        for (const field of ['sig', 'Signature3']) {
+          const all = await findings(doc, field);
+          expect(
+            all.filter((finding) => finding.verdict !== 'permitted'),
+            `${file} ${field}`,
+          ).toEqual([]);
+          expect(
+            all.some((finding) => finding.rule === 'annotation' && finding.objectNumber === 30),
+          ).toBe(true);
+        }
+      });
+    }
+  });
+
+  test('a list replaced by another object, the old one left unwritten: one clear refusal', async () => {
+    expect(KNOWN_DIFFERENCES.map((entry) => `${entry.file} ${entry.field}`)).toEqual([
+      'acrobat-lta+acrobat-timestamp.pdf Signature3',
+    ]);
+    await withDocument('acrobat-lta+acrobat-timestamp.pdf', async (doc) => {
+      const refused = (await findings(doc, 'Signature3')).filter(
+        (finding) => finding.verdict === 'forbidden',
+      );
+      // Named once, with the reason, and nothing hanging off it as unexplained.
+      expect(refused).toHaveLength(1);
+      expect(refused[0]).toMatchObject({ rule: 'annotation', objectNumber: 3 });
+      expect(refused[0].detail).toMatch(/cannot be compared/);
+      // The first signature sealed a revision whose list was still inside the page. Judged on
+      // what the file holds now against that revision, both lists are in the evidence, and
+      // it reads as Acrobat reads it.
+      const first = verdictOf(await validateSignatures(doc), 'sig');
+      expect(first.modifications.verdict).toBe('permitted');
     });
   });
 

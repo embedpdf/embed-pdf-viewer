@@ -1224,11 +1224,8 @@ describe('evaluateStep: a signature field added by Acrobat', () => {
 
   test.each([
     ['drops the old entry', '[31 0 R]'],
-    ['puts the new widget first', '[31 0 R 30 0 R]'],
-    ['brings another annotation with it', '[30 0 R 31 0 R 70 0 R]'],
     ['holds an annotation written in place', '[30 0 R 31 0 R <</Subtype /Link>>]'],
-    ['gains nothing', '[30 0 R]'],
-  ])('a moved /Annots that %s is not explained by the new field', (_, holder) => {
+  ])('a moved /Annots that %s is forbidden', (_, holder) => {
     const step = judge(moved(holder));
     expect(step.verdict).toBe('forbidden');
     expect(step.findings.some((f) => f.objectNumber === 60 && f.verdict === 'permitted')).toBe(
@@ -1236,9 +1233,231 @@ describe('evaluateStep: a signature field added by Acrobat', () => {
     );
   });
 
+  // A new signature field explains its own widget joining the end of the list and nothing
+  // else. After a certification that allows form filling that is all that may happen to the
+  // list. After an approval signature the annotation rule judges the rest, as it does for a
+  // list inside the page: where the list is kept changes nothing.
+  test.each([
+    ['puts the new widget first', '[31 0 R 30 0 R]'],
+    ['brings another annotation with it', '[30 0 R 31 0 R 70 0 R]'],
+    ['gains nothing', '[30 0 R]'],
+  ])('a moved /Annots that %s is not explained by the new field', (_, holder) => {
+    const certified = signature(0, 30, { docMdp: 2, catalogCertification: true });
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: moved(holder),
+      before: structure({ signatures: [certified] }),
+      after: { ...after, signatures: [certified, after.signatures[1]] },
+    });
+    expect(step.verdict).toBe('forbidden');
+    expect(step.findings.some((f) => f.objectNumber === 60 && f.verdict === 'permitted')).toBe(
+      false,
+    );
+    const approval = judge(moved(holder));
+    expect(
+      approval.findings.some((f) => f.objectNumber === 60 && f.rule === 'signature-field-added'),
+    ).toBe(false);
+  });
+
   test("a new array that something else also points at is not the page's list alone", () => {
     const step = judge(moved('[30 0 R 31 0 R]', [edge(3, 'Annots'), edge(1, 'Names/Extra')]));
     expect(step.verdict).toBe('forbidden');
+  });
+});
+
+describe("evaluateStep: a page whose /Annots is an object of its own (Acrobat's way)", () => {
+  /** Object 60 is page 3's list: the text field's widget and the signature field. */
+  const list = (after: string, uses: ObjectReferrer[] = [edge(3, 'Annots')]): ObjectChange =>
+    change(60, { old: '[21 0 R 30 0 R]', new: after }, { old: [edge(3, 'Annots')], new: uses });
+  const trailer = change(
+    0,
+    { old: '<</Root 1 0 R/Size 60>>', new: '<</Prev 999/Root 1 0 R/Size 80>>' },
+    {},
+  );
+  /** A document timestamp in a new field, 31, whose widget joins the list. */
+  const newField = (holder: number): ObjectChange[] => [
+    change(
+      31,
+      {
+        old: null,
+        new: '<</F 132/FT /Sig/P 3 0 R/Rect [0 0 0 0]/Subtype /Widget/T (Signature3)/V 32 0 R>>',
+      },
+      { new: [edge(10, 'Fields/[2]'), edge(holder, '[2]')] },
+    ),
+    change(
+      32,
+      { old: null, new: '<</SubFilter /ETSI.RFC3161/Type /DocTimeStamp>>' },
+      { new: [edge(31, 'V')] },
+    ),
+    change(
+      10,
+      {
+        old: '<</Fields [20 0 R 30 0 R]/SigFlags 3>>',
+        new: '<</Fields [20 0 R 30 0 R 31 0 R]/SigFlags 3>>',
+      },
+      { old: [edge(1, 'AcroForm')], new: [edge(1, 'AcroForm')] },
+    ),
+  ];
+  const withField = structure({
+    fields: [
+      ...structure().fields,
+      { objectNumber: 31, name: 'Signature3', kind: 'signature', widgets: [31] },
+    ],
+    signatures: [
+      signature(0, 30),
+      signature(1, 31, {
+        kind: 'timestamp',
+        subFilter: 'ETSI.RFC3161',
+        fieldName: 'Signature3',
+        revisionIndex: 2,
+      }),
+    ],
+  });
+  /** A square comment with its popup and its appearance, joining the list. */
+  const comment: ObjectChange[] = [
+    change(
+      70,
+      { old: null, new: '<</AP <</N 72 0 R>>/P 3 0 R/Popup 71 0 R/Subtype /Square/Type /Annot>>' },
+      { new: [edge(60, '[2]'), edge(71, 'Parent')] },
+    ),
+    change(
+      71,
+      { old: null, new: '<</Parent 70 0 R/Subtype /Popup/Type /Annot>>' },
+      { new: [edge(60, '[3]'), edge(70, 'Popup')] },
+    ),
+    change(
+      72,
+      { old: null, new: 'stream(27,ab)<</Subtype /Form/Type /XObject>>' },
+      { new: [edge(70, 'AP/N')] },
+    ),
+  ];
+  const refused = (step: ReturnType<typeof evaluateStep>) =>
+    step.findings.filter((f) => f.verdict !== 'permitted');
+
+  test('the list grows there by a new signature field: permitted, the page is not written', () => {
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [list('[21 0 R 30 0 R 31 0 R]'), ...newField(60), trailer],
+      before: structure(),
+      after: withField,
+    });
+    expect(refused(step)).toEqual([]);
+    expect(step.verdict).toBe('permitted');
+    expect(step.findings.find((f) => f.objectNumber === 60)).toMatchObject({
+      rule: 'signature-field-added',
+      verdict: 'permitted',
+    });
+  });
+
+  test('the list grows there by a comment: permitted for an approval signature, not after P=2', () => {
+    const changes = [list('[21 0 R 30 0 R 70 0 R 71 0 R]'), ...comment, trailer];
+    const approval = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes,
+      before: structure(),
+      after: structure(),
+    });
+    expect(refused(approval)).toEqual([]);
+    expect(approval.findings.find((f) => f.objectNumber === 60)).toMatchObject({
+      rule: 'annotation',
+      verdict: 'permitted',
+    });
+    const fill = structure({
+      signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true })],
+    });
+    const certified = evaluateStep({ older: 1, newer: 2, changes, before: fill, after: fill });
+    expect(certified.verdict).toBe('forbidden');
+    expect(
+      certified.findings.some(
+        (f) => f.objectNumber === 70 && f.rule === 'annotation' && f.verdict === 'forbidden',
+      ),
+    ).toBe(true);
+  });
+
+  test.each([
+    ['drops a form widget', '[30 0 R]'],
+    ['drops a form widget while a comment joins', '[30 0 R 70 0 R 71 0 R]'],
+  ])('a list that %s is forbidden', (_, after) => {
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [list(after), ...comment, trailer],
+      before: structure(),
+      after: structure(),
+    });
+    expect(step.verdict).toBe('forbidden');
+    expect(step.findings.find((f) => f.objectNumber === 60)).toMatchObject({
+      rule: 'annotation',
+      verdict: 'forbidden',
+      detail: 'page /Annots added or removed a form widget',
+    });
+  });
+
+  test('a new signature field does not explain a list that also lost an entry', () => {
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [list('[30 0 R 31 0 R]'), ...newField(60), trailer],
+      before: structure(),
+      after: withField,
+    });
+    expect(step.verdict).toBe('forbidden');
+    expect(
+      step.findings.some((f) => f.objectNumber === 60 && f.rule === 'signature-field-added'),
+    ).toBe(false);
+  });
+
+  test('an array something else also points at is not a page list', () => {
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [
+        list('[21 0 R 30 0 R 31 0 R]', [edge(3, 'Annots'), edge(1, 'Names/Extra')]),
+        ...newField(60),
+        trailer,
+      ],
+      before: structure(),
+      after: withField,
+    });
+    expect(step.verdict).toBe('forbidden');
+    expect(step.findings.some((f) => f.objectNumber === 60 && f.verdict === 'permitted')).toBe(
+      false,
+    );
+  });
+
+  test('the page points at another list and the old one was not written: one refusal that says so', () => {
+    // What Acrobat writes for a second timestamp: a fresh list, 61, with the old entries and
+    // the new widget. The old list, 60, stays in the file untouched, so it is not a change.
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [
+        change(
+          3,
+          {
+            old: '<</Annots 60 0 R/Parent 2 0 R/Type /Page>>',
+            new: '<</Annots 61 0 R/Parent 2 0 R/Type /Page>>',
+          },
+          {
+            old: [edge(2, 'Kids/[0]'), edge(30, 'P')],
+            new: [edge(2, 'Kids/[0]'), edge(30, 'P'), edge(31, 'P')],
+          },
+        ),
+        change(61, { old: null, new: '[21 0 R 30 0 R 31 0 R]' }, { new: [edge(3, 'Annots')] }),
+        ...newField(61),
+        trailer,
+      ],
+      before: structure(),
+      after: withField,
+    });
+    expect(step.verdict).toBe('forbidden');
+    const forbidden = step.findings.filter((f) => f.verdict === 'forbidden');
+    expect(forbidden).toHaveLength(1);
+    expect(forbidden[0]).toMatchObject({ rule: 'annotation', objectNumber: 3 });
+    expect(forbidden[0].detail).toMatch(/cannot be compared/);
   });
 });
 

@@ -663,39 +663,64 @@ function appendedRefs(c: ObjectChange, key: string): number[] | null {
 }
 
 /**
- * What a page's /Annots gained when it only grew: in place, or moved out of
- * the page into a new array object that holds the old entries first.
- * Acrobat does the second when it adds a document timestamp to a page whose
- * /Annots was an array inside the page (fixture
- * `signature-long-term/acrobat-lta.pdf`: the earlier signature stays valid).
- * `holder` is that new object, to claim with the page.
+ * The array objects of this step that are one page's /Annots and nothing
+ * else, with their page. Acrobat keeps a page's annotation list this way,
+ * as an object of its own, and every entry a reference.
  */
-function grownAnnots(
-  ctx: StepContext,
-  page: ObjectChange,
-): { appended: number[]; holder: ObjectChange | null } | null {
-  const inPlace = appendedRefs(page, 'Annots');
-  if (inPlace) return { appended: inPlace, holder: null };
-  const oldItems = dictEntries(page.value.old)?.Annots;
-  const moved = dictEntries(page.value.new)?.Annots;
-  if (oldItems && oldItems.t !== 'array') return null;
-  if (!moved || moved.t !== 'ref') return null;
-  const holder = ctx.byNum.get(moved.num);
-  if (!holder || holder.change !== 'added' || holder.value.truncated) return null;
-  const list = holder.value.new;
-  if (!list || list.t !== 'array') return null;
-  // The new object is this page's list and nothing else.
-  if (!holder.usage.new.every((e) => e.parent === page.objectNumber && e.label === 'Annots')) {
-    return null;
+function annotsHolders(ctx: StepContext): Map<number, number> {
+  const pages = new Set([...ctx.before.pages, ...ctx.after.pages]);
+  const out = new Map<number, number>();
+  for (const c of ctx.changes) {
+    if (c.kind !== 'array' || c.value.truncated) continue;
+    const uses = [...c.usage.old, ...c.usage.new];
+    // Every use is one page's /Annots: nothing else points at the array.
+    if (uses.length === 0 || !uses.every((e) => pages.has(e.parent) && e.label === 'Annots')) {
+      continue;
+    }
+    const owners = new Set(uses.map((e) => e.parent));
+    if (owners.size !== 1) continue;
+    const onlyReferences = [c.value.old, c.value.new].every(
+      (value) =>
+        value === null || (value.t === 'array' && refsOf(value).length === value.items.length),
+    );
+    if (onlyReferences) out.set(c.objectNumber, uses[0].parent);
   }
-  const oldRefs = refsOf(oldItems);
-  const newRefs = refsOf(list);
-  // Every entry is a reference: an annotation written inside either array is not one we can follow.
-  if (oldItems && oldRefs.length !== oldItems.items.length) return null;
-  if (newRefs.length !== list.items.length) return null;
-  if (oldRefs.length >= newRefs.length) return null;
-  for (let i = 0; i < oldRefs.length; i++) if (oldRefs[i] !== newRefs[i]) return null;
-  return { appended: newRefs.slice(oldRefs.length), holder };
+  return out;
+}
+
+/** A page's annotation list on one side of a step, and the object that holds it when it has one. */
+interface PageList {
+  refs: number[];
+  holder: ObjectChange | null;
+}
+
+/**
+ * Read a page's annotation list on one side: from the page when the array
+ * is inside it, from the list's own object when this step wrote that
+ * object. Null when it cannot be read: the list is an object of its own
+ * that this step left alone, so its entries are not among the evidence.
+ */
+function pageList(
+  ctx: StepContext,
+  holders: ReadonlyMap<number, number>,
+  page: ObjectChange,
+  side: Side,
+): PageList | null {
+  const value = dictEntries(page.value[side])?.Annots;
+  if (!value) return { refs: [], holder: null };
+  if (value.t === 'array') return { refs: refsOf(value), holder: null };
+  if (value.t !== 'ref') return null;
+  const holder = ctx.byNum.get(value.num);
+  if (!holder || holders.get(holder.objectNumber) !== page.objectNumber) return null;
+  const list = holder.value[side];
+  return list ? { refs: refsOf(list), holder } : null;
+}
+
+/** What `after` has beyond `before`, when `before` is its beginning; null otherwise. */
+function appendedTo(before: number[], after: number[]): number[] | null {
+  if (before.length > after.length) return null;
+  for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) return null;
+  return after.slice(before.length);
 }
 
 function newSignatureFields(ctx: StepContext): Set<number> {
@@ -748,24 +773,46 @@ function ruleSignatureFieldAdded(ctx: StepContext): void {
       }
     }
   }
-  // The page that lists the new widget: /Annots append-only.
+  // The page that lists the new widget: /Annots append-only. The list is an
+  // array inside the page, or an object of its own (Acrobat's way); when the
+  // field is added it may stay where it is or move from one to the other
+  // (fixture `signature-long-term/acrobat-lta.pdf`).
+  const holders = annotsHolders(ctx);
   for (const p of ctx.after.pages) {
     const c = ctx.byNum.get(p);
     if (!c || ctx.isIdentical(c)) continue;
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size !== 1 || !changed.has('Annots')) continue;
-    const grown = grownAnnots(ctx, c);
-    if (grown && grown.appended.every((n) => newWidgets.has(n))) {
+    const before = pageList(ctx, holders, c, 'old');
+    const after = pageList(ctx, holders, c, 'new');
+    if (!before || !after) continue;
+    const appended = appendedTo(before.refs, after.refs);
+    if (!appended || !appended.every((n) => newWidgets.has(n))) continue;
+    // A list that moved to another object must also have grown: a move alone
+    // is not something a new field explains.
+    const moved = before.holder !== after.holder;
+    if (moved && appended.length === 0) continue;
+    ctx.claimAll(c, rule);
+    ctx.permitted(c, rule, 'page /Annots gained the new signature widget');
+    for (const holder of new Set([before.holder, after.holder])) {
+      if (!holder) continue;
+      ctx.claimAll(holder, rule);
+      ctx.permitted(
+        holder,
+        rule,
+        'page /Annots moved into an object of its own, with the new signature widget',
+      );
+    }
+  }
+  // A list that already is an object of its own, and grows there: the page
+  // itself is not written (fixtures `signature-long-term/grow-acrobat-lta+*`).
+  for (const number of holders.keys()) {
+    const c = ctx.byNum.get(number)!;
+    if (c.change !== 'modified' || ctx.isIdentical(c)) continue;
+    const appended = appendedTo(refsOf(c.value.old), refsOf(c.value.new));
+    if (appended && appended.length > 0 && appended.every((n) => newWidgets.has(n))) {
       ctx.claimAll(c, rule);
-      ctx.permitted(c, rule, 'page /Annots gained the new signature widget');
-      if (grown.holder) {
-        ctx.claimAll(grown.holder, rule);
-        ctx.permitted(
-          grown.holder,
-          rule,
-          'page /Annots moved into an object of its own, with the new signature widget',
-        );
-      }
+      ctx.permitted(c, rule, 'page /Annots, an object of its own, gained the new signature widget');
     }
   }
   // A parent field whose /Kids gained the new field.
@@ -1020,6 +1067,27 @@ function ruleFormFill(ctx: StepContext): void {
     ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
 }
 
+/**
+ * What a change of a page's annotation list touches: `'widget'` when it adds
+ * or removes a form widget that no rule permitted (a field shown or hidden),
+ * `'annotations'` otherwise.
+ */
+function listChange(
+  ctx: StepContext,
+  widgets: ReadonlySet<number>,
+  before: number[],
+  after: number[],
+): 'widget' | 'annotations' {
+  const removed = before.filter((n) => !after.includes(n));
+  const added = after.filter((n) => !before.includes(n));
+  const touchesWidget = [...removed, ...added].some(
+    (n) =>
+      widgets.has(n) &&
+      !ctx.findings.some((f) => f.objectNumber === n && f.verdict === 'permitted'),
+  );
+  return touchesWidget ? 'widget' : 'annotations';
+}
+
 function ruleAnnotation(ctx: StepContext): void {
   const rule = 'annotation';
   const pages = new Set([...ctx.before.pages, ...ctx.after.pages]);
@@ -1029,11 +1097,16 @@ function ruleAnnotation(ctx: StepContext): void {
     const sub = dictEntries(c.value.new ?? c.value.old)?.Subtype;
     return sub?.t === 'name' && sub.v === 'Widget';
   };
+  const holders = annotsHolders(ctx);
   const annots: ObjectChange[] = [];
   for (const c of ctx.changes) {
     if (c.kind !== 'dictionary' || ctx.isIdentical(c)) continue;
+    // Listed by a page: in the array inside the page, or in the page's list
+    // object.
     const onPage = [...c.usage.old, ...c.usage.new].some(
-      (e) => pages.has(e.parent) && e.label.startsWith('Annots/'),
+      (e) =>
+        (pages.has(e.parent) && e.label.startsWith('Annots/')) ||
+        (holders.has(e.parent) && /^\[\d+\]$/.test(e.label)),
     );
     if (onPage && !isWidget(c)) annots.push(c);
   }
@@ -1064,24 +1137,50 @@ function ruleAnnotation(ctx: StepContext): void {
     }
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size === 1 && changed.has('Annots')) {
-      const removed = refsOf(dictEntries(c.value.old)?.Annots).filter(
-        (n) => !refsOf(dictEntries(c.value.new)?.Annots).includes(n),
-      );
-      const added = refsOf(dictEntries(c.value.new)?.Annots).filter(
-        (n) => !refsOf(dictEntries(c.value.old)?.Annots).includes(n),
-      );
-      const touchesWidget = [...removed, ...added].some(
-        (n) =>
-          widgets.has(n) &&
-          !ctx.findings.some((f) => f.objectNumber === n && f.verdict === 'permitted'),
-      );
-      if (touchesWidget) {
+      const before = pageList(ctx, holders, c, 'old');
+      const after = pageList(ctx, holders, c, 'new');
+      const listObjects = [before?.holder, after?.holder].filter((h) => h != null);
+      if (!before || !after) {
+        // Acrobat points the page at a new list object when it adds a
+        // signature field to a page whose list already was an object of its
+        // own, and leaves the old object in the file unwritten (fixture
+        // `signature-long-term/acrobat-lta+acrobat-timestamp.pdf`). What the
+        // old list held is then not among the evidence, so nothing shows
+        // that the new one kept it.
+        ctx.claimAll(c, rule, false);
+        for (const holder of listObjects) ctx.claimAll(holder, rule, false);
+        ctx.forbidden(
+          c,
+          rule,
+          'page /Annots points at another list object, and the earlier list was not written in this revision: what it held cannot be compared',
+        );
+        continue;
+      }
+      if (listChange(ctx, widgets, before.refs, after.refs) === 'widget') {
         ctx.forbidden(c, rule, 'page /Annots added or removed a form widget');
         continue;
       }
       ctx.claimAll(c, rule);
       ctx.permitted(c, rule, 'page /Annots changed');
+      for (const holder of listObjects) {
+        ctx.claimAll(holder, rule);
+        ctx.permitted(holder, rule, 'page /Annots, an object of its own, changed');
+      }
     }
+  }
+  // A list that is an object of its own and changes there: the page itself is
+  // not written. Acrobat adds a comment this way (fixture
+  // `signature-long-term/acrobat-lta+acrobat-comment.pdf`).
+  for (const number of holders.keys()) {
+    const c = ctx.byNum.get(number)!;
+    if (c.change !== 'modified' || ctx.isIdentical(c)) continue;
+    if (ctx.findings.some((f) => f.objectNumber === number && f.verdict === 'permitted')) continue;
+    if (listChange(ctx, widgets, refsOf(c.value.old), refsOf(c.value.new)) === 'widget') {
+      ctx.forbidden(c, rule, 'page /Annots added or removed a form widget');
+      continue;
+    }
+    ctx.claimAll(c, rule);
+    ctx.permitted(c, rule, 'page /Annots, an object of its own, changed');
   }
   for (const side of SIDES) {
     ctx.claimSubtree(

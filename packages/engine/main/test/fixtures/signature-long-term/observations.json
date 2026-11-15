@@ -8,6 +8,7 @@
     "method": "Acrobat JavaScript: signatureValidate(), signatureInfo(), signatureGetModifications(). The test root was trusted for signed and certified documents. Files with validation data were judged with the test authority stopped.",
     "status": {
       "4": "valid and trusted",
+      "3": "validity unknown: the signer could not be checked",
       "2": "invalid"
     }
   },
@@ -335,6 +336,139 @@
           "certification": "allowNone",
           "byteRange": "kDSSigValTrue",
           "objectIntegrity": "kDSSigValTrue"
+        }
+      ]
+    },
+    {
+      "file": "grow-acrobat-lta+second-timestamp.pdf",
+      "sha256": "783d62b0d79bd59042c9d942eaabc63a06651a3718d1c11ebb433ce36508568c",
+      "byteLength": 69558,
+      "made": "acrobat-lta.pdf, then pyHanko 0.38.1 added a second document timestamp: the /Annots object grows in place.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Timestamp-ea6fe9a0-e690-472f-a5fb-dbfb922eec2c",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "grow-acrobat-lta+second-signature.pdf",
+      "sha256": "d277f0e7d88ab7e72ac3ae1e4120eafdb475e9f16222ffac482ea0a4a91c7ea7",
+      "byteLength": 78050,
+      "made": "acrobat-lta.pdf, then pyHanko 0.38.1 added an approval signature in a new visible field: the /Annots object grows in place. Acrobat could not check the new signer offline.",
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Second",
+          "status": 3,
+          "statusText": "Signature validity is UNKNOWN. The document has not been modified since this signature was applied. The signer's identity was valid when it was issued, but no revocation checks could be made to validate the identity at this time.",
+          "longTermText": null,
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lta+acrobat-comment.pdf",
+      "sha256": "9759107dc41ed76a05bf529409c687c738b4f4806ed09b525115734366a5ec45",
+      "byteLength": 67670,
+      "made": "acrobat-lta.pdf, then Acrobat added a square comment: the /Annots object grows in place by the square and its popup.",
+      "judgedCopyKept": false,
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        }
+      ]
+    },
+    {
+      "file": "acrobat-lta+acrobat-timestamp.pdf",
+      "sha256": "4588fca18176e1bdc8954121e676843e6ff9868737aee59e4cce3642f33af925",
+      "byteLength": 80363,
+      "made": "acrobat-lta.pdf, then Acrobat added a second document timestamp: it points the page at a new /Annots object that holds the old widgets and the new one, and leaves the old object in the file.",
+      "judgedCopyKept": false,
+      "signatures": [
+        {
+          "field": "sig",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Signer. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature3",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
+        },
+        {
+          "field": "Signature4",
+          "status": 4,
+          "statusText": "Signature is VALID, signed by EmbedPDF Test Timestamp Authority. The document has not been modified since this signature was applied. The signer's identity is valid.",
+          "longTermText": "Signature is LTV enabled",
+          "certification": null,
+          "byteRange": "kDSSigValTrue",
+          "objectIntegrity": "kDSSigValUnused"
         }
       ]
     }
