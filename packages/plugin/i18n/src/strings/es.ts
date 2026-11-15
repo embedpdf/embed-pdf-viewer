@@ -18,6 +18,7 @@ export const es: EmbedpdfStrings = {
     view: { rotateClockwise: 'Girar a la derecha', rotateCounterclockwise: 'Girar a la izquierda' },
     selection: { copy: 'Copiar' },
     annotation: { delete: 'Eliminar' },
+    history: { undo: 'Deshacer', redo: 'Rehacer' },
     document: { download: 'Descargar', print: 'Imprimir' },
     snapshot: { copy: 'Copiar', save: 'Guardar imagen', clear: 'Descartar instantánea' },
     tool: {

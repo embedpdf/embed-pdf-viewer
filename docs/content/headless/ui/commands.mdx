@@ -64,10 +64,13 @@ and says `null` for an id it doesn't have.
 | `snapshot:copy`, `snapshot:save`                     | Copy the snapshot, or save it as a PNG file  | `Mod+C`          |
 | `snapshot:clear`                                     | Let the snapshot go                          | `Escape`         |
 | `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
+| `history:undo`, `history:redo`                       | Undo or redo the last change                 | `Mod+Z`, `Mod+Shift+Z` |
 | `document:download`, `document:print`                | Download or print the document               | `Mod+S`, `Mod+P` |
 
 Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
-`annotation:delete` a selection the user may delete, the `snapshot:` commands a snapshot. Without
+`annotation:delete` a selection the user may delete, the `snapshot:` commands a snapshot, and
+`history:undo` and `history:redo` a change to undo or redo, and <Fw only={['react', 'vue', 'svelte']}>`historyPlugin()` among your
+plugins</Fw><Fw only="angular">`withHistory()` in `provideEmbedPdf()`</Fw>. Without
 [`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not allowed.
 
 ## Keyboard shortcuts

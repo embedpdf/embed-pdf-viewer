@@ -13,6 +13,7 @@ export const ja: EmbedpdfStrings = {
     view: { rotateClockwise: '右に回転', rotateCounterclockwise: '左に回転' },
     selection: { copy: 'コピー' },
     annotation: { delete: '削除' },
+    history: { undo: '元に戻す', redo: 'やり直し' },
     document: { download: 'ダウンロード', print: '印刷' },
     snapshot: { copy: 'コピー', save: '画像を保存', clear: 'スナップショットを解除' },
     tool: {

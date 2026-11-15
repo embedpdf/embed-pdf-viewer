@@ -8,6 +8,7 @@ export const zhCN: EmbedpdfStrings = {
     view: { rotateClockwise: '顺时针旋转', rotateCounterclockwise: '逆时针旋转' },
     selection: { copy: '复制' },
     annotation: { delete: '删除' },
+    history: { undo: '撤销', redo: '重做' },
     document: { download: '下载', print: '打印' },
     snapshot: { copy: '复制', save: '保存图像', clear: '清除快照' },
     tool: {

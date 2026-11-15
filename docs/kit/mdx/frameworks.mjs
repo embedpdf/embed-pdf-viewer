@@ -69,6 +69,7 @@ const PLUGINS = [
   'Documents',
   'Fonts',
   'Form',
+  'History',
   'I18n',
   'Interaction',
   'Link',
