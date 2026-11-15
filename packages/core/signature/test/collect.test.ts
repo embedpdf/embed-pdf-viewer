@@ -190,7 +190,7 @@ describe('collecting validation data', () => {
       await signTimestamped(doc);
       const crl = await ca.revocation.fetch({
         kind: 'crl',
-        url: 'http://test-authority.invalid/crl',
+        url: 'http://test-authority.example/crl',
       });
 
       // No source at all: what is known is enough.
@@ -208,7 +208,7 @@ describe('collecting validation data', () => {
       await signTimestamped(doc);
       const foreign = await other.revocation.fetch({
         kind: 'crl',
-        url: 'http://test-authority.invalid/crl',
+        url: 'http://test-authority.example/crl',
       });
       const result = await addValidationInfo(doc, {
         trust,
@@ -239,7 +239,7 @@ describe('collecting validation data', () => {
       const error = await caught(() => addValidationInfo(doc, { trust, revocation: source }));
       expect(error.code).toBe(EngineErrorCode.Network);
       // The first address that was asked.
-      expect(error.details).toMatchObject({ source: 'http://test-authority.invalid/ocsp' });
+      expect(error.details).toMatchObject({ source: 'http://test-authority.example/ocsp' });
       expect(await storedIn(doc)).toEqual(empty);
     });
   });
@@ -259,7 +259,7 @@ describe('collecting validation data', () => {
         }),
       );
       expect(error.code).toBe(EngineErrorCode.Network);
-      expect(error.details).toMatchObject({ source: 'http://test-authority.invalid/ocsp' });
+      expect(error.details).toMatchObject({ source: 'http://test-authority.example/ocsp' });
       expect(error.message).toMatch(/fetch failed/);
     });
   });

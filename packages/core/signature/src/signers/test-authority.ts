@@ -379,7 +379,7 @@ export async function createTestCertificateAuthority(
 ): Promise<TestCertificateAuthority> {
   ensureEngine();
   const now = options.now ?? (() => new Date());
-  const url = (options.url ?? 'http://test-authority.invalid').replace(/\/$/, '');
+  const url = (options.url ?? 'http://test-authority.example').replace(/\/$/, '');
   const addresses = { ocsp: `${url}/ocsp`, crl: `${url}/crl`, issuer: `${url}/issuer` };
   const commonName = options.commonName ?? 'EmbedPDF test certificate authority';
 

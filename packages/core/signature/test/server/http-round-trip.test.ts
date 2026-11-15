@@ -30,7 +30,7 @@ import { revocationRoute } from '../../src/server';
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, '..', '..', '..', '..', 'engine', 'main', 'test', 'fixtures');
 const field = { kind: 'fqn', name: 'sig' } as const;
-const AUTHORITY = 'http://test-authority.invalid';
+const AUTHORITY = 'http://test-authority.example';
 
 const bodyOf = async (message: IncomingMessage): Promise<Uint8Array> => {
   const chunks: Buffer[] = [];

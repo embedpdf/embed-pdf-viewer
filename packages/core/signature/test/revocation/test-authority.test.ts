@@ -44,15 +44,15 @@ describe('createTestCertificateAuthority', () => {
     expect(certificate.issuer.isEqual(root.subject)).toBe(true);
     expect(await certificate.verify(root)).toBe(true);
     expect(revocationAddresses(certificate)).toEqual({
-      ocsp: ['http://test-authority.invalid/ocsp'],
-      crl: ['http://test-authority.invalid/crl'],
-      issuer: ['http://test-authority.invalid/issuer'],
+      ocsp: ['http://test-authority.example/ocsp'],
+      crl: ['http://test-authority.example/crl'],
+      issuer: ['http://test-authority.example/issuer'],
     });
     // The address of the issuer's certificate serves the authority's own.
     expect(
       await authority.revocation.fetch({
         kind: 'issuer',
-        url: 'http://test-authority.invalid/issuer',
+        url: 'http://test-authority.example/issuer',
       }),
     ).toEqual(authority.certificate);
   });

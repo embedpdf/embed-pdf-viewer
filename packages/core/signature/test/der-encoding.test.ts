@@ -21,7 +21,7 @@ import { buildOcspRequest } from '../src/revocation/request';
 import { derProblem } from './helpers/der';
 
 const digest = new Uint8Array(32).map((_, i) => (i * 11 + 5) & 0xff);
-const AUTHORITY = 'http://test-authority.invalid';
+const AUTHORITY = 'http://test-authority.example';
 
 describe('the strict reader these tests use', () => {
   const problemOf = (...bytes: number[]) => derProblem(new Uint8Array(bytes));

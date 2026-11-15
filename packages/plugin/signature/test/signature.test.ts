@@ -1168,7 +1168,7 @@ describe('validation data', () => {
       // The address that did not answer is named, as for a timestamp authority.
       const unanswered = {
         code: 'operation-failed',
-        details: { source: expect.stringContaining('test-authority.invalid') },
+        details: { source: expect.stringContaining('test-authority.example') },
         cause: { code: 'Network' },
       };
       expect(result.validationInfoError).toMatchObject(unanswered);
