@@ -134,7 +134,7 @@ describe('field index', () => {
     expect(widgetRowOf(index, 9)?.rect.x).toBe(60);
   });
 
-  test("a page's widgets leave out the hidden ones, and say the state each shows", () => {
+  test("a page's widgets leave out the hidden ones and the ones of no size, and say the state each shows", () => {
     const row = (objectNumber: number, flags: object, appearanceState: string | null = null) =>
       ({
         subtype: 'widget',
@@ -148,7 +148,15 @@ describe('field index', () => {
       }) as unknown as WidgetAnnotation;
     const index = indexFields({
       ...snapshot([text()]),
-      widgets: [row(4, {}, 'Off'), row(5, { hidden: true }), row(6, { noView: true }), row(7, {})],
+      widgets: [
+        row(4, {}, 'Off'),
+        row(5, { hidden: true }),
+        row(6, { noView: true }),
+        row(7, {}),
+        // A document timestamp's widget, and a box that is only a line.
+        row(8, { rect: { x: 0, y: 792, width: 0, height: 0 } }),
+        row(9, { rect: { x: 0, y: 0, width: 40, height: 0 } }),
+      ],
     });
     expect(shownWidgetsOf(index, 3).map((widget) => widget.appearanceState)).toEqual(['Off', null]);
     expect(
