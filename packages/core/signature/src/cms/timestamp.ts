@@ -148,13 +148,15 @@ export async function buildTimestampToken(input: BuildTimestampTokenInput): Prom
   signerInfo.signature = new asn1js.OctetString({
     valueHex: cmsSignatureValue(input.authority.algorithm, raw),
   });
+  const encapContentInfo = new pkijs.EncapsulatedContentInfo({ eContentType: OID.tstInfo });
+  // Set after the constructor ran. Given the content, the constructor splits it into an
+  // octet string made of parts, which is not DER. A token is DER, and a strict reader
+  // refuses anything else (pyHanko does).
+  encapContentInfo.eContent = new asn1js.OctetString({ valueHex: eContent });
   const signedData = new pkijs.SignedData({
     version: 3,
     digestAlgorithms: [digestAlgorithm],
-    encapContentInfo: new pkijs.EncapsulatedContentInfo({
-      eContentType: OID.tstInfo,
-      eContent: new asn1js.OctetString({ valueHex: eContent }),
-    }),
+    encapContentInfo,
     certificates: [authorityCert],
     signerInfos: [signerInfo],
   });
