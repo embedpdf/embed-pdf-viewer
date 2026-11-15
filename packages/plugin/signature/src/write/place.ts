@@ -4,10 +4,16 @@
  * stamp (one placement law, the stamp plugin's).
  */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
-import type { FormFieldRef, SignatureCompleteResult } from '@embedpdf/engine-core/runtime';
+import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
-import type { Mark, PlaceMarkResult, SignatureCapability, SignFieldInput } from '../contract';
+import type {
+  Mark,
+  PlaceMarkResult,
+  SignatureCapability,
+  SignFieldInput,
+  SignFieldResult,
+} from '../contract';
 import { hasSignedField, sameFieldRef, setTarget } from '../model';
 import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
@@ -49,9 +55,7 @@ export function createPlacement(
     siblings,
   }: Pick<SignatureServices, 'events' | 'store' | 'authority' | 'siblings'>,
   { snapshot }: Pick<SignatureReads, 'snapshot'>,
-  {
-    sign,
-  }: { sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult> },
+  { sign }: { sign(input: SignFieldInput, options?: OperationOptions): Promise<SignFieldResult> },
   {
     fillField,
   }: { fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void> },

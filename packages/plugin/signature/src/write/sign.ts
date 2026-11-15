@@ -5,21 +5,28 @@
  * detached CMS; `cancelPending` cancels. The parked signing, the sealed
  * field's facts and `onSigned` come from the confirmed events the engine
  * publishes for each step (`sync/signatures.ts`), for every session alike.
+ * A seal is followed by its validation data when the settings ask for it
+ * (`write/validation-info.ts`).
  */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
 import type { CmsSigner } from '@embedpdf/core-signature';
 import type {
   DocumentHandle,
   FormFieldRef,
-  SignatureCompleteResult,
   SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 
-import type { PrepareSignatureInput, SignatureCapability, SignFieldInput } from '../contract';
+import type {
+  PrepareSignatureInput,
+  SignatureCapability,
+  SignFieldInput,
+  SignFieldResult,
+} from '../contract';
 import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
 import { verb } from '../services/errors';
 import type { SignaturesMirror } from '../sync/signatures';
+import type { SignatureValidationInfo } from './validation-info';
 
 export function createSigning(
   ctx: SignatureContext,
@@ -27,6 +34,7 @@ export function createSigning(
   { api: reads }: Pick<SignatureReads, 'api'>,
   target: { clearIfTarget(field: FormFieldRef): void },
   signatures: Pick<SignaturesMirror, 'disown'>,
+  { afterSeal }: Pick<SignatureValidationInfo, 'afterSeal'>,
 ) {
   const { withBusy, requireSignatures } = store;
   const { resolveKey, resolveTimestampAuthority, timestampTrust, assertAllowedField } = authority;
@@ -94,7 +102,7 @@ export function createSigning(
   const sign = async (
     input: SignFieldInput,
     options?: OperationOptions,
-  ): Promise<SignatureCompleteResult> => {
+  ): Promise<SignFieldResult> => {
     assertMaySign(input, 'signature.sign');
     if (options?.signal?.aborted) throw cancelled(options.signal);
     return withBusy(async () => {
@@ -122,7 +130,7 @@ export function createSigning(
         ...(timestampAuthority ? { timestampAuthority, timestampTrust: timestampTrust() } : {}),
       });
       target.clearIfTarget(input.field);
-      return result;
+      return afterSeal(result, options?.signal);
     });
   };
 
@@ -156,7 +164,7 @@ export function createSigning(
     signingId: string,
     cms: Uint8Array,
     options?: OperationOptions,
-  ): Promise<SignatureCompleteResult> => {
+  ): Promise<SignFieldResult> => {
     // Its field was checked when it was prepared; the engine checks it again.
     if (options?.signal?.aborted) throw cancelled(options.signal);
     return withBusy(async () => {
@@ -180,7 +188,7 @@ export function createSigning(
       });
       prepared.delete(signingId);
       target.clearIfTarget(result.signature.field);
-      return result;
+      return afterSeal(result, options?.signal);
     });
   };
 

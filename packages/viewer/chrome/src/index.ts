@@ -81,8 +81,10 @@ export { StampToken } from '@embedpdf/react/stamp';
 // whole feature.
 export { SignatureToken } from '@embedpdf/react/signature';
 export {
+  createTestCertificateAuthority,
   createTestSigner,
   createTestTimestampAuthority,
+  httpRevocationSource,
   httpTimestampAuthority,
   indexedDbKeyStore,
   memoryKeyStore,

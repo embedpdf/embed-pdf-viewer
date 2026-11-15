@@ -727,6 +727,8 @@ export const de: Locale = {
       signTimestampUnreachable:
         'Der Zeitstempeldienst hat nicht geantwortet. Versuchen Sie es erneut.',
       signTimestampRefused: 'Der Zeitstempeldienst hat die Anfrage abgelehnt.',
+      signedWithoutValidationInfo:
+        'Unterschrieben. Die Prüfinformationen konnten nicht hinzugefügt werden.',
       inspectTitle: 'Unterschrift',
       inspectSigner: 'Unterschrieben von',
       inspectReason: 'Grund',
@@ -750,6 +752,23 @@ export const de: Locale = {
       inspectLaterRevisions: 'Revisionen nach dem Unterschreiben',
       verdictPermitted: 'Zulässig',
       verdictForbidden: 'Nicht zulässig',
+      inspectRevocation: 'Sperrstatus',
+      revocationGood: 'Nicht gesperrt',
+      revocationRevoked: 'Gesperrt',
+      inspectLongTerm: 'Langzeitvalidierung',
+      longTermEnabled: 'Aktiviert',
+      longTermNotEnabled: 'Nicht aktiviert',
+      longTermUntil: 'Nachweisbar bis {date}',
+      longTermNoTimestamp: 'Kein vertrauenswürdiger Zeitstempel',
+      longTermUntrusted: 'Nicht vertrauenswürdig: {name}',
+      longTermNoAnswer: 'Keine Sperrauskunft: {name}',
+      longTermRevoked: 'Gesperrt: {name}',
+      longTermUnnamed: 'Zertifikat ohne Namen',
+      longTermAdd: 'Prüfinformationen hinzufügen',
+      longTermAdding: 'Wird hinzugefügt…',
+      longTermAddFailed: 'Die Prüfinformationen konnten nicht hinzugefügt werden.',
+      longTermAddUnreachable:
+        'Eine Zertifizierungsstelle hat nicht geantwortet. Versuchen Sie es erneut.',
     },
   },
 };
