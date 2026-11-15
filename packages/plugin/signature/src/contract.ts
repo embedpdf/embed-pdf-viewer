@@ -56,6 +56,7 @@ export type {
   ValidationInfoCounts,
 } from '@embedpdf/engine-core/runtime';
 export type {
+  AppliedValidationTime,
   CmsSigner,
   HttpRevocationSourceOptions,
   HttpTimestampAuthorityOptions,

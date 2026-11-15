@@ -24,12 +24,42 @@ export interface TrustPort {
 /**
  * When a chain is judged. `now` is the honest default; `timestamp` is only
  * legitimate for a verified RFC 3161 token, which is why it carries the
- * proof flag; its `genTime` is the token's time as an ISO 8601 string. The
+ * proof flag; its `stampedAt` is the token's time as an ISO 8601 string. The
  * signature's own `/M` is a claim and never a validation time.
+ *
+ * The token's time was named `genTime` before 3.3. That name is still read, and
+ * `stampedAt` is the one used when both are given.
  */
 export type ValidationTime =
   | { kind: 'now' }
-  | { kind: 'timestamp'; genTime: string; tokenVerified: true };
+  | {
+      kind: 'timestamp';
+      stampedAt: string;
+      tokenVerified: true;
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      genTime?: string;
+    }
+  | {
+      kind: 'timestamp';
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      genTime: string;
+      tokenVerified: true;
+      stampedAt?: undefined;
+    };
+
+/**
+ * The validation time a verdict reports. A timestamp's time is under both of its names, with
+ * the same value, so code written for either reads it.
+ */
+export type AppliedValidationTime =
+  | { readonly kind: 'now' }
+  | {
+      readonly kind: 'timestamp';
+      readonly stampedAt: string;
+      readonly tokenVerified: true;
+      /** @deprecated Use `stampedAt`; goes in 4.0. */
+      readonly genTime: string;
+    };
 
 export type TrustStatus = 'trusted' | 'untrusted' | 'unknown';
 
@@ -149,7 +179,19 @@ export async function validateTimestampAuthority(input: {
 
 /** The moment a validation time names: now, or the timestamp's time. */
 export function timeOf(at: ValidationTime): Date {
-  return at.kind === 'now' ? new Date() : new Date(at.genTime);
+  return at.kind === 'now' ? new Date() : new Date(stampedAtOf(at));
+}
+
+/** A validation time as a verdict reports it: a timestamp's time under both of its names. */
+export function appliedValidationTime(at: ValidationTime): AppliedValidationTime {
+  if (at.kind === 'now') return { kind: 'now' };
+  const stampedAt = stampedAtOf(at);
+  return { kind: 'timestamp', stampedAt, genTime: stampedAt, tokenVerified: true };
+}
+
+/** A timestamp's time, under whichever name it was given. */
+function stampedAtOf(at: Exclude<ValidationTime, { kind: 'now' }>): string {
+  return at.stampedAt === undefined ? at.genTime : at.stampedAt;
 }
 
 function validAt(certificate: pkijs.Certificate, at: Date): boolean {

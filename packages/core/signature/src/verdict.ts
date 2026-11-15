@@ -13,7 +13,7 @@ import { longTermVerdict, type LongTermVerdict, type RevocationVerdict } from '.
 import { DEFAULT_MAX_CRL_BYTES, fillPool } from './revocation/fill';
 import { readValidationPool, ValidationPool } from './revocation/pool';
 import type { RevocationSource } from './revocation/source';
-import type { TrustPort, TrustStatus, ValidationTime } from './trust';
+import type { AppliedValidationTime, TrustPort, TrustStatus, ValidationTime } from './trust';
 
 export type IntegrityVerdict = 'valid' | 'invalid' | 'indeterminate';
 export type ModificationsVerdict = 'unchanged' | 'permitted' | 'forbidden' | 'indeterminate';
@@ -26,7 +26,7 @@ export interface TimestampFacts {
   readonly trust: TrustStatus;
   readonly trustReason: string | null;
   /** When the authority was judged: now, or at a later document timestamp (`earliest-timestamp`). */
-  readonly validationTime: ValidationTime;
+  readonly validationTime: AppliedValidationTime;
   /**
    * Whether a certificate between the authority and your anchor was withdrawn by
    * `validationTime`, from the answers the file holds. `unknown` when the authority isn't
@@ -51,15 +51,15 @@ export type TimestampVerdict = TimestampFacts &
   (
     | {
         readonly summary: 'valid' | 'valid-untrusted';
-        /** What the token asserts: the bytes existed by this time (ISO 8601). */
-        readonly genTime: string;
+        /** What the token asserts: the bytes existed by this time (ISO 8601). The token's `genTime`. */
+        readonly stampedAt: string;
         /** DER of the authority's certificate. */
         readonly authorityCertificate: Uint8Array;
       }
     | {
         readonly summary: 'invalid' | 'indeterminate';
         /** `null` when the token can't be read far enough to say. */
-        readonly genTime: string | null;
+        readonly stampedAt: string | null;
         readonly authorityCertificate: Uint8Array | null;
       }
   );
@@ -78,7 +78,8 @@ export interface SignatureVerdict {
   /** The certificate chains to one of the caller's anchors. */
   trust: TrustStatus;
   trustReason?: string;
-  validationTime: ValidationTime;
+  /** When the signer's certificate was judged: now, or at the time a timestamp proves (`stampedAt`). */
+  validationTime: AppliedValidationTime;
   /**
    * Whether a certificate between the signer and your anchor was withdrawn by
    * `validationTime`, from the answers the file holds: its validation data, and what its

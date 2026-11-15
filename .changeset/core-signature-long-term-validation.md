@@ -23,11 +23,16 @@ Long-term validation: `addValidationInfo()` keeps a signature checkable for year
 
 **`sign(doc, { kind: 'timestamp', key })` needs no `field`.** The engine makes a field for the document timestamp, so the last step of keeping a file checkable is one call. `result.signature.fieldName` says which field it is.
 
-**A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. No type or option changed.
+**A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. The option takes what it took before.
 
 - **What changes for an app that already validates:** a signature whose signer's certificate expired after it was signed, and that carries a timestamp from an authority you trust, reads `'valid'` where it read `'valid-untrusted'`.
 - Judged at its timestamp, a signature reads `revocation: 'good'` from the answers stored when it was signed, and a certificate withdrawn after the timestamp does not make it `'invalid'`. Judged as of now, the same answers read `'unknown'`, and the withdrawal reads `'invalid'`.
 - A signature with no timestamp you trust is judged as of now, as before.
+
+**`validationTime` names a timestamp's time `stampedAt`.** `{ kind: 'timestamp', stampedAt, tokenVerified: true }`: the name the timestamp's own verdict uses, so the time a verdict reports reads the same wherever it appears.
+
+- `genTime`, its name until now, still works until 4.0. A verdict's `validationTime` carries the time under both names, with the same value (`AppliedValidationTime`), and the option takes either. Given both, `stampedAt` is the one used.
+- On a value you type as `ValidationTime` yourself, `genTime` is optional now. A verdict's `validationTime` always has it.
 
 **`revocation` on every verdict.** `'good'`, `'revoked'` or `'unknown'`: whether a certificate between the signer and your anchor was withdrawn by `validationTime`. `revocationReason` names the certificate when it isn't `'good'`. A timestamp's verdict has both too, for its authority.
 
@@ -36,10 +41,10 @@ Long-term validation: `addValidationInfo()` keeps a signature checkable for year
 - **`summary` is `'invalid'` when a trusted signer's certificate is proven withdrawn by the time it is judged at.** It was `'valid'` before, because nothing was checked. `'unknown'` never changes `summary`. A timestamp whose trusted authority is proven withdrawn is `'invalid'` and no longer counts as a trusted time.
 - A certificate you trust as it is has nobody above it to withdraw it, so it reads `'good'`.
 
-**`longTerm` on every verdict.** `{ enabled, at, until, documentTimestamp, missing }`, always judged at the time a timestamp proves, whatever `validationTime` is.
+**`longTerm` on every verdict.** `{ enabled, provenAt, expiresAt, documentTimestampedAt, missing }`, always judged at the time a timestamp proves, whatever `validationTime` is.
 
 - `enabled` is what Acrobat calls "LTV enabled": a timestamp you trust covers the signature, the signer was trusted then, and the file holds a good answer for every certificate of the signer's path and of the timestamp authority's.
-- `at` is that time, `until` the day the certificate of the last covering timestamp expires, and `documentTimestamp` the time of the last trusted document timestamp added after the signature.
+- `provenAt` is that time, `expiresAt` the day the certificate of the last covering timestamp expires, and `documentTimestampedAt` the time of the last trusted document timestamp added after the signature. Each is a point in time, named as the API names them everywhere: an ISO 8601 string ending in `At`.
 - `missing` says what stands in the way, one `{ certificate, reason }` per certificate: `'no-timestamp'`, `'untrusted'`, `'no-answer'` or `'revoked'`.
 - It agrees with Acrobat's "LTV enabled" line on each of the 32 signatures Acrobat judged in the repository's fixtures.
 
@@ -47,7 +52,7 @@ Long-term validation: `addValidationInfo()` keeps a signature checkable for year
 
 `validateChain()`'s verdict has `withoutIssuer`: the certificate whose issuer wasn't found, when that is why a path isn't trusted.
 
-New exported types: `LongTermVerdict`, `LongTermGap`, `LongTermGapReason`, `RevocationVerdict`, `AddValidationInfoOptions`, `AddValidationInfoResult`, `HttpRevocationSourceOptions`, `RevocationRouteRequest`.
+New exported types: `AppliedValidationTime`, `LongTermVerdict`, `LongTermGap`, `LongTermGapReason`, `RevocationVerdict`, `AddValidationInfoOptions`, `AddValidationInfoResult`, `HttpRevocationSourceOptions`, `RevocationRouteRequest`.
 
 **A test certificate authority.** `createTestCertificateAuthority()` is a throwaway authority for tests and demos. `authority.issueSigner()` gives a signer whose certificate chains to `authority.certificate` and names where to ask about it. `authority.revocation` answers those questions from memory, as a real authority answers them over HTTP: an OCSP response signed by a responder the authority certified, and a CRL. `authority.revoke(signer, { at, reason })` withdraws a certificate, and both answers say so from then on. OpenSSL verifies its answers.
 

@@ -176,7 +176,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
       expect(text).toContain('Not revoked');
       expect(text).toContain('Enabled');
       // The day the proof runs out, written out in the viewer's format language.
-      const until = new Date(longTerm.until).toLocaleDateString('en-US', {
+      const until = new Date(longTerm.expiresAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -299,7 +299,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
       ]);
       const longTerm = await longTermOf(tab);
       expect(longTerm.enabled).toBe(true);
-      expect(longTerm.documentTimestamp).not.toBeNull();
+      expect(longTerm.documentTimestampedAt).not.toBeNull();
 
       // The signed field has its control, a button named after it. The timestamp's field has
       // a box of no size: nothing to click, and nothing for Tab to stop at.

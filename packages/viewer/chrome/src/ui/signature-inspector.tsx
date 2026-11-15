@@ -119,8 +119,8 @@ export function SignatureInspector() {
   const longTermDetail = !longTerm
     ? null
     : longTerm.enabled
-      ? longTerm.until
-        ? t('demo.longTermUntil', { params: { date: day(longTerm.until, locale) } })
+      ? longTerm.expiresAt
+        ? t('demo.longTermUntil', { params: { date: day(longTerm.expiresAt, locale) } })
         : null
       : gap
         ? t(GAP_KEYS[gap.reason], {
@@ -178,7 +178,7 @@ export function SignatureInspector() {
             <span className="text-fg-muted">{t('demo.inspectTimestamp')}</span>
             <span className="text-end">
               <span className={tone(timestamp.summary)}>
-                {timestamp.genTime ? dateTime(timestamp.genTime, locale) : '—'}
+                {timestamp.stampedAt ? dateTime(timestamp.stampedAt, locale) : '—'}
               </span>
               {timestamp.authorityName ? (
                 <span className="text-fg-muted block">{timestamp.authorityName}</span>

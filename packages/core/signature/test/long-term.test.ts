@@ -202,7 +202,7 @@ describe('revocation and long-term validation, from the file', () => {
         }
         expect(then.longTerm).toMatchObject({
           enabled: false,
-          until: null,
+          expiresAt: null,
           missing: [{ certificate: 'Ada', reason: 'revoked' }],
         });
       });
@@ -315,9 +315,9 @@ describe('revocation and long-term validation, from the file', () => {
         const bare = await both(doc);
         const gap = {
           enabled: false,
-          at: SIGNED.toISOString(),
-          until: null,
-          documentTimestamp: null,
+          provenAt: SIGNED.toISOString(),
+          expiresAt: null,
+          documentTimestampedAt: null,
           missing: [{ certificate: 'Ada', reason: 'no-answer' }],
         };
         expect(bare.then.longTerm).toEqual(gap);
@@ -329,9 +329,9 @@ describe('revocation and long-term validation, from the file', () => {
         });
         const enabled = {
           enabled: true,
-          at: SIGNED.toISOString(),
-          until: certificateFromDer(authority.certificate).notAfter.value.toISOString(),
-          documentTimestamp: null,
+          provenAt: SIGNED.toISOString(),
+          expiresAt: certificateFromDer(authority.certificate).notAfter.value.toISOString(),
+          documentTimestampedAt: null,
           missing: [],
         };
         const stored = await both(doc);
@@ -340,7 +340,7 @@ describe('revocation and long-term validation, from the file', () => {
       });
     });
 
-    test('a document timestamp added later is named, and moves until to its own certificate', async () => {
+    test('a document timestamp added later is named, and moves the expiry to its own certificate', async () => {
       await freshSigner();
       const later = await createTimestampAuthorityIdentity('a later authority', undefined, {
         notBefore: new Date(Date.now() - 60 * DAY),
@@ -373,17 +373,17 @@ describe('revocation and long-term validation, from the file', () => {
         const timestamp = verdicts.find((verdict) => verdict.signature.kind === 'timestamp')!;
         expect(signature.longTerm).toEqual({
           enabled: true,
-          at: SIGNED.toISOString(),
-          until: certificateFromDer(later.certificate).notAfter.value.toISOString(),
-          documentTimestamp: stamped.toISOString(),
+          provenAt: SIGNED.toISOString(),
+          expiresAt: certificateFromDer(later.certificate).notAfter.value.toISOString(),
+          documentTimestampedAt: stamped.toISOString(),
           missing: [],
         });
         // The document timestamp is judged the same way, for its own authority.
         expect(timestamp.longTerm).toEqual({
           enabled: true,
-          at: stamped.toISOString(),
-          until: certificateFromDer(later.certificate).notAfter.value.toISOString(),
-          documentTimestamp: null,
+          provenAt: stamped.toISOString(),
+          expiresAt: certificateFromDer(later.certificate).notAfter.value.toISOString(),
+          documentTimestampedAt: null,
           missing: [],
         });
       });
@@ -404,9 +404,9 @@ describe('revocation and long-term validation, from the file', () => {
         expect(now).toMatchObject({ revocation: 'good', summary: 'valid', timestamp: null });
         expect(now.longTerm).toEqual({
           enabled: false,
-          at: null,
-          until: null,
-          documentTimestamp: null,
+          provenAt: null,
+          expiresAt: null,
+          documentTimestampedAt: null,
           missing: [{ certificate: 'Ada', reason: 'no-timestamp' }],
         });
       });
@@ -420,7 +420,7 @@ describe('revocation and long-term validation, from the file', () => {
         expect(then.timestamp).toMatchObject({ summary: 'valid-untrusted', revocation: 'unknown' });
         expect(then.longTerm).toMatchObject({
           enabled: false,
-          at: null,
+          provenAt: null,
           missing: [{ certificate: 'Ada', reason: 'no-timestamp' }],
         });
       });
@@ -512,7 +512,7 @@ describe('revocation and long-term validation, from the file', () => {
         expect(then).toMatchObject({ summary: 'valid', validationTime: { kind: 'now' } });
         expect(then.longTerm).toMatchObject({
           enabled: false,
-          at: null,
+          provenAt: null,
           missing: [{ certificate: 'Ada', reason: 'no-timestamp' }],
         });
       });

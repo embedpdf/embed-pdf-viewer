@@ -286,10 +286,10 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
         if (acrobat) {
           expect(text).toBe('Signature is LTV enabled');
           expect(longTerm.missing).toEqual([]);
-          expect(longTerm.until).toBe(AUTHORITY_ENDS);
+          expect(longTerm.expiresAt).toBe(AUTHORITY_ENDS);
         } else {
           expect(text).toMatch(/is not LTV enabled/);
-          expect(longTerm.until).toBeNull();
+          expect(longTerm.expiresAt).toBeNull();
           // What is missing is an answer, never trust or a timestamp: Acrobat trusted the same
           // root and called each of these signatures' timestamps valid.
           expect(longTerm.missing.length).toBeGreaterThan(0);
@@ -317,7 +317,7 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
           const verdicts = await validateSignatures(doc, {
             trust: { anchors: async () => [root] },
           });
-          return verdictOf(verdicts, 'sig').longTerm.documentTimestamp;
+          return verdictOf(verdicts, 'sig').longTerm.documentTimestampedAt;
         });
       // Validation data alone, from pyHanko and from Acrobat.
       expect(await read('ours-b-t+lt-no-vri.pdf')).toBeNull();

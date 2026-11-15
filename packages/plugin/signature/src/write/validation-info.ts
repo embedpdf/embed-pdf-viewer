@@ -86,7 +86,7 @@ export function createValidationInfo(
     // one. Otherwise the last timestamp still covers everything, and another proves no more.
     const uncovered =
       added.certificates + added.ocspResponses + added.crls > 0 ||
-      covered.some((verdict) => verdict.longTerm.documentTimestamp === null);
+      covered.some((verdict) => verdict.longTerm.documentTimestampedAt === null);
     if (!uncovered) return { added, documentTimestamp: null };
     const result = await ctx.cancellable(
       signal,

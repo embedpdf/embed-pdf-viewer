@@ -167,7 +167,7 @@ describe('validation data (cloud SDK, real runtime)', () => {
       expect(added.verdicts[0]).toMatchObject({
         summary: 'valid',
         revocation: 'good',
-        longTerm: { enabled: true, documentTimestamp: null },
+        longTerm: { enabled: true, documentTimestampedAt: null },
       });
 
       const stamped = await sign(doc, {
@@ -180,7 +180,7 @@ describe('validation data (cloud SDK, real runtime)', () => {
       const verdicts = await validateSignatures(doc, { trust });
       const signed = verdicts.find((verdict) => verdict.signature.fieldName === 'sig')!;
       expect(signed).toMatchObject({ summary: 'valid', longTerm: { enabled: true } });
-      expect(signed.longTerm.documentTimestamp).not.toBeNull();
+      expect(signed.longTerm.documentTimestampedAt).not.toBeNull();
       expect(signed.modifications.verdict).toBe('permitted');
       // The answers are in the file the timestamp made.
       expect((await doc.signatures.getValidationInfo()).ocspResponses.length).toBeGreaterThan(0);

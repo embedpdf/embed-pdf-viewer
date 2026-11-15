@@ -20,6 +20,7 @@ export {
 } from './gate';
 export {
   validateChain,
+  type AppliedValidationTime,
   type TrustPort,
   type TrustStatus,
   type TrustVerdict,

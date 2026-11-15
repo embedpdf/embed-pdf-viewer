@@ -182,7 +182,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
       const text = await viewerText(tab);
       expect(text).toContain('Timestamp');
       // The time shown is the authority's, written out in the viewer's format language.
-      const shown = new Date(timestamp.genTime).toLocaleString('en-US');
+      const shown = new Date(timestamp.stampedAt).toLocaleString('en-US');
       expect(text).toContain(shown);
       await tab.close();
     });

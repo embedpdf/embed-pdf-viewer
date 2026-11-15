@@ -391,7 +391,7 @@ That is the strongest form a signed PDF has: the signature, the proof of when, t
 its certificates were good, and a timestamp over all of it.
 
 A timestamp is itself signed with a certificate that expires, usually after some years. Until
-then the file proves itself; `longTerm.until` in the [verdict](#long-term-validation) is that
+then the file proves itself; `longTerm.expiresAt` in the [verdict](#long-term-validation) is that
 date. To carry the proof past it, run the same two calls again before it: they store the
 answers for the last timestamp's authority and add a new timestamp over everything. A file
 that is never renewed loses nothing it holds. Only the proof of _when_ gets weaker after that
@@ -799,7 +799,7 @@ for (const result of results) {
   const stamp = result.timestamp;
   if (stamp?.summary === 'valid') {
     const authority = stamp.authorityName;
-    console.log(`Signed by ${stamp.genTime}, says ${authority}`);
+    console.log(`Signed by ${stamp.stampedAt}, says ${authority}`);
   } else {
     const claimed = result.signature.signer.signedAt;
     console.log(`Signed at ${claimed}, by the signer's clock`);
@@ -810,12 +810,14 @@ for (const result of results) {
 | Field                  | What it is                                                                                              |
 | :--------------------- | :------------------------------------------------------------------------------------------------------ |
 | `summary`              | `'valid'`, `'valid-untrusted'`, `'invalid'` or `'indeterminate'`, as for a signature.                   |
-| `genTime`              | The time the authority vouches for: the signature existed by then. `null` when the token can't be read. |
+| `stampedAt`            | The time the authority vouches for: the signature existed by then. `null` when the token can't be read. |
 | `authorityName`        | Who vouches for the time: the name in the authority's certificate, or `null` when it has none.          |
 | `authorityCertificate` | The authority's certificate (DER), or `null` when it can't be found.                                    |
 | `cryptography`         | Whether the token checks out and stamps this signature.                                                 |
 | `trust`, `trustReason` | Whether the authority's certificate leads to one you trust and may issue timestamps, and why not.       |
 | `validationTime`       | When the authority's certificate was judged.                                                            |
+
+`stampedAt` is the time the token itself carries, where RFC 3161 calls it `genTime`.
 
 `timestampAnchors` returns the certificates you trust to say what time it was, apart from
 `anchors`, the ones you trust to say who signed. Keep an authority's root out of `anchors`:
@@ -851,7 +853,10 @@ timestamp you trust shows it was signed in time. Without one it is judged now, a
 `'valid-untrusted'`.
 
 `result.validationTime` says which it was: its `kind` is `'timestamp'`, with the timestamp's
-`genTime`, or `'now'`.
+`stampedAt`, or `'now'`.
+
+`genTime` still works, until 4.0: it was the name of that time before 3.3. A verdict carries
+the same time under both names, and a `validationTime` you pass may use either.
 
 [Revocation](#revocation) is judged at the same time: a certificate withdrawn after the
 timestamp was still good when it signed.
@@ -932,25 +937,25 @@ a network. It always speaks for the signature's timestamp, whatever `validationT
 const { longTerm } = results[0];
 
 longTerm.enabled; // true
-longTerm.at; // '2026-11-14T21:28:37.237Z'
-longTerm.until; // '2036-01-01T00:00:00.000Z'
-longTerm.documentTimestamp; // '2026-11-14T21:29:30.387Z'
+longTerm.provenAt; // '2026-11-14T21:28:37.237Z'
+longTerm.expiresAt; // '2036-01-01T00:00:00.000Z'
+longTerm.documentTimestampedAt; // '2026-11-14T21:29:30.387Z'
 ```
 
-| Field               | What it is                                                                                                                                                                                                  |
-| :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`           | A timestamp you trust covers the signature, its signer was trusted then, and the file holds a good answer for every certificate: the signer's and the timestamp authority's. What Acrobat calls "LTV enabled". |
-| `at`                | The time it was judged at: the earliest timestamp you trust that covers the signature, its own or a document timestamp added after it. `null` when there is none.                                              |
-| `until`             | How long the file proves this by itself: the day the certificate of the last timestamp covering the signature expires. `null` when not enabled.                                                                |
-| `documentTimestamp` | The time of the last document timestamp you trust that was added after the signature, or `null` when none covers it.                                                                                           |
-| `missing`           | What stands in the way, one entry per certificate: its name in `certificate` and a `reason`, as in [All or nothing](#all-or-nothing). Empty when enabled.                                                     |
+| Field                   | What it is                                                                                                                                                                                                                                       |
+| :---------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`               | A timestamp you trust covers the signature, its signer was trusted then, and the file holds a good answer for every certificate: the signer's and the timestamp authority's. What Acrobat calls "LTV enabled".                                   |
+| `provenAt`              | The time the signature is proven to have existed by, which it is judged at: the earliest timestamp you trust that covers the signature, its own or a document timestamp added after it. `null` when there is none.                               |
+| `expiresAt`             | When the proof the file carries by itself runs out: the day the certificate of the last timestamp covering the signature expires. The signature doesn't become invalid then; the proof of when it was made gets weaker. `null` when not enabled. |
+| `documentTimestampedAt` | The time of the last document timestamp you trust that was added after the signature, or `null` when none covers it.                                                                                                                             |
+| `missing`               | What stands in the way, one entry per certificate: its name in `certificate` and a `reason`, as in [All or nothing](#all-or-nothing). Empty when enabled.                                                                                        |
 
 `enabled` is the question Acrobat asks. A validator that follows the European standard asks one
 more: when were the stored answers put in the file? A
 [document timestamp](#then-timestamp-the-document) over them is the proof. So a file is finished
-when `enabled` is true and `documentTimestamp` is not `null`.
+when `enabled` is true and `documentTimestampedAt` is not `null`.
 
-A document timestamp added later also moves `until` to its own certificate's end date. That is
+A document timestamp added later also moves `expiresAt` to its own certificate's end date. That is
 all [renewing](#then-timestamp-the-document) is. A document timestamp has a `longTerm` of its
 own, for its authority's certificates.
 
@@ -1129,7 +1134,7 @@ the authority's token over `prepared.digest`.
 
 `validateSignatures()` reads a document timestamp like a signature: `integrity` says whether the
 file it stamped is intact, and `timestamp` holds [the same verdict](#the-timestamp) a
-signature's timestamp gets, with its `genTime` and authority.
+signature's timestamp gets, with its `stampedAt` and authority.
 
 ### The validation data in the file
 

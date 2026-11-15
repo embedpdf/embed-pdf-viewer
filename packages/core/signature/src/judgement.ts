@@ -20,16 +20,18 @@ import type {
 import { pathRevocation, summarizeRevocation, type ValidationPool } from './revocation/pool';
 import { certificateCommonName } from './signers/self-signed';
 import {
+  appliedValidationTime,
   timeOf,
   validateChainAmong,
   validateTimestampAuthority,
+  type AppliedValidationTime,
   type TrustPort,
   type TrustStatus,
   type ValidationTime,
 } from './trust';
 import type { IntegrityVerdict, TimestampFacts, TimestampVerdict } from './verdict';
 
-export const NOW: ValidationTime = { kind: 'now' };
+export const NOW: AppliedValidationTime = { kind: 'now' };
 
 export const EARLIEST = { kind: 'earliest-timestamp' } as const;
 
@@ -127,7 +129,7 @@ export async function judge(
       ? reliesOn
         ? timestampTime(reliesOn.genTime)
         : NOW
-      : (requested as ValidationTime);
+      : appliedValidationTime(requested as ValidationTime);
     const chain = reading.internal
       ? await validateChainAmong(reading.internal, trust, at, pool.certificates)
       : {
@@ -187,8 +189,8 @@ export function longTermInputOf(
 }
 
 /** A validation time in words, for a reason: "now", or the time a timestamp proves. */
-function nameOf(at: ValidationTime): string {
-  return at.kind === 'now' ? 'now' : at.genTime;
+function nameOf(at: AppliedValidationTime): string {
+  return at.kind === 'now' ? 'now' : at.stampedAt;
 }
 
 /** What one signature says before any certificate is judged: the facts time doesn't change. */
@@ -210,7 +212,7 @@ export interface Reading {
 export interface Judgement {
   trust: TrustStatus;
   trustReason: string | undefined;
-  validationTime: ValidationTime;
+  validationTime: AppliedValidationTime;
   /** The validated path, anchor last, when trusted: a signer's, or a document timestamp's authority's. */
   path: Uint8Array[] | null;
   revocation: RevocationVerdict;
@@ -241,7 +243,7 @@ export interface JudgedToken {
 function provenTimeOf(token: JudgedToken): ProvenTime | null {
   const { verdict, path } = token;
   if (verdict.summary !== 'valid' || !path) return null;
-  return { genTime: verdict.genTime, path, authorityCertificate: verdict.authorityCertificate };
+  return { genTime: verdict.stampedAt, path, authorityCertificate: verdict.authorityCertificate };
 }
 
 /** Read one signature, and offer what its CMS carries to `pool`. */
@@ -362,7 +364,7 @@ async function readDocumentTimestamp(
 export async function judgeToken(
   check: TimestampCheck,
   trust: TrustPort | null,
-  at: ValidationTime,
+  at: AppliedValidationTime,
   pool: ValidationPool,
   certificates: pkijs.Certificate[] = [],
 ): Promise<JudgedToken> {
@@ -407,7 +409,7 @@ export async function judgeToken(
       verdict: {
         ...facts,
         summary: status === 'trusted' ? 'valid' : 'valid-untrusted',
-        genTime,
+        stampedAt: genTime,
         authorityCertificate,
       },
       path,
@@ -418,7 +420,7 @@ export async function judgeToken(
     verdict: {
       ...facts,
       summary: check.verdict === 'invalid' || revoked ? 'invalid' : 'indeterminate',
-      genTime,
+      stampedAt: genTime,
       authorityCertificate,
     },
     path,
@@ -426,8 +428,8 @@ export async function judgeToken(
   };
 }
 
-function timestampTime(genTime: string): ValidationTime {
-  return { kind: 'timestamp', genTime, tokenVerified: true };
+function timestampTime(stampedAt: string): AppliedValidationTime {
+  return { kind: 'timestamp', stampedAt, genTime: stampedAt, tokenVerified: true };
 }
 
 /** The earliest of the tokens whose verdict is `valid`, or null when none is. */
@@ -435,7 +437,7 @@ function earliestValid(tokens: readonly JudgedToken[]): JudgedToken | null {
   let earliest: JudgedToken | null = null;
   for (const token of tokens) {
     if (token.verdict.summary !== 'valid') continue;
-    if (!earliest || token.verdict.genTime < earliest.verdict.genTime!) earliest = token;
+    if (!earliest || token.verdict.stampedAt < earliest.verdict.stampedAt!) earliest = token;
   }
   return earliest;
 }

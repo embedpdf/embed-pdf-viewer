@@ -160,7 +160,7 @@ describe('collecting validation data', () => {
       expect(result.verdicts[0]).toMatchObject({
         summary: 'valid',
         revocation: 'good',
-        longTerm: { enabled: true, at: SIGNED.toISOString(), missing: [] },
+        longTerm: { enabled: true, provenAt: SIGNED.toISOString(), missing: [] },
       });
 
       // The paths can be followed from the file: the signer, its issuer, the responder that
@@ -475,8 +475,8 @@ describe('collecting validation data', () => {
         modifications: { verdict: 'permitted' },
         longTerm: {
           enabled: true,
-          at: SIGNED.toISOString(),
-          documentTimestamp: timestamp.timestamp!.genTime,
+          provenAt: SIGNED.toISOString(),
+          documentTimestampedAt: timestamp.timestamp!.stampedAt,
           missing: [],
         },
       });
@@ -486,7 +486,7 @@ describe('collecting validation data', () => {
     await withDocument(async (doc) => {
       const { signature, timestamp } = await read(doc);
       expect(signature).toMatchObject({ summary: 'valid', longTerm: { enabled: true } });
-      expect(signature.longTerm.documentTimestamp).toBe(timestamp.timestamp!.genTime);
+      expect(signature.longTerm.documentTimestampedAt).toBe(timestamp.timestamp!.stampedAt);
       // The file as it was, the signature, and one revision that holds the answers and the
       // timestamp: the timestamp seals in what was stored before it.
       expect((await doc.signatures.list()).revisions).toHaveLength(3);

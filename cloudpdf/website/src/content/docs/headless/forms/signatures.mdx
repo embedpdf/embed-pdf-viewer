@@ -244,7 +244,7 @@ doesn't tell a certificate authority who is reading it.
 const { longTerm } = verdict;
 
 longTerm.enabled; // true: what Acrobat calls "LTV enabled"
-longTerm.until; // the day that proof runs out, or null
+longTerm.expiresAt; // the day that proof runs out, or null
 longTerm.missing; // what stands in the way: [{ certificate, reason }]
 ```
 
@@ -273,7 +273,7 @@ own claim otherwise:
 const stamp = verdict.timestamp;
 const when =
   stamp?.summary === 'valid'
-    ? `${stamp.genTime}, confirmed by ${stamp.authorityName}`
+    ? `${stamp.stampedAt}, confirmed by ${stamp.authorityName}`
     : `${verdict.signature.signer.signedAt}, the signer's clock`;
 ```
 

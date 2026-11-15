@@ -33,19 +33,23 @@ export interface LongTermVerdict {
    * signer's path and the timestamp authority's, below the certificates you trust.
    */
   enabled: boolean;
-  /** The time it was judged at (ISO 8601): the earliest trusted timestamp that covers it, or null. */
-  at: string | null;
   /**
-   * How long the file proves this by itself (ISO 8601): the day the certificate of the last
-   * trusted timestamp covering the signature expires. Null when not enabled.
+   * The time the signature is proven to have existed by (ISO 8601), which it was judged at:
+   * that of the earliest trusted timestamp that covers it, or null.
    */
-  until: string | null;
+  provenAt: string | null;
+  /**
+   * When the proof the file carries by itself runs out (ISO 8601): the day the certificate of
+   * the last trusted timestamp covering the signature expires. The signature does not become
+   * invalid then; the proof of when it was made gets weaker. Null when not enabled.
+   */
+  expiresAt: string | null;
   /**
    * The time of the last trusted document timestamp added after the signature (ISO 8601), or
    * null when none covers it. With one, a strict validator has proof of when the stored
    * answers existed; without one, it has the signature's own timestamp only.
    */
-  documentTimestamp: string | null;
+  documentTimestampedAt: string | null;
   /** What stands in the way, one entry per certificate. Empty when enabled. */
   missing: LongTermGap[];
 }
@@ -110,17 +114,17 @@ export async function longTermFindings(input: LongTermInput): Promise<LongTermFi
       (last, stamp) => (!last || stamp.genTime > last.genTime ? stamp : last),
       null,
     );
-  const documentTimestamp = lastOf(covering)?.genTime ?? null;
+  const documentTimestampedAt = lastOf(covering)?.genTime ?? null;
   const without = (
-    at: string | null,
+    provenAt: string | null,
     gaps: LongTermFindings['gaps'],
     rows: CertificateRevocation[] = [],
   ): LongTermFindings => ({
     verdict: {
       enabled: false,
-      at,
-      until: null,
-      documentTimestamp,
+      provenAt,
+      expiresAt: null,
+      documentTimestampedAt,
       missing: gaps.map(({ certificate, reason }) => ({ certificate, reason })),
     },
     rows,
@@ -167,9 +171,9 @@ export async function longTermFindings(input: LongTermInput): Promise<LongTermFi
   return {
     verdict: {
       enabled: true,
-      at: proven.genTime,
-      until: certificateFromDer(last.authorityCertificate).notAfter.value.toISOString(),
-      documentTimestamp,
+      provenAt: proven.genTime,
+      expiresAt: certificateFromDer(last.authorityCertificate).notAfter.value.toISOString(),
+      documentTimestampedAt,
       missing: [],
     },
     rows,

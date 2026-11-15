@@ -772,7 +772,7 @@ describe('timestamps', () => {
         const [then] = await signature.validate(options);
         expect(then).toMatchObject({
           summary: 'valid',
-          validationTime: { kind: 'timestamp', genTime: then!.timestamp!.genTime },
+          validationTime: { kind: 'timestamp', stampedAt: then!.timestamp!.stampedAt },
         });
       }
     } finally {
@@ -1102,7 +1102,7 @@ describe('validation data', () => {
       expect(verdict).toMatchObject({
         summary: 'valid',
         revocation: 'good',
-        longTerm: { enabled: true, documentTimestamp: null, missing: [] },
+        longTerm: { enabled: true, documentTimestampedAt: null, missing: [] },
       });
       // Nothing is left to add: asking again stores nothing.
       const again = await signature.addValidationInfo(SIG);
@@ -1139,7 +1139,7 @@ describe('validation data', () => {
       const verdicts = await signature.validate();
       const signed = verdicts.find((verdict) => verdict.signature.fieldName === 'sig')!;
       expect(signed.longTerm.enabled).toBe(true);
-      expect(signed.longTerm.documentTimestamp).not.toBeNull();
+      expect(signed.longTerm.documentTimestampedAt).not.toBeNull();
 
       // The answers are in the file and a timestamp covers them: a second call adds neither.
       const again = await signature.addValidationInfo();
