@@ -12,6 +12,7 @@ import type {
   RevisionStructure,
   StepInput,
   StepVerdict,
+  UnwrittenObject,
 } from './types';
 
 type Side = 'old' | 'new';
@@ -117,6 +118,32 @@ export function restrictionsOf(before: RevisionStructure): {
   // The judged level: what a validator holds this step to. Nothing signed
   // yet: nothing forbids, the rule set explains what it can.
   return { level: protection.judged ?? 'annotate', locks: protection.fieldLocks };
+}
+
+/**
+ * The objects the rules read that `changes` does not hold, for the transport
+ * to read from the revisions' bytes and hand over as `StepInput.unwritten`.
+ *
+ * One kind so far: the annotation list of a page this step wrote, when the
+ * list is an object of its own that the step left alone. Acrobat adds a
+ * signature field to such a page by pointing it at a new list object, so
+ * what the page listed before is in no object the revision wrote (fixture
+ * `signature-long-term/acrobat-lta+acrobat-timestamp.pdf`).
+ */
+export function unwrittenObjectsToRead(
+  input: Pick<StepInput, 'changes' | 'before' | 'after'>,
+): number[] {
+  const pages = new Set([...input.before.pages, ...input.after.pages]);
+  const written = new Set(input.changes.map((c) => c.objectNumber));
+  const out = new Set<number>();
+  for (const c of input.changes) {
+    if (!pages.has(c.objectNumber)) continue;
+    for (const side of SIDES) {
+      const list = dictEntries(c.value[side])?.Annots;
+      if (list?.t === 'ref' && !written.has(list.num)) out.add(list.num);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
 }
 
 /**
@@ -280,6 +307,8 @@ function edgeKey(e: ObjectReferrer): string {
 class StepContext {
   readonly findings: ChangeFinding[] = [];
   readonly byNum = new Map<number, ObjectChange>();
+  /** The objects the step left alone that the transport read for the rules. */
+  readonly unwritten = new Map<number, UnwrittenObject>();
   readonly before: RoleIndex;
   readonly after: RoleIndex;
   /**
@@ -297,6 +326,10 @@ class StepContext {
     readonly locks: DocumentFieldLock[],
   ) {
     for (const c of input.changes) this.byNum.set(c.objectNumber, c);
+    for (const kept of input.unwritten ?? []) {
+      // A step's own object is read from the step, never from here.
+      if (!this.byNum.has(kept.objectNumber)) this.unwritten.set(kept.objectNumber, kept);
+    }
     this.before = indexRoles(input.before);
     this.after = indexRoles(input.after);
   }
@@ -688,17 +721,22 @@ function annotsHolders(ctx: StepContext): Map<number, number> {
   return out;
 }
 
-/** A page's annotation list on one side of a step, and the object that holds it when it has one. */
+/** A page's annotation list on one side of a step, and where it is kept. */
 interface PageList {
   refs: number[];
+  /** The object that holds the list when it is one of its own; 0 when the array is inside the page. */
+  object: number;
+  /** That object's change, when this step wrote it. */
   holder: ObjectChange | null;
 }
 
 /**
  * Read a page's annotation list on one side: from the page when the array
- * is inside it, from the list's own object when this step wrote that
- * object. Null when it cannot be read: the list is an object of its own
- * that this step left alone, so its entries are not among the evidence.
+ * is inside it; from the list's own object when this step wrote that
+ * object; and from the revision's bytes (`StepInput.unwritten`) when the
+ * step left that object alone. Null when it cannot be read: the transport
+ * handed over no such object, or it holds something other than a list of
+ * references.
  */
 function pageList(
   ctx: StepContext,
@@ -707,13 +745,20 @@ function pageList(
   side: Side,
 ): PageList | null {
   const value = dictEntries(page.value[side])?.Annots;
-  if (!value) return { refs: [], holder: null };
-  if (value.t === 'array') return { refs: refsOf(value), holder: null };
+  if (!value) return { refs: [], object: 0, holder: null };
+  if (value.t === 'array') return { refs: refsOf(value), object: 0, holder: null };
   if (value.t !== 'ref') return null;
   const holder = ctx.byNum.get(value.num);
-  if (!holder || holders.get(holder.objectNumber) !== page.objectNumber) return null;
+  if (!holder) {
+    const kept = ctx.unwritten.get(value.num);
+    if (!kept || kept.read !== 'ok' || kept.value?.t !== 'array') return null;
+    const refs = refsOf(kept.value);
+    if (refs.length !== kept.value.items.length) return null;
+    return { refs, object: value.num, holder: null };
+  }
+  if (holders.get(holder.objectNumber) !== page.objectNumber) return null;
   const list = holder.value[side];
-  return list ? { refs: refsOf(list), holder } : null;
+  return list ? { refs: refsOf(list), object: holder.objectNumber, holder } : null;
 }
 
 /** What `after` has beyond `before`, when `before` is its beginning; null otherwise. */
@@ -775,8 +820,10 @@ function ruleSignatureFieldAdded(ctx: StepContext): void {
   }
   // The page that lists the new widget: /Annots append-only. The list is an
   // array inside the page, or an object of its own (Acrobat's way); when the
-  // field is added it may stay where it is or move from one to the other
-  // (fixture `signature-long-term/acrobat-lta.pdf`).
+  // field is added it may stay where it is, move from one to the other
+  // (fixture `signature-long-term/acrobat-lta.pdf`), or move to a new list
+  // object while the old one stays in the file unwritten
+  // (`signature-long-term/acrobat-lta+acrobat-timestamp.pdf`).
   const holders = annotsHolders(ctx);
   for (const p of ctx.after.pages) {
     const c = ctx.byNum.get(p);
@@ -790,17 +837,20 @@ function ruleSignatureFieldAdded(ctx: StepContext): void {
     if (!appended || !appended.every((n) => newWidgets.has(n))) continue;
     // A list that moved to another object must also have grown: a move alone
     // is not something a new field explains.
-    const moved = before.holder !== after.holder;
+    const moved = before.object !== after.object;
     if (moved && appended.length === 0) continue;
     ctx.claimAll(c, rule);
     ctx.permitted(c, rule, 'page /Annots gained the new signature widget');
+    const replaced = before.object !== 0 && after.object !== 0;
     for (const holder of new Set([before.holder, after.holder])) {
       if (!holder) continue;
       ctx.claimAll(holder, rule);
       ctx.permitted(
         holder,
         rule,
-        'page /Annots moved into an object of its own, with the new signature widget',
+        replaced
+          ? 'page /Annots moved to another list object, with the new signature widget'
+          : 'page /Annots moved into an object of its own, with the new signature widget',
       );
     }
   }
@@ -1141,18 +1191,16 @@ function ruleAnnotation(ctx: StepContext): void {
       const after = pageList(ctx, holders, c, 'new');
       const listObjects = [before?.holder, after?.holder].filter((h) => h != null);
       if (!before || !after) {
-        // Acrobat points the page at a new list object when it adds a
-        // signature field to a page whose list already was an object of its
-        // own, and leaves the old object in the file unwritten (fixture
-        // `signature-long-term/acrobat-lta+acrobat-timestamp.pdf`). What the
-        // old list held is then not among the evidence, so nothing shows
-        // that the new one kept it.
+        // A list in an object this step left alone, which the transport did
+        // not read or which does not read as a list of references. What it
+        // held is then not among the evidence, so nothing shows what the
+        // change kept.
         ctx.claimAll(c, rule, false);
         for (const holder of listObjects) ctx.claimAll(holder, rule, false);
         ctx.forbidden(
           c,
           rule,
-          'page /Annots points at another list object, and the earlier list was not written in this revision: what it held cannot be compared',
+          'page /Annots points at a list object this revision did not write, and that list could not be read: what it held cannot be compared',
         );
         continue;
       }

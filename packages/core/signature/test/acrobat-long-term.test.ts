@@ -47,17 +47,7 @@ const observations: { cases: Observation[] } = JSON.parse(
  * Where the engine still reads `forbidden` and Acrobat reads valid. Each entry is a debt, not a
  * policy: when the engine learns to agree, the test below fails and the entry goes.
  */
-const KNOWN_DIFFERENCES: { file: string; field: string; why: string }[] = [
-  {
-    file: 'acrobat-lta+acrobat-timestamp.pdf',
-    field: 'Signature3',
-    why:
-      'Acrobat pointed the page at a new /Annots object and left the old one in the file ' +
-      'unwritten. The old list is then not among the evidence the analysis gets, so it cannot ' +
-      'show that the new list kept every entry. It needs the engine to read an object a ' +
-      'revision did not write.',
-  },
-];
+const KNOWN_DIFFERENCES: { file: string; field: string; why: string }[] = [];
 const knownDifference = (file: string, field: string) =>
   KNOWN_DIFFERENCES.some((entry) => entry.file === file && entry.field === field);
 
@@ -178,23 +168,22 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
     }
   });
 
-  test('a list replaced by another object, the old one left unwritten: one clear refusal', async () => {
-    expect(KNOWN_DIFFERENCES.map((entry) => `${entry.file} ${entry.field}`)).toEqual([
-      'acrobat-lta+acrobat-timestamp.pdf Signature3',
-    ]);
+  test('a list replaced by another object, the old one left unwritten, is read from the file', async () => {
+    expect(KNOWN_DIFFERENCES).toEqual([]);
+    // Acrobat pointed the page at a new /Annots object and left the old one in the file. No
+    // revision after the first timestamp wrote the old list, so the engine reads it from the
+    // earlier revision's bytes to see that the new list kept every entry.
     await withDocument('acrobat-lta+acrobat-timestamp.pdf', async (doc) => {
-      const refused = (await findings(doc, 'Signature3')).filter(
-        (finding) => finding.verdict === 'forbidden',
-      );
-      // Named once, with the reason, and nothing hanging off it as unexplained.
-      expect(refused).toHaveLength(1);
-      expect(refused[0]).toMatchObject({ rule: 'annotation', objectNumber: 3 });
-      expect(refused[0].detail).toMatch(/cannot be compared/);
-      // The first signature sealed a revision whose list was still inside the page. Judged on
-      // what the file holds now against that revision, both lists are in the evidence, and
-      // it reads as Acrobat reads it.
-      const first = verdictOf(await validateSignatures(doc), 'sig');
-      expect(first.modifications.verdict).toBe('permitted');
+      const found = await findings(doc, 'Signature3');
+      expect(found.filter((finding) => finding.verdict !== 'permitted')).toEqual([]);
+      // The page and its new list are explained by the field the timestamp added.
+      expect(found.filter((finding) => finding.objectNumber === 3)).toEqual([
+        expect.objectContaining({ rule: 'signature-field-added', verdict: 'permitted' }),
+      ]);
+      const verdicts = await validateSignatures(doc);
+      expect(verdictOf(verdicts, 'Signature3').modifications.verdict).toBe('permitted');
+      // The first signature sealed a revision whose list was still inside the page.
+      expect(verdictOf(verdicts, 'sig').modifications.verdict).toBe('permitted');
     });
   });
 

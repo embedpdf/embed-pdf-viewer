@@ -56,6 +56,7 @@ import type {
   BaseVersionInfo,
   SignatureCompleteResult,
   SignaturePrepared,
+  ValidationInfoAddResult,
 } from '../signature/types';
 import type { AttachmentRef } from '../dto/Attachment';
 
@@ -301,6 +302,14 @@ export type DocumentEvent =
       signingId: string;
       origin: EventOrigin;
     }
+  | ({
+      /**
+       * Validation data was stored in the document. A verdict that depends
+       * on it must be read again.
+       */
+      type: 'signatures.validationInfoAdded';
+      origin: EventOrigin;
+    } & ValidationInfoAddResult)
   | {
       /**
        * The session moved to a new saved version (a completed signature,

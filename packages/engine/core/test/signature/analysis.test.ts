@@ -11,6 +11,8 @@ import {
   type PdfCoordinates,
   type RevisionStructure,
   type Signature,
+  type UnwrittenObject,
+  unwrittenObjectsToRead,
 } from '../../src/shared';
 
 describe("parsePdfValue: the fork's shallow serialisation", () => {
@@ -1428,36 +1430,122 @@ describe("evaluateStep: a page whose /Annots is an object of its own (Acrobat's 
     );
   });
 
-  test('the page points at another list and the old one was not written: one refusal that says so', () => {
+  describe('the page points at another list, and the old one stays in the file unwritten', () => {
     // What Acrobat writes for a second timestamp: a fresh list, 61, with the old entries and
-    // the new widget. The old list, 60, stays in the file untouched, so it is not a change.
-    const step = evaluateStep({
-      older: 1,
-      newer: 2,
-      changes: [
-        change(
-          3,
-          {
-            old: '<</Annots 60 0 R/Parent 2 0 R/Type /Page>>',
-            new: '<</Annots 61 0 R/Parent 2 0 R/Type /Page>>',
-          },
-          {
-            old: [edge(2, 'Kids/[0]'), edge(30, 'P')],
-            new: [edge(2, 'Kids/[0]'), edge(30, 'P'), edge(31, 'P')],
-          },
-        ),
-        change(61, { old: null, new: '[21 0 R 30 0 R 31 0 R]' }, { new: [edge(3, 'Annots')] }),
-        ...newField(61),
-        trailer,
-      ],
-      before: structure(),
-      after: withField,
+    // the new widget. The old list, 60, stays in the file untouched, so it is not a change:
+    // the transport reads it from the revision's bytes.
+    const replaced = (newList: string): ObjectChange[] => [
+      change(
+        3,
+        {
+          old: '<</Annots 60 0 R/Parent 2 0 R/Type /Page>>',
+          new: '<</Annots 61 0 R/Parent 2 0 R/Type /Page>>',
+        },
+        {
+          old: [edge(2, 'Kids/[0]'), edge(30, 'P')],
+          new: [edge(2, 'Kids/[0]'), edge(30, 'P'), edge(31, 'P')],
+        },
+      ),
+      change(61, { old: null, new: newList }, { new: [edge(3, 'Annots')] }),
+      ...newField(61),
+      trailer,
+    ];
+    const oldList = (
+      text: string | null,
+      read: UnwrittenObject['read'] = 'ok',
+    ): UnwrittenObject => ({
+      objectNumber: 60,
+      value: text === null ? null : parsePdfValue(text),
+      read,
     });
-    expect(step.verdict).toBe('forbidden');
-    const forbidden = step.findings.filter((f) => f.verdict === 'forbidden');
-    expect(forbidden).toHaveLength(1);
-    expect(forbidden[0]).toMatchObject({ rule: 'annotation', objectNumber: 3 });
-    expect(forbidden[0].detail).toMatch(/cannot be compared/);
+    const judge = (newList: string, unwritten?: UnwrittenObject[]) =>
+      evaluateStep({
+        older: 1,
+        newer: 2,
+        changes: replaced(newList),
+        ...(unwritten ? { unwritten } : {}),
+        before: structure(),
+        after: withField,
+      });
+    const refusal = (step: ReturnType<typeof evaluateStep>) => {
+      expect(step.verdict).toBe('forbidden');
+      const forbidden = step.findings.filter((f) => f.verdict === 'forbidden');
+      expect(forbidden).toHaveLength(1);
+      expect(forbidden[0]).toMatchObject({ rule: 'annotation', objectNumber: 3 });
+      return forbidden[0].detail;
+    };
+
+    test('the rules ask for the old list, and for nothing a step wrote', () => {
+      const asked = (changes: ObjectChange[]) =>
+        unwrittenObjectsToRead({ changes, before: structure(), after: withField });
+      expect(asked(replaced('[21 0 R 30 0 R 31 0 R]'))).toEqual([60]);
+      // A list the step wrote is read from the step.
+      expect(asked([list('[21 0 R 30 0 R 31 0 R]'), ...newField(60), trailer])).toEqual([]);
+      // A page that is not written names nothing, whatever else changed.
+      expect(asked([...newField(60), trailer])).toEqual([]);
+    });
+
+    test('the new list keeps every old entry and adds the new widget: permitted', () => {
+      const step = judge('[21 0 R 30 0 R 31 0 R]', [oldList('[21 0 R 30 0 R]')]);
+      expect(step.verdict).toBe('permitted');
+      expect(step.findings.filter((f) => f.objectNumber === 3)).toEqual([
+        expect.objectContaining({ rule: 'signature-field-added', verdict: 'permitted' }),
+      ]);
+      expect(step.findings.filter((f) => f.objectNumber === 61)).toEqual([
+        expect.objectContaining({
+          rule: 'signature-field-added',
+          verdict: 'permitted',
+          detail: expect.stringMatching(/another list object/),
+        }),
+      ]);
+    });
+
+    test('the new list drops an old entry: forbidden', () => {
+      const step = judge('[21 0 R 31 0 R]', [oldList('[21 0 R 30 0 R]')]);
+      expect(step.verdict).toBe('forbidden');
+      expect(
+        step.findings.some((f) => f.rule === 'signature-field-added' && f.objectNumber === 3),
+      ).toBe(false);
+    });
+
+    test('the new list puts the old entries in another order: not explained by the new field', () => {
+      const step = judge('[30 0 R 21 0 R 31 0 R]', [oldList('[21 0 R 30 0 R]')]);
+      expect(
+        step.findings.some((f) => f.rule === 'signature-field-added' && f.objectNumber === 3),
+      ).toBe(false);
+    });
+
+    test('the old list was not read: one refusal that says so', () => {
+      expect(refusal(judge('[21 0 R 30 0 R 31 0 R]'))).toMatch(/cannot be compared/);
+    });
+
+    test('the old list does not parse, or is absent: the same refusal', () => {
+      expect(refusal(judge('[21 0 R 30 0 R 31 0 R]', [oldList(null, 'failed')]))).toMatch(
+        /cannot be compared/,
+      );
+      expect(refusal(judge('[21 0 R 30 0 R 31 0 R]', [oldList(null, 'absent')]))).toMatch(
+        /cannot be compared/,
+      );
+    });
+
+    test('the old object is not a list of references: the same refusal', () => {
+      expect(refusal(judge('[21 0 R 30 0 R 31 0 R]', [oldList('<</Type /Annot>>')]))).toMatch(
+        /cannot be compared/,
+      );
+      expect(refusal(judge('[21 0 R 30 0 R 31 0 R]', [oldList('[21 0 R (text)]')]))).toMatch(
+        /cannot be compared/,
+      );
+    });
+
+    test('a value handed over for an object the step wrote is not read', () => {
+      // The step wrote 61 as the old entries and the widget. A transport that also hands it
+      // over as something else changes nothing.
+      const step = judge('[21 0 R 30 0 R 31 0 R]', [
+        oldList('[21 0 R 30 0 R]'),
+        { objectNumber: 61, value: parsePdfValue('[99 0 R]'), read: 'ok' },
+      ]);
+      expect(step.verdict).toBe('permitted');
+    });
   });
 });
 

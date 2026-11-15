@@ -15,6 +15,8 @@ import {
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSnapshot,
+  type ValidationInfo,
+  type ValidationInfoAddResult,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -279,6 +281,24 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         return result;
       });
     });
+  }
+
+  getValidationInfo(): AbortablePromise<ValidationInfo> {
+    return this.closedRejection() ?? this.noValidationInfoYet();
+  }
+
+  addValidationInfo(): AbortablePromise<ValidationInfoAddResult> {
+    return this.closedRejection() ?? this.noValidationInfoYet();
+  }
+
+  /** The server has no route for a document's validation data yet. */
+  private noValidationInfoYet(): AbortablePromise<never> {
+    return AbortablePromise.rejectReason(
+      new EngineError(
+        EngineErrorCode.NotImplemented,
+        "the cloud engine does not read or store a document's validation data yet",
+      ),
+    );
   }
 
   /** Version routes address a field by its fully qualified name; an object-number ref is resolved through the snapshot. */

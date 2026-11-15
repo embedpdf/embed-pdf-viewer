@@ -47,6 +47,8 @@ import {
   type SignaturesCompleteWorkerRequest,
   type SignaturesCancelWorkerRequest,
   type SignaturesAnalyzeWorkerRequest,
+  type SignaturesValidationInfoWorkerRequest,
+  type SignaturesAddValidationInfoWorkerRequest,
   type SignaturesFinalizeCandidateWorkerRequest,
   type SignaturesContentsWorkerRequest,
   type SignaturesDigestWorkerRequest,
@@ -199,6 +201,8 @@ import {
   SignatureAnalyzer,
   SignatureMutator,
   SignatureReader,
+  ValidationInfoMutator,
+  ValidationInfoReader,
   disposeSignatureModel,
 } from '../features/signature';
 import { PageTextReader } from '../features/text';
@@ -602,6 +606,12 @@ export class WorkerHost {
           break;
         case 'signatures.cancel':
           resultPack = this.handleSignaturesCancel(msg);
+          break;
+        case 'signatures.validationInfo':
+          resultPack = this.handleSignaturesValidationInfo(msg);
+          break;
+        case 'signatures.addValidationInfo':
+          resultPack = this.handleSignaturesAddValidationInfo(msg, ctrl.signal);
           break;
         case 'signatures.analyze':
           resultPack = this.handleSignaturesAnalyze(msg);
@@ -1059,6 +1069,43 @@ export class WorkerHost {
     // The install already advanced the mutation sequence; finishMutation
     // only adds the (now empty) layer artifact for layer sessions.
     return this.finishMutation(session, { tag: 'signatures.complete', result }, req.artifactPath);
+  }
+
+  private handleSignaturesValidationInfo(
+    req: SignaturesValidationInfoWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const info = new ValidationInfoReader(this.runtime, session).read();
+    // Each entry was copied out of the runtime's memory into a buffer of its own.
+    const ownBuffer = (entry: Uint8Array) => entry.buffer as ArrayBuffer;
+    const certificates = info.certificates.map(ownBuffer);
+    const ocspResponses = info.ocspResponses.map(ownBuffer);
+    const crls = info.crls.map(ownBuffer);
+    return wirePack({ tag: 'signatures.validationInfo', certificates, ocspResponses, crls }, [
+      ...certificates,
+      ...ocspResponses,
+      ...crls,
+    ]);
+  }
+
+  private handleSignaturesAddValidationInfo(
+    req: SignaturesAddValidationInfoWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const result = new ValidationInfoMutator(this.runtime, session).add(
+      {
+        certificates: req.certificates.map((entry) => new Uint8Array(entry)),
+        ocspResponses: req.ocspResponses.map((entry) => new Uint8Array(entry)),
+        crls: req.crls.map((entry) => new Uint8Array(entry)),
+      },
+      signal,
+    );
+    const payload = { tag: 'signatures.addValidationInfo' as const, result };
+    // The document already held every entry: nothing was written.
+    const wrote = Object.values(result.added).some((count) => count > 0);
+    if (!wrote) return wirePack(payload);
+    return this.finishMutation(session, payload, req.artifactPath);
   }
 
   private handleSignaturesAnalyze(

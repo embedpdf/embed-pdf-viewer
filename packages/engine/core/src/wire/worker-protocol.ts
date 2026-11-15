@@ -87,6 +87,7 @@ import type {
   SignaturePrepared,
   SignatureSnapshot,
   SignedDocumentPolicy,
+  ValidationInfoAddResult,
 } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
@@ -336,6 +337,27 @@ export interface SignaturesCancelWorkerRequest {
   docId: string;
   layerName?: string;
   signingId: string;
+}
+
+export interface SignaturesValidationInfoWorkerRequest {
+  kind: 'signatures.validationInfo';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/** Store validation data; see `DocumentSignaturesService.addValidationInfo`. */
+export interface SignaturesAddValidationInfoWorkerRequest extends WriteJobFields {
+  kind: 'signatures.addValidationInfo';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  certificates: ArrayBuffer[];
+  ocspResponses: ArrayBuffer[];
+  crls: ArrayBuffer[];
+  artifactPath?: string;
 }
 
 export interface SignaturesAnalyzeWorkerRequest {
@@ -1648,6 +1670,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | SignaturesPrepareWorkerRequest
   | SignaturesCompleteWorkerRequest
   | SignaturesCancelWorkerRequest
+  | SignaturesValidationInfoWorkerRequest
+  | SignaturesAddValidationInfoWorkerRequest
   | SignaturesAnalyzeWorkerRequest
   | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
@@ -1714,6 +1738,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       result: SignatureCompleteResult;
     } & WritePayloadFacts)
   | { tag: 'signatures.cancel'; result: SignatureCancelResult }
+  | {
+      tag: 'signatures.validationInfo';
+      certificates: ArrayBuffer[];
+      ocspResponses: ArrayBuffer[];
+      crls: ArrayBuffer[];
+    }
+  | { tag: 'signatures.addValidationInfo'; result: ValidationInfoAddResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';

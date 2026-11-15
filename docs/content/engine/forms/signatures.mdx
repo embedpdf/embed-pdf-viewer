@@ -1076,9 +1076,17 @@ await doc.signatures.addValidationInfo({
 });
 ```
 
-`doc.signatures.addValidationInfo()` checks only that each entry is well-formed, and stores
-nothing the file already holds. It is a change like any other: it is in the file you next save,
-as a revision after the signatures, and a signature or timestamp made after it seals it in.
+`getValidationInfo()` reads the document as it is now, so an entry you added and haven't saved
+yet is among them.
+
+`doc.signatures.addValidationInfo()` checks only that each entry is one DER object of at most
+16 MiB, and stores nothing the file already holds. It returns `added`, the number of new entries
+of each kind. An entry that fails the check, such as a certificate still in PEM text, fails the
+call with `InvalidArg`; `details.field` names it, as in `certificates[1]`, and nothing is stored.
+
+It is a change like any other: it is in the file you next save, as a revision after the
+signatures, and a signature or timestamp made after it seals it in. It can't be undone, and
+undoing another change leaves it in place.
 
 ### Timestamp something else
 

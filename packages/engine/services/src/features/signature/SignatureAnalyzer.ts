@@ -14,6 +14,7 @@ import type {
   RevisionHealth,
   RevisionStructure,
   SignatureSnapshot,
+  UnwrittenObject,
 } from '@embedpdf/engine-core/runtime';
 import {
   assessmentOf,
@@ -26,6 +27,7 @@ import {
   restrictionsFor,
   sameEffectiveValue,
   SIGNATURE_POLICY_VERSION,
+  unwrittenObjectsToRead,
   USAGE_INCOMPLETE,
 } from '@embedpdf/engine-core/runtime';
 import { deriveProtection } from '@embedpdf/engine-core/runtime';
@@ -227,6 +229,7 @@ export class SignatureAnalyzer {
       let before: RevisionStructure;
       let after: RevisionStructure;
       let changes: ObjectChange[] = [];
+      let unwritten: UnwrittenObject[] = [];
       let health: { old: RevisionHealth; new: RevisionHealth } | undefined;
       try {
         const sealed = this.openPrefix(target, revisions, sinceRevision, pair);
@@ -237,7 +240,7 @@ export class SignatureAnalyzer {
         before = readStructure(this.runtime, sealed);
         after = untilRevision === sinceRevision ? before : readStructure(this.runtime, judged);
         if (untilRevision > sinceRevision) {
-          ({ changes, health } = this.compare(sealed, judged, before, after));
+          ({ changes, unwritten, health } = this.compare(sealed, judged, before, after));
         }
       } finally {
         pair.close();
@@ -251,6 +254,7 @@ export class SignatureAnalyzer {
         older: sinceRevision,
         newer: untilRevision,
         changes,
+        unwritten,
         before,
         after,
         health,
@@ -342,12 +346,18 @@ export class SignatureAnalyzer {
             : this.openPrefix(target, revisions, r, new CloseStack());
         try {
           const newerStructure = readStructure(this.runtime, newer);
-          const { changes, health } = this.compare(older, newer, olderStructure, newerStructure);
+          const { changes, unwritten, health } = this.compare(
+            older,
+            newer,
+            olderStructure,
+            newerStructure,
+          );
           steps.push(
             evaluateStep({
               older: r - 1,
               newer: r,
               changes,
+              unwritten,
               before: olderStructure,
               after: newerStructure,
               health,
@@ -463,14 +473,19 @@ export class SignatureAnalyzer {
   /**
    * The fork's exact object diff between two revision documents,
    * marshalled: values in pass one, anchored edges in pass two (the anchors
-   * are the changed objects plus each side's structural objects).
+   * are the changed objects plus each side's structural objects). With it,
+   * the objects the rules read that the newer revision did not write.
    */
   private compare(
     older: Ptr,
     newer: Ptr,
     before: RevisionStructure,
     after: RevisionStructure,
-  ): { changes: ObjectChange[]; health: { old: RevisionHealth; new: RevisionHealth } } {
+  ): {
+    changes: ObjectChange[];
+    unwritten: UnwrittenObject[];
+    health: { old: RevisionHealth; new: RevisionHealth };
+  } {
     const { fn, mem } = this.runtime;
     const diff = fn.EPDFDoc_CompareRevisions(older, newer);
     if (diff === NULL_PTR) {
@@ -545,6 +560,11 @@ export class SignatureAnalyzer {
       );
       return {
         changes: this.withAnchoredUsage(diff, changes, before, after),
+        // An object the newer revision did not write reads the same in both;
+        // the older document is asked, as the one a rule compares against.
+        unwritten: unwrittenObjectsToRead({ changes, before, after }).map((objectNumber) =>
+          this.readUnwritten(older, objectNumber),
+        ),
         health: { old: this.readHealth(diff, DIFF_OLD), new: this.readHealth(diff, DIFF_NEW) },
       };
     } finally {
@@ -604,6 +624,53 @@ export class SignatureAnalyzer {
         },
         ...(incomplete ? { usageIncomplete: true } : {}),
       };
+    });
+  }
+
+  /**
+   * Object `objectNumber` as `revision`'s loaded bytes hold it, in the form
+   * the diff's values have. Its value is null when the object is absent,
+   * when its bytes do not parse, or when it is past the fork's inspection
+   * cap: `read` tells the first two apart.
+   */
+  private readUnwritten(revision: Ptr, objectNumber: number): UnwrittenObject {
+    const { fn, mem } = this.runtime;
+    return withScratchN(mem, [4, 4], ([statusPtr, truncPtr]) => {
+      const call = (buffer: Ptr, capacity: number): number => {
+        mem.poke(statusPtr, 'i32', -1);
+        mem.poke(truncPtr, 'i32', 0);
+        return fn.EPDFDoc_GetLoadedObjectValue(
+          revision,
+          objectNumber,
+          buffer,
+          capacity,
+          statusPtr,
+          truncPtr,
+        );
+      };
+      const gap = (read: ObjectReadStatus): UnwrittenObject => ({
+        objectNumber,
+        value: null,
+        read,
+      });
+      const length = call(NULL_PTR, 0);
+      const read = READ_BY_CODE[Number(mem.peek(statusPtr, 'i32'))] ?? 'failed';
+      const truncated = Number(mem.peek(truncPtr, 'i32')) !== 0;
+      if (read !== 'ok' || truncated || length <= 0) return gap(read);
+      return withScratch(mem, length, (buffer) => {
+        const written = call(buffer, length);
+        if (written <= 0 || Number(mem.peek(truncPtr, 'i32')) !== 0) return gap(read);
+        // Bytes, one to one, as the diff's values are read.
+        const bytes = mem.readBytes(buffer, written - 1);
+        let text = '';
+        for (const b of bytes) text += String.fromCharCode(b);
+        try {
+          return { objectNumber, value: parsePdfValue(text), read };
+        } catch {
+          // A serialisation this engine cannot read carries no evidence.
+          return gap(read);
+        }
+      });
     });
   }
 

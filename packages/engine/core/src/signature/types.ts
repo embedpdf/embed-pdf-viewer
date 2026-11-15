@@ -291,3 +291,26 @@ export interface SignatureCompleteResult {
 export interface SignatureCancelResult {
   status: 'cancelled' | 'already-completed' | 'unknown';
 }
+
+/**
+ * What a document holds so that its signatures can be checked later with no
+ * network (the document security store, `/DSS`): certificates, OCSP
+ * responses and CRLs, each entry one DER object.
+ */
+export interface ValidationInfo {
+  certificates: Uint8Array[];
+  ocspResponses: Uint8Array[];
+  crls: Uint8Array[];
+}
+
+/** The lists of a {@link ValidationInfo}. */
+export type ValidationInfoKind = keyof ValidationInfo;
+
+/** How many entries of each kind a write stored. */
+export type ValidationInfoCounts = Record<ValidationInfoKind, number>;
+
+export interface ValidationInfoAddResult {
+  /** The entries that were new: one the document already held is not stored again. */
+  added: ValidationInfoCounts;
+  meta: MutationMeta;
+}

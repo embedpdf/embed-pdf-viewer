@@ -8,7 +8,12 @@ export {
   dictEntries,
   refsOf,
 } from './pdf-value';
-export { evaluateStep, restrictionsOf, sameEffectiveValue } from './evaluate';
+export {
+  evaluateStep,
+  restrictionsOf,
+  sameEffectiveValue,
+  unwrittenObjectsToRead,
+} from './evaluate';
 export { restrictionsFor } from './restrictions';
 export { EdgeResolver, DEFAULT_EDGE_RESOLVER_BUDGET, USAGE_INCOMPLETE } from './resolve';
 export type { EdgeResolverBudget, ResolvedUsage } from './resolve';

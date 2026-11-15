@@ -118,6 +118,18 @@ export interface ObjectChange {
   usageIncomplete?: boolean;
 }
 
+/**
+ * An object a rule reads that the step did not write, as the revision's
+ * bytes hold it. It reads the same in both revisions: a step lists every
+ * object whose cross-reference mapping moved, and this one's did not.
+ */
+export interface UnwrittenObject {
+  objectNumber: number;
+  /** Null when the object is absent, could not be read, or is past the inspection cap. */
+  value: PdfValue | null;
+  read: ObjectReadStatus;
+}
+
 export interface RevisionField {
   objectNumber: number;
   /** Fully qualified name. */
@@ -260,6 +272,12 @@ export interface StepInput {
   older: number;
   newer: number;
   changes: ObjectChange[];
+  /**
+   * The objects `unwrittenObjectsToRead` names, read from the revisions'
+   * bytes. Absent on a transport that reads none: a rule that needs one then
+   * finds its evidence missing.
+   */
+  unwritten?: UnwrittenObject[];
   before: RevisionStructure;
   after: RevisionStructure;
   /** What the transport learned about each revision as a whole (see `RevisionHealth`). */
