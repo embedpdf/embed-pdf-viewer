@@ -84,6 +84,7 @@ describe('LazyTransport', () => {
   });
 
   test('boot failure rejects every buffered pack and all future sends', async () => {
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
     const lazy = new LazyTransport(async () => {
       throw new Error('wasm compile failed');
     });
@@ -108,6 +109,14 @@ describe('LazyTransport', () => {
     lazy.send(pack(3));
     await microtasks();
     expect(seen.map((m) => m.jobId)).toEqual([1, 2, 3]);
+
+    // Said in the console once, however many jobs it fails.
+    expect(reported).toHaveBeenCalledTimes(1);
+    expect(reported).toHaveBeenCalledWith(
+      '[embedpdf]',
+      expect.objectContaining({ message: expect.stringMatching(/wasm compile failed/) }),
+    );
+    reported.mockRestore();
   });
 
   test('terminate before any boot never spawns the inner transport', async () => {

@@ -1,17 +1,14 @@
+<!-- Generated from docs/content/engine/setup.local.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/engine-services
 
-Engine v3 service implementations: synchronous, runtime-agnostic PDF logic
-that runs identically inside the local WASM worker
-([`@embedpdf/engine`](https://www.npmjs.com/package/@embedpdf/engine)) and the
-[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)
-`worker_thread` pool.
+The PDF logic of the EmbedPDF engine, the same code in the browser's worker and on a CloudPDF server.
 
-You normally don't install this directly — it arrives as a dependency of an
-engine implementation.
+Part of [EmbedPDF](https://www.embedpdf.com). It comes with `@embedpdf/engine`, `@cloudpdf/engine`, `@cloudpdf/server`.
 
 ## Documentation
 
-https://www.embedpdf.com/docs
+- [Setup](https://www.embedpdf.com/docs/engine/setup): Install the local engine, create it once for your app, and run it in any bundler, with server-side rendering, or in Node.
 
 ## License
 

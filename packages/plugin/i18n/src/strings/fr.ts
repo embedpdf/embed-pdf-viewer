@@ -18,6 +18,7 @@ export const fr: EmbedpdfStrings = {
     view: { rotateClockwise: 'Rotation horaire', rotateCounterclockwise: 'Rotation antihoraire' },
     selection: { copy: 'Copier' },
     annotation: { delete: 'Supprimer' },
+    history: { undo: 'Annuler', redo: 'Rétablir' },
     document: { download: 'Télécharger', print: 'Imprimer' },
     snapshot: { copy: 'Copier', save: 'Enregistrer l’image', clear: 'Effacer l’instantané' },
     tool: {

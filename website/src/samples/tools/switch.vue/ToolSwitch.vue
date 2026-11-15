@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { useInteraction, useInteractionState } from '@embedpdf/vue/interaction';
 
-const LABELS: Record<string, string> = { pointer: 'Select', pan: 'Hand' };
+const LABELS: Record<string, string> = {
+  pointer: 'Select',
+  pan: 'Hand',
+  zoom: 'Zoom',
+  snapshot: 'Snapshot',
+};
 const HINTS: Record<string, string> = {
   pointer: 'A drag selects text',
   pan: 'A drag scrolls the pages',
+  zoom: 'A drag zooms to the box, a click zooms in',
+  snapshot: 'A drag takes part of a page as an image',
 };
 
 // A button for every tool you can switch to, the active one pressed.

@@ -1,6 +1,7 @@
 import type { AnnotationBundle } from './AnnotationBundle';
 import type { BundleImportPages } from './bundle';
 import type { Annotation } from '../annotation/kinds';
+import type { PdfActionTree } from '../dto/PdfAction';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
@@ -85,12 +86,59 @@ export interface AnnotationImportResult<C extends Coordinates = PageCoordinates>
 }
 
 /**
- * The facts an import committed: one `annotations.created` per annotation, in
- * bundle order, each with the envelope of its own page and its own id. The
- * cache pins move once, with the last.
+ * The fields of `data` that are markers for something the engine can't
+ * write. An import and a copy leave each one out, and so does a viewer that
+ * shows a copy before the engine answers, so nothing here needs zod.
+ */
+export function fieldMarkersOf(
+  data: Annotation,
+): Array<{ field: string; reason: AnnotationDropReason }> {
+  const markers: Array<{ field: string; reason: AnnotationDropReason }> = [];
+  const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
+  if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
+  if (measure?.subtype === 'unknown') markers.push({ field: 'measure', reason: 'unknown-measure' });
+  const target = data.subtype === 'link' ? data.target : null;
+  const carriedTarget = !!target && isWritableLinkTarget(target);
+  if (target && !carriedTarget) markers.push({ field: 'target', reason: 'unsupported-action' });
+  // `actions` reads `/A` and `/AA`, and no write takes it. A copy has only
+  // the `/A` a link's target writes: one go-to or URI action, without a
+  // chain or an `/IsMap`. A target a write can't make is reported above.
+  const { actions } = data;
+  const lost = Object.entries(actions ?? {}).some(([trigger, tree]) =>
+    data.subtype !== 'link' || trigger !== 'activate' ? true : carriedTarget && !writtenAsIs(tree),
+  );
+  if (lost) markers.push({ field: 'actions', reason: 'unsupported-action' });
+  return markers;
+}
+
+/** Whether a link's `/A` is what writing its target writes again. */
+function writtenAsIs<Destination>(tree: PdfActionTree<Destination> | undefined): boolean {
+  const root = tree?.root;
+  if (!tree || tree.incomplete || !root || root.next.length > 0) return false;
+  return !(root.type === 'uri' && root.isMap);
+}
+
+/** Whether a write can make a link's target; the others read as markers. */
+function isWritableLinkTarget(target: { kind: string; name?: string }): boolean {
+  return target.kind === 'named'
+    ? STANDARD_NAMED_ACTIONS.has(target.name ?? '')
+    : target.kind === 'goto' || target.kind === 'uri';
+}
+
+const STANDARD_NAMED_ACTIONS: ReadonlySet<string> = new Set([
+  'NextPage',
+  'PrevPage',
+  'FirstPage',
+  'LastPage',
+]);
+
+/**
+ * The facts an import committed, or a copy: one `annotations.created` per
+ * annotation, in the order they were made, each with the envelope of its own
+ * page and its own id. The cache pins move once, with the last.
  */
 export function annotationImportFacts(
-  result: AnnotationImportResult,
+  result: Pick<AnnotationImportResult, 'annotations' | 'meta'>,
 ): Array<{ page: PageRef } & AnnotationCreateResult> {
   const last = result.annotations.length - 1;
   return result.annotations.map((annotation, index) => {

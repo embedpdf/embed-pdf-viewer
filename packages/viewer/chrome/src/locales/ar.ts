@@ -107,6 +107,7 @@ export const ar: Locale = {
         saveFile: 'حفظ الملف',
         removeLink: 'إزالة الارتباط',
         delete: 'حذف',
+        duplicate: 'تكرار',
         group: 'تجميع',
         ungroup: 'فك التجميع',
         stampFromSelection: 'إنشاء ختم',
@@ -502,6 +503,7 @@ export const ar: Locale = {
       box: 'الخانة {number}',
       addButton: 'إضافة زر',
       addBox: 'إضافة خانة',
+      duplicateGroup: 'تكرار المجموعة',
     },
     // The style panel's own words around the properties.
     stylePanel: {

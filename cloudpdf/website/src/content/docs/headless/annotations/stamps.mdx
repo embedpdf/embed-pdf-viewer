@@ -11,16 +11,19 @@ A stamp is artwork you place on a page: "Approved", a company seal, a signature.
 keeps stamps in **libraries**, arms one for a click, and writes the placed stamp the way Acrobat
 does, so it's the same stamp there.
 
-Register `stampPlugin()` next to `annotationPlugin()`, and use `useStamp()`. The example imports the
-standard library, lists its stamps and arms one: hover a page to see where it lands, and click to
-place it:
-
-<Example name="stamp/basic" mode="open" />
+Register `stampPlugin()` next to `annotationPlugin()`, and use `useStamp()`:
 
 ```ts
 const { library } = await stamp.importLibrary(await loadDefaultLibrary('en'));
 await stamp.armAsset(assetId); // the next click places it
 ```
+
+{/* readme: end */}
+
+The example imports the standard library, lists its stamps and arms one: hover a page to see where
+it lands, and click to place it:
+
+<Example name="stamp/basic" mode="open" />
 
 - **A library names itself.** A library is a PDF: its title is the library's name, and its named
   pages are the stamps. An Acrobat stamp file imports as it is.
@@ -99,6 +102,53 @@ the engine marks are written on the first time a mark names it, and embeds when 
 The example makes a drawn signature and typed initials; type more, and place them:
 
 <Example name="stamp/marks" />
+
+## Handwriting fonts for typed marks
+
+A typed signature looks like one in a handwriting font. Three come as a package:
+
+```sh npm2yarn
+npm install @embedpdf/default-signature-fonts
+```
+
+| Key | Font | Size |
+| :-- | :-- | :-- |
+| `allura` | Allura: formal, like a signature | 81 KB |
+| `great-vibes` | Great Vibes: flowing calligraphy | 159 KB |
+| `caveat` | Caveat: casual handwriting | 125 KB |
+
+Give them to the plugin's `fonts` setting, and a typed mark names one by its key:
+
+```ts
+import {
+  DEFAULT_SIGNATURE_FONTS,
+  loadSignatureFont,
+} from '@embedpdf/default-signature-fonts/library';
+
+stampPlugin({
+  fonts: DEFAULT_SIGNATURE_FONTS.map(({ key }) => ({
+    key,
+    load: () => loadSignatureFont(key),
+  })),
+});
+```
+
+```ts
+await stamp.createAsset({
+  libraryId,
+  label: 'Signature',
+  mark: {
+    kind: 'text',
+    text: 'Ada Lovelace',
+    fontFamily: 'allura',
+  },
+});
+```
+
+Each font is a lazy chunk of your build: its file downloads the first time a mark names it, and
+the engine embeds it in the PDF, so the mark looks the same in every PDF reader. The fonts cover
+Latin, Latin Extended and Vietnamese; Caveat has no Vietnamese. The ready-made viewer offers the
+three by default.
 
 ## Place a stamp with code
 

@@ -35,7 +35,7 @@ describe('a page the publish gate holds back', () => {
 
     expect(body).toBe(
       "# Search\n\nThis page describes EmbedPDF 3.0 for Vue, which isn't released yet. " +
-        '[Read the React version](https://www.embedpdf.com/docs/headless/react/text/search).',
+        '[Read the React version](https://www.embedpdf.com/docs/headless/react/text/search.md).',
     );
     expect(markdown).toContain('title: "Search — Vue"');
     expect(markdown).toContain('source: "https://www.embedpdf.com/docs/headless/vue/text/search"');
@@ -69,7 +69,7 @@ describe('a viewer page the publish gate holds back', () => {
 
     expect(markdown.split('---\n').at(-1)?.trim()).toBe(
       "# Layout\n\nThis page describes EmbedPDF 3.0 for Vanilla JS, which isn't released yet. " +
-        '[Read the React version](https://www.embedpdf.com/docs/viewer/react/customize/layout).',
+        '[Read the React version](https://www.embedpdf.com/docs/viewer/react/customize/layout.md).',
     );
   });
 });

@@ -178,6 +178,8 @@ import type {
   SearchSnippet,
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
+import type { AnnotationCopyResult } from '../transfer/annotationCopy';
+import type { FormCopyResult } from '../transfer/formCopy';
 import type {
   AnnotationImportBody,
   AnnotationImportOptions,
@@ -1178,7 +1180,8 @@ export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z
   meta: AnnotationListMutationMetaSchema,
 });
 
-export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
+/** What an import and a copy answer: the annotations made, where each came from, what was left out. */
+const annotationsMadeShape = {
   annotations: z.array(AnnotationSchema),
   refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
   dropped: z.array(
@@ -1202,7 +1205,15 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
     }),
   ),
   meta: AnnotationListMutationMetaSchema,
-}) as z.ZodType<AnnotationImportResult>;
+};
+
+export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object(
+  annotationsMadeShape,
+) as z.ZodType<AnnotationImportResult>;
+
+export const AnnotationCopyResultSchema: z.ZodType<AnnotationCopyResult> = z.object(
+  annotationsMadeShape,
+) as z.ZodType<AnnotationCopyResult>;
 
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
@@ -1304,7 +1315,8 @@ export const FormResetBodySchema = z
 /** What `updateWidget` takes on the wire: the widget patch (`PATCH …/form/widgets/{p}/{key}`). */
 export const FormWidgetUpdateBodySchema = z.object({ patch: WidgetPatchSchema }).strict();
 
-export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
+/** What a design import and a copy answer: the fields made, where each came from, what was left out. */
+const fieldsMadeShape = {
   fields: z.array(FormFieldDTOSchema),
   widgets: z.array(WidgetDTOSchema),
   refMap: z.array(z.object({ from: FormFieldRefSchema, to: FormFieldRefSchema })),
@@ -1326,7 +1338,15 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
   ),
   calculationOrder: z.array(FormFieldRefSchema).optional(),
   meta: FormMutationMetaSchema,
-}) as unknown as z.ZodType<FormImportResult>;
+};
+
+export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object(
+  fieldsMadeShape,
+) as unknown as z.ZodType<FormImportResult>;
+
+export const FormCopyResultSchema: z.ZodType<FormCopyResult> = z.object(
+  fieldsMadeShape,
+) as unknown as z.ZodType<FormCopyResult>;
 
 export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z.object({
   fields: z.array(FormFieldDTOSchema),

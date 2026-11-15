@@ -254,6 +254,36 @@ describe('a stamp before the engine wrote it', () => {
     expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
     expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
   });
+
+  it('a copy of it shows the same picture, where the copy is', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const png = pngOf(200, 100);
+    harness.create.mockReturnValueOnce(new Promise(() => {}));
+    await harness.capability.stamps.arm({ source: png });
+    expect(harness.capability.placeArmedStamp(PAGE, { x: 300, y: 400 })).toBe(true);
+    await Promise.resolve();
+    const [placed] = harness.model().order;
+
+    // Copied while the engine is still placing it.
+    void harness.capability.duplicate([harness.model().byId[placed!]!.annotation.ref], {
+      offset: { x: 10, y: 10 },
+    });
+
+    const [, copy] = harness.model().order;
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${placed}@placed|${copy}@placed`);
+    const [, picture, ...rest] = await harness.capability.renderAppearances(PAGE, 2);
+    expect(rest).toEqual([]);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(0);
+    const original = harness.model().byId[placed!]!.apBox!;
+    expect(picture).toMatchObject({
+      ref: harness.model().byId[copy!]!.annotation.ref,
+      rect: { ...original, x: original.x + 10, y: original.y + 10 },
+      version: 0,
+    });
+    const blob = await picture!.image.blob();
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+  });
 });
 
 describe('an annotation an undo brings back', () => {

@@ -15,6 +15,7 @@ import {
   type AnnotationImportResult,
   type AnnotationList,
   type AnnotationListOptions,
+  type AnnotationChangeVerb,
   type DocumentAnnotationsService,
   type ManifestPage,
   type PageObjectNumber,
@@ -39,7 +40,10 @@ import type { HttpClient } from '../transport/HttpClient';
  *  version (404 on the immutable leaf → refresh the manifest → retry). */
 const MAX_COHERENCE_RESTARTS = 2;
 
-export class CloudDocumentAnnotationsService implements DocumentAnnotationsService {
+export class CloudDocumentAnnotationsService implements Omit<
+  DocumentAnnotationsService,
+  AnnotationChangeVerb
+> {
   constructor(
     private readonly http: HttpClient,
     private readonly docId: string,

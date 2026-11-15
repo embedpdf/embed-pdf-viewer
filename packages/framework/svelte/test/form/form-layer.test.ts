@@ -341,7 +341,7 @@ describe('<FormLayer> field pictures', () => {
           `blob:${annotationKey(text!.ref)}:null`,
           `blob:${checkKey}:Off`,
         ]);
-        // Placed by the box the engine drew it into, in page pixels.
+        // Placed at its widget's box, in page pixels.
         expect(view.container.querySelectorAll('img')[1]!.style.top).toBe('140px');
 
         // A checkbox switches to the picture it holds: nothing is fetched.
@@ -349,6 +349,15 @@ describe('<FormLayer> field pictures', () => {
         await fireEvent.click(await waitFor(() => view.getByRole('checkbox', { name: 'agree' })));
         await waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
         await waitFor(() => expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`));
+        expect(fetches.mock.calls.length).toBe(asked);
+
+        // A move takes the picture along: it is drawn where the widget is now, not where the
+        // engine drew it, and nothing is fetched.
+        await form.updateWidget(check!.ref, { rect: { x: 300, y: 400, width: 14, height: 14 } });
+        const moved = () => view.container.querySelectorAll('img')[1]!.style;
+        await waitFor(() => expect(moved().top).toBe('400px'));
+        expect(moved().left).toBe('300px');
+        expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`);
         expect(fetches.mock.calls.length).toBe(asked);
 
         // A fill shows at once: the painter draws the new value while the page's newer pictures

@@ -58,7 +58,7 @@ export class AnnotationsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -147,7 +147,7 @@ export class AnnotationsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -242,7 +242,7 @@ export class AnnotationsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -343,7 +343,7 @@ export class AnnotationsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -441,7 +441,7 @@ export class AnnotationsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -524,7 +524,7 @@ export class AnnotationsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -605,7 +605,7 @@ export class AnnotationsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -688,7 +688,7 @@ export class AnnotationsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -790,7 +790,7 @@ export class AnnotationsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -900,7 +900,7 @@ export class AnnotationsClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );

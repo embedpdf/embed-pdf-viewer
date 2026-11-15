@@ -124,11 +124,12 @@ other.
 ### When the viewer goes away
 
 When the viewer unmounts, or [mounts again](../setup#change-the-config-later) with a new config,
-its `viewer` is done: listeners stop and calls reject. A new `onReady` brings the new one.
+its `viewer` is done: listeners stop and calls reject, with a `PluginError` whose code is
+`instance-closed`. A read, such as `getActiveId()` or `canUndo()`, throws it. A new `onReady`
+brings the new one.
 
 ### Events on the element
 
 The `<embedpdf-viewer>` element fires `epdf:ready` (with `event.detail.viewer`),
 `epdf:documentchange` (with `event.detail.documentId`) and `epdf:panelresize` (with
-`event.detail.id` and `event.detail.width`), for plain HTML pages. In a framework, `onReady`,
-`onDocumentChange` and `onPanelResize` are the same events.
+`event.detail.id` and `event.detail.width`), for plain HTML pages. <Fw only={['vanilla', 'react']}>In React, `onReady`, `onDocumentChange` and `onPanelResize` are the same events.</Fw><Fw only="vue">In Vue, `@ready`, `@document-change` and `@panel-resize` are the same events.</Fw><Fw only="svelte">In Svelte, `onready`, `ondocumentchange` and `onpanelresize` are the same events.</Fw><Fw only="angular">In Angular, `(ready)`, `(documentChange)` and `(panelResize)` are the same events.</Fw>

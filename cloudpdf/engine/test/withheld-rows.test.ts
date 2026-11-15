@@ -30,7 +30,7 @@ describe('withheld rows', () => {
 
   test('that moved the font list become fonts.changed', () => {
     for (const kind of ['annot.create', 'form.setValue', 'change']) {
-      const events = auditRowToEvents(withheld(kind, { fontsVersion: 2 }), 'me');
+      const events = auditRowToEvents(withheld(kind, { fontsVersion: 2 }), 'me')!;
       expect(events.map((event) => event.type)).toEqual(['fonts.changed']);
       expect(events[0].origin).toMatchObject({ kind: 'remote', serverSequence: 12 });
     }

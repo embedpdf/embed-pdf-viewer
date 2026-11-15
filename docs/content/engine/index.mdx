@@ -10,9 +10,10 @@ import { Cards, Card } from '@/components/docs/cards';
 <Engine local>
 
 The EmbedPDF engine opens PDF files in the browser and lets you render their pages, read and
-search their text, add annotations, fill forms, edit pages and save the result. It runs PDFium,
-the PDF library inside Chrome, in a Web Worker, so your page stays responsive. Nothing is
-uploaded: the file never leaves the device.
+search their text, add annotations, fill forms, edit pages and save the result. It runs
+[EmbedPDF Runtime](https://github.com/embedpdf/runtime), our fork of PDFium, the PDF library
+inside Chrome, in a Web Worker, so your page stays responsive. Nothing is uploaded: the file never
+leaves the device.
 
 The ready-made viewer and the headless components are built on this engine. Use it directly
 when you want PDF features without a viewer: a thumbnail job, a form filler, an export script.
@@ -80,6 +81,8 @@ const image = await doc.page(pages[0].ref).render.image();
 Every call is async, can be cancelled, and fails with a typed error you can branch on. The same
 code runs on the local engine and on the CloudPDF engine: only how you create the engine and
 open a file differs.
+
+{/* readme: end */}
 
 A few things exist only on the local engine: its fonts, `warmup()`, raw pixels, and saving a
 document's layer or to a file. A document opened with `localEngine()` has them. Code that takes

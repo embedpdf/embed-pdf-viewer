@@ -1,7 +1,7 @@
 import { generateStaticParamsFor, importPage } from 'nextra/pages';
 
 import { renderDocsMarkdown } from '@/lib/docs-markdown';
-import { docsRelease } from '@/lib/docs-release';
+import { docsRelease, liveSiblings } from '@/lib/docs-release';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
@@ -32,6 +32,7 @@ export async function GET(_request: Request, props: RouteProps) {
     canonicalPath: `/${mdxPath.join('/')}`,
     // Says what the page says: in full, or why the publish gate holds it back.
     release: docsRelease(resolved.contentPath, resolved.integration),
+    siblings: liveSiblings(resolved.contentPath, resolved.integration),
   });
   const filename = `${mdxPath.at(-1) ?? 'documentation'}.md`;
 

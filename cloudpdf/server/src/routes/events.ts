@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import { checkCapability, type DocCapability } from '@embedpdf/engine-core/runtime';
 
+import { VERSION_HEADER } from '../app/api-version';
 import type { DrainCoordinator } from '../app/drain';
 import {
   mayCreateObjects,
@@ -14,6 +15,7 @@ import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { DocumentService } from '../services/DocumentService';
 import { toJsonlEvent } from '../services/EventLogService';
+import { unreadableBy } from '../services/eventReadability';
 import { visibleRow, type StreamRow } from '../services/eventVisibility';
 import type { LayerService } from '../services/LayerService';
 
@@ -59,6 +61,9 @@ export interface EventsRoutesOptions {
  *     handshake is gapless).
  *   - A client more than MAX_BACKFILL rows behind gets `full-refresh` and
  *     a cursor at head — refetch state, then stream forward.
+ *   - A row the client's version can't read (a kind of change that arrived
+ *     after it) goes out as `full-refresh` too, under the row's id, and the
+ *     stream carries on with the rows after it.
  *   - `auth-expiring` is sent shortly before JWT expiry; the client
  *     refreshes its token and reconnects with its cursor.
  *   - `auth-revoked` closes the stream the moment the connection's `jti`
@@ -97,6 +102,10 @@ export async function registerEventsRoutes(
     const may = (capability: DocCapability) =>
       checkCapability(capability, ctx.jwt.scope, permissionFlags, protection);
     const rights = { annotations: may('doc.annotate.read'), forms: may('doc.forms.read') };
+    // The version the client speaks, which the request's hook checked; none
+    // sent reads as this server's own.
+    const sent = req.headers[VERSION_HEADER.toLowerCase()];
+    const clientVersion = typeof sent === 'string' ? sent : null;
 
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);
     const requested = parseLastEventId(req);
@@ -124,7 +133,7 @@ export async function registerEventsRoutes(
       cursor = head; // no cursor → "from now"
     } else if (head - requested > MAX_BACKFILL) {
       // Too far behind to replay row by row: refetch state, stream forward.
-      raw.write(`event: full-refresh\nid: ${head}\ndata: {}\n\n`);
+      raw.write(`event: full-refresh\nid: ${head}\ndata: {"reason":"backlog-overflow"}\n\n`);
       cursor = head;
     } else {
       cursor = requested;
@@ -157,7 +166,14 @@ export async function registerEventsRoutes(
             // every promoted page pin, the plane pointers); the client drops
             // its cached manifest when it reads that row.
             const visible = visibleRow(toJsonlEvent(row) as StreamRow, rights);
-            raw.write(`id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(visible)}\n\n`);
+            if (unreadableBy(clientVersion, visible)) {
+              // A kind newer than the client: it reads the document again.
+              raw.write(
+                `event: full-refresh\nid: ${row.id}\ndata: {"reason":"unknown-change"}\n\n`,
+              );
+            } else {
+              raw.write(`id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(visible)}\n\n`);
+            }
             cursor = row.id;
             // A publish dropped every session's numbers: tell this one now.
             if (row.kind === 'signature.complete') void sendSession();

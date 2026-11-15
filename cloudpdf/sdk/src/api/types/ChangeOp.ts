@@ -7,11 +7,13 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.AnnotationsUpdate
     | CloudPDF.ChangeOp.AnnotationsDelete
     | CloudPDF.ChangeOp.AnnotationsReorder
+    | CloudPDF.ChangeOp.AnnotationsCopy
     | CloudPDF.ChangeOp.FormsSetValue
     | CloudPDF.ChangeOp.FormsSetDisplay
     | CloudPDF.ChangeOp.FormsSetAppearanceText
     | CloudPDF.ChangeOp.FormsReset
     | CloudPDF.ChangeOp.FormsCreate
+    | CloudPDF.ChangeOp.FormsCopy
     | CloudPDF.ChangeOp.FormsUpdate
     | CloudPDF.ChangeOp.FormsDelete
     | CloudPDF.ChangeOp.FormsAddWidget
@@ -81,6 +83,21 @@ export namespace ChangeOp {
         position: CloudPDF.AnnotationPosition;
     }
 
+    export interface AnnotationsCopy {
+        type: "annotations.copy";
+        refs: CloudPDF.AnnotationRef[];
+        page?: CloudPDF.PageRef | undefined;
+        offset?: ChangeOpAnnotationsCopy.Offset | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpAnnotationsCopy {
+        export interface Offset {
+            x: number;
+            y: number;
+        }
+    }
+
     export interface FormsSetValue {
         type: "forms.setValue";
         field: CloudPDF.FormFieldRef;
@@ -120,6 +137,23 @@ export namespace ChangeOp {
         draft: CloudPDF.FormFieldDraft;
         objectNumber?: number | undefined;
         widgetObjectNumbers?: number[] | undefined;
+    }
+
+    export interface FormsCopy {
+        type: "forms.copy";
+        fields: CloudPDF.FormFieldRef[];
+        widgets?: CloudPDF.AnnotationRef[] | undefined;
+        page?: CloudPDF.PageRef | undefined;
+        offset?: ChangeOpFormsCopy.Offset | undefined;
+        values?: boolean | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpFormsCopy {
+        export interface Offset {
+            x: number;
+            y: number;
+        }
     }
 
     export interface FormsUpdate {

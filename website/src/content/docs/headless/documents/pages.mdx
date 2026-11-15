@@ -13,13 +13,15 @@ The page edit plugin changes the document's pages: rotate, reorder, delete, dupl
 new ones, blank or from another PDF. These are edits to the file, kept when it's downloaded. Register
 `pageEditPlugin()` and use `usePageEdit()`:
 
-<Example name="page-edit/organize" mode="open" />
-
 ```ts
 await pageEdit.rotateBy([page.ref], 90);
 await pageEdit.reorder([page.ref], 'start'); // to the front
 await pageEdit.delete([page.ref]);
 ```
+
+{/* readme: end */}
+
+<Example name="page-edit/organize" mode="open" />
 
 After an edit, everything that shows pages updates by itself: the Stage, thumbnails, page numbers. On
 a shared document, the others see the change too. Each edit is one step to undo: undo puts the pages

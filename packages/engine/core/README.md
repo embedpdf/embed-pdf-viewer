@@ -1,23 +1,14 @@
+<!-- Generated from docs/content/engine/setup.local.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/engine-core
 
-Engine v3 core: the transport-agnostic contract every EmbedPDF engine
-implementation speaks.
+The contract every EmbedPDF engine follows: its types, its errors and the shape of every call.
 
-- `Engine` / `DocumentHandle` interfaces and `AbortablePromise`
-- DTOs, wire schemas, and `EngineError` codes
-- a conformance harness shared by every implementation — the local WASM
-  engine ([`@embedpdf/engine`](https://www.npmjs.com/package/@embedpdf/engine))
-  and the cloud client ([`@cloudpdf/engine`](https://www.npmjs.com/package/@cloudpdf/engine))
-  are parity-tested against it
-
-You normally don't install this directly — it arrives as a dependency of an
-engine implementation. Depend on it directly when writing your own `Engine`
-implementation or typing code against the contract without choosing an
-implementation.
+Part of [EmbedPDF](https://www.embedpdf.com). It comes with `@embedpdf/angular`, `@embedpdf/core-signature`, `@embedpdf/engine`, `@embedpdf/react`, `@embedpdf/svelte`, `@embedpdf/viewer`, `@embedpdf/vue`, `@cloudpdf/engine`, `@cloudpdf/plugin-protected-display`, `@cloudpdf/server`, `@cloudpdf/server-modules`.
 
 ## Documentation
 
-https://www.embedpdf.com/docs
+- [Setup](https://www.embedpdf.com/docs/engine/setup): Install the local engine, create it once for your app, and run it in any bundler, with server-side rendering, or in Node.
 
 ## License
 

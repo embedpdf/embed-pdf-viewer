@@ -2,7 +2,7 @@
  * The full viewer, as a component — and the customization contract. The
  * `ViewerCustomization` surface here is the exact shape that later powers
  * `EmbedPDF.init({...})` and every framework wrapper, because all of it is
- * plain data (see README.md).
+ * plain data (see docs/conventions/viewer-chrome.md).
  *
  * Two semantics, on purpose:
  *  - registries (commands / icons / strings) merge additively over the
@@ -58,6 +58,7 @@ import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
 import { resolveViewerCommands, type CommandDefinition } from './config/viewer-commands';
 import { fallbackCodeOf, localeCodeOf, localesOf, type LanguageStrings } from './locales';
+import { FormatLocaleProvider } from './format-locale';
 import {
   ViewerConfigProvider,
   type PanelResizeEvent,
@@ -101,7 +102,7 @@ import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
 
 /**
  * The customization surface — identical in the vanilla snippet and every
- * framework wrapper. See README.md for the ladder this implements.
+ * framework wrapper. docs/conventions/viewer-chrome.md has its rules.
  */
 export interface ViewerCustomization<AppState = any> {
   /**
@@ -491,7 +492,7 @@ export function FullViewer({
   });
 
   // Dev guardrail: every icon a command names must resolve. Warnings name the
-  // exact id (README promise); the layout's ids are checked where it resolves.
+  // exact id (docs/conventions/viewer-chrome.md); the layout's ids are checked where it resolves.
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
     for (const command of resolved.viewerCommands.commands) {
@@ -690,7 +691,9 @@ export function FullViewer({
             onDocumentChange={onDocumentChange}
           />
           <SlottedEdgesProvider value={slottedEdges}>
-            <Shell components={components} />
+            <FormatLocaleProvider locale={locale}>
+              <Shell components={components} />
+            </FormatLocaleProvider>
           </SlottedEdgesProvider>
         </ViewerConfigProvider>
       </HeadlessViewer>

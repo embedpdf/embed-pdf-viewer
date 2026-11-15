@@ -107,6 +107,7 @@ export const fr: Locale = {
         saveFile: 'Enregistrer le fichier',
         removeLink: 'Supprimer le lien',
         delete: 'Supprimer',
+        duplicate: 'Dupliquer',
         group: 'Grouper',
         ungroup: 'Dissocier',
         stampFromSelection: 'Créer un tampon',
@@ -501,6 +502,7 @@ export const fr: Locale = {
       box: 'Case {number}',
       addButton: 'Ajouter un bouton',
       addBox: 'Ajouter une case',
+      duplicateGroup: 'Dupliquer le groupe',
     },
     // The style panel's own words around the properties.
     stylePanel: {

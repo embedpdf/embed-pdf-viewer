@@ -204,6 +204,19 @@ await page.annotations.create({
 `clearFallbacks()` removes the Hebrew and Arabic fonts along with yours, and
 `localEngine({ defaultFallbackFonts: false })` never loads them.
 
+The two families come in regular and bold, as the package `@embedpdf/default-fallback-fonts`,
+which the engine brings with it. To get a font's file yourself, add the package to your own
+dependencies:
+
+```ts
+import { loadFallbackFont } from '@embedpdf/default-fallback-fonts/library';
+
+const data = await loadFallbackFont('noto-naskh-arabic'); // a lazy chunk of your build
+```
+
+The keys are `noto-sans-hebrew`, `noto-sans-hebrew-bold`, `noto-naskh-arabic` and
+`noto-naskh-arabic-bold`.
+
 </Engine>
 
 <Engine cloud>

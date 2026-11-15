@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "matrix:build": "vite build"
+    "matrix:build": "vite build",
+    "matrix:build:workers-folder": "vite build --config vite.workers-folder.config.js",
+    "matrix:dev": "vite"
   },
   "dependencies": {
     "@embedpdf/bundler-probe": "workspace:*"

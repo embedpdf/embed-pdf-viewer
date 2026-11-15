@@ -2,7 +2,7 @@
 import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
-import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { cloudEngine } from '@cloudpdf/engine';
@@ -31,6 +31,7 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
         <template #page>
           <RenderLayer />
           <SelectionLayer />
+          <SnapshotLayer />
         </template>
       </Stage>
     </DocumentGate>

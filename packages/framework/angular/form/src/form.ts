@@ -79,6 +79,8 @@ export class EpdfForm extends pluginService({
     'import',
     'refresh',
     'create',
+    'duplicate',
+    'duplicateWidgets',
     'update',
     'delete',
     'removeWidget',

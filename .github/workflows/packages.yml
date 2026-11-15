@@ -1,6 +1,7 @@
 # The TypeScript packages gate: typecheck, tests and the contract checks for
-# packages/**, examples/**, website and tooling/**, and the docs gate. Called by
-# ci.yml (the umbrella that owns the PR gate); never triggered on its own.
+# packages/**, examples/**, website and tooling/**, the docs kit's tests, and
+# the docs gate. Called by ci.yml (the umbrella that owns the PR gate); never
+# triggered on its own.
 #
 # Turbo does the scoping: with the cache restored (local cache dir below,
 # remote cache when TURBO_TOKEN/TURBO_TEAM are configured), an unchanged
@@ -100,13 +101,15 @@ jobs:
           --filter='./packages/**'
           --filter='./examples/**'
           --filter='./website'
+          --filter='./docs/kit'
           --filter='./tooling/**'
 
   # The docs gate (docs/conventions/docs-architecture.md): every docs page's snippets, and the
   # code a viewer page shows, compiled against the packages in this commit, per framework, and
   # which pages are live (docs/content/scripts/publish-gate.mjs). A viewer page that doesn't
   # compile yet is held back on the site and fails nothing here; the job fails when a check
-  # crashes or stops checking, or a headless page stops compiling (`--strict`).
+  # crashes or stops checking, or when a headless page, or a viewer page a package's README
+  # shows, stops compiling (`--strict`).
   docs:
     name: docs gate
     runs-on: ubuntu-latest
@@ -180,3 +183,9 @@ jobs:
       # so the review sees the diff, and a drift here is a PR that forgot.
       - name: API snapshot is current
         run: pnpm api:check
+      # A package's README is written from the docs page that documents it
+      # (docs/conventions/docs-architecture.md); a PR that changes the page, the
+      # README's frame or the package's description writes it again
+      # (`pnpm readme:sync`), and a drift here is a PR that forgot.
+      - name: Package READMEs are current
+        run: pnpm readme:check

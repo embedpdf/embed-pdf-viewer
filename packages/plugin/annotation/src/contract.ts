@@ -15,6 +15,7 @@ import type {
   DeepPartial,
   EventHook,
   EventOrigin,
+  HistoryOptions,
   OperationOptions,
   PluginErrorInfo,
   ResourceStatus,
@@ -550,6 +551,24 @@ export interface AnnotationImportResult {
   readonly dropped: readonly AnnotationImportDrop[];
 }
 
+/** How `duplicate()` copies: where the copies go, and whether they are selected. */
+export interface AnnotationDuplicateOptions {
+  /** The page the copies go on, as a ref or an index. Left out: each on its own page. */
+  readonly page?: PageRef | number;
+  /** How far each copy moves, in page points: `x` to the right, `y` down. Left out: not at all. */
+  readonly offset?: { readonly x: number; readonly y: number };
+  /** Select the copies as they show. */
+  readonly select?: boolean;
+}
+
+/** What `duplicate()` did: the copies, and what was left out. */
+export interface AnnotationDuplicateResult {
+  /** The copies as the engine wrote them, in the order the originals were named. */
+  readonly annotations: readonly Annotation[];
+  /** What was left out, and why, in the same order. */
+  readonly dropped: readonly AnnotationImportDrop[];
+}
+
 /** Which annotations `export()` takes. */
 export interface AnnotationExportSelection {
   /** These annotations, with what they point at and their replies. */
@@ -612,6 +631,21 @@ export interface AnnotationSelectionCapability {
   canGroup(): boolean;
   /** Whether the selection holds a group that can be split. */
   canUngroup(): boolean;
+  /**
+   * Copy the selected annotations beside the originals and select the
+   * copies, as one step to undo. They land 10 points right and down, or left
+   * or up where that keeps them on the page; `offset` places them yourself.
+   * A selected group is copied as a group of its own. Resolves
+   * `{ annotations, dropped }`, as `duplicate()` on the plugin does.
+   */
+  duplicate(
+    options?: OperationOptions & { offset?: { readonly x: number; readonly y: number } },
+  ): Promise<AnnotationDuplicateResult>;
+  /**
+   * Whether the selection can be copied: something is selected, the user may
+   * create annotations, and nothing selected is locked.
+   */
+  canDuplicate(): boolean;
   /**
    * Where a menu attaches: the selection's page and the box around it, or
    * `null` with nothing selected, or while a gesture moves, resizes or turns it.
@@ -838,9 +872,9 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
    * beside them (a stamp's `appearance`, a file attachment's `file`). It
    * shows at once; resolves `{ annotation }` with the engine's record.
    * `select` selects it, as drawing it would; without it, code never changes
-   * the selection. A read of another annotation makes the same one again (a
-   * copy): its own fields are written, and where it is comes from `page`.
-   * Rejects `permission-denied` without `annotations:create`, `not-found` for
+   * the selection. A read of another annotation is written as it is, its
+   * name included, and where it is comes from `page`; `duplicate()` makes a
+   * copy. Rejects `permission-denied` without `annotations:create`, `not-found` for
    * a page that isn't in the document or an unknown `tool`, `invalid-input`
    * for a kind the engine doesn't know or a value a write can't make (another
    * app's beveled border).
@@ -893,6 +927,21 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
     options?: OperationOptions,
   ): Promise<void>;
   /**
+   * Copy annotations in this document, as one change: the copies show at
+   * once, and it is one step to undo. A copy carries its original's fields,
+   * with its drawing, its file and its link; it has its own ref and name, and
+   * the user is its author. Copies keep the links between them (a copied
+   * group is a group of its own); a reply comes only when it is named.
+   * `select` selects the copies. Resolves `{ annotations, dropped }`. Rejects
+   * `permission-denied` without `annotations:create`, `not-found` for an
+   * annotation or a page that isn't in the document, `invalid-input` for
+   * another plugin's record (a form field's box).
+   */
+  duplicate(
+    refs: readonly AnnotationRef[],
+    options?: AnnotationDuplicateOptions & OperationOptions,
+  ): Promise<AnnotationDuplicateResult>;
+  /**
    * Take annotations out as a bundle, with the bytes they carry (a stamp's
    * drawing, an attached file): every annotation, a selection of them (with
    * what they point at and their replies), or some pages'. Waits for pending
@@ -904,13 +953,15 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   ): Promise<AnnotationBundle>;
   /**
    * Put a bundle's annotations into this document, as one change: they show
-   * once it's done. Resolves `{ annotations, refMap, dropped }`. Rejects
-   * `permission-denied` without `annotations:create` (and, for the default
+   * once the engine wrote them, and it is one step to undo. `history: false`
+   * keeps it out of undo and redo, for what your app loads by itself.
+   * Resolves `{ annotations, refMap, dropped }`. Rejects `permission-denied`
+   * without `annotations:create` (and, for the default
    * `attribution: 'restore'`, `doc.annotate.import`).
    */
   import(
     bundle: AnnotationBundle,
-    options?: AnnotationImportOptions & OperationOptions,
+    options?: AnnotationImportOptions & OperationOptions & HistoryOptions,
   ): Promise<AnnotationImportResult>;
   /**
    * Download a stamp's drawing (`'appearance'`) or an attachment's file
@@ -951,11 +1002,25 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
    */
   canDelete(ref: AnnotationRef): boolean;
   /**
+   * Whether the user may copy these annotations: the right to create them
+   * (`annotations:create`), and none of them locked, since its copy would be
+   * locked too. `false` for one that can't be copied (a form field's box).
+   * `duplicate()` from code copies a locked one all the same.
+   */
+  canDuplicate(refs: readonly AnnotationRef[]): boolean;
+  /**
    * Whether the `editable` setting lets people change this annotation by
    * hand; `false` for one the document doesn't have. Whether a change would
    * succeed is `canUpdate()` and `canDelete()`.
    */
   isEditable(ref: AnnotationRef): boolean;
+  /**
+   * Whether this is an annotation people move: `false` for one that sits on
+   * text (a highlight, a caret, a redaction of words), which stays where its
+   * text is, and for one the document doesn't have. Whether a move would
+   * succeed now is `canUpdate()` and `isEditable()`.
+   */
+  isMovable(ref: AnnotationRef): boolean;
   /** Stop a drag, or a polygon in progress. */
   cancel(): void;
 

@@ -30,7 +30,11 @@ import {
   type EncoderWorkerSource,
   type LocalImageEncoder,
 } from './render/BrowserImageEncoder';
-import { BrowserWorkerTransport, watchWorkerReady } from './transport/BrowserWorkerTransport';
+import {
+  BrowserWorkerTransport,
+  watchWorkerReady,
+  WorkerStartError,
+} from './transport/BrowserWorkerTransport';
 import { LazyTransport, type LazyTransportOptions } from './transport/LazyTransport';
 import type { Transport } from './transport/Transport';
 import { allowWorkerUrl, createWorkerBlobUrl, startWorker } from './trusted-types';
@@ -46,7 +50,7 @@ import {
 import type { EngineWorkerInit } from './worker/bootstrap';
 import { nextJobId } from './worker/jobIds';
 import type { JobId } from './worker/protocol';
-import { findEngineWorkerFile } from './worker-files';
+import { findEngineWorkerFile, prebundledDevWasm } from './worker-files';
 
 // The developer-facing surface both engine packages share (errors, refs,
 // helpers, the document types), from one list in engine-core, so code names
@@ -141,8 +145,9 @@ export function createLocalEngineWithWorker(
  *
  * The wasm source rides the same decision: the default and `'inline'`
  * deliveries (a bundler-renamed file or a blob, neither with the wasm beside
- * it) receive the default, the sibling the consumer's bundler emitted, and
- * nothing after it (see resolveDefaultWasmSource); a configured URL or a
+ * it) receive the default, the sibling the consumer's bundler emitted, or the
+ * inline copy where a dev server prebundled the package without its files,
+ * and nothing after it (see resolveDefaultWasmSource); a configured URL or a
  * caller-built worker self-resolves `embedpdf.wasm` as a sibling of the worker
  * script when no explicit source is configured.
  */
@@ -211,14 +216,26 @@ function workerBoot(
       } catch (error) {
         spawned.destroy();
         spawned.worker.terminate();
-        if (spawned.file === null) throw error;
-        throw new Error(
-          `[embedpdf] the engine worker did not start from ${spawned.file}, where your bundler ` +
-            "was to put @embedpdf/engine's workers/embedpdf-worker.js. If it cannot emit that " +
-            'file, import `localEngine` from `@embedpdf/engine/portable`, or copy the file and ' +
-            'pass its URL as `worker`. See https://www.embedpdf.com/docs/viewer/self-hosting',
-          { cause: error },
-        );
+        if (spawned.file !== null) {
+          throw new Error(
+            `[embedpdf] the engine worker did not start from ${spawned.file}, where your ` +
+              "bundler was to put @embedpdf/engine's workers/embedpdf-worker.js. If it cannot " +
+              'emit that file, import `localEngine` from `@embedpdf/engine/portable`, or copy ' +
+              'the file and pass its URL as `worker`. See ' +
+              'https://www.embedpdf.com/docs/viewer/self-hosting',
+            { cause: error },
+          );
+        }
+        if (configuredUrl !== null && error instanceof WorkerStartError) {
+          throw new Error(
+            `[embedpdf] the engine worker did not start from ${configuredUrl}, the \`worker\` ` +
+              'URL it was given. Check that the file is served there as JavaScript, and that ' +
+              "the page's Content-Security-Policy allows it (`worker-src`). See " +
+              'https://www.embedpdf.com/docs/viewer/self-hosting',
+            { cause: error },
+          );
+        }
+        throw error;
       }
     },
     lazyOptions: {},
@@ -243,7 +260,8 @@ interface CreatedWorker {
  * Create the worker for a non-live delivery. The default starts the bundled
  * `workers/embedpdf-worker.js` (see {@link findEngineWorkerFile}). Where no
  * worker can start from that file (the scripts on another origin than the
- * page), and for `'inline'`, the worker starts from a blob: URL of the same
+ * page, or a dev server that prebundled the package without the file), and
+ * for `'inline'`, the worker starts from a blob: URL of the same
  * bundle as a string — its own lazily imported module, so bundlers emit it as
  * a separate chunk that is only downloaded when this line runs. The blob URL
  * is revoked once the handshake settles.
@@ -262,6 +280,9 @@ async function createEngineWorker(
       file: null,
     };
   }
+  // Asked first: a dev server that prebundled the package left the file behind, and
+  // `findEngineWorkerFile` names none once that is known.
+  if (delivery === undefined) await prebundledDevWasm();
   const file = delivery === undefined ? findEngineWorkerFile() : null;
   if (file !== null) {
     return { worker: startWorker(file, { type: 'module' }), destroy: () => {}, file };
@@ -287,8 +308,9 @@ async function createEngineWorker(
     throw new Error(
       '[embedpdf] could not start the engine worker from a blob: URL, which it uses when ' +
         "the viewer's scripts are on another origin than the page (a browser starts a worker " +
-        "only from the page's own) or when `worker` is `'inline'`. Allow `worker-src blob:`, or " +
-        "serve the viewer's files from your own origin. See " +
+        "only from the page's own), when a dev server prebundled the package without its " +
+        "worker file (Vite 7 and older), or when `worker` is `'inline'`. Allow " +
+        "`worker-src blob:`, or serve the viewer's files from your own origin. See " +
         'https://www.embedpdf.com/docs/viewer/concepts/security',
       { cause },
     );
@@ -319,7 +341,8 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * The worker backing the engine — see {@link WorkerSource}. Omit for the
    * zero-config default: this package's `workers/embedpdf-worker.js`, which
    * your bundler emits as a file of your build (`worker-src 'self'`), or a
-   * blob: URL when the scripts are on another origin than the page. Pass a
+   * blob: URL when the scripts are on another origin than the page, or a dev
+   * server prebundled the package without the file (Vite 7 and older). Pass a
    * same-origin URL to a copied `workers/embedpdf-worker.js` to serve it
    * yourself, or a `() => Worker` thunk (called once at boot) for full
    * control — a custom worker build, a shared lifecycle, ... A live `Worker`

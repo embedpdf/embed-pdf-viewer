@@ -22,7 +22,8 @@ import { createTestContext } from '../src/testing';
  * in staging order; the views replay it over a truth that moves; it leaves a
  * view once that mirror holds the answer (an exact fold, a page read, a failed
  * read and a later load); a refusal takes its dependents with it; holds and
- * groups; and one store update per change.
+ * groups; a change one of the engine's verbs makes; and one store update per
+ * change.
  */
 
 interface Deferred<T> {
@@ -476,6 +477,110 @@ describe('a group', () => {
     expect(() => ctx.changes.group({ key: 'g' }, () => ctx.changes.hold({ key: 'h' }))).toThrow(
       /inside a group/,
     );
+  });
+});
+
+describe("a change one of the engine's verbs makes", () => {
+  /** A verb's call, as a plugin stages it, answered when the test says. */
+  const verb = () => {
+    const answer = deferred<ChangeResult>();
+    const send = vi.fn((_doc: unknown, _write: { readonly opId: string }) => answer.promise);
+    return { answer, send };
+  };
+
+  it('is sent in its turn, after what was typed, under the id the queue gave it', async () => {
+    const { ctx, notes, calls, apply } = await loaded();
+    const typing = ctx.changes.hold({ key: 'note.type' });
+    typing.set([write(1, 'uno')]);
+    const staged = vi.fn();
+    ctx.changes.onStaged(staged);
+    const { send } = verb();
+
+    const change = ctx.changes.stage({ label: { key: 'note.import' }, send });
+    // What was typed went first; then the verb was called, with the change's id.
+    expect(calls.map((call) => call.change)).toEqual([{ ops: [write(1, 'uno')] }]);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![1]).toEqual({ opId: change.opId });
+    expect(send.mock.invocationCallOrder[0]!).toBeGreaterThan(apply.mock.invocationCallOrder[0]!);
+    expect(staged.mock.calls.map(([each]) => each.opId)).toEqual([
+      typing.change!.opId,
+      change.opId,
+    ]);
+    // It has no ops: nothing shows for it, and it is a step of the history.
+    expect(change).toMatchObject({ undoOf: null, shows: [], undo: [], history: true, held: false });
+    expect(notes.view()).toEqual({ 1: 'uno', 2: 'two' });
+  });
+
+  it("settles like any change: applied with the verb's answer, refused under its label", async () => {
+    const { ctx } = await loaded();
+    const settled = vi.fn();
+    ctx.changes.onSettled(settled);
+
+    const first = verb();
+    const applied = ctx.changes.stage({ label: { key: 'note.import' }, send: first.send });
+    expect(ctx.changes.listPending()).toEqual([applied]);
+    first.answer.resolve(resultOf(applied.opId));
+    await expect(applied.result).resolves.toEqual(resultOf(applied.opId));
+    expect(ctx.changes.hasPending()).toBe(false);
+
+    const second = verb();
+    const refused = ctx.changes.stage({
+      label: { key: 'note.import' },
+      send: second.send,
+      history: false,
+    });
+    expect(refused.history).toBe(false);
+    second.answer.reject(new Error('refused'));
+    await expect(refused.result).rejects.toMatchObject({ code: 'operation-failed' });
+    expect(settled.mock.calls.map(([event]) => [event.status, event.change.opId])).toEqual([
+      ['applied', applied.opId],
+      ['refused', refused.opId],
+    ]);
+  });
+
+  it('is waited for before a download', async () => {
+    const { ctx } = await loaded();
+    const { answer, send } = verb();
+    const change = ctx.changes.stage({ label: { key: 'note.import' }, send });
+    let settledAll = false;
+    const settling = ctx.settle().then(() => {
+      settledAll = true;
+    });
+    await tick();
+    expect(settledAll).toBe(false);
+    answer.resolve(resultOf(change.opId));
+    await settling;
+  });
+
+  it('takes the id its caller chose, and refuses one a change on its way has', async () => {
+    const { ctx } = await loaded();
+    const { send } = verb();
+    const change = ctx.changes.stage({ label: { key: 'note.import' }, send, opId: 'load-1' });
+    expect(change.opId).toBe('load-1');
+    expect(send.mock.calls[0]![1]).toEqual({ opId: 'load-1' });
+    const again = verb();
+    expect(() =>
+      ctx.changes.stage({ label: { key: 'note.import' }, send: again.send, opId: 'load-1' }),
+    ).toThrow(/on its way/);
+    expect(again.send).not.toHaveBeenCalled();
+  });
+
+  it('is undone by its id, and can not join a group', async () => {
+    const { ctx, calls } = await loaded();
+    const { answer, send } = verb();
+    const change = ctx.changes.stage({ label: { key: 'note.import' }, send });
+    answer.resolve(resultOf(change.opId));
+    await tick();
+    ctx.changes.stage({ label: { key: 'history.undo' }, undoOf: change.opId, shows: [] });
+    expect(calls.map((call) => call.change)).toEqual([{ undoOf: change.opId }]);
+
+    const inside = verb();
+    expect(() =>
+      ctx.changes.group({ key: 'notes.edit' }, () =>
+        ctx.changes.stage({ label: { key: 'note.import' }, send: inside.send }),
+      ),
+    ).toThrow(/can not join a group/);
+    expect(inside.send).not.toHaveBeenCalled();
   });
 });
 

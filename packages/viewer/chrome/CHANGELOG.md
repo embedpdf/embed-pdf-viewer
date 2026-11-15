@@ -1,5 +1,17 @@
 # @embedpdf/viewer-chrome
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – New command `annotation:duplicate`, with `Ctrl`/`Cmd`+`D` and a button in the bar over a selection. It copies the selected annotations beside the originals and selects the copies, as one step to undo. The button shows for annotations people move, so not for a highlight, and is greyed out while a locked annotation is selected. New icon `duplicate` and label `commands.annotate.duplicate`, in all 15 languages.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – Duplicate (`annotation:duplicate`, `Ctrl`/`Cmd`+`D`) now copies form fields in Form design: a radio button's copy joins its group as a new choice, and any other field's copy is a new field named after the original. The form design sidebar has **Duplicate group** for a radio group, which copies the whole group as a new one. New label `formDesign.duplicateGroup`, in all 15 languages.
+
+### Patch Changes
+
+- [#1069](https://github.com/embedpdf/embed-pdf-viewer/pull/1069) by [@TbhVishal](https://github.com/TbhVishal) – A comment and a reply show their time as well as their day, with the year once it isn't this year's, and the whole date and time in a tooltip. Dates, times and file sizes are written in the language the viewer shows, the way the reader's region writes them: an English viewer reads `14 Sept, 17:30` in a British browser and `Sep 14, 5:30 PM` in an American one, and a `locale` that names a region, such as `'en-GB'`, writes them that way for everyone. A language whose code the browser can't read is written in the browser's own formats.
+
 ## 3.1.0
 
 ### Minor Changes

@@ -122,6 +122,55 @@ describe("the engine entry's static graph", () => {
 });
 
 /**
+ * The inline wasm is a 4 MB chunk. The default entry reaches it only through
+ * `@embedpdf/engine/dev-wasm`, which the export map gives the binary where a build says
+ * `development` (a dev server that prebundles the package without `embedpdf.wasm`) and a module
+ * that holds nothing everywhere else, so a production build carries the binary once, as the file.
+ */
+describe('the inline wasm in the default entry', () => {
+  const INLINE = '@embedpdf/engine-runtime-wasm32/wasm-inline';
+
+  /** Every package import in the graph, however it is made. */
+  const packageImports = ({ outputs }: Graph) =>
+    Object.values(outputs).flatMap((output) => output.imports.filter((i) => i.external));
+
+  it('is imported by name nowhere, and asked for through dev-wasm with `import()`', () => {
+    for (const graph of [source, published]) {
+      const imports = packageImports(graph);
+      expect(imports.filter((i) => i.path === INLINE)).toEqual([]);
+      expect(imports.filter((i) => i.path === '@embedpdf/engine/dev-wasm')).toEqual([
+        expect.objectContaining({ kind: 'dynamic-import' }),
+      ]);
+    }
+  });
+
+  /** The package imports of `@embedpdf/engine/dev-wasm` as a resolver with `conditions` sees it. */
+  async function devWasmImports(conditions: string[]): Promise<string[]> {
+    const result = await build({
+      // Re-exported, so the import is used: the package's files have no side effects to keep.
+      stdin: { contents: `export { default } from '@embedpdf/engine/dev-wasm';`, resolveDir: root },
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      conditions,
+      write: false,
+      metafile: true,
+      external: ['@embedpdf/engine-runtime-wasm32'],
+      logLevel: 'silent',
+    });
+    return Object.values(result.metafile.outputs).flatMap((output) =>
+      output.imports.map((imported) => imported.path),
+    );
+  }
+
+  it('comes with the `development` condition, and with no other', async () => {
+    expect(await devWasmImports(['development'])).toEqual([INLINE]);
+    expect(await devWasmImports(['production'])).toEqual([]);
+    expect(await devWasmImports([])).toEqual([]);
+  });
+});
+
+/**
  * The modules of a published entry's static graph that import zod, as an app's bundler resolves
  * the entry (`import`, or `require` for the CommonJS build). Only engine-core is followed; every
  * other package stays external.

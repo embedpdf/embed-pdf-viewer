@@ -9,7 +9,11 @@ import {
 
 import { DOCS_SITE } from '../docs-site';
 
-import { docsIntegrationHref } from './docs-integrations';
+import {
+  docsIntegrationHref,
+  PRODUCT_INTEGRATIONS,
+  type DocsIntegration,
+} from './docs-integrations';
 
 export type { DocsRelease };
 
@@ -28,6 +32,21 @@ export function docsRelease(contentPath: string[], integration?: string): DocsRe
     livePages: () => loadLivePages(LIVE_PAGES),
     engine: DOCS_SITE.engine,
   });
+}
+
+/**
+ * The other integrations a fanned-out page is live for. Its Markdown names them
+ * (`other_frameworks`), so a reader working in one of them can switch to its version.
+ */
+export function liveSiblings(
+  contentPath: string[],
+  integration: DocsIntegration | undefined,
+): DocsIntegration[] {
+  const product = contentPath[1];
+  if (!integration || (product !== 'viewer' && product !== 'headless')) return [];
+  return (PRODUCT_INTEGRATIONS[product] as readonly DocsIntegration[]).filter(
+    (sibling) => sibling !== integration && docsRelease(contentPath, sibling).live,
+  );
 }
 
 /** Where a held-back page points: its React version, when that one is live. */

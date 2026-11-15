@@ -3,8 +3,8 @@
  * State table as a signal (`search.hitCount()`), its events as RxJS streams
  * (`search.completed$`), and, when the plugin has settings, `settings()`, `getSettings()`,
  * `updateSettings()`, `resetSettings()` and `settingsChanged$`. `pluginService()` builds all of that from what the
- * plugin declares already, so a plugin's service is a few lines; the package README's "Adding a
- * plugin binding" shows one.
+ * plugin declares already, so a plugin's service is a few lines;
+ * docs/conventions/framework-adapters.md shows one.
  *
  * A service acts on the document of the injector that created it: under `[epdfDocumentScope]`
  * that document, else the active one. Its methods are looked up when they're called, so a

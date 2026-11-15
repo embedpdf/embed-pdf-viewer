@@ -265,6 +265,53 @@ const { field: updated } = await doc.forms.addWidget(field.ref, {
 The field now shows in both places, with the same value. For a radio group, pass the new
 button's `exportValue` in the same object; a checkbox widget gets `'Yes'` when you leave it out.
 
+## Copy a field
+
+`copy()` makes a new field from each field you name, with all of its widgets, as
+`doc.annotations.copy()` does for annotations:
+
+```ts
+const { fields } = await doc.forms.copy([field.ref], {
+  page: other.ref,
+});
+```
+
+A copy has its original's settings, scripts, default value and value, and each widget's place,
+look, flags and actions. Its name is the original's with the next free number: `email` becomes
+`email_2`, `text_1` becomes `text_2`, `billing.name` becomes `billing.name_2`. A radio group's
+copy keeps its buttons' values.
+
+| Option    | What it does                                                  | Default          |
+| :-------- | :------------------------------------------------------------ | :--------------- |
+| `page`    | The page the copies go on, at the same spot from its top-left. | each on its own  |
+| `offset`  | How far each copy moves: `{ x, y }` in page points.           | `{ x: 0, y: 0 }` |
+| `values`  | Whether a copy gets its original's value.                     | `true`           |
+| `widgets` | Copy only these widgets of the fields.                        | all of them      |
+
+With `values: false` a copy has no value, as a created field has none. It keeps its default
+value, which is what a reset puts back. A signature never comes along: a signed field's copy is
+unsigned.
+
+It resolves what an [import](import-export#copy-the-design) resolves:
+
+| Field     | What it is                                                    |
+| :-------- | :------------------------------------------------------------ |
+| `fields`  | The new fields, in the order of the fields given              |
+| `widgets` | Their widgets' rows                                           |
+| `refMap`  | Each copied field's ref, with its copy's                      |
+| `dropped` | What was left out, and why                                    |
+
+A copy leaves out what an [import](import-export#whats-left-out) leaves out, with the same
+reasons: a field of a kind the engine doesn't know, a script or a link without
+`doc.forms.script`, an action the engine can't write. Everything else is copied. A ref the form
+doesn't have refuses the call with `NotFound`.
+
+One call names at most as many fields as a bundle holds [items](import-export#limits), 10,000
+by default. More refuses the call with `PayloadTooLarge`, and nothing is copied.
+
+A copy is one change, and one undo takes all of it away. To show the same field in one more
+place, with the same value, use [`addWidget()`](#add-a-widget).
+
 ## Delete a widget
 
 `deleteWidget()` deletes a widget: it leaves its page, and its field when it has one. It resolves
@@ -438,6 +485,9 @@ repair can't be undone, and it ends undo for every change made before it; see
 
 Each event carries what the call returned, with the rows of the widgets it changed (`widgets`). See
 [Events](/docs/engine/concepts/events).
+
+A copy has no event of its own: `copy()` fires `forms.created` for each field it makes, as one
+transaction.
 
 ## Permissions
 

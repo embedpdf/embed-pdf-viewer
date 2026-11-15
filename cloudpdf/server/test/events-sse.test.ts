@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { API_VERSION } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
@@ -50,12 +51,18 @@ class SseCollector {
   private readonly abort = new AbortController();
   private done: Promise<void> | null = null;
 
-  async open(url: string, token: string, lastEventId?: number): Promise<void> {
+  async open(
+    url: string,
+    token: string,
+    lastEventId?: number,
+    headers: Record<string, string> = {},
+  ): Promise<void> {
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'text/event-stream',
         ...(lastEventId !== undefined ? { 'Last-Event-ID': String(lastEventId) } : {}),
+        ...headers,
       },
       signal: this.abort.signal,
     });
@@ -217,6 +224,57 @@ describe('GET /events — the SSE half of the document event stream', () => {
     expect(shown.payload).toEqual(created);
     await filler.close();
     await reader.close();
+  });
+
+  test("a client older than a kind of change gets full-refresh in the row's place, then the rows after it", async () => {
+    const tenantId = 'tenant-sse-versions';
+    const docId = 'docsse010';
+    const layerName = 'alice';
+    await seedDocument(fx, tenantId, docId, { pageCount: 3 });
+    const token = docToken(tenantId, docId, layerName);
+    const url = `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/events`;
+    // A 3.0 client, one of this server's version, and one that says nothing.
+    const older = new SseCollector();
+    await older.open(url, token, undefined, { 'EmbedPDF-Version': '3.0' });
+    const current = new SseCollector();
+    await current.open(url, token, undefined, { 'EmbedPDF-Version': API_VERSION });
+    const silent = new SseCollector();
+    await silent.open(url, token);
+
+    const target = { baseUrl: fx.baseUrl, docId, layerName, token };
+    // A page scale arrived in 3.1; a rotation is as old as 3.0.
+    appliedResult(
+      await postChange(target, [
+        { type: 'pages.setScale', pages: [1].map(toPageRef), measure: null },
+      ]),
+    );
+    appliedResult(
+      await postChange(target, [{ type: 'pages.rotate', pages: [2].map(toPageRef), rotation: 90 }]),
+    );
+
+    for (const sse of [older, current, silent]) await sse.waitFor(2);
+    const kindsOf = (sse: SseCollector) =>
+      sse.events.map(({ id, event, data }) => ({
+        id,
+        event,
+        items:
+          event === 'mutation'
+            ? (JSON.parse(data) as { payload: { items: { type: string }[] } }).payload.items.map(
+                (item) => item.type,
+              )
+            : JSON.parse(data),
+      }));
+    expect(kindsOf(older)).toEqual([
+      { id: 1, event: 'full-refresh', items: { reason: 'unknown-change' } },
+      { id: 2, event: 'mutation', items: ['pages.rotate'] },
+    ]);
+    for (const sse of [current, silent]) {
+      expect(kindsOf(sse)).toEqual([
+        { id: 1, event: 'mutation', items: ['pages.setScale'] },
+        { id: 2, event: 'mutation', items: ['pages.rotate'] },
+      ]);
+    }
+    await Promise.all([older.close(), current.close(), silent.close()]);
   });
 
   test('the hijacked SSE response preserves wildcard CORS headers', async () => {

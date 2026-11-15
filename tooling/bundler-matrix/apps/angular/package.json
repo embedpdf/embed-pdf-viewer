@@ -6,7 +6,8 @@
   "scripts": {
     "matrix:build": "ng build --configuration production",
     "matrix:build:assets": "ng build --configuration assets",
-    "matrix:build:portable": "ng build --configuration portable"
+    "matrix:build:portable": "ng build --configuration portable",
+    "matrix:serve": "ng serve"
   },
   "dependencies": {
     "@embedpdf/bundler-probe": "workspace:*",

@@ -63,6 +63,8 @@ interface HarnessOptions {
   claims?: (event: PointerEvent) => boolean;
   zoomGestures?: boolean;
   inMotion?: boolean;
+  /** What the stage answers a wheel: false leaves it to the page. Default true. */
+  takesWheel?: boolean;
 }
 
 function controllerHarness(options: HarnessOptions = {}) {
@@ -98,6 +100,7 @@ function controllerHarness(options: HarnessOptions = {}) {
 
   const host = {
     panBy: vi.fn(),
+    wheelBy: vi.fn(() => options.takesWheel ?? true),
     zoomAround: vi.fn(),
     beginGesture: vi.fn(),
     endGesture: vi.fn(),
@@ -142,7 +145,9 @@ function controllerHarness(options: HarnessOptions = {}) {
     up: (overrides?: Record<string, unknown>) => winListeners.get('pointerup')!(ev(overrides)),
     pointerCancel: (overrides?: Record<string, unknown>) =>
       winListeners.get('pointercancel')!(ev(overrides)),
-    wheel: (overrides: Record<string, unknown> = {}) =>
+    /** Send a wheel event; true when the controller cancelled it. */
+    wheel: (overrides: Record<string, unknown> = {}) => {
+      const preventDefault = vi.fn();
       elListeners.get('wheel')!({
         deltaY: 100,
         deltaX: 0,
@@ -152,9 +157,13 @@ function controllerHarness(options: HarnessOptions = {}) {
         shiftKey: false,
         clientX: 10,
         clientY: 10,
-        preventDefault: () => {},
+        cancelable: true,
+        timeStamp: 0,
+        preventDefault,
         ...overrides,
-      }),
+      });
+      return preventDefault.mock.calls.length > 0;
+    },
     frame: () => {
       const pending = frames.splice(0);
       pending.forEach((callback) => callback(now));
@@ -292,10 +301,39 @@ describe('gesture controller lifecycle', () => {
 
   it('wheel: ctrl zooms through the classifier, plain wheel pans', () => {
     const harness = controllerHarness({ sink: false });
-    harness.wheel({ ctrlKey: true, clientX: 50, clientY: 60 });
+    expect(harness.wheel({ ctrlKey: true, clientX: 50, clientY: 60 })).toBe(true);
     expect(harness.host.zoomAround).toHaveBeenCalledWith({ x: 50, y: 60 }, 1.2);
-    harness.wheel({ deltaY: 40, deltaX: 4 });
+    expect(harness.wheel({ deltaY: 40, deltaX: 4, timeStamp: 1234 })).toBe(true);
+    // The wheel's delta, and the time the event says it happened.
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-4, -40, 1234);
+  });
+
+  it('wheel: one the stage leaves to the page goes uncancelled, for the browser to scroll with', () => {
+    const harness = controllerHarness({ sink: false, takesWheel: false });
+    expect(harness.wheel({ deltaY: 40 })).toBe(false);
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40, 0);
+  });
+
+  it('wheel: a host with no wheelBy keeps every wheel and pans', () => {
+    const harness = controllerHarness({ sink: false });
+    Reflect.deleteProperty(harness.host, 'wheelBy');
+    expect(harness.wheel({ deltaY: 40, deltaX: 4 })).toBe(true);
     expect(harness.host.panBy).toHaveBeenCalledWith(-4, -40);
+  });
+
+  it('wheel: a zoom wheel never reaches the browser, with zoom gestures off too', () => {
+    const harness = controllerHarness({ sink: false, takesWheel: false, zoomGestures: false });
+    expect(harness.wheel({ ctrlKey: true, deltaY: 40 })).toBe(true);
+    expect(harness.host.zoomAround).not.toHaveBeenCalled();
+    expect(harness.host.wheelBy).toHaveBeenCalledWith(-0, -40, 0); // it pans instead
+  });
+
+  it('wheel: one that cannot be cancelled is already scrolling the page, so the stage stays put', () => {
+    const harness = controllerHarness({ sink: false });
+    expect(harness.wheel({ cancelable: false })).toBe(false);
+    expect(harness.wheel({ cancelable: false, ctrlKey: true })).toBe(false);
+    expect(harness.host.wheelBy).not.toHaveBeenCalled();
+    expect(harness.host.zoomAround).not.toHaveBeenCalled();
   });
 
   it('detach mid-gesture balances the open camera bracket', () => {

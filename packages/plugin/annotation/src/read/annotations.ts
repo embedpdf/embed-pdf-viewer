@@ -1,5 +1,10 @@
 import { PluginError } from '@embedpdf/core';
-import { isEditableByHand, type ModelAnnotation, type Model } from '@embedpdf/core-annotation';
+import {
+  isEditableByHand,
+  isMovable as isMovableRecord,
+  type ModelAnnotation,
+  type Model,
+} from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type Annotation,
@@ -136,7 +141,13 @@ export function createAnnotationReads(
     return !!record && isEditableByHand(model, record.annotation);
   };
 
-  const api = { get, list, isPending, getHovered, isEditable };
+  /** Whether it is an annotation people move: its kind moves, and it doesn't sit on text. */
+  const isMovable = (ref: AnnotationRef): boolean => {
+    const record = store.model().byId[annotationKey(ref)];
+    return !!record && isMovableRecord(record);
+  };
+
+  const api = { get, list, isPending, getHovered, isEditable, isMovable };
 
   return {
     get,

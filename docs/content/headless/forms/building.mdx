@@ -145,6 +145,60 @@ looks like the field's last button, and a radio group's new choice gets the next
 Pass what you want instead: `form.addWidget(plan.ref, { rect, exportValue: 'yearly' })` takes
 everything an entry of `create()`'s `widgets` takes.
 
+## Copy fields
+
+`duplicateWidgets()` copies boxes, as Duplicate does in a designer. What a copy becomes follows
+from what its box is:
+
+- **A radio button is one answer to a question.** Its copy is another button in the same group,
+  with the next free `Choice<n>` as its value.
+- **Any other box is a whole question.** Its copy is a new field, named after the original:
+  `email` becomes `email_2`.
+
+```ts
+// another button in the group, below the one it copies
+await form.duplicateWidgets([button.ref], {
+  offset: { x: 0, y: 24 },
+});
+
+// a new text field beside the original
+const { fields } = await form.duplicateWidgets([box.ref], {
+  offset: { x: 10, y: 10 },
+});
+```
+
+Boxes of one field that are copied together become one new field. `duplicate()` copies whole
+fields instead: a radio group becomes a new group with the same buttons and the same values.
+
+```ts
+const { fields } = await form.duplicate([plan.ref], {
+  offset: { x: 0, y: 80 },
+});
+```
+
+A new field has its original's settings, scripts and default value. It doesn't have its answer:
+it starts empty, as a new field does. Pass `values: true` to copy the answer too. A signature
+never comes along.
+
+| Option   | What it does                                              | Default            |
+| :------- | :-------------------------------------------------------- | :----------------- |
+| `page`   | The page the copies go on, as a ref or an index.          | each on its own    |
+| `offset` | How far each copy moves: `{ x, y }` in page points.       | `{ x: 0, y: 0 }`   |
+| `values` | Whether a new field gets its original's answer.           | `false`            |
+
+Both resolve `{ fields, widgets, dropped }`: the fields that were made or got a new button, the
+new boxes, and what was left out. A copy leaves out what
+an [import](/docs/engine/forms/import-export#whats-left-out) leaves out: a field of a kind the
+engine doesn't know, a script when `canWriteScripts()` is false, an action it can't write. A box
+in no field is left out too.
+
+One call makes at most 10,000 new fields: the engine's item
+[limit](/docs/engine/forms/import-export#limits), which a server can change. More is refused with
+`invalid-input`, and nothing is copied.
+
+In design mode, [Duplicate the selection](../annotations/selecting#duplicate-the-selection)
+does this for the selected boxes, together with the annotations selected beside them.
+
 ## Scripts and calculations
 
 A field's scripts go in `actions` when you create or change it: a calculated total, a formatted
@@ -196,6 +250,8 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `create(draft)`                         | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
 | `update(ref, patch)`                    | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
 | `addWidget(ref, placement?)`            | Shows a field in one more place: a radio group's next choice, a checkbox's next box. Resolves `{ field, widget }`. [One more button for a group](#one-more-button-for-a-group)                        |
+| `duplicate(fields, options?)`           | Copies whole fields, each as a new field. Resolves `{ fields, widgets, dropped }`. [Copy fields](#copy-fields)                                                                                        |
+| `duplicateWidgets(widgets, options?)`   | Copies boxes: a radio button joins its group, any other box becomes a new field. Resolves `{ fields, widgets, dropped }`. [Copy fields](#copy-fields)                                                 |
 | `delete(ref)`                           | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
 | `updateWidget(widget, patch)`           | Changes one box's place or look; pass only what changes. Resolves `{ widget }`. [Change a field's settings](#change-a-fields-settings)                                                                |
 | `getFieldSettings(ref)`                 | A field's settings described for a panel: `{ properties, values }`, or `null`. [Change a field's settings](#change-a-fields-settings)                                                                 |

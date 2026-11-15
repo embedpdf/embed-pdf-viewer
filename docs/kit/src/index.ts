@@ -5,6 +5,7 @@
  */
 export { Callout } from './callout';
 export { Cards, Card, CardGrid, GridCard, type GridCardIcon } from './cards';
+export { ThemeTokens, ThemeToken } from './theme-tokens';
 export {
   Feedback,
   POSITIVE_FEEDBACK_REASONS,
@@ -51,11 +52,14 @@ export {
 export * as mdast from './mdast';
 export {
   renderDocsMarkdownWith,
+  renderDocsReadmeWith,
   resolveDocsTreeWith,
   stringifyDocsTree,
   type AstNode,
   type DocsCodeFile,
   type DocsMarkdownSite,
+  type DocsReadmeOptions,
+  type DocsReadmeParts,
   type RenderDocsMarkdownOptions,
 } from './docs-markdown';
 export { PageMarkdownActions } from './page-markdown-actions';

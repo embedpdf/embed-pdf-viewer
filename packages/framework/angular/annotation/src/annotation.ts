@@ -114,6 +114,7 @@ export class EpdfAnnotation extends pluginService({
     'update',
     'delete',
     'reorder',
+    'duplicate',
     'export',
     'import',
     'downloadResource',
@@ -122,6 +123,8 @@ export class EpdfAnnotation extends pluginService({
     'canCreate',
     'canUpdate',
     'canDelete',
+    'canDuplicate',
+    'isMovable',
     'cancel',
   ],
   events: [
@@ -162,6 +165,8 @@ export class EpdfAnnotation extends pluginService({
     ungroup: this.binding.namespaceMethod('selection', 'ungroup'),
     canGroup: this.binding.namespaceMethod('selection', 'canGroup'),
     canUngroup: this.binding.namespaceMethod('selection', 'canUngroup'),
+    duplicate: this.binding.namespaceMethod('selection', 'duplicate'),
+    canDuplicate: this.binding.namespaceMethod('selection', 'canDuplicate'),
     getAnchor: this.binding.namespaceMethod('selection', 'getAnchor'),
     getRotationAnchor: this.binding.namespaceMethod('selection', 'getRotationAnchor'),
     // The plugin hands out the same object while nothing changes.

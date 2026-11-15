@@ -57,13 +57,16 @@ export function applyAnnotationBaseDraft(
 
 /**
  * Write the annotation-wide base fields shared by every Patch
- * (contents/subject). /T is bound at creation and not patchable — see
- * `AnnotationPatchBase`. /NM is set only at create.
+ * (contents/subject/nm). /T is bound at creation and not patchable — see
+ * `AnnotationPatchBase`.
  *
  * Three-state semantics on string|null fields:
  *   undefined -> don't touch the dict
  *   null      -> remove the entry
  *   "..."     -> set the entry to that value
+ *
+ * An empty `nm` names nothing: it removes `/NM`, as a create given one
+ * writes none.
  */
 export function applyAnnotationBasePatch(
   fn: PdfFunctions,
@@ -76,6 +79,9 @@ export function applyAnnotationBasePatch(
   }
   if (patch.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);
+  }
+  if (patch.nm !== undefined) {
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'NM', patch.nm || null);
   }
   const flags = flagFieldsOf(patch);
   if (flags) setAnnotFlags(fn, annotPtr, flags);

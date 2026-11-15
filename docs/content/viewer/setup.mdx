@@ -46,11 +46,36 @@ Any height works: a fixed one, `100vh`, or the remaining space of a flex or grid
 (`flex: 1; min-height: 0`). Its width follows the box too, and the viewer adapts to it, not to the
 window: see [Small screens](customize/small-screens).
 
+On a page that scrolls, a wheel over the viewer scrolls the pages, and at their end the next
+scroll goes on to your page. A viewer that fills the window has no page to scroll, so turn that
+off with `plugins: { stage: { scrollChaining: false } }`: see
+[Inside a page that scrolls](/docs/headless/viewing/stage#inside-a-page-that-scrolls).
+
 ## Pass it config
 
 Everything the viewer can do is one config object. In a framework, every key is a prop:
 
 <Snippet name="viewer/setup/config" />
+
+<Fw only="vanilla">
+
+On a plain HTML page, `init()` takes the config with a `target`, a selector or an element: it puts
+the viewer inside it and returns the `<embedpdf-viewer>` element. Written as a tag, the element
+takes its config through its `config` property.
+
+<Engine local>
+
+Three keys can be attributes of the tag too: `src`, `locale` and `theme`.
+
+</Engine>
+
+<Engine cloud>
+
+Two keys can be attributes of the tag too: `locale` and `theme`.
+
+</Engine>
+
+</Fw>
 
 <Engine local>
 
@@ -160,6 +185,13 @@ Pass a function, and the viewer asks it again a minute before each token expires
 `src: { id: contract.documentId, token: () => fetchDocumentToken(contract.id) }`. See
 [Authentication](/docs/engine/authentication) for the ways to open a document and what a token
 carries.
+
+<Fw only="vanilla">
+
+A cloud document is an object, not a URL, so on a plain HTML page it is given from script, never as
+the `src` attribute: `element.src = { token }`.
+
+</Fw>
 
 </Engine>
 

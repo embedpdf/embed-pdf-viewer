@@ -16,6 +16,7 @@ import {
 import type { StageCapability } from '../../src/stage';
 import type { CurrentValue } from '../../src/runtime';
 import { bytesInput, pagedEngine } from '../fixtures/counter-plugin';
+import LeavingStage from '../fixtures/LeavingStage.svelte';
 import Probes from '../fixtures/Probes.svelte';
 import StageHarness from '../fixtures/StageHarness.svelte';
 import StageScopeProbe from '../fixtures/StageScopeProbe.svelte';
@@ -157,6 +158,43 @@ describe('<Stage>', () => {
     await view.rerender({ contentProps: { seen, pageIndex: 0, zoom: 2 } });
     flushSync();
     await waitFor(() => expect(stage.getZoomLevel()).toBe(2));
+  });
+
+  describe('a layer that reads its page as it goes away', () => {
+    /** A Stage showing document `a`, and what each layer read of its page in its cleanup. */
+    async function leavingStage() {
+      const left: { page: number; view: string; documentId: string }[] = [];
+      const viewer = await viewerWith([stagePlugin()], LeavingStage, { left }, pagedEngine(3));
+      await viewer.kernel.documents.open(bytesInput('a'));
+      flushSync();
+      const lens = viewer.kernel.capability(asHost(StageToken));
+      lens.setViewportSize({ width: 800, height: 600 });
+      flushSync();
+      const shown = [...viewer.view.container.querySelectorAll('.leaving')].map((layer) =>
+        Number(layer.getAttribute('data-page')),
+      );
+      expect(shown.length).toBeGreaterThan(0);
+      const pagesOfA = shown.map((page) => ({ page, view: lens.getLensId(), documentId: 'a' }));
+      return { ...viewer, left, pagesOfA };
+    }
+
+    it('reads the page as it was when another document becomes the active one', async () => {
+      const { kernel, view, left, pagesOfA } = await leavingStage();
+      // The new document is the active one while it opens, so the Stage has no lens.
+      const opening = kernel.documents.open(bytesInput('b'));
+      flushSync();
+      expect(view.container.querySelectorAll('.leaving').length).toBe(0);
+      expect(left).toEqual(pagesOfA);
+      await opening;
+    });
+
+    it('reads the page as it was when its document closes', async () => {
+      const { kernel, view, left, pagesOfA } = await leavingStage();
+      await kernel.documents.close('a');
+      flushSync();
+      expect(view.container.querySelectorAll('.leaving').length).toBe(0);
+      expect(left).toEqual(pagesOfA);
+    });
   });
 });
 

@@ -78,16 +78,16 @@ export const isSelectable = (model: Model, id: Id): boolean => {
 const textBound = (record: ModelAnnotation): boolean =>
   kindOf(record.annotation).caps.anchored && shapeOf(record.annotation).kind === 'quads';
 
+/** Is this an annotation people move at all? Its kind moves, and it isn't
+ *  bound to text. Whether it can be moved now is {@link canMove}. */
+export const isMovable = (record: ModelAnnotation): boolean =>
+  kindOf(record.annotation).caps.movable && !textBound(record);
+
 /** Can this annotation be dragged by its body to move? (`locked` and the
  *  session's `editable` rule freeze it.) */
 export const canMove = (model: Model, id: Id): boolean => {
   const record = model.byId[id];
-  return (
-    !!record &&
-    isTransformableByHand(model, record) &&
-    kindOf(record.annotation).caps.movable &&
-    !textBound(record)
-  );
+  return !!record && isTransformableByHand(model, record) && isMovable(record);
 };
 
 /** Does this kind expose drag handles (box resize or per-vertex)? Only

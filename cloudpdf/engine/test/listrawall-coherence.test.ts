@@ -362,4 +362,64 @@ describe('stream.desynced — the SSE full-refresh surfaces to subscribers', () 
       await doc.close();
     }
   });
+
+  test('a full-refresh frame that says why passes its reason on', async () => {
+    const fx = buildStub();
+    const doc = new CloudDocumentHandle(fx.http, DOC_ID);
+    try {
+      const events: DocumentEvent[] = [];
+      doc.events.subscribe((e) => events.push(e));
+      await waitFor(() => fx.calls.some((p) => p.endsWith('/events')), 'the SSE stream to open');
+
+      fx.pushSse('event: full-refresh\nid: 41\ndata: {"reason":"unknown-change"}');
+      await waitFor(() => events.length > 0, 'the desync event');
+      expect(events).toEqual([
+        { type: 'stream.desynced', reason: 'unknown-change', at: expect.any(String) },
+      ]);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('a row of a kind this version lacks reads as a desync, and the next read is fresh', async () => {
+    const fx = buildStub();
+    const doc = new CloudDocumentHandle(fx.http, DOC_ID);
+    try {
+      await doc.annotations.list(); // manifest cached at pin 1
+      const events: DocumentEvent[] = [];
+      doc.events.subscribe((e) => events.push(e));
+      await waitFor(() => fx.calls.some((p) => p.endsWith('/events')), 'the SSE stream to open');
+
+      // Another session's change, of a kind a newer server has, moved the annotation list.
+      fx.state.docVersion = 2;
+      fx.state.annotationsVersion = 2;
+      fx.state.auditHead = 41;
+      const meta = { affectedPages: [], cacheDelta: null, opId: 'copy-1', undoable: true };
+      const row = {
+        id: 41,
+        ts: 1,
+        sub: 'bob',
+        kind: 'change',
+        pageObjectNumber: null,
+        affectedPages: [],
+        originSessionId: 'someone-else',
+        payload: { items: [{ type: 'future.thing', meta }], meta },
+      };
+      fx.pushSse(`id: 41\nevent: mutation\ndata: ${JSON.stringify(row)}`);
+      await waitFor(() => events.length > 0, 'the desync event');
+      // No event without a type, and nothing left to read stale.
+      expect(events).toEqual([
+        { type: 'stream.desynced', reason: 'unknown-change', at: expect.any(String) },
+      ]);
+
+      const before = fx.calls.length;
+      const snap = await doc.annotations.list();
+      expect(snap.auditHead).toBe(41);
+      expect(fx.calls.slice(before).filter((p) => p.includes('/items'))).toEqual([
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=2,engine=e1,shape=1`,
+      ]);
+    } finally {
+      await doc.close();
+    }
+  });
 });

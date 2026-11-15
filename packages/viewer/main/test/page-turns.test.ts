@@ -1,6 +1,6 @@
 /**
  * One page at a time, in a real browser: the View menu's Page by page switches the Stage to paged
- * flow, and a mouse wheel past the page's edge turns it, one page per gesture.
+ * flow, and a mouse wheel or a trackpad swipe past the page's edge turns it, one page per gesture.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   dist,
+  evenlyTimed,
   frames,
   launchChromium,
   serveViewer,
@@ -151,6 +152,27 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('page by page', () => {
     await tab.waitForTimeout(300);
     await tab.mouse.wheel(0, -120);
     await expect.poll(() => pageIndex(tab)).toBe(1);
+    await tab.close();
+  });
+
+  it('turns a page for every trackpad swipe, also while the last still coasts', async () => {
+    const tab = await open();
+    await tab.evaluate(() =>
+      (window as unknown as TurnWindow).viewer
+        .get('stage')
+        .updateSettings({ flow: 'paged', zoom: { mode: 'fit-page' } }),
+    );
+    await frames(tab);
+
+    // A trackpad leaves no pause between two swipes: the first still coasts, slower and slower,
+    // when the second speeds up. Each swipe pushes far enough to turn once, and what coasts in
+    // after it never does, so a machine slow enough to put a pause between two wheels turns the
+    // same two pages.
+    const swipe = [10, 30, 50, 20, 10, 5];
+    await evenlyTimed(tab, { x: 550, y: 400 }, [...swipe, ...swipe]);
+    await expect.poll(() => pageIndex(tab)).toBe(2);
+    await frames(tab);
+    expect(await pageIndex(tab)).toBe(2);
     await tab.close();
   });
 });

@@ -17,6 +17,7 @@ import { composeApi, type PluginContext } from '@embedpdf/core';
 
 import { createAnimation } from './camera/animation';
 import { createGestures } from './camera/gestures';
+import { createWheel } from './camera/wheel';
 import { createCameraWrite } from './camera/write';
 import { connectStage } from './connect';
 import type { StageConfig } from './contract';
@@ -43,10 +44,12 @@ export function createStageController(ctx: PluginContext<StageModel>, config: St
   const write = createCameraWrite(ctx, services);
   const animation = createAnimation(services, write);
 
-  // Navigation, then gestures: a push past a paged view's edge turns the page.
+  // Navigation, then gestures: a push past a paged view's edge turns the page,
+  // and a wheel with nowhere to go is left to the page around the viewer.
   const arrive = createArrival(ctx, services, write, animation);
   const turns = createTurns(ctx, services, reads, arrive.api);
   const gestures = createGestures(ctx, services, write, animation, reads, turns);
+  const wheel = createWheel(ctx, services, turns, gestures.api);
 
   // Settings, zoom and the view lifecycle.
   const reveal = createReveal(ctx, services, write, animation, arrive);
@@ -59,6 +62,7 @@ export function createStageController(ctx: PluginContext<StageModel>, config: St
     reads.api,
     animation.api,
     gestures.api,
+    wheel.api,
     arrive.api,
     reveal.api,
     settings.api,

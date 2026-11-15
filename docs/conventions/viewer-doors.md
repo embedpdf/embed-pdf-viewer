@@ -128,6 +128,25 @@ bundler, so the app has one element class, the one the engine is registered on.
    Assert the bundle too: the `/core` door must emit no `FPDF_` symbols and no
    wasm asset.
 
+## The delivery build
+
+`@embedpdf/viewer` is built by Vite as an app, not by the package preset
+(`packages/viewer/main/vite.config.ts`):
+
+- **Preact stands in for React here and only here.** The config aliases
+  `react`, `react-dom` and the JSX runtimes to `preact/compat`. The aliases
+  are absolute file paths, because the imports they replace live in other
+  workspace packages, whose `node_modules` have no Preact.
+- **Every asset URL is relative** (`renderBuiltUrl`), so `dist/` can be served
+  from any CDN path.
+- **`process.env.NODE_ENV` compiles to `'production'`**, so the viewer checks
+  the layout in every build: a CDN user's mistyped id warns with the id and
+  the closest one that exists.
+- **A child of the element with a `slot` attribute** is shown in the layout's
+  matching `custom()` socket. It stays in the page: the page's CSS and the
+  host framework's state keep working, and the toolbar measures the box it is
+  shown in.
+
 ## Enforcement
 
 `eslint.config.js` carries the import-boundary rules for laws 2 and 3

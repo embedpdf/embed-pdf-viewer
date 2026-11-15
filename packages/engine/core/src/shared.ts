@@ -389,6 +389,14 @@ export type {
   AnnotationImportResult,
 } from './transfer/annotationImport';
 export { annotationImportFacts } from './transfer/annotationImport';
+export type {
+  AnnotationCopyOptions,
+  AnnotationCopyPlacement,
+  AnnotationCopyPlan,
+  AnnotationCopyResult,
+  PlannedAnnotationCopy,
+} from './transfer/annotationCopy';
+export { planAnnotationCopies } from './transfer/annotationCopy';
 export { closeExportSelection } from './transfer/exportSelection';
 export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
 export {
@@ -422,6 +430,15 @@ export type {
   WidgetFlags,
 } from './transfer/formImport';
 export { formImportFacts, formValuesImportFacts, WIDGET_FLAG_NAMES } from './transfer/formImport';
+export type {
+  FormCopyOptions,
+  FormCopyPlacement,
+  FormCopyPlan,
+  FormCopyResult,
+  PlannedFieldCopy,
+} from './transfer/formCopy';
+export { copyNameOf, fieldNameTaken, planFormCopies } from './transfer/formCopy';
+export { widgetFlagsOf, widgetPlacementOf } from './transfer/formFieldCreates';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level attachments service.
@@ -585,6 +602,7 @@ export type {
 } from './annotation/appearance';
 export {
   appearanceChangeOf,
+  translatedAnnotation,
   appearanceImpactOf,
   semanticEqual,
   UNBAKED_KINDS,

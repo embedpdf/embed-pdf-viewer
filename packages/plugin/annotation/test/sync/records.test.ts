@@ -4,7 +4,12 @@ import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { annotationKey, formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { foldRecords, NO_RECORDS, type AnnotationRecords } from '../../src/sync/records';
+import {
+  foldRecords,
+  NO_RECORDS,
+  predictRecords,
+  type AnnotationRecords,
+} from '../../src/sync/records';
 
 /**
  * The confirmed layer: a pure fold over confirmed events from every origin,
@@ -201,5 +206,47 @@ describe('annotations born inline in the file', () => {
     );
     expect(next.order).toEqual(['base:11:3', 'obj:7']);
     expect(next.byKey['base:11:3']!.pictureVersion).toBe(1);
+  });
+});
+
+describe('a copy on its way', () => {
+  const box = { x: 10, y: 20, width: 30, height: 40 };
+  const square = (objectNumber: number) => recordOn(11, objectNumber, { rect: box, box });
+  const copy = {
+    type: 'annotations.copy',
+    refs: [square(1).ref, square(2).ref],
+    offset: { x: 5, y: 5 },
+    objectNumbers: [8, 9],
+  } as const;
+
+  it('shows each copy under the number it was given, with the annotation it copies', () => {
+    const shown = predictRecords(recordsOf(square(1), square(2)), copy);
+    expect(shown.order).toEqual(['obj:1', 'obj:2', 'obj:8', 'obj:9']);
+    expect(shown.byKey['obj:8']).toMatchObject({
+      pictureVersion: 0,
+      copyOf: square(1).ref,
+      dto: { subtype: 'square', box: { x: 15, y: 25, width: 30, height: 40 } },
+    });
+    expect(shown.byKey['obj:9']!.copyOf).toEqual(square(2).ref);
+  });
+
+  it('leaves a copy the engine confirmed as the engine wrote it', () => {
+    const records = recordsOf(square(1), square(2));
+    const written = { ...predictRecords(records, copy).byKey['obj:8']!.dto, nm: 'named' };
+    const confirmed = applied(
+      records,
+      event({ type: 'annotations.created', page: written.page, annotation: written }),
+    );
+    const shown = predictRecords(confirmed, copy);
+    expect(shown.byKey['obj:8']).toBe(confirmed.byKey['obj:8']);
+    expect(shown.byKey['obj:8']!.copyOf).toBeUndefined();
+    expect(shown.order).toEqual(['obj:1', 'obj:2', 'obj:8', 'obj:9']);
+  });
+
+  it('shows nothing for a copy the engine numbers itself, or of an annotation that is gone', () => {
+    const records = recordsOf(square(1), square(2));
+    const { objectNumbers: _numbers, ...unnumbered } = copy;
+    expect(predictRecords(records, unnumbered)).toBe(records);
+    expect(predictRecords(recordsOf(square(1)), copy).order).toEqual(['obj:1']);
   });
 });

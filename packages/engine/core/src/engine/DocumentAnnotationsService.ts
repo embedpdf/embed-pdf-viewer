@@ -1,6 +1,8 @@
 import type { AnnotationList, AnnotationListOptions } from '../annotation/AnnotationList';
 import { AbortablePromise } from '../promise/AbortablePromise';
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationCopyOptions, AnnotationCopyResult } from '../transfer/annotationCopy';
 import type { AnnotationImportOptions, AnnotationImportResult } from '../transfer/annotationImport';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
@@ -39,4 +41,21 @@ export interface DocumentAnnotationsService {
     bundle: AnnotationBundle,
     options?: AnnotationImportOptions,
   ): AbortablePromise<AnnotationImportResult>;
+  /**
+   * Copy annotations of this document, as one change: a copy of each, in the
+   * order of `refs`, on its own page or on `options.page`, moved by
+   * `options.offset`. A copy carries its source's data and flags, a stamp's
+   * drawing and an attachment's file; it has its own ref and a fresh name,
+   * and the session is its author. Links between the copies stay; a link to
+   * an annotation that isn't copied is left out, and so are replies that
+   * aren't named. What can't be made again is in `dropped`. It is the op
+   * `annotations.copy` through `doc.apply`, so its `opId` undoes it. Emits
+   * one `annotations.created` per copy, sharing `origin.tx`. Refused with
+   * `NotFound` for an annotation the document doesn't have. Needs
+   * `doc.annotate.read`, and what creating each copy needs.
+   */
+  copy(
+    refs: readonly AnnotationRef[],
+    options?: AnnotationCopyOptions,
+  ): AbortablePromise<AnnotationCopyResult>;
 }

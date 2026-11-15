@@ -2,6 +2,7 @@ import { annotDeletable, annotTransformable, type FlagBearer } from '@embedpdf/c
 import {
   annotationKey,
   deletedWith,
+  planAnnotationCopies,
   type Annotation,
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
@@ -73,7 +74,25 @@ export function createAuthority(
   };
   const canDelete = (ref: AnnotationRef): boolean => blockersOf(ref).length === 0;
 
-  return { canRead, canCreate, canUpdate, canDelete, blockersOf, allowsMutation };
+  /**
+   * Whether a person may copy these annotations: the right to create, each
+   * one here and copied whole by the engine's own rule
+   * (`planAnnotationCopies`), and none locked. A copy of a locked annotation
+   * is locked too, so a person could neither move nor delete it.
+   */
+  const canDuplicate = (refs: readonly AnnotationRef[]): boolean => {
+    if (!refs.length || !canCreate()) return false;
+    const model = store.model();
+    const sources: Annotation[] = [];
+    for (const ref of refs) {
+      const annotation = model.byId[annotationKey(ref)]?.annotation;
+      if (!annotation || annotation.locked) return false;
+      sources.push(annotation);
+    }
+    return planAnnotationCopies(sources, {}).dropped.length === 0;
+  };
+
+  return { canRead, canCreate, canUpdate, canDelete, canDuplicate, blockersOf, allowsMutation };
 }
 
 /** Deleted with the annotation it belongs to: unlocked, and the session's to delete. */

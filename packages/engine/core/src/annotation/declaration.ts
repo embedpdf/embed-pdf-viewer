@@ -82,8 +82,6 @@ export interface FieldTraits {
   readonly writeNullable: boolean;
   /** A create must supply the field: it has no default. */
   readonly required: boolean;
-  /** The field can't change after create. */
-  readonly createOnly: boolean;
   /** An update also takes what a read returns (kept only when unchanged). */
   readonly readBack: boolean;
   /** What the field holds that is measured on the page. */
@@ -102,8 +100,6 @@ export interface Field<Read, Write, Traits> {
   nullableOnRead(): Field<Read, Write, Override<Traits, { readNullable: true }>>;
   /** A create may leave the field out, and the kind's default applies. */
   optional(): Field<Read, Write, Override<Traits, { required: false }>>;
-  /** The field can't change after create. */
-  createOnly(): Field<Read, Write, Override<Traits, { createOnly: true }>>;
   /** A write accepts a different schema than a read returns. */
   writes<NextWrite>(schema: z.ZodType<NextWrite>): Field<Read, NextWrite, Traits>;
   /**
@@ -137,7 +133,6 @@ function createField<Read, Write, Traits>(
     nullable: () => next({ readNullable: true, writeNullable: true }),
     nullableOnRead: () => next({ readNullable: true }),
     optional: () => next({ required: false }),
-    createOnly: () => next({ createOnly: true }),
     readBack: () => next({ readBack: true }),
     space: (space) => next({ space }),
     writes: (schema) => createField(read, schema, traits),
@@ -149,7 +144,6 @@ export interface OwnerTraits<Owner extends FieldOwner, Required extends boolean>
   readNullable: false;
   writeNullable: false;
   required: Required;
-  createOnly: false;
   readBack: false;
   space: 'none';
 }
@@ -162,7 +156,6 @@ const ownedBy = <Owner extends FieldOwner, Required extends boolean>(
   readNullable: false,
   writeNullable: false,
   required,
-  createOnly: false,
   readBack: false,
   space: 'none',
 });

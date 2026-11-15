@@ -52,6 +52,37 @@ export function walk(directory) {
   });
 }
 
+/**
+ * This repository's packages, by name: the folder each is in, from the repository's root, its
+ * `package.json`, and whether it is published.
+ */
+export function workspacePackages() {
+  const listed = spawnSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  );
+  const packages = new Map();
+  for (const file of listed.stdout.split('\n').filter(Boolean)) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+      if (manifest.name) {
+        packages.set(manifest.name, {
+          directory: path.posix.dirname(file),
+          manifest,
+          published: manifest.private !== true,
+        });
+      }
+    } catch {
+      // A manifest that doesn't parse names nothing.
+    }
+  }
+  return packages;
+}
+
 // ── options ─────────────────────────────────────────────────────────────────
 
 export const COMPILER_OPTIONS = {

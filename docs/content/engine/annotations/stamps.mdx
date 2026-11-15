@@ -152,23 +152,29 @@ is in. For a stamp made by another app, it's the picture as that app drew it.
 
 ## Copy a stamp
 
-The read and the drawing together make the same stamp again, on another page or in another
-document:
+In the same document, [`copy()`](/docs/engine/annotations#copy-annotations) makes the copy in
+one call. The copy places the same drawing, so the file gets no second one, and nothing is
+downloaded:
+
+```ts
+await doc.annotations.copy([stamp.ref], { page: otherPage.ref });
+```
+
+For another document, the read and the drawing together make the same stamp again:
 
 ```ts
 const drawing = await page.annotations.downloadResource(stamp.ref, 'appearance');
 
-await otherPage.annotations.create(stamp, { resources: { appearance: drawing } });
+await pageOfOtherDoc.annotations.create(stamp, { resources: { appearance: drawing } });
 ```
 
-The copy has the same box, `fit`, `rotation`, `opacity` and `name`; the engine records the user
-who makes it as its author.
+That stamp has the same box, `fit`, `rotation`, `opacity` and `name`; the engine records the
+user who makes it as its author. A read carries its unique name, and a create with a name
+that's taken on its page fails with `InvalidArg`: clear it with `{ ...stamp, nm: null }` (see
+[Refs & identity](/docs/engine/concepts/identity)).
 
-To copy on the same page, clear the unique name: `{ ...stamp, nm: null }` (see
-[Refs & identity](/docs/engine/concepts/identity)). A copy with a name that's taken on its page
-fails with `InvalidArg`.
-
-To copy many annotations at once, stamps included, use [Import & export](/docs/engine/annotations/import-export).
+To take many annotations to another document at once, stamps included, use
+[Import & export](/docs/engine/annotations/import-export).
 
 ## Permissions
 

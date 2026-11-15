@@ -1,8 +1,8 @@
 /**
  * @embedpdf/plugin-commands/standard — the commands every viewer has: zoom,
  * pages, view rotation, a command for every tool, copy, the snapshot, delete,
- * download and print, with shortcuts, and labels in EmbedPDF's eight
- * languages (the i18n plugin has the strings). Some of them reach the browser
+ * undo and redo, download and print, with shortcuts, and labels in EmbedPDF's
+ * eight languages (the i18n plugin has the strings). Some of them reach the browser
  * (the clipboard, a file download), which plugins never touch, so each
  * framework's `/commands` builds them with its platform: that is the
  * `standardCommands` an app imports. Print goes through the kernel, which has
@@ -10,6 +10,7 @@
  */
 import { DocumentsToken } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+import { HistoryToken } from '@embedpdf/plugin-history/contract';
 import { InteractionToken, type Tool } from '@embedpdf/plugin-interaction/contract';
 import { RenderToken, SNAPSHOT_TOOL, type PageImage } from '@embedpdf/plugin-render/contract';
 import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
@@ -33,6 +34,7 @@ export interface StandardCommandsPlatform {
 const stageOf = (context: CommandContext) => context.tryGet(StageToken);
 const snapshotOf = (context: CommandContext) => context.tryGet(RenderToken)?.getSnapshot() ?? null;
 const interactionOf = (context: CommandContext) => context.tryGet(InteractionToken);
+const historyOf = (context: CommandContext) => context.tryGet(HistoryToken);
 
 /** Enabled while the document has a Stage. */
 const hasStage = (context: CommandContext): boolean => stageOf(context) !== null;
@@ -235,6 +237,29 @@ export function createStandardCommands(
           selected.every(({ ref }) => annotation.canDelete(ref) && annotation.isEditable(ref))
         );
       },
+    },
+
+    // ── history: without the history plugin, both stay disabled ──
+    // Focus in a text field keeps its own undo: shortcuts skip text fields.
+    {
+      id: 'history:undo',
+      labelKey: 'commands.history.undo',
+      label: 'Undo',
+      icon: 'undo',
+      shortcut: 'Mod+Z',
+      categories: ['history'],
+      run: (context) => historyOf(context)?.undo(),
+      enabled: (context) => historyOf(context)?.canUndo() ?? false,
+    },
+    {
+      id: 'history:redo',
+      labelKey: 'commands.history.redo',
+      label: 'Redo',
+      icon: 'redo',
+      shortcut: ['Mod+Shift+Z', 'Mod+Y'],
+      categories: ['history'],
+      run: (context) => historyOf(context)?.redo(),
+      enabled: (context) => historyOf(context)?.canRedo() ?? false,
     },
 
     // ── the snapshot the snapshot tool holds ──

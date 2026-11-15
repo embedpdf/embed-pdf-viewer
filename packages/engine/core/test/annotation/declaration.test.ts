@@ -15,7 +15,7 @@ const note = defineKind(
     ref: field.engine(z.string()),
     author: field.attribution(z.string()).nullable(),
     actions: field.preserved(z.object({ activate: z.string() })).nullable(),
-    nm: field.data(z.string()).nullable().optional().createOnly(),
+    nm: field.data(z.string()).nullable().optional(),
     rect: field.data(z.object({ left: z.number(), right: z.number() })),
     contents: field.data(z.string()).nullable().optional(),
     hidden: field.data(z.boolean()).optional(),
@@ -121,7 +121,6 @@ describe('defineKind', () => {
     expect(note.fields.actions.traits.owner).toBe('preserved');
     expect(note.fields.nm.traits).toMatchObject({
       owner: 'data',
-      createOnly: true,
       required: false,
     });
     expect(note.fields.rect.traits).toMatchObject({ required: true, readNullable: false });

@@ -101,13 +101,19 @@ The icon, its color and its opacity change like any field: `{ icon: 'tag' }`.
 
 ## Copy an attachment
 
-The read and the bytes together make the same attachment again, on another page or in another
-document:
+In the same document, [`copy()`](/docs/engine/annotations#copy-annotations) makes the copy in
+one call, with the same file, name and dates. Nothing is downloaded:
+
+```ts
+await doc.annotations.copy([attachment.ref], { page: otherPage.ref });
+```
+
+For another document, the read and the bytes together make the same attachment again:
 
 ```ts
 const bytes = await page.annotations.downloadResource(attachment.ref, 'file');
 
-await otherPage.annotations.create(attachment, { resources: { file: bytes } });
+await pageOfOtherDoc.annotations.create(attachment, { resources: { file: bytes } });
 ```
 
 ## Files on a page and files of the document
@@ -120,8 +126,10 @@ page don't see the document's files.
 ## Limits
 
 - A name can't be empty, and a create without the `file` bytes is refused with `InvalidArg`.
-- To [export](/docs/engine/annotations/import-export) an attachment, its file must fit a bundle's
-  limit for one resource: 50 MB. A larger one refuses the export with `PayloadTooLarge`.
+- To [export](/docs/engine/annotations/import-export) or
+  [copy](/docs/engine/annotations#copy-annotations) an attachment, its file must fit a bundle's
+  limit for one resource: 50 MB. A larger one refuses the export or the copy with
+  `PayloadTooLarge`.
 
 <Engine cloud>
 

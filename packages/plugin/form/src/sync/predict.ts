@@ -11,14 +11,17 @@ import {
   fieldAfterValue,
   formFieldAfter,
   formFieldOfDraft,
+  planFormCopies,
   reorderedList,
   widgetAfterPatch,
   widgetsAfterDisplay,
   type AnnotationRef,
   type FieldWithWidgets,
   type FormField,
+  type FormFieldDraft,
   type FormFieldRef,
   type FormWidget,
+  type PlannedFieldCopy,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -82,8 +85,8 @@ const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbo
  * `widgetAfterPatch`): what the fields and their widgets hold after it. An op
  * those rules refuse shows nothing; one whose values only the engine's schemas
  * refuse shows until the engine's refusal takes the change away.
- * A create shows once it names its numbers; taking a widget out of its field
- * shows once the engine answers.
+ * A create, a copy and a new widget show once they name their numbers; taking
+ * a widget out of its field shows once the engine answers.
  *
  * The view replays every pending change each time any change is staged; the
  * same op over the same form gives the same form, so a field keeps its object
@@ -132,6 +135,10 @@ function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
       }
       case 'forms.create':
         return createdField(index, op);
+      case 'forms.copy':
+        return copiedFields(index, op);
+      case 'forms.addWidget':
+        return addedWidget(index, op);
       case 'forms.update': {
         const field = fieldByRef(index, op.field);
         return field
@@ -229,6 +236,117 @@ function createdField(
     : next;
 }
 
+/** One field a `forms.copy` makes, with the numbers the op names for it. */
+interface FieldCopy extends PlannedFieldCopy {
+  readonly objectNumber: number;
+  readonly widgetObjectNumbers: readonly number[];
+}
+
+/**
+ * The fields a `forms.copy` makes, by the engine's own rule
+ * (`planFormCopies`), each with the object numbers the op names: its own,
+ * then its widgets'. None for a copy that doesn't name them all, which
+ * shows when the engine answers, and none for one the engine would refuse.
+ * What a script right leaves out is the engine's to say: nothing of it shows.
+ */
+function copiesOf(
+  index: FieldIndex,
+  op: Extract<PredictedOp, { type: 'forms.copy' }>,
+): FieldCopy[] {
+  const { snapshot } = index;
+  if (!snapshot || !op.objectNumbers) return [];
+  let creates: readonly PlannedFieldCopy[];
+  try {
+    creates = planFormCopies({
+      form: snapshot,
+      fields: op.fields,
+      ...(op.widgets ? { widgets: op.widgets } : {}),
+      placement: {
+        ...(op.page ? { page: op.page } : {}),
+        ...(op.offset ? { offset: op.offset } : {}),
+      },
+      values: op.values ?? true,
+      mayScript: true,
+    }).creates;
+  } catch {
+    return [];
+  }
+  const needed = creates.reduce((count, create) => count + 1 + create.widgets.length, 0);
+  if (op.objectNumbers.length !== needed) return [];
+  let at = 0;
+  return creates.map((create) => {
+    const [objectNumber, ...widgetObjectNumbers] = op.objectNumbers!.slice(
+      at,
+      at + 1 + create.widgets.length,
+    );
+    at += 1 + create.widgets.length;
+    return { ...create, objectNumber: objectNumber!, widgetObjectNumbers };
+  });
+}
+
+/**
+ * `forms.copy`: each copy as a create of the same field shows (`createdField`),
+ * then its widgets' flags, which a create writes none of, and its value.
+ */
+function copiedFields(
+  index: FieldIndex,
+  op: Extract<PredictedOp, { type: 'forms.copy' }>,
+): FieldIndex {
+  let next = index;
+  for (const copy of copiesOf(index, op)) {
+    const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: copy.objectNumber };
+    if (fieldByRef(next, ref)) continue;
+    next = createdField(next, {
+      type: 'forms.create',
+      draft: copy.draft,
+      objectNumber: copy.objectNumber,
+      widgetObjectNumbers: copy.widgetObjectNumbers,
+    });
+    const made = fieldByRef(next, ref);
+    if (!made) continue;
+    next = upsertWidgets(
+      next,
+      rowsOfField(next, made).map((row, at) => widgetAfterPatch(row, copy.flags[at] ?? {})),
+    );
+    if (copy.value) next = withFields(next, [fieldAfterValue(withRows(next, made), copy.value)]);
+  }
+  return next;
+}
+
+/**
+ * `forms.addWidget`, once it names its widget's number: the widget as a
+ * create of a field of that kind places it, last among the field's. One that
+ * splits a merged field (the field's own widget moves to a new number) shows
+ * when the engine answers.
+ */
+function addedWidget(
+  index: FieldIndex,
+  op: Extract<PredictedOp, { type: 'forms.addWidget' }>,
+): FieldIndex {
+  if (op.objectNumber === undefined || op.splitObjectNumber !== undefined) return index;
+  const field = fieldByRef(index, op.field);
+  if (!field || field.kind === 'unknown' || field.ref.kind !== 'objectNumber') return index;
+  if (widgetRowOf(index, op.objectNumber)) return index;
+  const options =
+    'options' in field
+      ? { options: field.options.map(({ label, value }) => ({ label, value })) }
+      : {};
+  const made = formFieldOfDraft(
+    { kind: field.kind, name: field.name, ...options, widgets: [op.placement] } as FormFieldDraft,
+    {
+      objectNumber: field.ref.objectNumber,
+      widgets: [{ kind: 'objectNumber', page: op.placement.page, objectNumber: op.objectNumber }],
+    },
+  );
+  const [widget] = made.field.widgets;
+  const [row] = made.widgets;
+  if (!widget || !row) return index;
+  return upsertWidgets(
+    upsertFields(index, [{ ...field, widgets: [...field.widgets, widget] } as FormField]),
+    [row],
+  );
+}
+
 /** The fields a change's ops write a value or a look to, each once, in op order. */
 export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): FormField[] {
   const named = new Map<FieldKey, FormField>();
@@ -295,6 +413,29 @@ function undoOfOp(index: FieldIndex, op: PredictedOp): PredictedOp[] {
             {
               type: 'forms.delete',
               field: { kind: 'objectNumber', objectNumber: op.objectNumber },
+            },
+          ];
+    case 'forms.copy':
+      // The copies go, the last made first.
+      return copiesOf(index, op)
+        .map(
+          (copy): PredictedOp => ({
+            type: 'forms.delete',
+            field: { kind: 'objectNumber', objectNumber: copy.objectNumber },
+          }),
+        )
+        .reverse();
+    case 'forms.addWidget':
+      return op.objectNumber === undefined
+        ? []
+        : [
+            {
+              type: 'forms.deleteWidget',
+              widget: {
+                kind: 'objectNumber',
+                page: op.placement.page,
+                objectNumber: op.objectNumber,
+              },
             },
           ];
     case 'forms.update':

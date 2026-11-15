@@ -473,7 +473,13 @@ export {
   type EngineValues,
   type TokenPin,
 } from './wire/cachedReads';
-export { API_VERSION, apiVersionOf, parseApiVersion, type ApiVersion } from './wire/apiVersion';
+export {
+  API_VERSION,
+  apiVersionOf,
+  lacksWhatArrivedIn,
+  parseApiVersion,
+  type ApiVersion,
+} from './wire/apiVersion';
 export type {
   AnnotationsExportToken,
   FontsToken,
@@ -495,6 +501,7 @@ export {
   OutlineItemSchema,
 } from './dto/DocumentOutline.schema';
 export {
+  CHANGE_KINDS,
   CHANGE_REQUEST_LIMITS,
   ChangeAnswerSchema,
   ChangeEntryWireSchema,
@@ -505,4 +512,11 @@ export {
   ChangeResultSchema,
   ChangeWireComponents,
 } from './wire/changeSchemas';
+export {
+  CHANGE_KIND_SINCE,
+  changeKindSince,
+  changeKindsUnknownTo,
+  isChangeKind,
+  type ChangeKind,
+} from './wire/changeKinds';
 export { closed, readingOf, readsUnknownAs, withCatchAll, type SetReading } from './wire/reading';

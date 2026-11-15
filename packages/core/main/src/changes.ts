@@ -20,6 +20,10 @@
  *     waiting for its scripts). Any later stage sends the open holds first, so
  *     send order is always staging order;
  *   - a group makes everything staged inside it, by any plugin, one change.
+ *
+ * A change one of the engine's own verbs makes (an import) has no ops. It is
+ * staged with how to send it, takes its place in the order like any change,
+ * and shows nothing until the engine's events arrive.
  */
 import {
   generateUuidV7,
@@ -112,21 +116,44 @@ export type StagedChange =
       readonly undoOf: string;
       /** What the views show until the engine answers. */
       readonly shows: readonly PredictedOp[];
+    }
+  | {
+      readonly label: ChangeLabel;
+      /**
+       * A change one of the engine's own verbs makes (an import), in place of ops: called when
+       * the change is sent, with the `opId` the verb must run under. It resolves the verb's
+       * result as a change's answer. Nothing shows until the engine's events arrive, and
+       * undoing it shows the same way. Refused inside a group.
+       */
+      readonly send: SendChange;
+      /** The id the caller of the verb chose, when it chose one; minted otherwise. */
+      readonly opId?: string;
+      /** `false`: not a step of the history, such as what an app loads as a document opens. */
+      readonly history?: false;
     };
+
+/** How a change one of the engine's own verbs makes is sent: the verb's call, under `opId`. */
+export type SendChange = (
+  doc: DocumentHandle,
+  write: { readonly opId: string },
+) => PromiseLike<ChangeResult>;
 
 /** A change of this session the engine hasn't answered yet. */
 export interface PendingChange {
   /** Its name: what the engine's events carry as `origin.tx.id`, and what `undoOf` names. */
   readonly opId: string;
   readonly label: ChangeLabel;
-  /** For an undo: the `opId` of the change it undoes. `null` for a change of ops. */
+  /** For an undo: the `opId` of the change it undoes. `null` for every other change. */
   readonly undoOf: string | null;
   /**
    * A held change's `merge` key: consecutive changes with the same key are one step of the
    * history (the pauses of one typing session). `null` for every other change.
    */
   readonly merge: string | null;
-  /** What the views show until the engine answers: its ops, or an undo's prediction. */
+  /**
+   * What the views show until the engine answers: its ops, or an undo's prediction. Empty for
+   * a change one of the engine's verbs makes.
+   */
   readonly shows: readonly PredictedOp[];
   /** What undoing it looks like (drawing only); empty when the stager gave none. */
   readonly undo: readonly PredictedOp[];
@@ -174,7 +201,9 @@ export interface ChangeQueue {
   /**
    * Stage one user action. Every mirror's view shows it before this returns, and it is sent
    * after everything staged before it; an open hold is sent first. Inside a group it joins the
-   * group's change, and the group's change is what it returns.
+   * group's change, and the group's change is what it returns. Throws `invalid-input` for a
+   * change with no ops, for an `opId` a change on its way has, and inside a group for an undo
+   * or a change with `send`.
    */
   stage(change: StagedChange): PendingChange;
   /**
@@ -234,9 +263,11 @@ interface Entry {
   readonly seq: number;
   readonly opId: string;
   readonly label: ChangeLabel;
-  /** The engine's ops; `null` for an undo. */
+  /** The engine's ops; `null` for an undo, and for a change one of the engine's verbs makes. */
   ops: readonly ChangeOp[] | null;
   readonly undoOf: string | null;
+  /** How a change one of the engine's verbs makes is sent; `null` for every other change. */
+  readonly verb: SendChange | null;
   readonly merge: string | null;
   shows: readonly PredictedOp[];
   undo: readonly PredictedOp[];
@@ -295,6 +326,9 @@ export function createDocumentChanges(options: {
     label: ChangeLabel;
     ops: readonly ChangeOp[] | null;
     undoOf: string | null;
+    verb?: SendChange;
+    /** The id its stager chose; minted when absent. */
+    opId?: string;
     merge?: string | null;
     shows: readonly PredictedOp[];
     undo: readonly PredictedOp[];
@@ -312,9 +346,10 @@ export function createDocumentChanges(options: {
     result.catch(() => {});
     return {
       ...init,
+      verb: init.verb ?? null,
       merge: init.merge ?? null,
       seq: nextSeq++,
-      opId: generateUuidV7(),
+      opId: init.opId ?? generateUuidV7(),
       result,
       answered: false,
       abort: null,
@@ -372,7 +407,10 @@ export function createDocumentChanges(options: {
     entry.held = false;
     let answer: PromiseLike<ChangeResult> & { abort?: (reason?: unknown) => void };
     try {
-      answer = handleFor(entry.capability).apply(changeOf(entry), { opId: entry.opId });
+      const handle = handleFor(entry.capability);
+      answer = entry.verb
+        ? entry.verb(handle, { opId: entry.opId })
+        : handle.apply(changeOf(entry), { opId: entry.opId });
     } catch (error) {
       refused(entry, toPluginError(entry.capability, error));
       return;
@@ -440,6 +478,17 @@ export function createDocumentChanges(options: {
       assertOpen(capability);
       if ('undoOf' in change) {
         if (grouping) throw invalid(capability, 'an undo can not join a group');
+      } else if ('send' in change) {
+        if (grouping) {
+          throw invalid(
+            capability,
+            "a change one of the engine's verbs makes can not join a group",
+          );
+        }
+        // Each change on its way is told from the others by its `opId`.
+        if (change.opId !== undefined && entries.some((entry) => entry.opId === change.opId)) {
+          throw invalid(capability, `a change with the opId '${change.opId}' is on its way`);
+        }
       } else if (change.ops.length === 0) {
         throw invalid(capability, 'a change needs at least one op');
       } else if (grouping) {
@@ -458,16 +507,29 @@ export function createDocumentChanges(options: {
               held: false,
               capability,
             })
-          : createEntry({
-              label: change.label,
-              ops: change.ops,
-              undoOf: null,
-              shows: change.ops,
-              undo: change.undo ?? [],
-              history: change.history !== false,
-              held: false,
-              capability,
-            });
+          : 'send' in change
+            ? createEntry({
+                label: change.label,
+                ops: null,
+                undoOf: null,
+                verb: change.send,
+                opId: change.opId,
+                shows: [],
+                undo: [],
+                history: change.history !== false,
+                held: false,
+                capability,
+              })
+            : createEntry({
+                label: change.label,
+                ops: change.ops,
+                undoOf: null,
+                shows: change.ops,
+                undo: change.undo ?? [],
+                history: change.history !== false,
+                held: false,
+                capability,
+              });
       entries.push(entry);
       changed();
       staged.emit(entry);

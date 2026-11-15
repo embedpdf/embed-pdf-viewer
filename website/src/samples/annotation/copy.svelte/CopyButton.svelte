@@ -1,4 +1,4 @@
-<!-- A read passed to create() makes the same annotation again, here on the next page. -->
+<!-- duplicate() copies the selected annotation, here onto the next page. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
@@ -20,11 +20,12 @@
   async function copyToNextPage() {
     if (!first || !next) return;
     const target = next;
-    const copy = annotation.get(first.ref)!;
-    const { annotation: made } = await annotation.create(target.ref, copy, undefined, {
+    const { annotations } = await annotation.duplicate([first.ref], {
+      page: target.ref,
       select: true, // so the next click copies the copy, a page further
     });
-    stage.reveal(target.ref, { rect: made.rect });
+    const [made] = annotations;
+    if (made) stage.reveal(target.ref, { rect: made.rect });
     status = `Copied to page ${target.index + 1}`;
   }
 </script>

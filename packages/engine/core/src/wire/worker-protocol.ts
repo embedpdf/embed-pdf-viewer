@@ -578,6 +578,8 @@ export interface DocumentApplyChangesWorkerRequest {
   changes: ServerChange[];
   /** See `WriteJobFields.objectNumberFloor`. */
   objectNumberFloor?: number;
+  /** The limits a copy inside the document must stay within; the defaults otherwise. */
+  limits?: BundleLimits;
   artifactPath?: string;
 }
 

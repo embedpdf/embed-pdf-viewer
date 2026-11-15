@@ -1,8 +1,8 @@
 {
   "name": "@embedpdf/engine",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
-  "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
+  "description": "The EmbedPDF engine: opens, renders, searches, edits and saves PDF files in the browser and in Node, with one typed API.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -24,6 +24,11 @@
     "./worker-source": {
       "types": "./workers/embedpdf-worker.source.d.ts",
       "default": "./workers/embedpdf-worker.source.js"
+    },
+    "./dev-wasm": {
+      "types": "./workers/dev-wasm.d.ts",
+      "development": "./workers/dev-wasm.js",
+      "default": "./workers/dev-wasm.none.js"
     },
     "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
     "./workers/encoder-worker.js": "./workers/encoder-worker.js",
@@ -105,6 +110,11 @@
         "types": "./workers/embedpdf-worker.source.d.ts",
         "default": "./workers/embedpdf-worker.source.js"
       },
+      "./dev-wasm": {
+        "types": "./workers/dev-wasm.d.ts",
+        "development": "./workers/dev-wasm.js",
+        "default": "./workers/dev-wasm.none.js"
+      },
       "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
       "./workers/encoder-worker.js": "./workers/encoder-worker.js",
       "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
@@ -114,13 +124,15 @@
     "rawExports": [
       "./worker-entry",
       "./worker-source",
+      "./dev-wasm",
       "./workers/embedpdf-worker.js",
       "./workers/encoder-worker.js",
       "./workers/inline-transport.node.js"
     ],
     "devExports": "development",
     "neverBundle": [
-      "#inline-transport"
+      "#inline-transport",
+      "@embedpdf/engine/dev-wasm"
     ],
     "conditions": {
       ".": {

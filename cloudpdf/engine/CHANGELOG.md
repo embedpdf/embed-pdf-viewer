@@ -1,5 +1,15 @@
 # @cloudpdf/engine
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – The cloud engine has `doc.annotations.copy(refs, { page?, offset?, objectNumbers? })`, and `doc.apply` takes the op `annotations.copy`. The copies are made on the server in one request, so nothing is downloaded. Against a server older than 3.2 the change is refused with `NotImplemented` before anything is sent.
+
+- [#1056](https://github.com/embedpdf/embed-pdf-viewer/pull/1056) by [@bobsingor](https://github.com/bobsingor) – The cloud engine works with a server that is older or newer than it for change kinds. A change with a kind of op the server doesn't have yet is refused on its own, before anything is sent, with `NotImplemented`; its `details` name the op (`kind`), the version that has it (`needs`) and the server's (`serverVersion`). The changes called beside it still go out. A change from another session of a kind this version doesn't know now reads as `stream.desynced` with `reason: 'unknown-change'`, so everything is read again; before, it became an event without a type and reads stayed stale.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – The cloud engine has `doc.forms.copy(fields, { page?, offset?, values?, widgets?, objectNumbers? })`, and `doc.apply` takes the op `forms.copy`. The copies are made on the server in one request. Against a server older than 3.2 the change is refused with `NotImplemented` before anything is sent.
+
 ## 3.1.0
 
 ### Minor Changes

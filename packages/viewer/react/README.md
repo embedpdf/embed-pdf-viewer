@@ -1,11 +1,28 @@
+<!-- Generated from docs/content/viewer/quick-start.mdx and docs/content/viewer/features/index.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/viewer-react
 
-The full EmbedPDF viewer as a React component: a thin wrapper around the
-`<embedpdf-viewer>` custom element from [`@embedpdf/viewer`](https://www.npmjs.com/package/@embedpdf/viewer).
+A complete PDF viewer as a React component: toolbars, annotations, forms and signatures, with the PDF engine built in.
 
-```bash
+## Quick start
+
+This guide adds the viewer to your app, then makes it yours in four small steps. Each step works on
+its own, so stop whenever it's enough.
+
+### 1. Install
+
+```sh
 npm install @embedpdf/viewer-react
 ```
+
+The package brings everything: the toolbar and panels, the PDF engine, and its WebAssembly, which
+your build serves from your own site.
+
+### 2. Show a PDF
+
+Give the viewer a document and a height:
+
+**`first.tsx`**
 
 ```tsx
 import { PDFViewer } from '@embedpdf/viewer-react';
@@ -15,66 +32,44 @@ export function App() {
 }
 ```
 
-No engine or wasm configuration is needed: the built-in local engine (PDFium
-compiled to WebAssembly, running in a Web Worker) is the default, and your
-bundler ships `embedpdf.wasm` inside your own build. Self-hosting, strict-CSP
-worker delivery, and injecting a different engine implementation are all
-available through the `engine` prop — see the docs.
+The viewer fills the box you give it, so it needs a height: a fixed one, `100vh`, or the rest of a
+flex layout. People can now scroll, zoom, search, select text, annotate, fill in forms, sign and
+download.
 
-## Your own components
+## All features
 
-`ToolbarItem`, `Panel` and `Region` put your component in the place the layout
-makes for it, while it stays in **your** React tree — your context, your
-state, your CSS:
+Most features are on from the start; measuring, redaction, building forms and snapshots wait until
+you turn them on. Turn features on or off with `features`, by the name in the first column:
 
-```tsx
-<PDFViewer
-  src="https://www.embedpdf.com/pdfs/welcome.pdf"
-  layout={(layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' })}
->
-  <ToolbarItem id="doc-picker">
-    <MyDocPicker />
-  </ToolbarItem>
-</PDFViewer>
+```js
+{ features: { measurement: true, redaction: true, comments: false } }
 ```
 
-`useToolbarItem()` tells it where it sits, and `Button`, `Menu`, `MenuItem` and
-`Icon` are the viewer's own, for yours.
-
-## Driving the viewer
-
-```tsx
-<PDFViewer
-  src="https://www.embedpdf.com/pdfs/welcome.pdf"
-  onReady={(viewer) => viewer.commands.execute('zoom:in')}
-/>
-```
-
-`onReady` hands you the `viewer`: each plugin's API by its name
-(`viewer.get('search')`, or its token), `viewer.documents`, `viewer.commands`
-and the `watch` reactivity primitive. Inside the viewer, a component of yours
-gets it with `usePDFViewer()`, and `useCommand(id)` gives it a command as a
-button needs it (label, icon, shortcut, state and `run()`). The headless hooks
-of `@embedpdf/react` work there too. When the viewer unmounts, its `viewer` is
-done: its listeners stop and its calls refuse.
-
-`plugins` takes each plugin's settings by its name
-(`plugins={{ stage: { spread: 'odd' } }}`), and a plugin of your own by a name
-`viewer.get()` then finds it under.
-
-`src`, `theme`, `locale`, `features`, `readOnly` and `fetch` follow their props
-while the viewer runs; every other prop is read once, so give the viewer a new `key` to
-start over with a changed one.
-
-## Server-side rendering
-
-The package is a client component (`'use client'`) and safe to import on the
-server, where `<PDFViewer>` renders the empty `<embedpdf-viewer>` element; the
-viewer starts in the browser.
+| Feature       | What people can do                                                                           | On from the start | Settings                                                                                                  |
+| :------------ | :------------------------------------------------------------------------------------------- | :---------------- | :-------------------------------------------------------------------------------------------------------- |
+| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts           | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations)                            |
+| `shapes`      | Draw rectangles, circles, lines, arrows and polygons                                         | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations#the-tools)                  |
+| `comments`    | Comment on annotations and reply, in a panel with every thread                               | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations#comments)                   |
+| `stamps`      | Place stamps: the standard ones, their own, or images                                        | yes               | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations#stamps)                     |
+| `signatures`  | Draw, type or upload a signature; sign fields; check signatures                              | yes               | [Forms & signatures](https://www.embedpdf.com/docs/viewer/react/features/forms-and-signatures#signatures) |
+| `forms`       | Fill in forms; build them in the Form mode                                                   | Filling only      | [Forms & signatures](https://www.embedpdf.com/docs/viewer/react/features/forms-and-signatures)            |
+| `redaction`   | Mark text and areas, then remove them from the file for good                                 | no                | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations#redaction)                  |
+| `measurement` | Measure distances, perimeters and areas at the drawing's scale                               | no                | [Annotations](https://www.embedpdf.com/docs/viewer/react/features/annotations#measurements)               |
+| `pages`       | Rotate, move, insert, duplicate and delete pages in the thumbnails panel, each step undoable | yes               | [Panels](https://www.embedpdf.com/docs/viewer/react/customize/panels#organize-pages)                      |
+| `attachments` | See, save, attach and remove files inside the PDF                                            | yes               | [Panels](https://www.embedpdf.com/docs/viewer/react/customize/panels#the-attachments)                     |
+| `search`      | Find text, with every match highlighted and listed                                           | yes               | [`plugins.search`](https://www.embedpdf.com/docs/headless/react/text/search#settings)                     |
+| `text`        | Select and copy text                                                                         | yes               | [`plugins.selection`](https://www.embedpdf.com/docs/headless/react/text/selection#settings)               |
+| `snapshots`   | Copy or save part of a page as a picture                                                     | no                | [Documents](https://www.embedpdf.com/docs/viewer/react/documents#take-a-snapshot)                         |
+| `thumbnails`  | A picture of every page, to jump around                                                      | yes               | [Panels](https://www.embedpdf.com/docs/viewer/react/customize/panels)                                     |
+| `outline`     | The document's table of contents                                                             | yes               | [Panels](https://www.embedpdf.com/docs/viewer/react/customize/panels)                                     |
+| `documents`   | Open other files (with the local engine), download, print, several documents in tabs         | yes               | [Documents](https://www.embedpdf.com/docs/viewer/react/documents)                                         |
 
 ## Documentation
 
-Full guides and API reference: https://www.embedpdf.com/docs
+- [Quick start](https://www.embedpdf.com/docs/viewer/react/quick-start): Install the viewer, show a PDF, give it your color and your own button, put your own component in the toolbar, and talk to it from code.
+- [Setup](https://www.embedpdf.com/docs/viewer/react/setup): Sizing, server-side rendering, the engine, and several viewers on a page.
+- [Layout](https://www.embedpdf.com/docs/viewer/react/customize/layout): Toolbars at the bottom, on the side, floating, or several at once.
+- [Theming](https://www.embedpdf.com/docs/viewer/react/customize/theming): Your colors, light and dark, and the look of every part.
 
 ## License
 

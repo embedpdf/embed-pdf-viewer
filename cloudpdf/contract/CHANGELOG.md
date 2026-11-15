@@ -1,5 +1,13 @@
 # @cloudpdf/contract
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – The contract has the change op `annotations.copy` (`refs`, `page`, `offset`, `objectNumbers`) and its result item (`annotations`, `refMap`, `dropped`, `meta`). `openapi.json` describes both.
+
+- [#1075](https://github.com/embedpdf/embed-pdf-viewer/pull/1075) by [@bobsingor](https://github.com/bobsingor) – The contract has the change op `forms.copy` (`fields`, `widgets`, `page`, `offset`, `values`, `objectNumbers`) and its result item (`fields`, `widgets`, `refMap`, `dropped`, `calculationOrder`, `meta`). `openapi.json` describes both.
+
 ## 3.1.0
 
 ### Minor Changes

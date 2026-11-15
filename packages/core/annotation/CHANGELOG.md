@@ -1,5 +1,11 @@
 # @embedpdf/core-annotation
 
+## 3.2.0
+
+### Minor Changes
+
+- [#1071](https://github.com/embedpdf/embed-pdf-viewer/pull/1071) by [@bobsingor](https://github.com/bobsingor) – New `isMovable(record)`: whether an annotation is one people move at all. Its kind moves, and it isn't bound to text, as a highlight or a redaction of words is. `canMove(model, id)` uses it, and adds the lock, the session's rights and its `editable` rule.
+
 ## 3.1.0
 
 ### Patch Changes

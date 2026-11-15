@@ -1,6 +1,7 @@
 import {
   EngineError,
   EngineErrorCode,
+  type BundleLimits,
   type ChangeAuthority,
   type ChangeItem,
   type ChangeItemType,
@@ -21,6 +22,12 @@ export interface ChangeContext {
   /** Who the change acts for: each op and step is checked against it. */
   readonly authority: ChangeAuthority;
   readonly signal: AbortSignal;
+  /**
+   * The deployment's bundle limits. An op that copies inside the document
+   * (`annotations.copy`, `forms.copy`) carries what a bundle may, and is
+   * refused past them.
+   */
+  readonly limits: BundleLimits;
   /**
    * Whether the change fills in a field the caller may fill (an undo: puts
    * one back). Then a field a script calculates, or shows or hides, may be

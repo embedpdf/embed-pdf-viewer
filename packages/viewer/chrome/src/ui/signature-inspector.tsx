@@ -19,6 +19,7 @@ import {
   type FormFieldRef,
   type SignatureVerdict,
 } from '@embedpdf/react/signature';
+import { useFormatLocale } from '../format-locale';
 import { Icon } from './icons';
 
 const verdictKey = (verdict: SignatureVerdict | null): string =>
@@ -34,11 +35,10 @@ const verdictKey = (verdict: SignatureVerdict | null): string =>
             : 'demo.verdictInvalid'
           : 'demo.verdictIndeterminate';
 
-/** A PDF date string (`D:YYYYMMDDHHmmSSZ` or with a zone offset) as a locale date; the raw text when it is not one. */
-/** A moment in the reader's locale; the text itself if it isn't one. */
-const dateTime = (iso: string): string => {
+/** A moment as the viewer's format language writes it; the text itself if it isn't one. */
+const dateTime = (iso: string, locale: string | undefined): string => {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(locale);
 };
 
 const tone = (summary: SignatureVerdict['summary'] | null): string =>
@@ -52,6 +52,7 @@ const tone = (summary: SignatureVerdict['summary'] | null): string =>
 
 export function SignatureInspector() {
   const t = useT();
+  const locale = useFormatLocale();
   const surface = useSurface('signature-inspector');
   const signature = useSignature();
   // Re-render when the signatures are read, and when one or its verdict changes.
@@ -109,7 +110,9 @@ export function SignatureInspector() {
         {row(t('demo.inspectSigner'), dto.signer.name ?? '—')}
         {dto.signer.reason ? row(t('demo.inspectReason'), dto.signer.reason) : null}
         {dto.signer.location ? row(t('demo.inspectLocation'), dto.signer.location) : null}
-        {dto.signer.signedAt ? row(t('demo.inspectTime'), dateTime(dto.signer.signedAt)) : null}
+        {dto.signer.signedAt
+          ? row(t('demo.inspectTime'), dateTime(dto.signer.signedAt, locale))
+          : null}
       </div>
       <div className="border-border-subtle mt-2 flex flex-col gap-1 border-t pt-2">
         {row(

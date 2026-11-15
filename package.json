@@ -30,7 +30,9 @@
     "ci:publish": "node scripts/assert-publish-phase.mjs && node fern/scripts/validate-sdk.mjs typescript && pnpm publish -r --access public --publish-branch main --report-summary",
     "check:network-literals": "node tooling/build/src/check-network-literals.mjs",
     "api:snapshot": "node tooling/build/src/api-snapshot.mjs",
-    "api:check": "node tooling/build/src/api-snapshot.mjs --check"
+    "api:check": "node tooling/build/src/api-snapshot.mjs --check",
+    "readme:sync": "pnpm --filter @embedpdf/docs-content readmes",
+    "readme:check": "pnpm --filter @embedpdf/docs-content readmes --check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

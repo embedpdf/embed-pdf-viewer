@@ -1,4 +1,4 @@
-<!-- A read passed to create() makes the same annotation again, here on the next page. -->
+<!-- duplicate() copies the selected annotation, here onto the next page. -->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
@@ -23,11 +23,12 @@ async function copyToNextPage() {
   const source = first.value;
   const target = next.value;
   if (!source || !target) return;
-  const copy = annotation.get(source.ref)!;
-  const { annotation: made } = await annotation.create(target.ref, copy, undefined, {
+  const { annotations } = await annotation.duplicate([source.ref], {
+    page: target.ref,
     select: true, // so the next click copies the copy, a page further
   });
-  stage.reveal(target.ref, { rect: made.rect });
+  const [made] = annotations;
+  if (made) stage.reveal(target.ref, { rect: made.rect });
   status.value = `Copied to page ${target.index + 1}`;
 }
 </script>

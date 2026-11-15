@@ -267,7 +267,7 @@ describe('<epdf-form-layer> field pictures', () => {
       });
       const checkKey = annotationKey(check!.ref);
       expect(pictures()).toEqual([`blob:${annotationKey(text!.ref)}:null`, `blob:${checkKey}:Off`]);
-      // Placed by the box the engine drew it into, in page pixels.
+      // Placed at its widget's box, in page pixels.
       expect((images()[1] as HTMLElement).style.top).toBe('140px');
 
       // A click activates the widget once its write is answered: waited for, so it runs before the page goes.
@@ -281,6 +281,18 @@ describe('<epdf-form-layer> field pictures', () => {
         expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`);
       });
       await vi.waitFor(() => expect(activated).toHaveBeenCalled());
+      expect(fetches.mock.calls.length).toBe(asked);
+
+      // A move takes the picture along: it is drawn where the widget is now, not where the
+      // engine drew it, and nothing is fetched.
+      await form.updateWidget(check!.ref, { rect: { x: 300, y: 400, width: 14, height: 14 } });
+      const moved = () => (images()[1] as HTMLElement).style;
+      await vi.waitFor(async () => {
+        await fixture.whenStable();
+        expect(moved().top).toBe('400px');
+      });
+      expect(moved().left).toBe('300px');
+      expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`);
       expect(fetches.mock.calls.length).toBe(asked);
 
       // A fill shows at once: the painter draws the new value while the page's newer pictures

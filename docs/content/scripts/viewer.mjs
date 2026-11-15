@@ -15,7 +15,6 @@
  * A staged file keeps its page's line numbers: what the check adds goes on lines the page's code
  * doesn't use, or is cut out of the column an error points at (`stagedText`).
  */
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -27,6 +26,7 @@ import {
   siteRequire,
   toPosix,
   VIEWER_CDN_URLS,
+  workspacePackages,
 } from './compile.mjs';
 
 // ── the names a page's code uses ────────────────────────────────────────────
@@ -658,28 +658,6 @@ function installedPackages(source) {
   for (const [, args] of source.matchAll(commands)) {
     for (const arg of args.trim().split(/\s+/)) {
       if (!arg.startsWith('-')) packages.push(arg.replace(/^(@?[^@]+)@.*$/, '$1'));
-    }
-  }
-  return packages;
-}
-
-/** This repository's packages, by name: whether each is published. */
-function workspacePackages() {
-  const listed = spawnSync(
-    'git',
-    ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'],
-    {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    },
-  );
-  const packages = new Map();
-  for (const file of listed.stdout.split('\n').filter(Boolean)) {
-    try {
-      const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8'));
-      if (manifest.name) packages.set(manifest.name, { published: manifest.private !== true });
-    } catch {
-      // A manifest that doesn't parse names nothing.
     }
   }
   return packages;

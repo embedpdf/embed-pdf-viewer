@@ -22,7 +22,7 @@ import { pdfPageCountOf } from './internal/write/stampDrawing';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
-import { annotationIndexByName } from './internal/read/annotationIndexByName';
+import { annotationIndexByName, nameTakenError } from './internal/read/annotationIndexByName';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
@@ -289,11 +289,7 @@ export class AnnotationBatchApplier {
       claimed.has(claim) ||
       annotationIndexByName(this.runtime, docPtr, record.pageIndex, nm) >= 0
     ) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `nm '${nm}' is already used on page ${record.pageObjectNumber}`,
-        { details: { field: 'nm' } },
-      );
+      throw nameTakenError(nm, record.pageObjectNumber);
     }
     claimed.add(claim);
   }

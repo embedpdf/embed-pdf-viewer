@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: StageSettings = {
   panFallback: true,
   zoomGestures: true,
   turnGestures: true,
+  scrollChaining: true,
   zoomBox: { fill: null, stroke: null },
   // Web: 1 PDF point = 96/72 CSS px, so 100% is physically accurate. A native
   // adapter overrides this at registration with its own logical-unit factor.
@@ -101,8 +102,9 @@ export const SETTINGS_EFFECT: Record<keyof StageSettings, SettingEffect> = {
   interaction: 'none',
   panFallback: 'none',
   zoomGestures: 'none',
-  // Read by the Stage's own pan verbs; the surface binding never sees it.
+  // Read by the Stage's own pan and wheel verbs; the surface binding never sees them.
   turnGestures: 'none',
+  scrollChaining: 'none',
   zoomBox: 'none', // paint only
   viewUnitsPerPoint: 'scene', // a layout input: changing it resizes every page
 };

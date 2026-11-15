@@ -6,6 +6,7 @@ import {
   annotationImportFacts,
   deletedAnnotationsOf,
   deletedFieldOf,
+  isSkippedItem,
   toPageRef,
   type AnnotationCreateResult,
   type AnnotationImportResult,
@@ -36,7 +37,11 @@ import {
   type FormFieldRef,
   type SignatureCompleteResult,
 } from '@embedpdf/engine-core/runtime';
-import { decodePrepared, type SignaturePreparedWire } from '@embedpdf/engine-core/wire';
+import {
+  decodePrepared,
+  isChangeKind,
+  type SignaturePreparedWire,
+} from '@embedpdf/engine-core/wire';
 
 /** The SSE `mutation` event body — the audit row in JSON (the server's
  *  `toJsonlEvent` shape). `payload` is byte-identical to what the mutating
@@ -69,9 +74,10 @@ export interface AuditEventRow {
  * import is one `annotations.created` per annotation, and a completed
  * signing is the signature and the new version. An undo's events name the
  * change it undid (`origin.undoOf`). Every event of a row shares `origin.transaction`,
- * its id the request's `Idempotency-Key`. Returns none for an own echo and for kinds
- * this engine version doesn't know (a newer server's events degrade to
- * "ignored", never to a crash).
+ * its id the request's `Idempotency-Key`. Returns none for an own echo, and
+ * `null` for a row this engine version can't read: a kind of row, or of
+ * change item, that a newer server has. Nothing says what such a row
+ * changed, so the caller reads the document again.
  *
  * A page name write's row is a `pages.reorder` that moved no page: its
  * payload is the result, as the originator got it, with the new `layout`.
@@ -79,7 +85,7 @@ export interface AuditEventRow {
  * The audit row keys pages by object number (its storage identity); the
  * event carries them as `PageRef` addresses, like every other event.
  */
-export function auditRowToEvents(row: AuditEventRow, mySessionId: string): DocumentEvent[] {
+export function auditRowToEvents(row: AuditEventRow, mySessionId: string): DocumentEvent[] | null {
   if (row.originSessionId === mySessionId) return []; // own echo — local publish covered it
 
   const origin: EventOrigin = {
@@ -96,6 +102,7 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
   // Nothing this connection may read of a withheld row, only its pins: it
   // still says the fonts changed, which the list shows anyone.
   const facts = row.withheld ? [] : factsOf(row, origin);
+  if (facts === null) return null;
   // A write that changed the fonts the list shows ends with `fonts.changed`,
   // as locally: its delta moved the list's pin.
   const events: DocumentEvent[] =
@@ -115,13 +122,14 @@ function movesFonts(row: AuditEventRow): boolean {
   return meta?.cacheDelta?.fontsVersion !== undefined;
 }
 
-/** The events a row records, in order, or none for a kind this version doesn't know. */
-function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
+/** The events a row records, in order, or `null` for a row this version can't read. */
+function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] | null {
   if (row.kind === 'change') {
+    const result = row.payload as ChangeResult;
+    // What an undo left alone publishes nothing, whatever kind it names.
+    if (result.items.some((item) => !isSkippedItem(item) && !isChangeKind(item.type))) return null;
     // A change is the events its items publish, in op order, as locally.
-    return changeEvents(row.payload as ChangeResult).map(
-      (event) => ({ ...event, origin }) as DocumentEvent,
-    );
+    return changeEvents(result).map((event) => ({ ...event, origin }) as DocumentEvent);
   }
   if (row.kind === 'annot.import') {
     return annotationImportFacts(row.payload as AnnotationImportResult).map((fact) => ({
@@ -164,11 +172,15 @@ function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
     ];
   }
   const event = eventOf(row, origin);
+  if (event === undefined) return null;
   return event ? [event] : [];
 }
 
-/** The one event a single-fact row records, or `null` for a kind this version doesn't know. */
-function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null {
+/**
+ * The one event a single-fact row records; `null` for a row with nothing to
+ * tell; `undefined` for a kind this version doesn't know.
+ */
+function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null | undefined {
   // The row's page: its explicit column, else the first affected page.
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
 
@@ -280,6 +292,6 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         signingId: (row.payload as { signingId: string }).signingId,
       };
     default:
-      return null;
+      return undefined;
   }
 }

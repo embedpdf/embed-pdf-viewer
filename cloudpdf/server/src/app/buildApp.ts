@@ -206,8 +206,8 @@ export interface BuildAppOptions {
   /** Override Fastify body limit. Defaults to 50 MiB. */
   bodyLimit?: number;
   /**
-   * How large an annotation bundle may be, exported or imported. Defaults to
-   * `DEFAULT_BUNDLE_LIMITS`.
+   * How large an annotation bundle may be, exported or imported, and how much
+   * a copy inside a document may carry. Defaults to `DEFAULT_BUNDLE_LIMITS`.
    */
   bundleLimits?: BundleLimits;
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
@@ -1496,7 +1496,11 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         bundleLimits: opts.bundleLimits ?? DEFAULT_BUNDLE_LIMITS,
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
-      await registerChangeRoutes(app, { documentService, layerService });
+      await registerChangeRoutes(app, {
+        documentService,
+        layerService,
+        ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
+      });
       await registerDocsRoutes(app, {
         service: documentService,
         ...(signer ? { sign: signer } : {}),

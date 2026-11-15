@@ -43,6 +43,18 @@ export const OBJECT_NUMBER_ESTIMATES = {
   copiedPages: (count: number) => 1_024 + 256 * count,
   /** Embedded files: a file specification and its stream each. */
   embeddedFiles: (count: number) => 2 * count,
+  /**
+   * Copies of the document's annotations. A copy makes two objects (itself
+   * and its appearance), a redaction three and a file attachment four; a
+   * stamp places the drawing its source places. Twice the most, each.
+   */
+  copiedAnnotations: (count: number) => 8 * count,
+  /**
+   * Copies of the document's form fields. A copy makes its field, and for
+   * each widget the widget and its appearances: a text field four objects, a
+   * checkbox six, a radio group about five a button. Room for a group of six.
+   */
+  copiedFields: (count: number) => 32 * count,
 } as const;
 
 /**

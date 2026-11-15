@@ -359,3 +359,61 @@ describe.each(DESIGNS)('design: $name', (design) => {
     }
   });
 });
+
+/**
+ * An import is a change the engine's own verb makes. Nothing shows for it before the engine
+ * answers; the history keeps it as one step, unless its caller says it isn't one.
+ */
+describe('design: import a bundle of fields', () => {
+  /** The checkbox as a bundle, and the form without it. */
+  const start = async (booted: Booted) => {
+    const bundle = await booted.form.export({ fields: [ref('agree')] });
+    await booted.form.delete(ref('agree'));
+    await booted.shapeCaughtUp();
+    booted.history.clear();
+    return { bundle, before: await booted.shapeTruth() };
+  };
+
+  it('is one step: an undo takes the fields away, a redo brings them back', async () => {
+    const booted = await boot();
+    try {
+      const { bundle, before } = await start(booted);
+      const { fields } = await booted.form.import(bundle);
+      expect(fields.map((field) => field.name)).toEqual(['agree']);
+      await booted.shapeCaughtUp();
+      const after = await booted.shapeTruth();
+      expect(after).not.toEqual(before);
+      expect(booted.history.getUndoLabel()).toEqual({ key: 'form.import' });
+
+      const undone = booted.answeredStep();
+      booted.history.undo();
+      await undone;
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).toEqual(before);
+      expect(booted.shape()).toEqual(before);
+      expect(booted.history.canUndo()).toBe(false);
+
+      const redone = booted.answeredStep();
+      booted.history.redo();
+      await redone;
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).toEqual(after);
+      expect(booted.shape()).toEqual(after);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('is no step with `history: false`: an undo leaves it alone', async () => {
+    const booted = await boot();
+    try {
+      const { bundle, before } = await start(booted);
+      await booted.form.import(bundle, { history: false });
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).not.toEqual(before);
+      expect(booted.history.canUndo()).toBe(false);
+    } finally {
+      await booted.destroy();
+    }
+  });
+});

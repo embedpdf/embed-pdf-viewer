@@ -108,6 +108,7 @@ export const zhTW: Locale = {
         saveFile: '儲存檔案',
         removeLink: '移除連結',
         delete: '刪除',
+        duplicate: '建立副本',
         group: '群組',
         ungroup: '取消群組',
         stampFromSelection: '建立圖章',
@@ -496,6 +497,7 @@ export const zhTW: Locale = {
       box: '核取方塊 {number}',
       addButton: '新增按鈕',
       addBox: '新增核取方塊',
+      duplicateGroup: '建立群組副本',
     },
     // The style panel's own words around the properties.
     stylePanel: {

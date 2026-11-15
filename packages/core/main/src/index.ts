@@ -22,6 +22,7 @@ export type {
   HoldOptions,
   PendingChange,
   PredictedOp,
+  SendChange,
   SettledChange,
   StagedChange,
 } from './changes';

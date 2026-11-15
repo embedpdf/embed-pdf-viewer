@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-measurement",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": false,
   "description": "Page calibration and distance measurement workflows for EmbedPDF.",
   "type": "module",

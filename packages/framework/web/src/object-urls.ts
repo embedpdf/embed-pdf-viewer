@@ -78,6 +78,10 @@ export interface AppearancePicture<Ref> {
 /** A picture's URL, the box it was rendered into, and the version of its item it shows. */
 export interface AppearanceUrl {
   url: string;
+  /**
+   * Where its item stood when the picture was loaded. An item that moves keeps its picture, so
+   * draw the picture where the item is now, not here.
+   */
   box: { x: number; y: number; width: number; height: number };
   version: number;
 }

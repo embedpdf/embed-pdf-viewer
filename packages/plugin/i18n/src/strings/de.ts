@@ -21,6 +21,7 @@ export const de: EmbedpdfStrings = {
     },
     selection: { copy: 'Kopieren' },
     annotation: { delete: 'Löschen' },
+    history: { undo: 'Rückgängig', redo: 'Wiederholen' },
     document: { download: 'Herunterladen', print: 'Drucken' },
     snapshot: { copy: 'Kopieren', save: 'Bild speichern', clear: 'Schnappschuss verwerfen' },
     tool: {

@@ -67,7 +67,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -149,7 +149,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -232,7 +232,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -319,7 +319,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -413,7 +413,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -490,7 +490,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -564,7 +564,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -651,7 +651,7 @@ export class DocumentsClient {
             _authRequest.headers,
             this._options?.headers,
             mergeOnlyDefinedHeaders({
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
                 ..._maybeEncodedRequest.headers,
             }),
             requestOptions?.headers,
@@ -753,7 +753,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -850,7 +850,7 @@ export class DocumentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

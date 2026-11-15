@@ -1,11 +1,16 @@
 /**
  * Page turns in paged flow: a push past the edge of the page turns it, read
  * off what the host port reports (pans, the drag bracket, the release fling).
- * A push is the part of a pan the clamp refused. A stream is one drag, or the
- * pans between two pauses (a wheel or trackpad gesture with its momentum). A
- * stream turns only at an edge it began at, so reading down to the bottom
- * stops there, and it turns once: the rest of it is spent, so momentum never
- * scrolls the page that just arrived.
+ * A push is the part of a pan the clamp refused. A stream is one drag, or one
+ * push of a wheel or trackpad with its momentum: the pans up to the next
+ * pause, or up to the next push the wheel tells while the last still coasts
+ * (`camera/wheel.ts`). A stream turns only at an edge it began at, so reading
+ * down to the bottom stops there, and it turns once: the rest of it is spent,
+ * so momentum never scrolls the page that just arrived.
+ *
+ * In every flow it also says whether a push has anywhere to go, which is how
+ * the wheel tells a stream of its own from one for the page around the viewer
+ * (`camera/wheel.ts`).
  */
 import type { Cancel, PluginContext } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
@@ -20,7 +25,7 @@ const TURN_PUSH = 60;
 /** The release speed past an edge that turns the page, in screen px/s: a flick. */
 const TURN_FLICK = 600;
 /** The pause that ends a wheel or trackpad stream. */
-const QUIET_MS = 200;
+export const QUIET_MS = 200;
 
 type Axis = 'x' | 'y';
 
@@ -131,6 +136,13 @@ export function createTurns(
       // A wheel turns as soon as it has pushed far enough; a drag waits for its release.
       if (!dragging) turnPast(stream, stream.push, TURN_PUSH);
     },
+    /**
+     * A wheel or trackpad pushes anew while its last push still coasts: the
+     * next stream begins here, with no pause before it.
+     */
+    pushBegan: (): void => {
+      if (!dragging) stream = null;
+    },
     /** A drag begins: one stream for all of it, however long it holds still. */
     dragBegan: (): void => {
       if (!enabled()) return;
@@ -159,6 +171,18 @@ export function createTurns(
     flung: (velocity: Point): boolean => {
       if (!enabled() || !stream) return false;
       return stream.spent || turnPast(stream, ahead(velocity), TURN_FLICK);
+    },
+    /**
+     * Whether a push by `delta` (screen px) has anywhere to go along its longer
+     * axis: the camera can move that way, or a turn has a page to turn to.
+     */
+    leadsSomewhere: (delta: Point): boolean => {
+      const axis: Axis = Math.abs(delta.x) > Math.abs(delta.y) ? 'x' : 'y';
+      const toward = ahead(delta)[axis] > 0 ? 'next' : 'previous';
+      // An unbounded camera has no edges.
+      if (!state().bounded || !edgesNow()[toward][axis]) return true;
+      if (!enabled()) return false;
+      return toward === 'next' ? navigation.canGoNext() : navigation.canGoPrevious();
     },
   };
 }

@@ -28,14 +28,19 @@ import type { PropertyReads } from '../read/properties';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationContext } from '../services';
 import type { AnnotationServices } from '../services';
+import type { Crud } from './crud';
 import { appliedOrThrow, batchResultOf, throwIfFailed } from './outcomes';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit, type StoreChange } from '../services/store';
 
+/** How far a duplicate lands from its original, in page points. */
+const DUPLICATE_OFFSET = 10;
+
 /**
  * The selection: what is selected, and the verbs that change its fields,
- * link, delete, rotate, group and ungroup it as one, every member through the
- * same `update → patch effect` path a gesture takes. Each verb is one change.
+ * link, delete, rotate, group, ungroup and duplicate it as one, every member
+ * through the same `update → patch effect` path a gesture takes. Each verb is
+ * one change.
  */
 export function createSelectionWrites(
   ctx: Pick<AnnotationContext, 'pageOf' | 'getPage' | 'cancellable'>,
@@ -45,13 +50,46 @@ export function createSelectionWrites(
     fonts,
     behaviors,
     lending,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors' | 'lending'>,
+    geometry,
+  }: Pick<
+    AnnotationServices,
+    'store' | 'authority' | 'fonts' | 'behaviors' | 'lending' | 'geometry'
+  >,
   annotations: Pick<AnnotationReads, 'selectedRecords' | 'listSelected'>,
   properties: Pick<PropertyReads, 'activeTextRange' | 'activeCaret' | 'selectionPropertiesOf'>,
   chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
   text: Pick<TextEditing, 'type' | 'styleTyping'>,
+  crud: Pick<Crud, 'duplicate'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
+
+  /** `refs` as this plugin's own records and the lent ones (a form's widgets, in design mode). */
+  const byOwner = (
+    refs: readonly AnnotationRef[],
+  ): { own: AnnotationRef[]; lent: AnnotationRef[] } => {
+    const own: AnnotationRef[] = [];
+    const lent: AnnotationRef[] = [];
+    for (const ref of refs) (lending.owns(annotationKey(ref)) ? lent : own).push(ref);
+    return { own, lent };
+  };
+
+  /**
+   * Where copies of the selection land: right and down of the originals, or
+   * left or up where that keeps on its page a copy that would leave it.
+   */
+  const beside = (): { x: number; y: number } => {
+    const boxes = annotations.selectedRecords().flatMap(({ annotation }) => {
+      const page = geometry.pageBoxOf(annotation.page.objectNumber);
+      return page ? [{ rect: annotation.rect, page }] : [];
+    });
+    const flips = (axis: 'x' | 'y', size: 'width' | 'height'): boolean =>
+      boxes.some(({ rect, page }) => rect[axis] + rect[size] + DUPLICATE_OFFSET > page[size]) &&
+      boxes.every(({ rect }) => rect[axis] - DUPLICATE_OFFSET >= 0);
+    return {
+      x: flips('x', 'width') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
+      y: flips('y', 'height') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
+    };
+  };
 
   /** Commit a selection message; resolves with its outcome over the refs that were selected. */
   const commitOverSelection = async (commit: () => Commit[], signal?: AbortSignal) => {
@@ -250,6 +288,40 @@ export function createSelectionWrites(
           return ref != null && authority.allowsMutation('update', ref);
         })
       );
+    },
+    // The selection holds every member of a selected group, so its copies
+    // are a group of their own.
+    // A lent record (a form's widget) is its lender's to copy, in the same
+    // change: what a person does to the selection goes to each record's owner.
+    duplicate: (
+      options: OperationOptions & { offset?: { readonly x: number; readonly y: number } } = {},
+    ) => {
+      const { own, lent } = byOwner(selectedRefs());
+      return crud.duplicate(
+        own,
+        {
+          offset: options.offset ?? beside(),
+          select: true,
+          ...(options.signal ? { signal: options.signal } : {}),
+        },
+        lent,
+      );
+    },
+    canDuplicate: (): boolean => {
+      const { own, lent } = byOwner(selectedRefs());
+      if (!own.length && !lent.length) return false;
+      if (own.length && !authority.canDuplicate(own)) return false;
+      const lender = lending.lender();
+      const model = store.model();
+      // A locked copy could neither be moved nor deleted by hand, whoever owns it.
+      return lent.every((ref) => {
+        const record = model.byId[annotationKey(ref)];
+        return (
+          !!record &&
+          !record.annotation.locked &&
+          (lender?.getAuthority(record.annotation).copy ?? false)
+        );
+      });
     },
   };
 

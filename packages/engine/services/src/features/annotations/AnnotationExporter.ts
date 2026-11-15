@@ -19,12 +19,14 @@ import {
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { openAnnotRaw } from './internal/identity/resolveAnnotIndexRaw';
-import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
-import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
+import {
+  appearanceBytesOf,
+  attachedFileBytesOf,
+  isTooLarge,
+} from './internal/read/annotationResourceBytes';
 import { RawAnnotationReader } from './RawAnnotationReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import { extractAttachmentToBuffer } from '../attachments/internal/attachmentPrimitives';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { visibleBoxReader } from '../pages/PagesReader';
 import { bundlePagesOf } from '../transfer/bundlePages';
@@ -132,41 +134,28 @@ class ResourceCollector extends BundleResources {
   // A stamp placing a drawing exports the drawing, once however many stamps
   // place it; any other appearance exports as the page shows it.
   private appearanceOf(annotPtr: Ptr): ResourceId | null {
-    const { fn, mem } = this.runtime;
-    const drawing = fn.EPDFAnnot_GetStampDrawing(annotPtr);
+    const drawing = this.runtime.fn.EPDFAnnot_GetStampDrawing(annotPtr);
     const known = drawing ? this.drawings.get(drawing) : undefined;
     if (known) return known;
-    const exportedPtr = drawing
-      ? fn.EPDFDoc_ExportDrawing(this.session.requireDocPtr(), drawing)
-      : exportUnturnedAppearance(fn, mem, annotPtr);
-    if (!exportedPtr) return null;
-    try {
-      const id = this.keep(saveDocumentToBuffer(fn, mem, exportedPtr, 'a drawing').bytes);
-      if (drawing) this.drawings.set(drawing, id);
-      return id;
-    } finally {
-      fn.FPDF_CloseDocument(exportedPtr);
-    }
+    const bytes = appearanceBytesOf(this.runtime, this.session.requireDocPtr(), annotPtr, drawing);
+    if (!bytes) return null;
+    const id = this.keep(bytes);
+    if (drawing) this.drawings.set(drawing, id);
+    return id;
   }
 
   private fileOf(annotPtr: Ptr): ResourceId | null {
-    const attachmentPtr = this.runtime.fn.FPDFAnnot_GetFileAttachment(annotPtr);
-    if (!attachmentPtr) return null;
-    let bytes: ArrayBuffer;
+    let bytes: ArrayBuffer | null;
     try {
-      bytes = extractAttachmentToBuffer(
-        this.runtime,
-        attachmentPtr,
-        this.limits.resourceBytes,
-      ).bytes;
+      bytes = attachedFileBytesOf(this.runtime, annotPtr, this.limits.resourceBytes);
     } catch (error) {
-      if (!EngineError.is(error, EngineErrorCode.PayloadTooLarge)) throw error;
+      if (!isTooLarge(error)) throw error;
       throw new EngineError(
         EngineErrorCode.PayloadTooLarge,
         `the annotation bundle is past its resourceBytes limit: an attached file is larger than ${this.limits.resourceBytes}`,
         { details: { limit: 'resourceBytes', max: this.limits.resourceBytes } },
       );
     }
-    return this.keep(bytes);
+    return bytes ? this.keep(bytes) : null;
   }
 }

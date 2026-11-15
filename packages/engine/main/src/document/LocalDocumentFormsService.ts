@@ -14,6 +14,7 @@ import {
   type FieldPosition,
   type FormCalculationsReorderResult,
   type DocumentFormsService,
+  type FormChangeVerb,
   type FormBundle,
   type FormExportSelection,
   type FormFieldCreateResult,
@@ -65,7 +66,7 @@ interface DocClosedView {
  * form routes. The worker host fans out to `FormReader` / `FormMutator`,
  * which serve every read from the session's version-keyed form-model cache.
  */
-export class LocalDocumentFormsService implements DocumentFormsService {
+export class LocalDocumentFormsService implements Omit<DocumentFormsService, FormChangeVerb> {
   constructor(
     private readonly docId: string,
     private readonly queue: JobQueue,

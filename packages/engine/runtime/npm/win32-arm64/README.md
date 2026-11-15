@@ -1,3 +1,15 @@
+<!-- Generated from docs/content/engine/setup.local.mdx by docs/content/scripts/readmes.mjs. Edit there, then run `pnpm readme:sync`. -->
+
 # @embedpdf/engine-runtime-win32-arm64
 
-Platform package for `@embedpdf/engine-runtime`. Install `@embedpdf/engine-runtime` instead of depending on this package directly.
+The native build of the EmbedPDF engine's PDF runtime for Windows on ARM64.
+
+Part of [EmbedPDF](https://www.embedpdf.com). It comes with `@embedpdf/engine`, `@cloudpdf/engine`, `@cloudpdf/server`.
+
+## Documentation
+
+- [Setup](https://www.embedpdf.com/docs/engine/setup): Install the local engine, create it once for your app, and run it in any bundler, with server-side rendering, or in Node.
+
+## License
+
+Apache-2.0

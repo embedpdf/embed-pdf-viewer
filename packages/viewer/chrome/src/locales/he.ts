@@ -107,6 +107,7 @@ export const he: Locale = {
         saveFile: 'שמירת הקובץ',
         removeLink: 'הסר קישור',
         delete: 'מחק',
+        duplicate: 'שכפל',
         group: 'קבץ',
         ungroup: 'פרק קבוצה',
         stampFromSelection: 'צור חותמת',
@@ -495,6 +496,7 @@ export const he: Locale = {
       box: 'תיבה {number}',
       addButton: 'הוסף לחצן',
       addBox: 'הוסף תיבה',
+      duplicateGroup: 'שכפל קבוצה',
     },
     // The style panel's own words around the properties.
     stylePanel: {

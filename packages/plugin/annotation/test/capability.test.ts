@@ -4,8 +4,13 @@
  * take a page as a ref or an index, the drawing order, the transfers, what a
  * tool does after it creates, and the comment checks.
  */
-import { annotationKey, isPluginError, toPageRef } from '@embedpdf/core';
-import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, isPluginError, toPageRef, type PendingChange } from '@embedpdf/core';
+import {
+  EngineError,
+  EngineErrorCode,
+  type AnnotationFlags,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 import { annotationState } from '../src/state';
@@ -304,8 +309,51 @@ describe('transfers', () => {
     await harness.load([]);
     const bundle = { version: 1 } as never;
     const result = await harness.capability.import(bundle, { attribution: 'stamp' });
-    expect(harness.importBundle).toHaveBeenCalledWith(bundle, { attribution: 'stamp' });
+    expect(harness.importBundle).toHaveBeenCalledWith(bundle, {
+      attribution: 'stamp',
+      opId: expect.any(String),
+    });
     expect(result).toEqual({ annotations: [], refMap: [], dropped: [] });
+  });
+
+  it('import is one change on the queue: a step of the history, unless its caller says no', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const bundle = { version: 1 } as never;
+    const staged: PendingChange[] = [];
+    harness.ctx.changes.onStaged((change) => staged.push(change));
+
+    await harness.capability.import(bundle);
+    await harness.capability.import(bundle, { history: false, opId: 'load-on-open' });
+    expect(staged.map(({ label, history, opId }) => ({ label, history, opId }))).toEqual([
+      { label: { key: 'annotation.import' }, history: true, opId: expect.any(String) },
+      { label: { key: 'annotation.import' }, history: false, opId: 'load-on-open' },
+    ]);
+    // The engine's verb ran under each change's id; `history` stayed in the viewer.
+    expect(harness.importBundle.mock.calls.map(([, options]) => options)).toEqual([
+      { opId: staged[0]!.opId },
+      { opId: 'load-on-open' },
+    ]);
+    expect(harness.pending()).toEqual([]);
+  });
+
+  it('import rejects with the engine’s refusal, and when it is cancelled', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const bundle = { version: 1 } as never;
+    harness.importBundle.mockRejectedValueOnce(
+      new EngineError(EngineErrorCode.InvalidArg, 'not a bundle'),
+    );
+    await expect(harness.capability.import(bundle)).rejects.toMatchObject({
+      code: 'invalid-input',
+    });
+
+    const cancel = new AbortController();
+    cancel.abort();
+    await expect(
+      harness.capability.import(bundle, { signal: cancel.signal }),
+    ).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(harness.pending()).toEqual([]);
   });
 
   it('downloadResource reads a resource’s bytes, and refuses one that isn’t here', async () => {

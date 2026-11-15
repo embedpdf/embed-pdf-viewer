@@ -8,6 +8,12 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
  * Sizes are measured on the bundle itself, never on a file or request
  * carrying it: the manifest (its pages and rows as JSON) plus each
  * resource's bytes.
+ *
+ * A copy inside a document makes no bundle, and is held to these limits all
+ * the same. `annotations.copy` is held to `items`, `resources`,
+ * `resourceBytes` and `bundleBytes`: counted on the annotations it names and
+ * the drawings and files it reads. `forms.copy` is held to `items`, counted
+ * on the fields it names: a widget carries no bytes.
  */
 export interface BundleLimits {
   /** The manifest's bytes plus every resource's bytes. */

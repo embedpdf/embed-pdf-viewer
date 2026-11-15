@@ -63,6 +63,7 @@ function surfaceHarness(options: { hub?: boolean; source?: string } = {}) {
 
   const host = {
     panBy: vi.fn(),
+    wheelBy: vi.fn(() => true),
     zoomAround: vi.fn(),
     beginGesture: vi.fn(),
     endGesture: vi.fn(),

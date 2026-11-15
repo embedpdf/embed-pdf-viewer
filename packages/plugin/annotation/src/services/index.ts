@@ -7,6 +7,7 @@ import type { AnnotationSettings } from '../contract';
 import { createAuthority, type Authority } from './authority';
 import { createView, type View } from '../read/view';
 import type { AnnotationContext } from './context';
+import { createCopySources, type CopySources } from './copy-sources';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
 import { createPageLookup, type PageLookup } from './geometry';
@@ -36,6 +37,8 @@ export interface AnnotationServices {
   readonly view: View;
   /** A sibling's records shown and edited as annotations (the form plugin's widgets). */
   readonly lending: Lending;
+  /** Whose picture each copy this session staged shows until the engine has drawn it. */
+  readonly copySources: CopySources;
   /** The one door user actions go through. */
   readonly store: AnnotationStore;
   readonly geometry: PageLookup;
@@ -60,7 +63,8 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
   const records = createRecordsMirror(ctx, events);
   const lending = createLending(() => ctx.notify());
   const view = createView(ctx, records, lending);
-  const store = createStore(ctx, view, records, events, lending);
+  const copySources = createCopySources(records);
+  const store = createStore(ctx, view, records, events, lending, copySources);
   // The tools a document has are read once, when it opens.
   const tools = createToolRegistry(ctx, settings.get().tools, store, events);
   const fonts = createFontLookup(ctx);
@@ -70,6 +74,7 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
     records,
     view,
     lending,
+    copySources,
     store,
     geometry,
     authority: createAuthority(ctx, store),

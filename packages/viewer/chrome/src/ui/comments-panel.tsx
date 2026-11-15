@@ -14,9 +14,11 @@ import { StageToken } from '@embedpdf/react/stage';
 import { useCommand, useCommands, useCommandsSettings } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
 import { useLayoutEnv } from '../config-context';
+import { useFormatLocale } from '../format-locale';
 import { REVIEW_STATE_LABEL_KEYS, hasComment, reviewStateOf } from '../config/comments';
 import { Icon } from './icons';
 import { commentIconAccent, commentTypeConfig } from './comment-config';
+import { timestampFormat, timestampOf } from './timestamp';
 import { CommandButton, buttonClass, buttonPart } from './toolbar';
 import { TooltipButton, WithTooltip } from './tooltip';
 
@@ -50,12 +52,24 @@ import { TooltipButton, WithTooltip } from './tooltip';
  * no menu, no edit and no delete.
  */
 
-const dateLabel = (iso: string | null): string => {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
+/**
+ * When a comment was last changed: short in its row, and whole in its tooltip. Nothing for a
+ * comment that doesn't say.
+ */
+function CommentTime({ dto, className }: { dto: Annotation; className?: string }) {
+  const format = timestampFormat(useFormatLocale());
+  const moment = timestampOf(dto.modifiedAt ?? dto.createdAt);
+  if (!moment) return null;
+  return (
+    <WithTooltip content={{ label: format.full(moment) }}>
+      {(tooltip) => (
+        <time {...tooltip} dateTime={moment.toISOString()} className={className}>
+          {format.short(moment)}
+        </time>
+      )}
+    </WithTooltip>
+  );
+}
 
 /** Whether people write here: the `comments.writing` feature is on. */
 function useWriting(): boolean {
@@ -293,8 +307,9 @@ function ThreadCard({
             <div className="text-fg truncate text-sm font-medium">
               {view.root.author ?? t('comments.anonymous')}
             </div>
-            <div className="text-fg-muted flex items-center gap-1.5 text-xs">
-              <span>{dateLabel(view.root.modifiedAt ?? view.root.createdAt)}</span>
+            {/* The status moves under the time where the card is too narrow for both. */}
+            <div className="text-fg-muted flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+              <CommentTime dto={view.root} />
               {state !== 'none' && (
                 // Who set the status, in its tooltip.
                 <WithTooltip
@@ -401,12 +416,11 @@ function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
   return (
     <div className="border-border-subtle ms-1 border-s-2 ps-2">
       <div className="flex items-baseline gap-2">
-        <span className="text-fg-secondary text-xs font-medium">
+        {/* The time stays whole: a long name is the one cut short. */}
+        <span className="text-fg-secondary min-w-0 truncate text-xs font-medium">
           {dto.author ?? t('comments.anonymous')}
         </span>
-        <span className="text-fg-muted text-[11px]">
-          {dateLabel(dto.modifiedAt ?? dto.createdAt)}
-        </span>
+        <CommentTime dto={dto} className="text-fg-muted shrink-0 whitespace-nowrap text-[11px]" />
       </div>
       <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable writing={writing} />
     </div>

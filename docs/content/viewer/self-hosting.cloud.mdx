@@ -16,6 +16,9 @@ pages, finds the text and stores every change. To run your own CloudPDF instead,
 Every request then goes to your server, and nothing else changes. Add its origin to `connect-src`
 in place of CloudPDF SaaS's: see [Security & CSP](concepts/security).
 
+`engine` takes two more settings beside `baseUrl`: the engine's own `token`, and the `fetch` it
+reaches CloudPDF with.
+
 ## What runs in the browser
 
 Reading a document is requests to your CloudPDF and nothing more: no WebAssembly, no Web Worker.

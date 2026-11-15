@@ -9,6 +9,12 @@ coverage
 public
 .svelte-kit/
 /static/
+# Package READMEs: docs/content/scripts/readmes.mjs writes them from the docs, with their code as the
+# compiled files have it. One still written by hand stays as written too.
+packages/**/README.md
+cloudpdf/**/README.md
+# A README's frame: a line that holds only a slot must stay a line of its own.
+docs/content/readme/
 # Generated: one long base64 line per font face (docs/kit/scripts/build-og-fonts.mjs).
 docs/kit/src/og/fonts.data.ts
 # Generated: the standard and last-resort programs and layout numbers (packages/core/fonts/scripts/generate-standard-fonts.mjs).

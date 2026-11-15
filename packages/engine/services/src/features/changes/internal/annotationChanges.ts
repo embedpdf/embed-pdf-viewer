@@ -38,6 +38,7 @@ import { exportAnnots, importAnnots } from './captures';
 import { assertExpected, leftAlone, type ChangeContext, type Done } from './changeContext';
 import { captureAfter, captureBefore, revertObjects, unchangedSince } from './objectCaptures';
 import { valuesEqual } from '../../../shared/valuesEqual';
+import { AnnotationCopier } from '../../annotations/AnnotationCopier';
 import { AnnotationImporter } from '../../annotations/AnnotationImporter';
 import { AnnotationMutator } from '../../annotations/AnnotationMutator';
 import {
@@ -45,6 +46,10 @@ import {
   resolveAnnotIndexRaw,
 } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from '../../annotations/internal/mutations/annotationMutationMeta';
+import {
+  annotationIndexByName,
+  nameTakenError,
+} from '../../annotations/internal/read/annotationIndexByName';
 import {
   applyReorder,
   familyOrder,
@@ -153,6 +158,36 @@ export function importAnnotations(ctx: ChangeContext, op: AnnotationImportOp): D
 }
 
 /**
+ * `annotations.copy`: copies of the document's annotations, created as the
+ * copy plans them (`AnnotationCopier`), each checked as its create would be.
+ * Reading the sources takes `doc.annotate.read`. Its reverse removes what it
+ * made, as an import's does.
+ */
+export function copyAnnotations(ctx: ChangeContext, op: Op<'annotations.copy'>): Done {
+  authorizeCapability(ctx.authority, 'doc.annotate.read');
+  const result = new AnnotationCopier(ctx.runtime, ctx.session, ctx.fonts).copy(
+    {
+      refs: op.refs,
+      ...(op.page ? { page: op.page } : {}),
+      ...(op.offset ? { offset: op.offset } : {}),
+      ...(op.objectNumbers ? { objectNumbers: op.objectNumbers } : {}),
+      read: (ref) => readAnnotation(ctx, ref),
+      authorizeCreate: (draft) => {
+        authorizeUnprotected(ctx.authority, annotationWriteCapability(draft.subtype));
+        // A copy is the caller's own create, in the caller's group.
+        return authorizeAnnotationCreate(ctx.authority, draft.subtype, undefined);
+      },
+      limits: ctx.limits,
+    },
+    ctx.signal,
+  );
+  return {
+    item: { type: 'annotations.copy', ...result },
+    reverse: importReverse(ctx, result.annotations, undefined),
+  };
+}
+
+/**
  * The undo of an import: one remove per imported annotation that no other
  * imported one takes with it (a note takes its popup and its imported
  * replies), the last made first, each holding its thread as the import
@@ -228,7 +263,26 @@ export function updateAnnotation(
   }
   authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
   assertExpected(opIndex, current, op.expect);
+  assertNewNameFree(ctx, current, op.patch.nm);
   return writeUpdate(ctx, op.ref, op.patch, 'annotations.update', op.resources);
+}
+
+/**
+ * A new name must be free on the annotation's page (ISO 32000-2 §12.5.2),
+ * checked against the page as the change's earlier ops left it. Only an op
+ * checks it: an undo puts back the name an annotation had, as the undo of a
+ * delete brings back the deleted one's.
+ */
+export function assertNewNameFree(
+  ctx: ChangeContext,
+  current: Annotation<PdfCoordinates>,
+  nm: string | null | undefined,
+): void {
+  if (!nm || nm === current.nm) return;
+  const record = ctx.session.resolvePageRef(current.ref.page);
+  if (annotationIndexByName(ctx.runtime, ctx.session.requireDocPtr(), record.pageIndex, nm) >= 0) {
+    throw nameTakenError(nm, record.pageObjectNumber);
+  }
 }
 
 /** `annotations.delete`; its reverse brings back everything it removed. */

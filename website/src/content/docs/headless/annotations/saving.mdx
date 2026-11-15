@@ -133,7 +133,8 @@ Use it to:
 > **Try it:** **Delete all**, then **Import**: they come back from the text. Import again: the
 > annotations with a name are left out, since they're there already.
 
-Export waits for pending changes, and imported annotations show at once, like any other change.
+Export waits for pending changes. An import is one change: its annotations show once the engine
+has written them, and the whole import is [one step to undo](#an-import-is-one-step-to-undo).
 
 What to export:
 
@@ -152,6 +153,7 @@ How to import:
 | :------------ | :----------------------------------------------------------------------------------------------- | :---------- |
 | `pages`       | Where each page's annotations go: `'same'` (the same page), `'by-position'`, or a list of pairs. | `'same'`    |
 | `attribution` | `'restore'` keeps who wrote each annotation, `'stamp'` makes the importing user the author.      | `'restore'` |
+| `history`     | `false` keeps the import out of undo and redo.                                                   | one step    |
 
 Use `'stamp'` when a user pastes annotations: they become theirs. `'restore'` writes annotations
 in other people's names, so it needs a special permission; keep it for trusted jobs, such as
@@ -167,6 +169,22 @@ The result tells you what happened:
 The engine's [Import & export](/docs/engine/annotations/import-export) page has every option,
 reason and limit.
 
+### An import is one step to undo
+
+An undo takes away every annotation the import added, and a redo brings them back under the same
+refs. That's what a user expects after a paste, or after an **Import** button.
+
+When your app imports by itself, the user did nothing to undo. Pass `history: false`, and undo
+leaves the import alone:
+
+```ts
+// behind a button or a paste: one step, undo removes them all
+await annotation.import(bundle, { attribution: 'stamp' });
+
+// loading what you stored: not a step
+await annotation.import(bundle, { history: false });
+```
+
 ## Keep annotations in your own database
 
 There are two ways to store annotations outside the PDF.
@@ -180,7 +198,11 @@ await api.put(`/reviews/${docId}`, AnnotationTransfer.stringify(await annotation
 
 // on open, once the annotations are loaded (status 'ready')
 const text = await api.get(`/reviews/${docId}`);
-if (text) await annotation.import(await AnnotationTransfer.parse(text));
+if (text) {
+  const bundle = await AnnotationTransfer.parse(text);
+  // your app loads them, not the user: nothing to undo
+  await annotation.import(bundle, { history: false });
+}
 ```
 
 **Store each annotation as it changes.** Listen for the events and write each change to your

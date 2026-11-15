@@ -1,3 +1,4 @@
+import { prefersMarkdown } from '@embedpdf/docs-kit/accept';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import {
@@ -44,27 +45,41 @@ export function middleware(request: NextRequest) {
   }
 
   // Public Markdown representations are served by a statically generated
-  // Route Handler while retaining the discoverable `<page>.md` URL.
-  // `/docs.md` (the landing) is its own top-level path, hence the matcher's
-  // second entry and the explicit equality check here.
-  if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && pathname.endsWith('.md'))) {
+  // Route Handler.
+  const markdownOf = (page: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = `/api/docs/markdown${pathname.slice(0, -3)}`;
+    url.pathname = `/api/docs/markdown${page}`;
     return NextResponse.rewrite(url);
+  };
+
+  // The discoverable `<page>.md` URL. `/docs.md` (the landing) is its own
+  // top-level path, hence the matcher's second entry and the explicit
+  // equality check here.
+  if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && isMarkdown)) {
+    return markdownOf(docsPath);
   }
 
-  const activeIntegration = docsIntegrationFromPath(docsPath);
+  // A file under `/docs` (a screenshot) has a dot in its name, and one answer.
+  if (segments.at(-1)?.includes('.')) return NextResponse.next();
+
+  // A page's own URL serves its Markdown too, to a request that asks for it
+  // (`Accept: text/markdown`), as AI coding agents do. Either answer says it
+  // depends on that header, so a cache keeps the two apart.
+  const asksForMarkdown = prefersMarkdown(request.headers.get('accept'));
+  const response = asksForMarkdown ? markdownOf(pathname) : NextResponse.next();
+  response.headers.append('Vary', 'Accept');
+
+  // The page a person opens is the integration the next product opens in.
+  const activeIntegration = asksForMarkdown ? null : docsIntegrationFromPath(docsPath);
   if (activeIntegration) {
-    const response = NextResponse.next();
     response.cookies.set(INTEGRATION_COOKIE, activeIntegration, {
       maxAge: 31_536_000,
       path: '/',
       sameSite: 'lax',
     });
-    return response;
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {

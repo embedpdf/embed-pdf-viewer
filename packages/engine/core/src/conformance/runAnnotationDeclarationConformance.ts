@@ -111,7 +111,11 @@ export function runAnnotationDeclarationConformance(
             (await page.annotations.list()).annotations.find(
               (annotation) => annotationKey(annotation.ref) === annotationKey(created.ref),
             ) as unknown as Record<string, unknown>;
-          const text: [string, string, string][] = [['subject', 'Pricing', 'Terms']];
+          const key = annotationKey(created.ref);
+          const text: [string, string, string][] = [
+            ['subject', 'Pricing', 'Terms'],
+            ['nm', `first-${key}`, `second-${key}`],
+          ];
           // A free text box and a redaction paint their contents, so clearing them is not tested here.
           if (data.subtype !== 'free-text' && data.subtype !== 'redact') {
             text.push(['contents', 'First note', 'Second note']);
@@ -188,23 +192,15 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
-    test('a field the kind does not declare is refused, and so is a new name', async () => {
+    test('a field the kind does not declare is refused', async () => {
       await onAuthoringPage(async (page) => {
         const square = creatables().find(({ data }) => data.subtype === 'square')!.data;
         await expect(
           page.annotations.create({ ...square, colour: '#000000' } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
-        const { annotation: created } = await page.annotations.create({
-          ...square,
-          nm: 'declared-square',
-        });
+        const { annotation: created } = await page.annotations.create(square);
         await expect(
           page.annotations.update(created.ref, { quadPoints: [] } as never),
-        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
-        const same = await page.annotations.update(created.ref, { nm: 'declared-square' });
-        expect(same.annotation.nm).toBe('declared-square');
-        await expect(
-          page.annotations.update(created.ref, { nm: 'renamed-square' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       });
     });

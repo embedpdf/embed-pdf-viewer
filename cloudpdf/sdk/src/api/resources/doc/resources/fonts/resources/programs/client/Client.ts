@@ -51,7 +51,7 @@ export class ProgramsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );
@@ -138,7 +138,7 @@ export class ProgramsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.2",
             }),
             requestOptions?.headers,
         );

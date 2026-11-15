@@ -3,6 +3,8 @@ title: Theming
 description: Light, dark or the system's choice, your accent color, every color and corner of the viewer, from config or from CSS.
 ---
 
+import { ThemeTokens, ThemeToken } from '@/components/docs/theme-tokens';
+
 # Theming
 
 Give the viewer your brand color, and every part follows it: pressed buttons, the active tab,
@@ -45,23 +47,54 @@ the app sets `preference`:
 > **Try it:** tick **Dark** above the viewer, then open the menu at the top left: the bars, the
 > menus and the space behind the pages all take your dark colors. Untick it to go back.
 
-| Token | What it colors | Light | Dark |
-| :-- | :-- | :-- | :-- |
-| `accent` | Pressed buttons, [primary](layout#a-primary-button) buttons, the active tab, links, focus rings, and every part on the pages that has no color of its own | `#3b82f6` | `#60a5fa` |
-| `background` | Behind the bars and panels | `#f3f4f6` | `#111827` |
-| `surface` | Bars and panels | `#ffffff` | `#1f2937` |
-| `surface-raised` | Menus, sheets, dialogs and floating bars | `#ffffff` | `#1f2937` |
-| `text` | Labels and text | `#111827` | `#f9fafb` |
-| `text-muted` | Secondary text, such as a page count | `#6b7280` | `#9ca3af` |
-| `border` | Lines between bars, panels and groups | `#d1d5db` | `#4b5563` |
-| `hover` | A button under the pointer | `#f3f4f6` | `#374151` |
-| `canvas` | Behind the pages | `#f3f4f6` | `#0d1117` |
-| `page-background` | A page before its picture arrives | `#ffffff` | `#ffffff` |
-| `page-shadow` | The shadow under each page; `none` for none | `0 6px 18px rgb(0 0 0 / 0.18)` | `0 6px 18px rgb(0 0 0 / 0.18)` |
-| `tooltip` | Behind a tooltip's words | `text`'s color | `text`'s color |
-| `tooltip-text` | A tooltip's words | `surface`'s color | `surface`'s color |
-| `radius` | The corners of buttons, menus, panels, tooltips and the bars floating over the pages | `6px` | `6px` |
-| `font` | Every word the viewer writes, its tooltips' too | your system's font | your system's font |
+<ThemeTokens>
+  <ThemeToken name="accent" light="#3b82f6" dark="#60a5fa">
+    Pressed buttons, [primary](layout#a-primary-button) buttons, the active tab, links, focus
+    rings, and every part on the pages that has no color of its own
+  </ThemeToken>
+  <ThemeToken name="background" light="#f3f4f6" dark="#111827">
+    Behind the bars and panels
+  </ThemeToken>
+  <ThemeToken name="surface" light="#ffffff" dark="#1f2937">
+    Bars and panels
+  </ThemeToken>
+  <ThemeToken name="surface-raised" light="#ffffff" dark="#1f2937">
+    Menus, sheets, dialogs and floating bars
+  </ThemeToken>
+  <ThemeToken name="text" light="#111827" dark="#f9fafb">
+    Labels and text
+  </ThemeToken>
+  <ThemeToken name="text-muted" light="#6b7280" dark="#9ca3af">
+    Secondary text, such as a page count
+  </ThemeToken>
+  <ThemeToken name="border" light="#d1d5db" dark="#4b5563">
+    Lines between bars, panels and groups
+  </ThemeToken>
+  <ThemeToken name="hover" light="#f3f4f6" dark="#374151">
+    A button under the pointer
+  </ThemeToken>
+  <ThemeToken name="canvas" light="#f3f4f6" dark="#0d1117">
+    Behind the pages
+  </ThemeToken>
+  <ThemeToken name="page-background" value="#ffffff">
+    A page before its picture arrives
+  </ThemeToken>
+  <ThemeToken name="page-shadow" kind="shadow" value="0 6px 18px rgb(0 0 0 / 0.18)">
+    The shadow under each page; `none` for none
+  </ThemeToken>
+  <ThemeToken name="tooltip" follows="text" default="`text`'s color">
+    Behind a tooltip's words
+  </ThemeToken>
+  <ThemeToken name="tooltip-text" follows="surface" default="`surface`'s color">
+    A tooltip's words
+  </ThemeToken>
+  <ThemeToken name="radius" kind="radius" value="6px">
+    The corners of buttons, menus, panels, tooltips and the bars floating over the pages
+  </ThemeToken>
+  <ThemeToken name="font" kind="font" default="your system's font">
+    Every word the viewer writes, its tooltips' too
+  </ThemeToken>
+</ThemeTokens>
 
 What's drawn on the pages has its own colors: the text selection, search matches, the handles of
 a selected annotation, form fields. Every one follows `accent` until you set it, and every one is
@@ -145,7 +178,10 @@ leaves the viewer as it is. What does reach it is what you aim at it: the CSS va
 ### Tailwind
 
 Set a variable with an arbitrary property on an element around the viewer:
-`class="[--epdf-accent:var(--color-violet-600)]"`.
+
+```html
+<div class="[--epdf-accent:var(--color-violet-600)]">…</div>
+```
 
 ### Colors saved in the PDF
 

@@ -282,6 +282,14 @@ export interface StageSettings {
    */
   readonly turnGestures: boolean;
   /**
+   * Whether a wheel or trackpad scroll that begins where this view can't
+   * scroll any further scrolls the page around the viewer instead, as it does
+   * over any scrolling element that has reached its end. A scroll that reaches
+   * the end stops there, and the next one scrolls the page. Off, the view
+   * keeps every wheel over it, which suits a viewer that fills the window.
+   */
+  readonly scrollChaining: boolean;
+  /**
    * The look of the box you drag with the `zoom` tool. A color left `null`
    * follows the viewer's accent (the fill at 8%); CSS `--epdf-zoom-box-fill`
    * and `--epdf-zoom-box-stroke` win over both.

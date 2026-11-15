@@ -200,6 +200,9 @@ Form bundles have the [same limits](/docs/engine/annotations/import-export#limit
 bundles, with fields and widgets together counted as items. Past a limit, the call fails with
 `PayloadTooLarge`, and `err.details.limit` names the limit.
 
+A [copy inside a document](authoring#copy-a-field) makes no bundle, and is held to the item
+limit, counted on the fields it names.
+
 <Engine cloud>
 
 An import is one request. Its `opId`, made for you when you don't pass one, makes a retry safe: a
