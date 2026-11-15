@@ -279,6 +279,8 @@ export function createOpenSslCertificateAuthority(): {
   certificate: Uint8Array;
   /** Issue a certificate that names the authority's OCSP and CRL addresses. DER. */
   issue(commonName: string): Uint8Array;
+  /** Issue a certificate as `issue` does, with its RSA key (PKCS #8, DER), to sign with. */
+  issueSigner(commonName: string): { certificate: Uint8Array; privateKey: Uint8Array };
   /** Withdraw a certificate it issued. */
   revoke(certificate: Uint8Array, reason?: 'keyCompromise' | 'superseded'): void;
   /** The OCSP response to a request as a client sent it. `responderId`: how it names itself; by name unless said. */
@@ -407,6 +409,26 @@ export function createOpenSslCertificateAuthority(): {
       const certificate = der(`${name}.pem`);
       issued.set(hex(certificate), `${name}.pem`);
       return certificate;
+    },
+    issueSigner(commonName) {
+      const name = issuePem(commonName, 'leaf');
+      const certificate = der(`${name}.pem`);
+      issued.set(hex(certificate), `${name}.pem`);
+      run([
+        'pkcs8',
+        '-topk8',
+        '-nocrypt',
+        '-in',
+        `${name}.key`,
+        '-outform',
+        'DER',
+        '-out',
+        `${name}.pk8`,
+      ]);
+      return {
+        certificate,
+        privateKey: new Uint8Array(readFileSync(join(directory, `${name}.pk8`))),
+      };
     },
     revoke(certificate, reason = 'keyCompromise') {
       const file = issued.get(hex(certificate));

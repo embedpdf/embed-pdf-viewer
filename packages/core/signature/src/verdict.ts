@@ -4,39 +4,22 @@ import type {
   Signature,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
-import type * as pkijs from 'pkijs';
 
-import { bytesEqual } from './cms/engine';
-import { CmsError, parseCmsInternal, type ParsedCms, type ParsedCmsInternal } from './cms/parse';
-import { verifyCmsSignature, type CryptographyVerdict } from './cms/verify';
-import { checkTimestampToken, signatureValueOf, type TimestampCheck } from './cms/verify-timestamp';
-import {
-  longTermVerdict,
-  type LongTermVerdict,
-  type ProvenDocumentTimestamp,
-  type ProvenTime,
-  type RevocationVerdict,
-} from './long-term';
-import {
-  pathRevocation,
-  readValidationPool,
-  summarizeRevocation,
-  ValidationPool,
-} from './revocation/pool';
-import { certificateCommonName } from './signers/self-signed';
-import {
-  timeOf,
-  validateChainAmong,
-  validateTimestampAuthority,
-  type TrustPort,
-  type TrustStatus,
-  type ValidationTime,
-} from './trust';
+import type { ParsedCms } from './cms/parse';
+import type { CryptographyVerdict } from './cms/verify';
+import { checkTimestampToken } from './cms/verify-timestamp';
+import { EARLIEST, judge, judgeToken, longTermInputOf, NOW, read, type Reading } from './judgement';
+import { longTermVerdict, type LongTermVerdict, type RevocationVerdict } from './long-term';
+import { DEFAULT_MAX_CRL_BYTES, fillPool } from './revocation/fill';
+import { readValidationPool, ValidationPool } from './revocation/pool';
+import type { RevocationSource } from './revocation/source';
+import type { TrustPort, TrustStatus, ValidationTime } from './trust';
 
 export type IntegrityVerdict = 'valid' | 'invalid' | 'indeterminate';
 export type ModificationsVerdict = 'unchanged' | 'permitted' | 'forbidden' | 'indeterminate';
 
-interface TimestampFacts {
+/** What every timestamp verdict says, whatever its summary. */
+export interface TimestampFacts {
   /** The token verifies, binds its authority's certificate, and stamps the bytes it belongs to. */
   readonly cryptography: CryptographyVerdict;
   /** The authority's certificate leads to one of your timestamp anchors and may issue timestamps. */
@@ -151,14 +134,20 @@ export interface ValidateSignaturesOptions {
    */
   validationTime?: ValidationTime | { kind: 'earliest-timestamp' };
   /**
+   * Where to ask for the answers the file lacks: whether a certificate was withdrawn, and the
+   * certificate of an issuer a path is missing. They are used for this check and nothing is
+   * stored. An address that does not answer leaves `revocation` as `unknown`. It is the only
+   * way a certificate judged as of now gets an answer, and it tells each authority asked that
+   * someone is checking that certificate. Needs `trust`.
+   */
+  revocation?: RevocationSource | null;
+  /**
    * `persisted` (default): the loaded bytes — what a file on disk says.
    * `working-copy`: unsaved edits are judged too, as the revision a save would
    * write — what the file a save produces will say. A viewer shows this one.
    */
   until?: 'persisted' | 'working-copy';
 }
-
-const NOW: ValidationTime = { kind: 'now' };
 
 /**
  * Validate every signature of a document: integrity from the engine's
@@ -181,6 +170,16 @@ export async function validateSignatures(
   // Long-term validation always speaks for the times the timestamps prove, so that judgement
   // is made whatever was asked for. It is the answer too unless another time was asked for.
   const requested = options.validationTime ?? EARLIEST;
+  if (options.revocation && trust) {
+    await fillPool({
+      readings,
+      trust,
+      pool,
+      source: options.revocation,
+      maxCrlBytes: DEFAULT_MAX_CRL_BYTES,
+      times: requested.kind === 'earliest-timestamp' ? [EARLIEST] : [EARLIEST, requested],
+    });
+  }
   const atTimestamps = await judge(readings, trust, pool, EARLIEST);
   const judged =
     requested.kind === 'earliest-timestamp'
@@ -230,143 +229,13 @@ export async function validateSignatures(
       summary,
       cms: reading.cms,
       timestamp: judgement.timestamp,
-      longTerm: await longTermVerdict({
-        kind: reading.kind,
-        revisionIndex: reading.signature.revisionIndex,
-        subject: reading.cms ? certificateCommonName(reading.cms.signerCertificate) : null,
-        reliesOn: proof.reliesOn,
-        withoutTime: proof.withoutTime,
-        signer: { trusted: proof.trust === 'trusted', path: proof.path },
-        documentTimestamps: atTimestamps.documentTimestamps,
-        pool,
-      }),
+      longTerm: await longTermVerdict(
+        // What the file holds: an answer that was only asked for is not in it.
+        longTermInputOf(reading, proof, atTimestamps.documentTimestamps, pool, 'file'),
+      ),
     });
   }
   return verdicts;
-}
-
-const EARLIEST = { kind: 'earliest-timestamp' } as const;
-
-/** Every reading judged, and the document timestamps that turned out to prove a time. */
-interface Judged {
-  judgements: Map<Reading, Judgement>;
-  documentTimestamps: ProvenDocumentTimestamp[];
-}
-
-/**
- * Judge the certificates behind every reading at `requested`: each timestamp's authority, then
- * each signer. Under `earliest-timestamp` a certificate is judged at the earliest trusted
- * timestamp that covers what it signed.
- */
-async function judge(
-  readings: readonly Reading[],
-  trust: TrustPort | null,
-  pool: ValidationPool,
-  requested: ValidationTime | typeof EARLIEST,
-): Promise<Judged> {
-  const earliest = requested.kind === 'earliest-timestamp';
-  /** The document timestamps trusted so far, with the revision each one sealed. */
-  const proven: ProvenDocumentTimestamp[] = [];
-  /** The earliest trusted document timestamp added after `revisionIndex`. */
-  const coveredBy = (revisionIndex: number | null): ProvenDocumentTimestamp | null => {
-    if (!earliest || revisionIndex === null) return null;
-    return proven
-      .filter((stamp) => stamp.revisionIndex > revisionIndex)
-      .reduce<ProvenDocumentTimestamp | null>(
-        (first, stamp) => (!first || stamp.genTime < first.genTime ? stamp : first),
-        null,
-      );
-  };
-
-  // Document timestamps first, from the last one back: a later one vouches for an earlier one's
-  // authority, and the last has nothing after it.
-  const judgements = new Map<Reading, Judgement>();
-  const documentTimestamps = readings
-    .filter((reading) => reading.kind === 'timestamp')
-    .sort((a, b) => (b.signature.revisionIndex ?? -1) - (a.signature.revisionIndex ?? -1));
-  for (const reading of documentTimestamps) {
-    const covered = coveredBy(reading.signature.revisionIndex);
-    const at = covered ? timestampTime(covered.genTime) : NOW;
-    const token = reading.token ? await judgeToken(reading.token, trust, at, pool) : null;
-    const timestamp = token?.verdict ?? null;
-    const revisionIndex = reading.signature.revisionIndex;
-    const time = token && reading.integrity === 'valid' ? provenTimeOf(token) : null;
-    if (time && revisionIndex !== null) proven.push({ ...time, revisionIndex });
-    judgements.set(reading, {
-      trust: timestamp?.trust ?? 'unknown',
-      trustReason: timestamp?.trustReason ?? undefined,
-      validationTime: at,
-      path: token?.path ?? null,
-      revocation: timestamp?.revocation ?? 'unknown',
-      revocationReason: timestamp?.revocationReason ?? undefined,
-      timestamp,
-      reliesOn: time,
-      // A sound token over these bytes whose authority isn't trusted proves no time to you.
-      withoutTime:
-        timestamp && reading.integrity === 'valid' && timestamp.cryptography === 'valid'
-          ? 'untrusted'
-          : 'no-timestamp',
-    });
-  }
-
-  for (const reading of readings) {
-    if (reading.kind === 'timestamp') continue;
-    const covered = coveredBy(reading.signature.revisionIndex);
-    const tokens: JudgedToken[] = [];
-    for (const check of reading.tokens) {
-      tokens.push(
-        await judgeToken(
-          check,
-          trust,
-          covered ? timestampTime(covered.genTime) : NOW,
-          pool,
-          reading.internal?.certificates,
-        ),
-      );
-    }
-    const own = earliestValid(tokens);
-    const timestamp = (own ?? tokens[0])?.verdict ?? null;
-    // The earlier of the signature's own timestamp and a document timestamp added after it.
-    const ownTime = own ? provenTimeOf(own) : null;
-    const reliesOn = earliest
-      ? ownTime && covered
-        ? ownTime.genTime <= covered.genTime
-          ? ownTime
-          : covered
-        : (ownTime ?? covered)
-      : null;
-    const at = earliest
-      ? reliesOn
-        ? timestampTime(reliesOn.genTime)
-        : NOW
-      : (requested as ValidationTime);
-    const chain = reading.internal
-      ? await validateChainAmong(reading.internal, trust, at, pool.certificates)
-      : { status: 'unknown' as const, reason: undefined, path: undefined };
-    const revocation =
-      chain.status === 'trusted' && chain.path
-        ? summarizeRevocation(await pathRevocation(pool, chain.path, timeOf(at)), nameOf(at))
-        : { status: 'unknown' as const, reason: NO_ISSUER };
-    judgements.set(reading, {
-      trust: chain.status,
-      trustReason: chain.reason,
-      validationTime: at,
-      path: chain.status === 'trusted' ? (chain.path ?? null) : null,
-      revocation: revocation.status,
-      revocationReason: revocation.reason ?? undefined,
-      timestamp,
-      reliesOn,
-      withoutTime: 'no-timestamp',
-    });
-  }
-  return { judgements, documentTimestamps: proven };
-}
-
-const NO_ISSUER = 'the signer is not trusted, so there is no issuer to check an answer against';
-
-/** A validation time in words, for a reason: "now", or the time a timestamp proves. */
-function nameOf(at: ValidationTime): string {
-  return at.kind === 'now' ? 'now' : at.genTime;
 }
 
 /**
@@ -389,242 +258,6 @@ export async function verifyTimestampToken(input: {
   const pool = new ValidationPool();
   if (check.token) pool.addCarried(check.token.certificates, check.token.revocation);
   return (await judgeToken(check, input.trust ?? null, NOW, pool)).verdict;
-}
-
-/** What one signature says before any certificate is judged: the facts time doesn't change. */
-interface Reading {
-  signature: Signature;
-  kind: Signature['kind'];
-  integrity: IntegrityVerdict;
-  cryptography: CryptographyVerdict;
-  /** A signature's CMS; null for a document timestamp and for a CMS that can't be read. */
-  internal: ParsedCmsInternal | null;
-  cms: ParsedCms | null;
-  /** A signature's timestamp tokens, each checked against its signature value. */
-  tokens: TimestampCheck[];
-  /** A document timestamp's own token, checked against the bytes it seals; null when its bytes couldn't be had. */
-  token: TimestampCheck | null;
-}
-
-/** What judging a signature's certificates adds to its reading. */
-interface Judgement {
-  trust: TrustStatus;
-  trustReason: string | undefined;
-  validationTime: ValidationTime;
-  /** The validated path, anchor last, when trusted: a signer's, or a document timestamp's authority's. */
-  path: Uint8Array[] | null;
-  revocation: RevocationVerdict;
-  revocationReason: string | undefined;
-  timestamp: TimestampVerdict | null;
-  /** The timestamp that proves the time the signature is judged at; null when none does. */
-  reliesOn: ProvenTime | null;
-  /** Why no timestamp proves a time, when none does. */
-  withoutTime: 'no-timestamp' | 'untrusted';
-}
-
-/** A timestamp token judged, with its authority's validated path when the authority is trusted. */
-interface JudgedToken {
-  verdict: TimestampVerdict;
-  path: Uint8Array[] | null;
-}
-
-/** The time a judged token proves, when it is `valid`: it verifies and its authority is trusted. */
-function provenTimeOf(token: JudgedToken): ProvenTime | null {
-  const { verdict, path } = token;
-  if (verdict.summary !== 'valid' || !path) return null;
-  return { genTime: verdict.genTime, path, authorityCertificate: verdict.authorityCertificate };
-}
-
-/** Read one signature, and offer what its CMS carries to `pool`. */
-async function read(
-  doc: DocumentHandle,
-  snapshot: SignatureSnapshot,
-  signature: Signature,
-  pool: ValidationPool,
-): Promise<Reading> {
-  const reading: Reading = {
-    signature,
-    kind: signature.kind,
-    integrity: 'indeterminate',
-    cryptography: 'unsupported',
-    internal: null,
-    cms: null,
-    tokens: [],
-    token: null,
-  };
-  if (!snapshot.chainValid || signature.coverage === 'malformed') {
-    reading.integrity = snapshot.chainValid ? 'invalid' : 'indeterminate';
-    return reading;
-  }
-  const read =
-    signature.kind === 'timestamp'
-      ? await readDocumentTimestamp(doc, signature, reading)
-      : await readSignature(doc, signature, reading);
-  if (read.internal) pool.addCarried(read.internal.certificates, read.internal.revocation);
-  for (const check of [...read.tokens, ...(read.token ? [read.token] : [])]) {
-    if (check.token) pool.addCarried(check.token.certificates, check.token.revocation);
-  }
-  return read;
-}
-
-async function readSignature(
-  doc: DocumentHandle,
-  signature: Signature,
-  reading: Reading,
-): Promise<Reading> {
-  let internal: ParsedCmsInternal;
-  try {
-    const contents = await doc.signatures.getContents(signature.field);
-    internal = parseCmsInternal(contents);
-    reading.cms = internal.parsed;
-    const digest = await doc.signatures.getDigest(signature.field, internal.digestAlgorithm);
-    const digestMatches = bytesEqual(digest, internal.messageDigest);
-    reading.integrity =
-      signature.coverage === 'whole-revision' && digestMatches ? 'valid' : 'invalid';
-  } catch (error) {
-    // A CMS this engine cannot read is not evidence of tampering.
-    reading.integrity =
-      error instanceof CmsError && error.reason === 'unsupported' ? 'indeterminate' : 'invalid';
-    if (!(error instanceof CmsError)) reading.integrity = 'indeterminate';
-    return reading;
-  }
-  reading.internal = internal;
-  reading.cryptography = await verifyCmsSignature(internal);
-  const signatureValue = signatureValueOf(internal.signerInfo);
-  for (const token of internal.timestampTokens) {
-    reading.tokens.push(
-      await checkTimestampToken({
-        token,
-        stamped: { kind: 'bytes', bytes: signatureValue },
-        certificates: internal.certificates,
-      }),
-    );
-  }
-  return reading;
-}
-
-/**
- * A document timestamp is its token: `integrity` is whether the token stamps the bytes it
- * seals, `cryptography` whether the token itself is sound.
- */
-async function readDocumentTimestamp(
-  doc: DocumentHandle,
-  signature: Signature,
-  reading: Reading,
-): Promise<Reading> {
-  let contents: Uint8Array;
-  try {
-    contents = await doc.signatures.getContents(signature.field);
-  } catch {
-    return reading;
-  }
-  const check = await checkTimestampToken({
-    token: contents,
-    stamped: {
-      kind: 'digest-with',
-      digest: (algorithm) => doc.signatures.getDigest(signature.field, algorithm),
-    },
-  }).catch((): TimestampCheck | null => null);
-  // The engine couldn't hash the sealed bytes: nothing is known about the token either way.
-  if (!check) return reading;
-  reading.token = check;
-  reading.cms = check.token?.parsed ?? null;
-  if (check.problem === 'unreadable') return reading;
-  const stampsTheseBytes = check.problem !== 'imprint';
-  reading.integrity =
-    signature.coverage === 'whole-revision' && stampsTheseBytes ? 'valid' : 'invalid';
-  // A token over other bytes may be sound in itself: judge it against the digest it does stamp.
-  reading.cryptography = stampsTheseBytes
-    ? check.verdict
-    : (
-        await checkTimestampToken({
-          token: contents,
-          stamped: {
-            kind: 'digest',
-            digest: check.info!.imprint,
-            algorithm: check.info!.imprintAlgorithm,
-          },
-        })
-      ).verdict;
-  return reading;
-}
-
-/** A checked token, with its authority judged at `at`: its trust, and whether it was withdrawn. */
-async function judgeToken(
-  check: TimestampCheck,
-  trust: TrustPort | null,
-  at: ValidationTime,
-  pool: ValidationPool,
-  certificates: pkijs.Certificate[] = [],
-): Promise<JudgedToken> {
-  const genTime = check.info ? check.info.genTime.toISOString() : null;
-  const authorityCertificate = check.token ? check.token.parsed.signerCertificate : null;
-  let status: TrustStatus = 'unknown';
-  let reason: string | null = check.detail;
-  let path: Uint8Array[] | null = null;
-  if (check.token && check.info) {
-    const authority = await validateTimestampAuthority({
-      token: check.token,
-      certificates: [...certificates, ...pool.certificates],
-      trust,
-      at,
-      genTime: check.info.genTime,
-    });
-    status = authority.status;
-    reason = authority.reason ?? null;
-    path = authority.status === 'trusted' ? (authority.path ?? null) : null;
-  }
-  const revocation = path
-    ? summarizeRevocation(await pathRevocation(pool, path, timeOf(at)), nameOf(at))
-    : {
-        status: 'unknown' as const,
-        reason: 'the authority is not trusted, so there is no issuer to check an answer against',
-      };
-  const facts: TimestampFacts = {
-    cryptography: check.verdict,
-    trust: status,
-    trustReason: reason,
-    validationTime: at,
-    revocation: revocation.status,
-    revocationReason: revocation.reason,
-    authorityName: authorityCertificate ? certificateCommonName(authorityCertificate) : null,
-  };
-  // Proof that the authority's certificate was withdrawn by the time it is judged at.
-  const revoked = status === 'trusted' && revocation.status === 'revoked';
-  if (check.verdict === 'valid' && !revoked && genTime !== null && authorityCertificate !== null) {
-    return {
-      verdict: {
-        ...facts,
-        summary: status === 'trusted' ? 'valid' : 'valid-untrusted',
-        genTime,
-        authorityCertificate,
-      },
-      path,
-    };
-  }
-  return {
-    verdict: {
-      ...facts,
-      summary: check.verdict === 'invalid' || revoked ? 'invalid' : 'indeterminate',
-      genTime,
-      authorityCertificate,
-    },
-    path,
-  };
-}
-
-function timestampTime(genTime: string): ValidationTime {
-  return { kind: 'timestamp', genTime, tokenVerified: true };
-}
-
-/** The earliest of the tokens whose verdict is `valid`, or null when none is. */
-function earliestValid(tokens: readonly JudgedToken[]): JudgedToken | null {
-  let earliest: JudgedToken | null = null;
-  for (const token of tokens) {
-    if (token.verdict.summary !== 'valid') continue;
-    if (!earliest || token.verdict.genTime < earliest.verdict.genTime!) earliest = token;
-  }
-  return earliest;
 }
 
 /**

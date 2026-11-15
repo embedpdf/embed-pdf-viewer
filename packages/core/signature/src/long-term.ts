@@ -80,9 +80,27 @@ export interface LongTermInput {
   /** Every trusted document timestamp of the file. */
   documentTimestamps: readonly ProvenDocumentTimestamp[];
   pool: ValidationPool;
+  /**
+   * `'file'`: only the answers the file holds count, which is what the verdict is about.
+   * `'anywhere'`: answers from outside count too, for working out what storing them would do.
+   */
+  answersFrom: 'file' | 'anywhere';
+}
+
+/** A long-term verdict with what it was worked out from, for the code that fills the gaps. */
+export interface LongTermFindings {
+  verdict: LongTermVerdict;
+  /** What the file says about each certificate that needs an answer, the good ones included. */
+  rows: CertificateRevocation[];
+  /** `verdict.missing`, each with the DER of the certificate it is about when it is about one. */
+  gaps: (LongTermGap & { der: Uint8Array | null })[];
 }
 
 export async function longTermVerdict(input: LongTermInput): Promise<LongTermVerdict> {
+  return (await longTermFindings(input)).verdict;
+}
+
+export async function longTermFindings(input: LongTermInput): Promise<LongTermFindings> {
   const covering =
     input.revisionIndex === null
       ? []
@@ -93,48 +111,68 @@ export async function longTermVerdict(input: LongTermInput): Promise<LongTermVer
       null,
     );
   const documentTimestamp = lastOf(covering)?.genTime ?? null;
-  const without = (at: string | null, missing: LongTermGap[]): LongTermVerdict => ({
-    enabled: false,
-    at,
-    until: null,
-    documentTimestamp,
-    missing,
+  const without = (
+    at: string | null,
+    gaps: LongTermFindings['gaps'],
+    rows: CertificateRevocation[] = [],
+  ): LongTermFindings => ({
+    verdict: {
+      enabled: false,
+      at,
+      until: null,
+      documentTimestamp,
+      missing: gaps.map(({ certificate, reason }) => ({ certificate, reason })),
+    },
+    rows,
+    gaps,
   });
 
   const proven = input.reliesOn;
-  if (!proven) return without(null, [{ certificate: input.subject, reason: input.withoutTime }]);
+  if (!proven) {
+    return without(null, [{ certificate: input.subject, reason: input.withoutTime, der: null }]);
+  }
   if (input.kind === 'signature' && (!input.signer.trusted || !input.signer.path)) {
-    return without(proven.genTime, [{ certificate: input.subject, reason: 'untrusted' }]);
+    return without(proven.genTime, [
+      { certificate: input.subject, reason: 'untrusted', der: null },
+    ]);
   }
 
   // Each certificate at the time it signed: the signer's path at the proven time, the
   // authority's path at the time of its own token, which is that same time.
   const at = new Date(proven.genTime);
-  const rows: CertificateRevocation[] = [
-    ...(input.kind === 'signature' ? await pathRevocation(input.pool, input.signer.path!, at) : []),
-    ...(await pathRevocation(input.pool, proven.path, at)),
+  const all: CertificateRevocation[] = [
+    ...(input.kind === 'signature'
+      ? await pathRevocation(input.pool, input.signer.path!, at, input.answersFrom)
+      : []),
+    ...(await pathRevocation(input.pool, proven.path, at, input.answersFrom)),
   ];
-  const missing: LongTermGap[] = [];
+  // A certificate on both paths is asked about once.
   const seen = new Set<string>();
-  for (const row of rows) {
-    if (row.status === 'good') continue;
-    // A certificate on both paths is named once.
+  const rows = all.filter((row) => {
     const key = toHex(row.certificate);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return false;
     seen.add(key);
-    missing.push({
+    return true;
+  });
+  const gaps = rows
+    .filter((row) => row.status !== 'good')
+    .map((row) => ({
       certificate: row.name,
-      reason: row.status === 'revoked' ? 'revoked' : 'no-answer',
-    });
-  }
-  if (missing.length > 0) return without(proven.genTime, missing);
+      reason: row.status === 'revoked' ? ('revoked' as const) : ('no-answer' as const),
+      der: row.certificate,
+    }));
+  if (gaps.length > 0) return without(proven.genTime, gaps, rows);
 
   const last = lastOf([proven, ...covering])!;
   return {
-    enabled: true,
-    at: proven.genTime,
-    until: certificateFromDer(last.authorityCertificate).notAfter.value.toISOString(),
-    documentTimestamp,
-    missing: [],
+    verdict: {
+      enabled: true,
+      at: proven.genTime,
+      until: certificateFromDer(last.authorityCertificate).notAfter.value.toISOString(),
+      documentTimestamp,
+      missing: [],
+    },
+    rows,
+    gaps: [],
   };
 }

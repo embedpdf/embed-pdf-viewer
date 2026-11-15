@@ -39,6 +39,11 @@ export interface TrustVerdict {
   reason?: string;
   /** DER certificates of the validated path, anchor last, when trusted. */
   path?: Uint8Array[];
+  /**
+   * DER of the certificate whose issuer was not found among the certificates offered, when
+   * that is why the path is not trusted.
+   */
+  withoutIssuer?: Uint8Array;
 }
 
 /**
@@ -220,6 +225,7 @@ async function validatePath(input: {
         reason: orphan
           ? `no certificate was found that issued "${nameOf(orphan)}"`
           : result.resultMessage || `chain validation code ${result.resultCode}`,
+        ...(orphan ? { withoutIssuer: certDer(orphan) } : {}),
       };
     }
     const path = result.certificatePath ?? [];

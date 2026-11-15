@@ -121,26 +121,21 @@ without the timestamp.
 ### Reach the authority from a browser
 
 Most timestamp authorities can't be called from a web page: they send no CORS headers. Point
-`url` at a route of your own that passes the request on. In Next.js, for example:
+`url` at a route of your own that passes the request on. The package ships one, for any server
+that speaks the Fetch API. In Next.js, for example:
 
 ```ts
 // app/api/timestamp/route.ts
-export async function POST(request: Request) {
-  const reply = await fetch('https://tsa.example.com/', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/timestamp-query',
-    },
-    body: await request.arrayBuffer(),
-  });
-  return new Response(reply.body, {
-    status: reply.status,
-    headers: {
-      'content-type': 'application/timestamp-reply',
-    },
-  });
-}
+import { timestampRoute } from '@embedpdf/core-signature/server';
+
+export const POST = timestampRoute({
+  url: 'https://tsa.example.com/',
+});
 ```
+
+It takes `headers` too, for an authority that wants an API key: the key then stays on your
+server. It passes the authority's reply back with its status, and answers `504` when the
+authority doesn't answer. Who may call your route is yours to decide, as for any route.
 
 On a server, `url` is the authority's own address. The company that issued your signing
 certificate usually runs a timestamp authority too.
@@ -327,14 +322,38 @@ export const POST = revocationRoute();
 ```
 
 It only calls `http` and `https` addresses, never a private or local one, and limits how large
-and how slow an answer may be. Who may call your route is yours to decide, as for any route.
+and how slow an answer may be. What comes back must be an OCSP response, a list of withdrawn
+certificates or a certificate, so the route can't be used to read a web page. Who may call your
+route is yours to decide, as for any route.
 
 The route learns which certificate is asked about, and nothing about the document. When you
 always sign with the same certificate, the answers are the same for every document, and the
-route keeps them for as long as they are good.
+route keeps them for as long as their issuer says they may be kept.
+
+| Option      | What it is                                                                         | Default                 |
+| :---------- | :--------------------------------------------------------------------------------- | :---------------------- |
+| `maxBytes`  | The largest answer it passes on.                                                   | 2 MiB                   |
+| `timeoutMs` | How long an issuer may take.                                                       | `10000`                 |
+| `cache`     | Where it keeps answers: an object with `get` and `set`, or `false` for none.       | The process's memory    |
+| `lookup`    | Resolves a name to its addresses, to refuse a name that leads to a private one.    | The runtime's resolver  |
+| `fetch`     | The `fetch` it calls issuers with.                                                 | The global one          |
+
+A list larger than `maxBytes` never reaches the page, so raise it together with
+[`maxCrlBytes`](#keep-a-signature-checkable-for-years).
+
+The route checks the address a name leads to, and then calls the name. A name that changes its
+answer in between is not caught. Where that matters, keep the server the route runs on from
+reaching your private network. On a runtime with no resolver, such as a worker at the edge,
+names are taken at their word; such a runtime can't reach a private network to begin with.
 
 `httpRevocationSource()` takes the same `url`, `headers`, `fetch`, `timeoutMs` and `retries` as
 [`httpTimestampAuthority()`](#authority-options), and tries again only when no answer came.
+
+To write the route in another language: it receives a JSON `POST` with `kind` (`'ocsp'`,
+`'crl'` or `'issuer'`), the `url` to ask, and for `'ocsp'` the request in base64 as `body`. It
+sends an OCSP request as a `POST` with `content-type: application/ocsp-request` and fetches the
+other two with a `GET`. It answers `200` with the bytes it got, and with an error status when it
+has none.
 
 ### Answers your signing service gave you
 

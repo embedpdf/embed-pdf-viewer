@@ -13,36 +13,59 @@ import { certificateCommonName } from '../signers/self-signed';
 import { checkRevocationAnswer, type RevocationAnswer, type RevocationAnswerCheck } from './answer';
 import { revocationStatusAt, type RevocationStatus } from './status';
 
+/** An answer in the pool, and whether the document already holds it. */
+export interface PooledAnswer extends RevocationAnswer {
+  /** False for an answer that came from outside the file: one a caller knew, or one that was fetched. */
+  inFile: boolean;
+}
+
 export class ValidationPool {
-  private readonly certificateByDer = new Map<string, pkijs.Certificate>();
-  private readonly answerByDer = new Map<string, RevocationAnswer>();
-  /** What every answer says about one certificate, by the certificate and its issuer. */
-  private readonly checked = new Map<string, Promise<RevocationAnswerCheck[]>>();
+  private readonly certificateByDer = new Map<
+    string,
+    { certificate: pkijs.Certificate; inFile: boolean }
+  >();
+  private readonly answerByDer = new Map<string, PooledAnswer>();
+  /** What each answer says about one certificate, in the order the answers were offered. */
+  private readonly checked = new Map<string, Promise<RevocationAnswerCheck>[]>();
 
   /** Every certificate offered, each once. */
   get certificates(): pkijs.Certificate[] {
-    return [...this.certificateByDer.values()];
+    return [...this.certificateByDer.values()].map((entry) => entry.certificate);
   }
 
-  /** Offer a certificate. Bytes that are not a certificate are left out. */
-  addCertificate(certificate: pkijs.Certificate | Uint8Array): void {
+  /**
+   * Offer a certificate. Bytes that are not a certificate are left out, and false comes back.
+   * `inFile` is false for one that came from outside the file.
+   */
+  addCertificate(certificate: pkijs.Certificate | Uint8Array, inFile = true): boolean {
     try {
       const der = certificate instanceof Uint8Array ? certificate : certDer(certificate);
       const key = toHex(der);
-      if (this.certificateByDer.has(key)) return;
-      this.certificateByDer.set(
-        key,
-        certificate instanceof Uint8Array ? certificateFromDer(certificate) : certificate,
-      );
+      if (this.certificateByDer.has(key)) return true;
+      this.certificateByDer.set(key, {
+        certificate:
+          certificate instanceof Uint8Array ? certificateFromDer(certificate) : certificate,
+        inFile,
+      });
+      return true;
     } catch {
       // Not a certificate: it can't be part of a path.
+      return false;
     }
   }
 
-  /** Offer an answer as it was stored. It is checked when it is asked about a certificate. */
-  addAnswer(kind: RevocationAnswer['kind'], der: Uint8Array): void {
+  /**
+   * Offer an answer as it was stored or sent. It is checked when it is asked about a
+   * certificate. `inFile` is false for one that came from outside the file.
+   */
+  addAnswer(kind: RevocationAnswer['kind'], der: Uint8Array, inFile = true): PooledAnswer {
     const key = `${kind}:${toHex(der)}`;
-    if (!this.answerByDer.has(key)) this.answerByDer.set(key, { kind, der });
+    let answer = this.answerByDer.get(key);
+    if (!answer) {
+      answer = { kind, der, inFile };
+      this.answerByDer.set(key, answer);
+    }
+    return answer;
   }
 
   /** Offer what a CMS carries itself: its certificates and its answers. */
@@ -52,22 +75,23 @@ export class ValidationPool {
     for (const der of revocation.crls) this.addAnswer('crl', der);
   }
 
-  /** What each answer says about `certificate`, which `issuer` issued. Checked once. */
-  checksFor(
+  /**
+   * What each answer says about `certificate`, which `issuer` issued. Each answer is checked
+   * once, also when more answers are offered between two calls.
+   */
+  async checksFor(
     certificate: pkijs.Certificate,
     issuer: pkijs.Certificate,
-  ): Promise<RevocationAnswerCheck[]> {
+  ): Promise<{ answer: PooledAnswer; check: RevocationAnswerCheck }[]> {
     const key = `${toHex(certDer(certificate))}:${toHex(certDer(issuer))}`;
-    let checks = this.checked.get(key);
-    if (!checks) {
-      checks = Promise.all(
-        [...this.answerByDer.values()].map((answer) =>
-          checkRevocationAnswer({ answer, certificate, issuer }),
-        ),
-      );
-      this.checked.set(key, checks);
+    const answers = [...this.answerByDer.values()];
+    const checks = this.checked.get(key) ?? [];
+    for (let index = checks.length; index < answers.length; index++) {
+      checks.push(checkRevocationAnswer({ answer: answers[index]!, certificate, issuer }));
     }
-    return checks;
+    this.checked.set(key, checks);
+    const done = await Promise.all(checks);
+    return answers.map((answer, index) => ({ answer, check: done[index]! }));
   }
 }
 
@@ -96,6 +120,10 @@ export interface CertificateRevocation extends RevocationStatus {
   certificate: Uint8Array;
   /** Its common name, or null when it has none. */
   name: string | null;
+  /** DER of the certificate that issued it: the next one of the path. */
+  issuer: Uint8Array;
+  /** The answer that decided it, as it is stored; null for `unknown`. */
+  evidence: PooledAnswer | null;
 }
 
 /**
@@ -107,6 +135,8 @@ export async function pathRevocation(
   pool: ValidationPool,
   path: readonly Uint8Array[],
   at: Date,
+  /** `'file'` leaves out the answers that came from outside the file. */
+  from: 'anywhere' | 'file' = 'anywhere',
 ): Promise<CertificateRevocation[]> {
   // A certificate that is its own anchor comes back from path validation twice in a row: it
   // is one certificate, and the one that is trusted.
@@ -114,11 +144,19 @@ export async function pathRevocation(
   const certificates = links.map(certificateFromDer);
   const rows: CertificateRevocation[] = [];
   for (let index = 0; index + 1 < certificates.length; index++) {
-    const checks = await pool.checksFor(certificates[index]!, certificates[index + 1]!);
+    const checked = (await pool.checksFor(certificates[index]!, certificates[index + 1]!)).filter(
+      (entry) => from === 'anywhere' || entry.answer.inFile,
+    );
+    const status = revocationStatusAt(
+      checked.map((entry) => entry.check),
+      at,
+    );
     rows.push({
       certificate: links[index]!,
       name: certificateCommonName(links[index]!),
-      ...revocationStatusAt(checks, at),
+      issuer: links[index + 1]!,
+      evidence: checked.find((entry) => entry.check === status.answer)?.answer ?? null,
+      ...status,
     });
   }
   return rows;

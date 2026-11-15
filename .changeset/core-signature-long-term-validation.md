@@ -2,7 +2,24 @@
 '@embedpdf/core-signature': minor
 ---
 
-Long-term validation, reading: `validateSignatures()` says whether a certificate was withdrawn, and whether the file holds everything to check a signature with no network.
+Long-term validation: `addValidationInfo()` keeps a signature checkable for years, and `validateSignatures()` says whether a certificate was withdrawn and whether the file holds everything to check a signature with no network.
+
+**`addValidationInfo(doc, { trust, revocation })`.** Once a document is signed and timestamped, it asks the certificate authorities whether each certificate was still good, checks every answer, and stores them in the file with the certificates a reader needs to follow the same paths. Acrobat then calls the signature "LTV enabled", and nobody has to be asked again.
+
+- It asks about each certificate between the signer and the one you trust, and the same for the timestamp's authority: the answers the file holds first, then `known` (answers and certificates you already have), then `revocation`, at the addresses the certificates name, OCSP before the issuer's list. An issuer's certificate that a signature left out is fetched from the address the certificate names, and is only ever a candidate for the path.
+- It returns `{ added, verdicts }`: how many entries of each kind it stored, and what `validateSignatures()` says about the result.
+- All or nothing: when a signature would not read as complete, nothing is stored. It throws `Network`, with the address in `details.source`, when an address didn't answer, and otherwise `SignatureRefused` with `details.reason` (`'no-timestamp'`, `'untrusted'`, `'no-answer'` or `'revoked'`), `details.certificate` and `details.field`. `partial: true` stores what there is instead.
+- `fields` covers some signatures only, and `maxCrlBytes` (1 MiB) is the largest list it stores.
+- Calling it again asks for nothing the file holds and adds nothing.
+
+**`httpRevocationSource({ url })`** is a `RevocationSource` for a web page, which can't ask a certificate authority itself: each question goes to a route of your own. It takes `url`, `headers`, `fetch`, `timeoutMs` and `retries`, as `httpTimestampAuthority()` does, and tries again only when no answer came.
+
+**`@embedpdf/core-signature/server`**, a new entry, has the routes, for any server that speaks the Fetch API:
+
+- `revocationRoute()` answers `httpRevocationSource()`. The addresses it is sent come from certificates, so it decides where it may go: only public `http` and `https` addresses, never a private or local one, a name that leads to one, or a redirect to either. It limits how large and how slow an answer may be, passes on only an OCSP response, a list of withdrawn certificates or a certificate, and keeps answers for as long as their authority's cache headers allow.
+- `timestampRoute({ url })` passes a timestamp request on to the authority you name, with `headers` a page must not hold.
+
+**`validateSignatures(doc, { trust, revocation })`** asks for the answers the file lacks and uses them for that check, without storing anything. An address that doesn't answer leaves `revocation` at `'unknown'`. `longTerm` stays about what the file holds.
 
 **A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. No type or option changed.
 
@@ -26,10 +43,10 @@ Long-term validation, reading: `validateSignatures()` says whether a certificate
 
 **A path may pass through the certificates the file holds.** A signature that leaves an issuer's certificate out of its CMS is `'trusted'` when the document's validation data has it.
 
-New exported types: `LongTermVerdict`, `LongTermGap`, `LongTermGapReason`, `RevocationVerdict`.
+`validateChain()`'s verdict has `withoutIssuer`: the certificate whose issuer wasn't found, when that is why a path isn't trusted.
+
+New exported types: `LongTermVerdict`, `LongTermGap`, `LongTermGapReason`, `RevocationVerdict`, `AddValidationInfoOptions`, `AddValidationInfoResult`, `HttpRevocationSourceOptions`, `RevocationRouteRequest`.
 
 **A test certificate authority.** `createTestCertificateAuthority()` is a throwaway authority for tests and demos. `authority.issueSigner()` gives a signer whose certificate chains to `authority.certificate` and names where to ask about it. `authority.revocation` answers those questions from memory, as a real authority answers them over HTTP: an OCSP response signed by a responder the authority certified, and a CRL. `authority.revoke(signer, { at, reason })` withdraws a certificate, and both answers say so from then on. OpenSSL verifies its answers.
 
 **Asking an authority.** `RevocationSource` is where revocation answers come from: one method, `fetch(request)`, that returns the bytes answering a `RevocationRequest` (an OCSP request for a responder, or an address to fetch a CRL or an issuer's certificate from). `RevocationReason` names why a certificate was withdrawn.
-
-Nothing in this package asks an authority or stores its answers in a document yet. `doc.signatures.addValidationInfo()` on the engine stores answers you already have.

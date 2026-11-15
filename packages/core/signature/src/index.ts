@@ -78,3 +78,13 @@ export {
 } from './signers/test-authority';
 export type { RevocationReason } from './revocation/answer';
 export type { RevocationRequest, RevocationSource } from './revocation/source';
+export {
+  httpRevocationSource,
+  type HttpRevocationSourceOptions,
+  type RevocationRouteRequest,
+} from './revocation/http-source';
+export {
+  addValidationInfo,
+  type AddValidationInfoOptions,
+  type AddValidationInfoResult,
+} from './collect';
