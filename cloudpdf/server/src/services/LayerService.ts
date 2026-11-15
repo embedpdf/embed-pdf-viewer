@@ -3030,7 +3030,8 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      input: SignaturePrepareInput;
+      /** With its field: the route takes no timestamp that leaves the field to the engine yet. */
+      input: SignaturePrepareInput & { field: FormFieldRef };
       /** Who signs and their grants: the worker checks the field is theirs to sign. */
       authority: ChangeAuthority;
     },

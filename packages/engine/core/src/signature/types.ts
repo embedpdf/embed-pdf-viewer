@@ -236,7 +236,13 @@ export interface SignatureAppearanceInput {
 }
 
 export interface SignaturePrepareInput {
-  field: FormFieldRef;
+  /**
+   * The signature field to sign. A signature needs one. A document timestamp
+   * (`kind: 'timestamp'`) may leave it out: the engine then makes a field for
+   * it, with a name no other field has and one widget of no size on the first
+   * page, in the same revision as the timestamp.
+   */
+  field?: FormFieldRef;
   kind?: SignatureKind;
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
@@ -265,6 +271,12 @@ export interface SignaturePrepared {
   expectedVersion: DocumentVersionRef;
   /** ISO timestamp after which the candidate is discarded. */
   expiresAt: string | null;
+  /**
+   * The field the engine made for a document timestamp that was prepared
+   * with no `field`, by its name. The field is in the document once the
+   * signing completes. Absent when a `field` was given.
+   */
+  field?: FormFieldRef;
 }
 
 export interface SignatureCompleteInput {

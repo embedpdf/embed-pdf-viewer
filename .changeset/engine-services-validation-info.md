@@ -8,4 +8,6 @@ Read and store a document's validation data, and read a page's earlier annotatio
 - The worker host answers two new requests, `signatures.validationInfo` and `signatures.addValidationInfo`. The second is a write: it runs in one transaction and has no undo.
 - `SignatureAnalyzer` reads the objects the rules ask for that a revision did not write, and hands them to the rules. A signature field or timestamp that Acrobat adds to a page whose annotation list is an object of its own now reads `permitted` for the earlier signature.
 
+- `SignatureMutator.prepare()` takes a document timestamp with no `field`: it makes the field on the signing candidate, so the live document gets it when the signing completes, in the timestamp's own revision, and never when it is cancelled.
+
 This needs a runtime that has `EPDFDss_GetCount`, `EPDFDss_GetData`, `EPDFDss_Add` and `EPDFDoc_GetLoadedObjectValue`.

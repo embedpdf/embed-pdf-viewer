@@ -123,9 +123,11 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     input: SignaturePrepareInput,
     options?: WriteOptions,
   ): AbortablePromise<SignaturePrepared> {
-    // The job checks that the handle may sign this field (its group).
+    // The job checks that the handle may sign this field (its group). A timestamp with no
+    // field gets one made for it, which takes the right to sign the document itself.
     const rejected =
-      this.gate('sign-some-field') ?? (input.certify ? this.gate('doc.sign.certify') : null);
+      this.gate(input.field ? 'sign-some-field' : 'doc.sign') ??
+      (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
     const write = this.opIdFor(options);
     if (write.rejected) return write.rejected;
@@ -143,10 +145,15 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
         }),
     });
     return this.await(submission, 'signatures.prepare', (payload) => {
+      // The field that was named, or the one the engine made for a timestamp.
+      const field = input.field ?? payload.result.field;
+      if (!field) {
+        throw new EngineError(EngineErrorCode.Unknown, 'the prepared signing names no field');
+      }
       this.publisher.publishWrite(write.opId, {
         type: 'signatures.prepared',
-        field: input.field,
         ...payload.result,
+        field,
       });
       return payload.result;
     });

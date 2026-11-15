@@ -21,4 +21,6 @@ result.added; // { certificates: 0, ocspResponses: 1, crls: 0 }
 - It needs `doc.sign`, and fails with `ProtectedDocument` after a certification that allows no changes.
 - It fires `signatures.validationInfoAdded` when it stored something.
 
+A document timestamp needs no field: `doc.signatures.prepare({ kind: 'timestamp' })` with no `field` makes one for it, with no size, so it shows nowhere on the page. The field is added in the same revision as the timestamp, and `prepared.field` names it.
+
 A signature field or document timestamp that Acrobat adds to a page whose annotation list is an object of its own now reads `permitted` for the earlier signatures, as Acrobat reads it.

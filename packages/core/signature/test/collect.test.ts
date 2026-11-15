@@ -25,6 +25,7 @@ import {
   addValidationInfo,
   createTestCertificateAuthority,
   createTestSigner,
+  createTestTimestampAuthority,
   generateSigningKeyPair,
   sign,
   validateSignatures,
@@ -438,6 +439,70 @@ describe('collecting validation data', () => {
       expect(error.code).toBe(EngineErrorCode.ProtectedDocument);
       expect(asked).toEqual([]);
     }, certified);
+  });
+
+  test('the whole way: sign, store the answers, then timestamp the document with no field made first', async () => {
+    await freshSigner();
+    const stamper = await createTestTimestampAuthority({ commonName: 'the document stamper' });
+    const port: TrustPort = {
+      anchors: async () => [ca.certificate],
+      timestampAnchors: async () => [authority.certificate, stamper.certificate],
+    };
+    const read = async (doc: DocumentHandle) => {
+      const verdicts = await validateSignatures(doc, { trust: port });
+      return {
+        signature: verdicts.find((verdict) => verdict.signature.kind === 'signature')!,
+        timestamp: verdicts.find((verdict) => verdict.signature.kind === 'timestamp')!,
+      };
+    };
+    const saved = await withDocument(async (doc) => {
+      await signTimestamped(doc);
+      await addValidationInfo(doc, { trust: port, revocation: ca.revocation });
+      // No field: the engine makes one for the timestamp.
+      const stamped = await sign(doc, { kind: 'timestamp', key: stamper });
+      expect(stamped.signature).toMatchObject({ kind: 'timestamp', fieldName: 'Timestamp1' });
+
+      const { signature, timestamp } = await read(doc);
+      expect(timestamp).toMatchObject({
+        integrity: 'valid',
+        summary: 'valid',
+        longTerm: { enabled: true },
+      });
+      // The signature is as it was sealed, checkable from the file, with a timestamp over it.
+      expect(signature).toMatchObject({
+        summary: 'valid',
+        revocation: 'good',
+        modifications: { verdict: 'permitted' },
+        longTerm: {
+          enabled: true,
+          at: SIGNED.toISOString(),
+          documentTimestamp: timestamp.timestamp!.genTime,
+          missing: [],
+        },
+      });
+      return doc.download();
+    });
+    // The same from the saved file, with nobody to ask.
+    await withDocument(async (doc) => {
+      const { signature, timestamp } = await read(doc);
+      expect(signature).toMatchObject({ summary: 'valid', longTerm: { enabled: true } });
+      expect(signature.longTerm.documentTimestamp).toBe(timestamp.timestamp!.genTime);
+      // The file as it was, the signature, and one revision that holds the answers and the
+      // timestamp: the timestamp seals in what was stored before it.
+      expect((await doc.signatures.list()).revisions).toHaveLength(3);
+    }, saved);
+  });
+
+  test('a signature still needs its field, and a key of your own cannot timestamp', async () => {
+    await freshSigner();
+    await withDocument(async (doc) => {
+      const noField = await caught(() => sign(doc, { key: signer }));
+      expect(noField.code).toBe(EngineErrorCode.InvalidArg);
+      expect(noField.details).toMatchObject({ field: 'field' });
+      const ownKey = await caught(() => sign(doc, { kind: 'timestamp', key: signer }));
+      expect(ownKey.code).toBe(EngineErrorCode.InvalidArg);
+      expect((await doc.signatures.list()).signatures.filter((entry) => entry.signed)).toEqual([]);
+    });
   });
 
   describe('a signer under an intermediate the signature leaves out', () => {

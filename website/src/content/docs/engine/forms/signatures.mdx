@@ -1088,7 +1088,9 @@ result.signature.kind; // 'timestamp'
 ```
 
 A document timestamp lives in a signature field. Without a `field` the engine makes one for
-it, with no size, so it shows nowhere on the page. Pass `field` to use one of your own.
+it, with no size, so it shows nowhere on the page. The field is added in the same revision as
+the timestamp, under a name no other field has, such as `Timestamp1`;
+`result.signature.fieldName` says which. Pass `field` to use one of your own.
 
 After a [certification](#certify-a-document) at level `1` a document timestamp is refused, with
 `ProtectedDocument`, like every other change.

@@ -21,6 +21,8 @@ Long-term validation: `addValidationInfo()` keeps a signature checkable for year
 
 **`validateSignatures(doc, { trust, revocation })`** asks for the answers the file lacks and uses them for that check, without storing anything. An address that doesn't answer leaves `revocation` at `'unknown'`. `longTerm` stays about what the file holds.
 
+**`sign(doc, { kind: 'timestamp', key })` needs no `field`.** The engine makes a field for the document timestamp, so the last step of keeping a file checkable is one call. `result.signature.fieldName` says which field it is.
+
 **A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. No type or option changed.
 
 - **What changes for an app that already validates:** a signature whose signer's certificate expired after it was signed, and that carries a timestamp from an authority you trust, reads `'valid'` where it read `'valid-untrusted'`.

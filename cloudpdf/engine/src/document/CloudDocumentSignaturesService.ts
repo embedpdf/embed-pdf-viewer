@@ -193,6 +193,16 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
   ): AbortablePromise<SignaturePrepared> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
+    const field = input.field;
+    if (!field) {
+      // The server's route takes a field: it makes none for a document timestamp yet.
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.NotImplemented,
+          'the cloud engine does not make a field for a document timestamp yet: name the `field` to timestamp in',
+        ),
+      );
+    }
     return AbortablePromise.run<SignaturePrepared>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
@@ -218,8 +228,8 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         await this.manifest.refresh(signal);
         this.publisher.publishWrite(opId, {
           type: 'signatures.prepared',
-          field: input.field,
           ...prepared,
+          field,
         });
         return prepared;
       });

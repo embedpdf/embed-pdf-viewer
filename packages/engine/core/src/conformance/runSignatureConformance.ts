@@ -703,6 +703,169 @@ function runSigningTests(
     }
   });
 
+  test('sign: a document timestamp needs no field; the engine makes one, in the same revision', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await openLocal(engine, opts, fx());
+    const preparedFields: unknown[] = [];
+    const unsubscribe = doc.events.subscribe((event) => {
+      if (event.type === 'signatures.prepared') preparedFields.push(event.field);
+    });
+    const names = async () => (await doc.forms.list()).fields.map((field) => field.name);
+    let reopened: DocumentHandle | null = null;
+    try {
+      const before = await names();
+      const first = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(first.subFilter).toBe('ETSI.RFC3161');
+      expect(first.field).toEqual({ kind: 'fqn', name: 'Timestamp1' });
+      // The field is on the candidate: the live document has none until the signing completes,
+      // and none at all when it is cancelled.
+      expect(await names()).toEqual(before);
+      expect((await doc.signatures.cancel(first.signingId)).status).toBe('cancelled');
+      expect(await names()).toEqual(before);
+
+      const prepared = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(prepared.field).toEqual({ kind: 'fqn', name: 'Timestamp1' });
+      const result = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      expect(result.status).toBe('completed');
+      expect(result.signature.kind).toBe('timestamp');
+      expect(result.signature.fieldName).toBe('Timestamp1');
+      expect(result.signature.coverage).toBe('whole-revision');
+      // One revision holds the field and the timestamp.
+      expect(result.signature.revisionIndex).toBe(1);
+      expect((await doc.signatures.list()).revisions).toHaveLength(2);
+
+      // The field is a signature field with one widget, of no size, on the first page.
+      const form = await doc.forms.list();
+      expect(form.fields.map((field) => field.name)).toEqual([...before, 'Timestamp1']);
+      expect(form.fields.find((field) => field.name === 'Timestamp1')!.kind).toBe('signature');
+      const firstPage = (await doc.pages.list()).pages[0]!.ref;
+      const widget = form.widgets.find(
+        (entry) =>
+          entry.ref.kind === 'objectNumber' &&
+          entry.ref.objectNumber === result.signature.widget!.objectNumber,
+      )!;
+      expect(widget.page).toEqual(firstPage);
+      expect(widget.rect.width).toBe(0);
+      expect(widget.rect.height).toBe(0);
+      expect(widget).toMatchObject({ print: true, locked: true, hidden: false });
+
+      // The next one gets the next name, and the first stays as it was sealed.
+      const next = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(next.field).toEqual({ kind: 'fqn', name: 'Timestamp2' });
+      const second = await doc.signatures.complete({
+        signingId: next.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: next.expectedVersion,
+      });
+      expect(second.signature.fieldName).toBe('Timestamp2');
+      const analysis = await doc.signatures.analyze({
+        since: { signatureIndex: result.signature.index },
+        detail: 'full',
+      });
+      expect(analysis.verdict).toBe('permitted');
+      const findings = analysis.steps.flatMap((step) => step.findings);
+      expect(findings.filter((finding) => finding.verdict !== 'permitted')).toEqual([]);
+      expect(findings.some((finding) => finding.rule === 'signature-field-added')).toBe(true);
+
+      expect(preparedFields).toEqual([
+        { kind: 'fqn', name: 'Timestamp1' },
+        { kind: 'fqn', name: 'Timestamp1' },
+        { kind: 'fqn', name: 'Timestamp2' },
+      ]);
+
+      reopened = await reopen(engine, opts, `${fx().id}-timestamps`, await doc.download());
+      const fresh = await reopened.signatures.list();
+      expect(fresh.revisions).toHaveLength(3);
+      expect(
+        fresh.signatures
+          .filter((signature) => signature.signed)
+          .map((signature) => `${signature.fieldName} ${signature.kind} ${signature.coverage}`),
+      ).toEqual(['Timestamp1 timestamp whole-revision', 'Timestamp2 timestamp whole-revision']);
+    } finally {
+      unsubscribe();
+      if (reopened) await reopened.close();
+      await doc.close();
+    }
+  });
+
+  test('sign: a timestamp field takes a name no other field has', async () => {
+    if (!supported()) return;
+    const doc = await openLocal(engineOf(), opts, fx());
+    try {
+      await doc.forms.create({ kind: 'text', name: 'Timestamp1' });
+      const prepared = await doc.signatures.prepare({ kind: 'timestamp' });
+      expect(prepared.field).toEqual({ kind: 'fqn', name: 'Timestamp2' });
+      const result = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      expect(result.signature.fieldName).toBe('Timestamp2');
+      // The text field the name belonged to is as it was.
+      const fields = (await doc.forms.list()).fields;
+      expect(fields.find((field) => field.name === 'Timestamp1')!.kind).toBe('text');
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('sign: only a document timestamp may leave the field out, and it takes doc.sign', async () => {
+    if (!supported()) return;
+    const engine = engineOf();
+    const doc = await openLocal(engine, opts, fx());
+    try {
+      // A signature is made in a field someone chose.
+      let caught: unknown;
+      try {
+        await doc.signatures.prepare({});
+      } catch (error) {
+        caught = error;
+      }
+      expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+      expect((caught as EngineError).details).toMatchObject({ field: 'field' });
+      // A field of no size shows nowhere: there is nothing to draw an appearance in.
+      expect(
+        await caughtCode(async () =>
+          doc.signatures.prepare({
+            kind: 'timestamp',
+            appearance: { pdf: await opts.fixtures.artwork.bytes() },
+          }),
+        ),
+      ).toBe(EngineErrorCode.SignatureRefused);
+      expect((await doc.signatures.list()).signatures).toHaveLength(1);
+    } finally {
+      await doc.close();
+    }
+    if (opts.openKind === 'id') return;
+    // The right to sign a group's fields is not the right to add a field to the document.
+    const signer = await engine.open(
+      { kind: 'bytes', id: `${fx().id}-group-timestamp`, bytes: await fx().bytes() },
+      { scope: ['doc.open', 'doc.forms.read', 'fields:sign:group=buyer'], identity: {} },
+    );
+    try {
+      expect(await caughtCode(() => signer.signatures.prepare({ kind: 'timestamp' }))).toBe(
+        EngineErrorCode.Forbidden,
+      );
+    } finally {
+      await signer.close();
+    }
+    const certified = opts.fixtures.certifiedNoChanges;
+    if (!certified) return;
+    const sealed = await open(engine, opts, certified);
+    try {
+      expect(await caughtCode(() => sealed.signatures.prepare({ kind: 'timestamp' }))).toBe(
+        EngineErrorCode.ProtectedDocument,
+      );
+    } finally {
+      await sealed.close();
+    }
+  });
+
   test("sign: unsaved edits are sealed in the signature's own revision (layer session)", async () => {
     if (!supported()) return;
     const doc = await openLocal(engineOf(), opts, fx());

@@ -64,6 +64,10 @@ export interface DocumentSignaturesService {
    * digest to sign. The live document is untouched and read-only until
    * `complete` or `abort` (`SigningPending`). Refusals are
    * `SignatureRefused` with the reason in the message.
+   *
+   * A document timestamp (`kind: 'timestamp'`) needs no `field`: the engine
+   * makes one for it on the candidate, and `field` of the result names it.
+   * That needs `doc.sign`.
    */
   prepare(
     input: SignaturePrepareInput,

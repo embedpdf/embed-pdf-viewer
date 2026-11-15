@@ -2,7 +2,7 @@
 '@embedpdf/engine-core': minor
 ---
 
-Read and store the validation data of a document, and judge two cases the way Acrobat does.
+Read and store the validation data of a document, timestamp a document with no field made first, and judge two cases the way Acrobat does.
 
 **`doc.signatures.getValidationInfo()` and `doc.signatures.addValidationInfo()`.** A PDF keeps what a reader needs to check its signatures later with no network in its document security store (`/DSS`): certificates, OCSP responses and CRLs.
 
@@ -13,6 +13,8 @@ Read and store the validation data of a document, and judge two cases the way Ac
   - It needs `doc.sign`. After a certification that allows no changes it fails with `ProtectedDocument`.
   - It fires `signatures.validationInfoAdded`, with `added`, when it stored something.
 - New exports: the types `ValidationInfo`, `ValidationInfoAddResult`, `ValidationInfoCounts` and `ValidationInfoKind`, `VALIDATION_INFO_KINDS`, `VALIDATION_INFO_LIMITS`, and `validationInfoEntryProblem()`, which says why bytes are not an entry the engine stores.
+
+**A document timestamp needs no field.** `doc.signatures.prepare({ kind: 'timestamp' })` may leave `field` out: the engine then makes a signature field for it, with a name no other field has (`Timestamp1`, `Timestamp2`, and so on) and one widget of no size on the first page, in the same revision as the timestamp. `SignaturePrepareInput.field` is optional for that reason, and `SignaturePrepared.field` names the field the engine made. A signature with no `field` fails with `InvalidArg`. It needs `doc.sign`, not the right to sign a group's fields.
 
 **A certification that allows no changes (`permission: 1`) allows no later revision.** The PDF standard lets validation data and a document timestamp follow one, and the engine did too. Acrobat reports such a certification as invalid once anything is added, so:
 
