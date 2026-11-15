@@ -197,13 +197,13 @@ const when =
 A timestamp's verdict never changes the signature's `summary`: a valid signature with a broken
 timestamp is still valid.
 
-By default every certificate is judged as of now, so a signature whose signer's certificate has
-expired since reads `'valid-untrusted'`. To judge each signature at its trusted timestamp, when
-the certificate was still good:
+Each certificate is judged at the signature's trusted timestamp, when it has one, so a
+signature whose signer's certificate has expired since still reads `'valid'`. To judge every
+certificate as of now:
 
 ```ts
 await signature.validate({
-  validationTime: { kind: 'earliest-timestamp' },
+  validationTime: { kind: 'now' },
 });
 ```
 

@@ -255,8 +255,9 @@ export interface SignatureInspectionRequestedEvent {
 /** Options for `validate()` and `validateField()`. */
 export interface SignatureValidateOptions extends OperationOptions {
   /**
-   * The moment the certificates are judged at; now by default. `{ kind: 'earliest-timestamp' }`
-   * judges each one at the earliest trusted timestamp that covers what it signed.
+   * The moment the certificates are judged at. By default each one is judged at the earliest
+   * trusted timestamp that covers what it signed, and now when there is none.
+   * `{ kind: 'now' }` judges them all as of now.
    */
   readonly validationTime?: ValidationTime | { readonly kind: 'earliest-timestamp' };
   /** `'persisted'` checks the file as it was opened; `'working-copy'` (the default) counts unsaved changes. */

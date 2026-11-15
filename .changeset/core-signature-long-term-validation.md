@@ -4,10 +4,16 @@
 
 Long-term validation, reading: `validateSignatures()` says whether a certificate was withdrawn, and whether the file holds everything to check a signature with no network.
 
+**A signature is judged at its timestamp by default.** `validateSignatures()` judges each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. It is the time a reader such as Acrobat judges at, and with the answers in the file read, a certificate is not accepted on its dates alone. `validationTime: { kind: 'now' }` judges every certificate as of now; `{ kind: 'earliest-timestamp' }` names the default. No type or option changed.
+
+- **What changes for an app that already validates:** a signature whose signer's certificate expired after it was signed, and that carries a timestamp from an authority you trust, reads `'valid'` where it read `'valid-untrusted'`.
+- Judged at its timestamp, a signature reads `revocation: 'good'` from the answers stored when it was signed, and a certificate withdrawn after the timestamp does not make it `'invalid'`. Judged as of now, the same answers read `'unknown'`, and the withdrawal reads `'invalid'`.
+- A signature with no timestamp you trust is judged as of now, as before.
+
 **`revocation` on every verdict.** `'good'`, `'revoked'` or `'unknown'`: whether a certificate between the signer and your anchor was withdrawn by `validationTime`. `revocationReason` names the certificate when it isn't `'good'`. A timestamp's verdict has both too, for its authority.
 
 - The answers come from the file and nothing is asked over a network: the document's validation data (`doc.signatures.getValidationInfo()`), the OCSP responses and CRLs a signature carries in its CMS, and Acrobat's `adbe-revocationInfoArchival` attribute. Each answer is checked by its own signature, wherever it sits.
-- An answer speaks for a time. One stored at signing says nothing about today, so judged now it reads `'unknown'`, and with `validationTime: { kind: 'earliest-timestamp' }` it reads `'good'`. A certificate withdrawn after the timestamp reads `'good'` at the timestamp and `'revoked'` now.
+- An answer speaks for a time. One stored at signing says the certificate was good then, so a signature judged at its timestamp reads `'good'`, and judged as of now it reads `'unknown'`. A certificate withdrawn after the timestamp reads `'good'` at the timestamp and `'revoked'` as of now.
 - **`summary` is `'invalid'` when a trusted signer's certificate is proven withdrawn by the time it is judged at.** It was `'valid'` before, because nothing was checked. `'unknown'` never changes `summary`. A timestamp whose trusted authority is proven withdrawn is `'invalid'` and no longer counts as a trusted time.
 - A certificate you trust as it is has nobody above it to withdraw it, so it reads `'good'`.
 

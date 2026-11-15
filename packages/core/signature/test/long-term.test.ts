@@ -121,10 +121,16 @@ describe('revocation and long-term validation, from the file', () => {
     );
   }
 
-  const both = async (doc: DocumentHandle, port: TrustPort = trust) => ({
-    now: (await validateSignatures(doc, { trust: port }))[0]!,
-    then: (await validateSignatures(doc, { trust: port, validationTime: earliest }))[0]!,
-  });
+  /** The signature judged as of now, and at its timestamp, which is what is judged by default. */
+  const both = async (doc: DocumentHandle, port: TrustPort = trust) => {
+    const [then] = await validateSignatures(doc, { trust: port });
+    const [named] = await validateSignatures(doc, { trust: port, validationTime: earliest });
+    expect(named).toEqual(then);
+    return {
+      now: (await validateSignatures(doc, { trust: port, validationTime: { kind: 'now' } }))[0]!,
+      then: then!,
+    };
+  };
 
   describe('revocation', () => {
     test('no answer in the file: unknown, and the summary stays', async () => {
@@ -138,8 +144,12 @@ describe('revocation and long-term validation, from the file', () => {
             revocation: 'unknown',
             summary: 'valid',
           });
-          expect(verdict.revocationReason).toMatch(/no answer about "Ada"/);
         }
+        // The reason names the time the answers were asked about.
+        expect(now.revocationReason).toBe('no answer about "Ada" speaks for now');
+        expect(then.revocationReason).toBe(
+          `no answer about "Ada" speaks for ${SIGNED.toISOString()}`,
+        );
         expect(then.validationTime).toMatchObject({ kind: 'timestamp' });
       });
     });
@@ -386,7 +396,10 @@ describe('revocation and long-term validation, from the file', () => {
         await doc.signatures.addValidationInfo({
           ocspResponses: [await answer('ocsp', new Date())],
         });
-        const { now } = await both(doc);
+        const { now, then } = await both(doc);
+        // With no timestamp to go by, nothing asked for is judged now too.
+        expect(then.validationTime).toEqual({ kind: 'now' });
+        expect(then).toMatchObject({ revocation: 'good', summary: 'valid' });
         // Judged now, a fresh answer says good.
         expect(now).toMatchObject({ revocation: 'good', summary: 'valid', timestamp: null });
         expect(now.longTerm).toEqual({

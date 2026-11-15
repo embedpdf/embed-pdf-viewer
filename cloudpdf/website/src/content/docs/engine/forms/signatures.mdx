@@ -733,8 +733,9 @@ for (const result of results) {
 change the signature forbids, or a certificate that was withdrawn. When something can't be established, it's `'indeterminate'`.
 Without `trust`, a good signature is `'valid-untrusted'` at best.
 
-`'trusted'` means the certificate is within its dates and leads to one of your anchors.
-Whether it was withdrawn is a separate answer, in [`revocation`](#revocation).
+`'trusted'` means the certificate leads to one of your anchors and was within its dates
+[at the time the signature is judged at](#the-time-a-signature-is-judged-at). Whether it was
+withdrawn is a separate answer, in [`revocation`](#revocation).
 
 By default the check looks at the saved file. Pass `until: 'working-copy'` to include the changes
 you haven't saved yet: the answer is what the file will say once you save it. A viewer uses this
@@ -793,32 +794,39 @@ timestamp is still valid: you know who signed, and only the time is the signer's
 The timestamp proves the signature existed **by** that time, not that it was made at that
 moment. It is the latest the document can have been signed.
 
-### Judge a signature at its timestamp
+### The time a signature is judged at
 
-By default every certificate is judged as of now, so a signature whose signer's certificate has
-expired since reads `'valid-untrusted'`. A trusted timestamp proves the signature existed while
-the certificate was still good. To judge it then, pass `validationTime`:
-
-```ts
-const results = await validateSignatures(doc, {
-  trust,
-  validationTime: { kind: 'earliest-timestamp' },
-});
-```
-
-Each certificate is then judged at the earliest trusted timestamp that covers what it signed:
+A certificate is good for a while: it expires, and its issuer can withdraw it. What counts for
+a signature is whether the certificate was good when it signed, and a timestamp you trust
+proves when that was. So each certificate is judged at the earliest trusted timestamp that
+covers what it signed, as Acrobat judges it:
 
 - **A signer's certificate**, at the signature's own timestamp or at a
   [document timestamp](#document-timestamps) added after it, whichever is earlier.
 - **A timestamp authority's certificate**, at a document timestamp added after its token. The
   last timestamp in the file has nothing after it, so its authority is judged now.
-- **With no trusted timestamp to go by**, now, as without the option.
+- **With no trusted timestamp to go by**, now.
+
+A signature whose signer's certificate has expired since still reads `'valid'`, when a
+timestamp you trust shows it was signed in time. Without one it is judged now, and reads
+`'valid-untrusted'`.
 
 `result.validationTime` says which it was: its `kind` is `'timestamp'`, with the timestamp's
 `genTime`, or `'now'`.
 
 [Revocation](#revocation) is judged at the same time: a certificate withdrawn after the
 timestamp was still good when it signed.
+
+To judge every certificate as of now, whatever the timestamps prove, pass `validationTime`:
+
+```ts
+const results = await validateSignatures(doc, {
+  trust,
+  validationTime: { kind: 'now' },
+});
+```
+
+`{ kind: 'earliest-timestamp' }` is the default by name.
 
 ### Revocation
 
@@ -840,18 +848,17 @@ Only a certificate that has an issuer above it needs an answer. One you trust as
 your own root, has nobody to withdraw it, so a signer you trust directly reads `'good'`.
 
 An answer speaks for a time. One stored when the document was signed says the certificate was
-good then, and says nothing about today. So judged now, the default, a signature from last year
-reads `'unknown'`, and [judged at its timestamp](#judge-a-signature-at-its-timestamp) it reads
-`'good'`:
+good then, and says nothing about today. A signature is
+[judged at its timestamp](#the-time-a-signature-is-judged-at), so a signature from last year
+reads `'good'` from the file:
 
 ```ts
-const results = await validateSignatures(doc, {
-  trust,
-  validationTime: { kind: 'earliest-timestamp' },
-});
+const results = await validateSignatures(doc, { trust });
 
 results[0].revocation; // 'good', from the file
 ```
+
+Judged as of now, the same signature reads `'unknown'`: no stored answer speaks for today.
 
 To ask the issuers what the file doesn't hold, pass a `revocation` source, the same one
 [`addValidationInfo()`](#reach-the-issuers-from-a-browser) takes. That is the only way a

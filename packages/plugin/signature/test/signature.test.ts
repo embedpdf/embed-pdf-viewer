@@ -738,7 +738,7 @@ describe('timestamps', () => {
     }
   });
 
-  it('validate() can judge each signature at its earliest trusted timestamp', async () => {
+  it('validate() judges each signature at its earliest trusted timestamp, and as of now when asked', async () => {
     const doc = await openDoc();
     const signer = await createTestSigner();
     const timestampAuthority = await createTestTimestampAuthority();
@@ -758,15 +758,21 @@ describe('timestamps', () => {
       await signature.refresh();
       await signature.sign({ field: SIG, mark });
 
-      const [now] = await signature.validate();
+      const [now] = await signature.validate({ validationTime: { kind: 'now' } });
       expect(now).toMatchObject({ summary: 'valid', validationTime: { kind: 'now' } });
       expect(now!.timestamp!.summary).toBe('valid');
 
-      const [then] = await signature.validate({ validationTime: { kind: 'earliest-timestamp' } });
-      expect(then).toMatchObject({
-        summary: 'valid',
-        validationTime: { kind: 'timestamp', genTime: then!.timestamp!.genTime },
-      });
+      // With nothing asked for, and when asked for by name.
+      for (const options of [
+        undefined,
+        { validationTime: { kind: 'earliest-timestamp' } } as const,
+      ]) {
+        const [then] = await signature.validate(options);
+        expect(then).toMatchObject({
+          summary: 'valid',
+          validationTime: { kind: 'timestamp', genTime: then!.timestamp!.genTime },
+        });
+      }
     } finally {
       await doc.close();
     }

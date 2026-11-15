@@ -127,26 +127,24 @@ export async function pathRevocation(
 /**
  * One answer for a whole path: `revoked` when any certificate was withdrawn by then, `good`
  * when every one has an answer that says good, `unknown` otherwise. `reason` names the
- * certificate that decided it, and is null for `good`.
+ * certificate that decided it, and is null for `good`. `when` names the time the rows were
+ * judged at, for the reason: "now", or a time.
  */
 export function summarizeRevocation(
   rows: readonly CertificateRevocation[],
-  at: Date,
+  when: string,
 ): { status: RevocationStatus['status']; reason: string | null } {
   const named = (row: CertificateRevocation) => `"${row.name ?? 'a certificate without a name'}"`;
   const revoked = rows.find((row) => row.status === 'revoked');
   if (revoked) {
     const answer = revoked.answer;
-    const when = answer?.says === 'revoked' ? ` on ${answer.revokedAt.toISOString()}` : '';
+    const on = answer?.says === 'revoked' ? ` on ${answer.revokedAt.toISOString()}` : '';
     const why = answer?.says === 'revoked' && answer.reason ? ` (${answer.reason})` : '';
-    return { status: 'revoked', reason: `${named(revoked)} was withdrawn${when}${why}` };
+    return { status: 'revoked', reason: `${named(revoked)} was withdrawn${on}${why}` };
   }
   const unknown = rows.find((row) => row.status === 'unknown');
   if (unknown) {
-    return {
-      status: 'unknown',
-      reason: `no answer about ${named(unknown)} speaks for ${at.toISOString()}`,
-    };
+    return { status: 'unknown', reason: `no answer about ${named(unknown)} speaks for ${when}` };
   }
   return { status: 'good', reason: null };
 }

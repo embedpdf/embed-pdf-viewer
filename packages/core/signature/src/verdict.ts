@@ -140,11 +140,14 @@ export interface SignatureVerdict {
 export interface ValidateSignaturesOptions {
   trust?: TrustPort | null;
   /**
-   * When certificates are judged: now by default. `{ kind: 'earliest-timestamp' }` judges each
-   * certificate at the earliest trusted timestamp that covers what it signed: a signer's at its
-   * signature's own timestamp or at a document timestamp added later, a timestamp authority's at
-   * a document timestamp added later, and now when there is none. Revocation is judged at the
-   * same time, from the answers the file holds.
+   * When certificates are judged. By default, and with `{ kind: 'earliest-timestamp' }`, each
+   * certificate is judged at the earliest trusted timestamp that covers what it signed: a
+   * signer's at its signature's own timestamp or at a document timestamp added later, a
+   * timestamp authority's at a document timestamp added later, and now when there is none.
+   * That is the time a reader such as Acrobat judges at: a certificate that expired or was
+   * withdrawn after it signed was still good when it signed. `{ kind: 'now' }` judges every
+   * certificate as of now. Revocation is judged at the same time, from the answers the file
+   * holds.
    */
   validationTime?: ValidationTime | { kind: 'earliest-timestamp' };
   /**
@@ -176,8 +179,8 @@ export async function validateSignatures(
   }
 
   // Long-term validation always speaks for the times the timestamps prove, so that judgement
-  // is made whatever was asked for; it is also the answer when that is what was asked for.
-  const requested = options.validationTime ?? NOW;
+  // is made whatever was asked for. It is the answer too unless another time was asked for.
+  const requested = options.validationTime ?? EARLIEST;
   const atTimestamps = await judge(readings, trust, pool, EARLIEST);
   const judged =
     requested.kind === 'earliest-timestamp'
@@ -342,7 +345,7 @@ async function judge(
       : { status: 'unknown' as const, reason: undefined, path: undefined };
     const revocation =
       chain.status === 'trusted' && chain.path
-        ? summarizeRevocation(await pathRevocation(pool, chain.path, timeOf(at)), timeOf(at))
+        ? summarizeRevocation(await pathRevocation(pool, chain.path, timeOf(at)), nameOf(at))
         : { status: 'unknown' as const, reason: NO_ISSUER };
     judgements.set(reading, {
       trust: chain.status,
@@ -360,6 +363,11 @@ async function judge(
 }
 
 const NO_ISSUER = 'the signer is not trusted, so there is no issuer to check an answer against';
+
+/** A validation time in words, for a reason: "now", or the time a timestamp proves. */
+function nameOf(at: ValidationTime): string {
+  return at.kind === 'now' ? 'now' : at.genTime;
+}
 
 /**
  * Check an RFC 3161 timestamp token over any digest: the daily hash of an audit log as much as
@@ -567,7 +575,7 @@ async function judgeToken(
     path = authority.status === 'trusted' ? (authority.path ?? null) : null;
   }
   const revocation = path
-    ? summarizeRevocation(await pathRevocation(pool, path, timeOf(at)), timeOf(at))
+    ? summarizeRevocation(await pathRevocation(pool, path, timeOf(at)), nameOf(at))
     : {
         status: 'unknown' as const,
         reason: 'the authority is not trusted, so there is no issuer to check an answer against',

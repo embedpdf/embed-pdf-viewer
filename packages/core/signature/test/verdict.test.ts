@@ -325,7 +325,8 @@ describe('reading timestamps', () => {
         });
         const trust = trusting(expiredSigner.certificate, authority.certificate);
 
-        const [now] = await validateSignatures(doc, { trust });
+        // Asked to judge now, the certificate has run out.
+        const [now] = await validateSignatures(doc, { trust, validationTime: { kind: 'now' } });
         expect(now).toMatchObject({
           trust: 'untrusted',
           summary: 'valid-untrusted',
@@ -333,18 +334,21 @@ describe('reading timestamps', () => {
         });
         expect(now!.timestamp!.summary).toBe('valid');
 
-        const [then] = await validateSignatures(doc, { trust, validationTime: earliest });
-        expect(then).toMatchObject({
-          trust: 'trusted',
-          summary: 'valid',
-          validationTime: {
-            kind: 'timestamp',
-            genTime: stamped.toISOString(),
-            tokenVerified: true,
-          },
-        });
-        // The authority has nothing after it to vouch for it: it is judged now.
-        expect(then!.timestamp!.validationTime).toEqual({ kind: 'now' });
+        // With nothing asked for, and when asked for by name: at the timestamp.
+        for (const options of [{ trust }, { trust, validationTime: earliest }]) {
+          const [then] = await validateSignatures(doc, options);
+          expect(then).toMatchObject({
+            trust: 'trusted',
+            summary: 'valid',
+            validationTime: {
+              kind: 'timestamp',
+              genTime: stamped.toISOString(),
+              tokenVerified: true,
+            },
+          });
+          // The authority has nothing after it to vouch for it: it is judged now.
+          expect(then!.timestamp!.validationTime).toEqual({ kind: 'now' });
+        }
       });
     });
 
@@ -409,8 +413,14 @@ describe('reading timestamps', () => {
           validationTime: { kind: 'now' },
         });
 
-        // Without the option nothing is judged in the past.
-        const [now] = await validateSignatures(doc, { trust });
+        // The same with nothing asked for.
+        const [byDefault] = await validateSignatures(doc, { trust });
+        expect(byDefault).toMatchObject({
+          trust: 'trusted',
+          validationTime: { kind: 'timestamp', genTime: stamped.toISOString() },
+        });
+        // Asked to judge now, nothing is judged in the past.
+        const [now] = await validateSignatures(doc, { trust, validationTime: { kind: 'now' } });
         expect(now).toMatchObject({ trust: 'untrusted', validationTime: { kind: 'now' } });
       });
     });
