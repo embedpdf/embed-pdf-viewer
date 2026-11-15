@@ -1,5 +1,6 @@
 import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+import { HistoryToken } from '@embedpdf/plugin-history/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
@@ -60,6 +61,8 @@ describe('standard commands', () => {
       'tool:snapshot': null,
       'selection:copy': 'Mod+C',
       'annotation:delete': ['Delete', 'Backspace'],
+      'history:undo': 'Mod+Z',
+      'history:redo': ['Mod+Shift+Z', 'Mod+Y'],
       'snapshot:copy': 'Mod+C',
       'snapshot:save': null,
       'snapshot:clear': 'Escape',
@@ -89,6 +92,25 @@ describe('standard commands', () => {
     const context = contextWith(new Map([[StageToken, stage]]));
     expect(command('zoom:in').enabled?.(context)).toBe(false);
     expect(command('zoom:out').enabled?.(context)).toBe(true);
+  });
+
+  it('undoes and redoes only while there is a step to take', () => {
+    const { command } = standard();
+    const history = { canUndo: () => true, canRedo: () => false, undo: vi.fn(), redo: vi.fn() };
+    const context = contextWith(new Map([[HistoryToken, history]]));
+    expect(command('history:undo').enabled?.(context)).toBe(true);
+    expect(command('history:redo').enabled?.(context)).toBe(false);
+    command('history:undo').run?.(context);
+    expect(history.undo).toHaveBeenCalled();
+    expect(history.redo).not.toHaveBeenCalled();
+  });
+
+  it('leaves undo and redo disabled without the history plugin', () => {
+    const { command } = standard();
+    const context = contextWith(new Map());
+    expect(command('history:undo').enabled?.(context)).toBe(false);
+    expect(command('history:redo').enabled?.(context)).toBe(false);
+    expect(() => command('history:undo').run?.(context)).not.toThrow();
   });
 
   it('has a tool command for every tool the document has', () => {

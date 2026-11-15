@@ -14,6 +14,7 @@ export const en = {
     },
     selection: { copy: 'Copy' },
     annotation: { delete: 'Delete' },
+    history: { undo: 'Undo', redo: 'Redo' },
     document: { download: 'Download', print: 'Print' },
     snapshot: { copy: 'Copy', save: 'Save image', clear: 'Clear snapshot' },
     tool: {

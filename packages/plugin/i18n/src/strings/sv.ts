@@ -18,6 +18,7 @@ export const sv: EmbedpdfStrings = {
     view: { rotateClockwise: 'Rotera medurs', rotateCounterclockwise: 'Rotera moturs' },
     selection: { copy: 'Kopiera' },
     annotation: { delete: 'Ta bort' },
+    history: { undo: 'Ångra', redo: 'Gör om' },
     document: { download: 'Ladda ned', print: 'Skriv ut' },
     snapshot: { copy: 'Kopiera', save: 'Spara bild', clear: 'Rensa ögonblicksbild' },
     tool: {

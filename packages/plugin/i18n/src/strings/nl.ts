@@ -13,6 +13,7 @@ export const nl: EmbedpdfStrings = {
     view: { rotateClockwise: 'Rechtsom draaien', rotateCounterclockwise: 'Linksom draaien' },
     selection: { copy: 'Kopiëren' },
     annotation: { delete: 'Verwijderen' },
+    history: { undo: 'Ongedaan maken', redo: 'Opnieuw' },
     document: { download: 'Downloaden', print: 'Afdrukken' },
     snapshot: { copy: 'Kopiëren', save: 'Afbeelding opslaan', clear: 'Momentopname wissen' },
     tool: {

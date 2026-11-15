@@ -2148,6 +2148,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@embedpdf/plugin-i18n':
         specifier: workspace:*
         version: link:../i18n
