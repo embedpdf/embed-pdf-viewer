@@ -424,4 +424,167 @@ describe("SignaturesClient", () => {
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
+
+    test("validationInfo (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { certificates: ["certificates"], ocspResponses: ["ocspResponses"], crls: ["crls"] };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.signatures.validationInfo({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("validationInfo (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.signatures.validationInfo({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("addValidationInfo (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = {
+            added: { certificates: 1, ocspResponses: 1, crls: 1 },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    outlineVersion: 1,
+                    viewportsVersion: 1,
+                    fontsVersion: 1,
+                    contentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                missingCharacters: ["missingCharacters"],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.signatures.addValidationInfo({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("addValidationInfo (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.signatures.addValidationInfo({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("addValidationInfo (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.signatures.addValidationInfo({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("addValidationInfo (4)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/signatures/validation-info")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(409)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.signatures.addValidationInfo({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.ConflictError);
+    });
 });

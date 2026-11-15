@@ -44,6 +44,8 @@ export type AuditMutationKind =
   | 'signature.cancel'
   /** A signature published a new base version through this layer. */
   | 'signature.complete'
+  /** Validation data for the layer's signatures was stored: its payload has the counts, never the bytes. */
+  | 'signature.addValidationInfo'
   /** One change of `POST …/changes`: its ops, or an undo (`undoOf`). */
   | 'change';
 

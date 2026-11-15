@@ -31,3 +31,6 @@ Read and store the validation data of a document, timestamp a document with no f
 For that third case an engine hands the rules the objects they ask for: `unwrittenObjectsToRead()` names them, and `StepInput.unwritten` carries them (`UnwrittenObject`). Without them such a page reads `forbidden`, with a reason that says the earlier list could not be read.
 
 `SIGNATURE_POLICY_VERSION` is 5. For a certification at level 2 or 3 and for approval signatures nothing changes.
+
+**On the wire, for the cloud (3.3).** `@embedpdf/engine-core/wire` has the schemas for validation data as base64 (`ValidationInfoWireSchema`, `ValidationInfoAddBodySchema`, `ValidationInfoAddResultSchema`, with `encodeValidationInfo()` and `decodeValidationInfo()`), a cached read kind `validationInfo` with its paths and resource, and `VALIDATION_INFO_SINCE`, the version these arrived in. A prepare's body may leave `field` out, and its answer may carry the `field` the engine made. The worker's answer to a prepare says the object number of the field the signing goes in.
+

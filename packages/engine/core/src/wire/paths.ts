@@ -257,6 +257,17 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/analysis@${encodeAnalysisToken(token)}`,
   layerSignaturesAnalysisCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/analysis`,
+  /** Immutable: the validation data the layer's file holds, pinned by `docVersion`. */
+  layerSignaturesValidationInfo: (
+    docId: string,
+    layerName: string,
+    docVersion: number,
+    pin: TokenPin,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/validation-info@${encodeDocToken(docVersion, pin)}`,
+  /** GET the current form, or POST (JSON, each entry as base64) to store more. */
+  layerSignaturesValidationInfoCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/validation-info`,
   /** POST (multipart envelope): author and seal a signing candidate. */
   layerSignaturesPrepare: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/prepare`,
@@ -934,6 +945,7 @@ export const wireTemplates = {
   layerDownloadLink: '/v1/docs/:docId/layers/:layerName/download-link',
   layerSignatures: '/v1/docs/:docId/layers/:layerName/signatures',
   layerSignaturesAnalysis: '/v1/docs/:docId/layers/:layerName/signatures/analysis',
+  layerSignaturesValidationInfo: '/v1/docs/:docId/layers/:layerName/signatures/validation-info',
   layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
   layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',

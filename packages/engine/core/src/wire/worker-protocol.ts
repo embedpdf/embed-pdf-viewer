@@ -1732,7 +1732,16 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.digest'; digest: ArrayBuffer }
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.version'; version: BaseVersionInfo }
-  | { tag: 'signatures.prepare'; result: SignaturePrepared }
+  | {
+      tag: 'signatures.prepare';
+      result: SignaturePrepared;
+      /**
+       * The object number of the field the signing goes in, on the candidate:
+       * the one asked for, or the one the engine made for a document
+       * timestamp prepared with no field.
+       */
+      fieldObjectNumber: number;
+    }
   | ({
       tag: 'signatures.complete';
       result: SignatureCompleteResult;

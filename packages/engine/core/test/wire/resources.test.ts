@@ -650,6 +650,7 @@ describe('cdnCoverageForScope', () => {
         // no download right (contents/digests, history).
         'layer-signatures',
         'layer-signatures-analysis',
+        'layer-signatures-validation-info',
         'layer-version-signatures',
         'layer-version-analysis',
         // ...and the form: its fields and widget rows, and the widget images.

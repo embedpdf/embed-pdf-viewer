@@ -29,6 +29,7 @@ export const CACHED_READ_KINDS = [
   'search',
   'signatures',
   'analysis',
+  'validationInfo',
   'download',
 ] as const;
 
@@ -68,6 +69,7 @@ export const SHAPES: Readonly<Record<CachedReadKind, number>> = {
   search: 1,
   signatures: 1,
   analysis: 1,
+  validationInfo: 1,
   download: 1,
 };
 

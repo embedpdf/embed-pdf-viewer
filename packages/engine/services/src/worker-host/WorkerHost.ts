@@ -1050,7 +1050,11 @@ export class WorkerHost {
       this.baseDocuments,
       this.options.signingCandidatePath,
     ).prepare(req.input, req.authority);
-    return wirePack({ tag: 'signatures.prepare', result });
+    return wirePack({
+      tag: 'signatures.prepare',
+      result,
+      fieldObjectNumber: session.pendingSigning!.fieldObjectNumber,
+    });
   }
 
   private handleSignaturesComplete(

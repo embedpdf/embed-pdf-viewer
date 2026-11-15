@@ -36,6 +36,7 @@ import {
   type RedactionApplyResult,
   type FormFieldRef,
   type SignatureCompleteResult,
+  type ValidationInfoAddResult,
 } from '@embedpdf/engine-core/runtime';
 import {
   decodePrepared,
@@ -290,6 +291,13 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'signatures.cancelled',
         origin,
         signingId: (row.payload as { signingId: string }).signingId,
+      };
+    case 'signature.addValidationInfo':
+      // The row says how many entries of each kind were stored, never the entries.
+      return {
+        type: 'signatures.validationInfoAdded',
+        origin,
+        ...(row.payload as ValidationInfoAddResult),
       };
     default:
       return undefined;

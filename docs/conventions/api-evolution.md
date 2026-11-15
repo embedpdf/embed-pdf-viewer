@@ -446,6 +446,7 @@ parameter, not a shape.
 | `search`                | `/layers/:layer/search/:tier/data@`                                    | `contentsVersion`, `layoutVersion`                                  | query, options, `from`, `skip`, limits      |
 | `signatures`            | `/layers/:layer/signatures@`                                           | `docVersion`                                                        |                                             |
 | `analysis`              | `/layers/:layer/signatures/analysis@`                                  | `docVersion`                                                        | since, level, policy, detail                |
+| `validationInfo`        | `/layers/:layer/signatures/validation-info@`                           | `docVersion`                                                        |                                             |
 | `download`              | `/layers/:layer/download@`                                             | `docVersion`                                                        | mode                                        |
 
 Routes are under `/v1/docs/:docId`, and each document route has a

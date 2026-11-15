@@ -51,6 +51,18 @@ describe('unreadableBy', () => {
     expect(unreadableBy(API_VERSION, row('constructor'))).toBe(true);
   });
 
+  it('stored validation data is a row a client older than 3.3 gets a full refresh for', () => {
+    const stored = row('signature.addValidationInfo', {
+      added: { certificates: 1, ocspResponses: 1, crls: 0 },
+    });
+    expect(unreadableBy('3.0', stored)).toBe(true);
+    expect(unreadableBy('3.1', stored)).toBe(true);
+    // A client of this build has what this build has, and a newer one has all of it.
+    expect(unreadableBy(API_VERSION, stored)).toBe(false);
+    expect(unreadableBy(null, stored)).toBe(false);
+    expect(unreadableBy(NEWER, stored)).toBe(false);
+  });
+
   it('every other kind of row is as old as 3.0, and a withheld row is only its pins', () => {
     expect(unreadableBy('3.0', row('annot.create', { annotation: {} }))).toBe(false);
     expect(unreadableBy('3.0', row('signature.complete'))).toBe(false);

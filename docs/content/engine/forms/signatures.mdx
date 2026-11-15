@@ -684,6 +684,18 @@ Once a field is signed, its look is part of what the signature seals, so
   provably doesn't belong to it.
 - **Signed bytes never change.** `getContents()`, `getDigest()` and `downloadRevision()` read a
   version, and a version is never changed, so the server lets browsers and CDNs cache them.
+- **Validation data is stored in the layer.** `doc.signatures.addValidationInfo()` changes the
+  layer you opened, as a form value does, and everyone else with it open receives
+  `signatures.validationInfoAdded`. A signature or a document timestamp made after it seals it
+  into the layer's next version.
+- **The server asks no certificate authority.** Your app collects the answers, as it does with
+  the local engine, and the server stores what it is given after the same check. So
+  `addValidationInfo()` from `@embedpdf/core-signature` works here as it is.
+- **A document timestamp needs no field** here either: the server makes it.
+- **These need a server of version 3.3.** An older one is never sent them:
+  `getValidationInfo()`, `addValidationInfo()` and a document timestamp with no `field` fail
+  with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to
+  update. Checking signatures still works against it.
 
 </Engine>
 
