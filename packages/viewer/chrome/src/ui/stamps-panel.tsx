@@ -81,7 +81,7 @@ export function StampsPanel() {
         ]),
       )
       .catch((error: unknown) => {
-        console.error('[embedpdf] default stamps failed:', error);
+        console.error('[embedpdf] stamp libraries failed:', error);
         if (live) setError(t('demo.stampsError'));
       })
       .finally(() => live && setBusy(null));

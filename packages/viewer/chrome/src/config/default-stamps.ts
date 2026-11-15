@@ -14,8 +14,11 @@
  * Loading is lazy (first open of the stamps panel, never at boot) and
  * locale-aware: the chrome locale leads, the browser languages break ties
  * for the locales the chrome does not translate itself, and a locale change
- * while a default library is loaded swaps it for the new one. The file names
- * itself (`/Title`, `Id: embedpdf-standard`), so no overrides are passed.
+ * while a default library is loaded swaps it for the new one. The library is
+ * imported under `embedpdf-standard` whatever id its file names: a file of
+ * your own at your URL may name another id or none (an Acrobat stamp file),
+ * and under that id it would be stored in the browser and imported again,
+ * beside the stored copy, on every visit. Its title is the file's.
  */
 import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { negotiateLocale } from '@embedpdf/react/i18n';
@@ -76,7 +79,7 @@ export function ensureDefaultLibrary(
     if (loaded?.locale === locale) return;
     if (current && !loaded) return; // removed by the user this session
     if (loaded) await stamp.deleteLibrary(DEFAULT_LIBRARY_ID);
-    await stamp.importLibrary(await defaultLibraryBytes(locale, url));
+    await stamp.importLibrary(await defaultLibraryBytes(locale, url), { id: DEFAULT_LIBRARY_ID });
   };
   const promise = run();
   loads.set(stamp, { locale, promise });

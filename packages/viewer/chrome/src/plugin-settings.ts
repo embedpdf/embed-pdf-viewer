@@ -36,7 +36,9 @@ export interface ViewerStampSettings {
   /**
    * Where the standard stamps come from: `true`, the copy that ships inside your build (a lazy
    * chunk, loaded when the stamps panel first opens); a URL with a `{locale}` slot, used exactly
-   * as given; `false`, none and no request. Default `true`.
+   * as given, which may be a stamp library of your own; `false`, none and no request. Whichever
+   * file it is, its stamps go by `standard:<name>` and it is never stored in the browser.
+   * Default `true`.
    */
   readonly standard?: boolean | string;
   /**
