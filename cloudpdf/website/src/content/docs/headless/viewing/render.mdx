@@ -67,6 +67,78 @@ out, `true` draws it. A clean preview without the annotations:
 
 <Snippet name="viewing/render-without-annotations" />
 
+## Draw the pages in other colors
+
+For reading at night, or on a page of your own colors, draw the pages in a preset, or choose the colors
+yourself. One setting recolors every picture the plugin draws: the pages, their tiles and their
+thumbnails:
+
+```ts
+renderPlugin({ pageColors: 'dark' });
+
+// While the app runs; a change redraws every page:
+render.updateSettings({ pageColors: 'sepia' });
+render.updateSettings({ pageColors: 'normal' }); // the pages as the file has them
+```
+
+| `pageColors` | The paper | Text and shapes |
+| :----------- | :-------- | :-------------- |
+| `'normal'`   | White     | As the file has them (the default) |
+| `'dark'`     | `#1e1e1e` | `#e8e6e3` |
+| `'sepia'`    | `#f4ecd8` | `#5b4636` |
+
+To choose them yourself, give an object of `'#rrggbb'` colors. Every field is optional: a color you
+leave out is `text`, which is black when you leave it out too, and the paper is white:
+
+```ts
+render.updateSettings({
+  pageColors: { background: '#0b1d2a', text: '#cfe8ff', convertFillToStroke: true },
+});
+```
+
+| Field | What it colors | Default |
+| :---- | :------------- | :------ |
+| `background` | The paper | `'#ffffff'` |
+| `text` | Whatever of the four below you leave out | `'#000000'` |
+| `pathFill` | The fill of shapes: a chart's bars, a box's background | `text` |
+| `pathStroke` | The outline of shapes, and lines | `text` |
+| `textFill` | The fill of text | `text` |
+| `textStroke` | The outline of text, where the font has one | `text` |
+| `convertFillToStroke` | Draw filled shapes as outlines, so a shape doesn't cover the text on it | `false` |
+
+`pageColors` is one value: a change replaces it whole, so a field you leave out is its default again,
+and not what it was. A color that isn't `'#rrggbb'` makes the pictures fail with `invalid-input`.
+
+### What it does and doesn't recolor
+
+The engine draws the page with PDFium's color scheme: all text takes one color and all shapes
+another, whatever color the file gave them. That suits pages of text and line drawings, and it has
+limits:
+
+- **Pictures stay as the file has them.** Embedded images, scanned pages and shadings are not
+  recolored, so a scanned page looks the same in every preset. For those, filter the picture
+  yourself: `renderPage` hands you the image to paint.
+- **Fills are flat.** With one color for every fill, a text label on a filled box would be the color
+  of the box. The presets draw filled shapes as outlines (`convertFillToStroke`) for that reason; a
+  chart's bars lose their colors either way.
+- **What the layers paint stays as it is.** The annotation layer and the form layer paint their own
+  pictures of the annotations and form fields over the page, in the colors the file gave them.
+- **The paper shows first.** Until its picture arrives a page shows its background, which is
+  white unless you set the viewer's `page.background`.
+- **Print is on white.** A [print picture](/docs/engine/documents/rendering#print-pictures) takes
+  no colors, and neither does a download.
+- **The local engine draws them.** The cloud engine draws pages as the file has them, and fails with
+  `unsupported` for anything else.
+
+A change makes every picture stale, as a change of the pages does: `onInvalidated` fires with
+`scope: 'content'` and no `origin`, and `getRenderEpoch` moves on. To draw one picture in other
+colors than the setting says, give `renderPage` or `renderThumbnail` a `pageColors` of its own:
+`'normal'` is the page as the file has it, whatever the setting is.
+
+```ts
+const light = await render.renderPage(page.ref, { width: 800, pageColors: 'normal' });
+```
+
 ## Show that a page is loading
 
 The first picture of a page can take a moment: a heavy page, a slow connection, a server that's
@@ -149,6 +221,7 @@ cache. A `rect` that runs past the page's edge is cut at it, and one that misses
 | `rotation`           | Turn the picture clockwise: `0`, `90`, `180` or `270` | `0`: the page as stored                                      |
 | `includeAnnotations` | Draw the annotations into the image              | when the user may read them                                       |
 | `includeFormFields`  | Draw the form fields into the image              | `false` without annotations; else when the user may read the form |
+| `pageColors`         | The colors this picture is drawn in, or `'normal'` for the page as the file has it | the [`pageColors` setting](#draw-the-pages-in-other-colors) |
 | `format`             | `'png'`, `'webp'` or `'bmp'`                     | per engine                                                        |
 | `quality`            | For WebP, from `0` to `1`                        | per engine                                                        |
 | `concurrency`        | For `renderPages`, how many pages render at once | `4`                                                               |
@@ -300,10 +373,11 @@ Set them when you register the plugin, and change them while the app runs with
 | `snapshot.scale`              | A [snapshot](#take-a-snapshot)'s pixels per point                     | `2`              |
 | `snapshot.box.fill`           | Inside the box you drag with the snapshot tool                        | the viewer's `accent` at 8% |
 | `snapshot.box.stroke`         | Its dashed edge                                                       | the viewer's `accent` |
+| `pageColors`                  | The colors the pages are drawn in: `'normal'`, `'dark'`, `'sepia'`, or colors of your own. [Draw the pages in other colors](#draw-the-pages-in-other-colors) | `'normal'` |
 
 `format` and `quality` read `null` while the engine chooses, and `updateSettings({ format: null })`
-gives the choice back. `snapshot.box` is one look: a change replaces it whole, so a color you leave
-out follows the accent again.
+gives the choice back. `snapshot.box` and `pageColors` are one value each: a change replaces them
+whole, so a color you leave out of `snapshot.box` follows the accent again.
 
 `<RenderLayer>` takes four <Word of="props" />: `annotations` and `formFields`, unset by default
 (see [What the picture draws](#what-the-picture-draws)), `tiles` (default `true`), and `thumbnail`:
@@ -319,7 +393,7 @@ from CSS: `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` win over t
 
 | Event           | Fires when                                  | Carries                      |
 | :-------------- | :------------------------------------------ | :--------------------------- |
-| `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
+| `onInvalidated` | Pages' pixels changed and they will redraw, also when `pageColors` changes | `pages`, `scope`, `origin`   |
 | `onPictureStateChanged` | A page's picture came on screen, failed, went slow, or left its view | `page`, `view`, `status`, `slow` |
 | `onSnapshotChanged` | A snapshot was taken, or let go | `snapshot`: `{ page, rect, image }`, or `null` |
 | `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |

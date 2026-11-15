@@ -3,7 +3,7 @@
  * Every function below is a pure transition or projection; the controller
  * applies the transitions with `ctx.state.update`.
  */
-import type { PageObjectNumber, PageRef, PageRenderLayers } from '@embedpdf/core';
+import type { PageColors, PageObjectNumber, PageRef, PageRenderLayers } from '@embedpdf/core';
 import type { Rotation, Point } from '@embedpdf/core-geometry';
 import type { InvalidateScope } from './contract';
 
@@ -103,3 +103,18 @@ export function renderEpochOf(
 /** What a picture draws, as one key part: `a1f0` draws annotations and no form fields. */
 export const layersKeyOf = (layers: PageRenderLayers): string =>
   `a${layers.includeAnnotations ? 1 : 0}f${layers.includeFormFields ? 1 : 0}`;
+
+/**
+ * The page colors of a picture as one key part, left out for the page as the
+ * file has it: `|cdark`, or `|c` and the fields of a custom scheme in name
+ * order. It reads what it is given and never refuses: the engine does.
+ */
+export function colorsKeyOf(pageColors: PageColors | undefined): string {
+  if (pageColors === undefined || pageColors === 'normal') return '';
+  if (typeof pageColors === 'string') return `|c${pageColors}`;
+  const fields = Object.entries(pageColors)
+    .filter(([, value]) => value !== undefined)
+    .sort(([left], [right]) => (left < right ? -1 : 1))
+    .map(([name, value]) => `${name}:${String(value).toLowerCase()}`);
+  return `|c{${fields.join(',')}}`;
+}

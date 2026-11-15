@@ -193,6 +193,13 @@ export {
   resolvePageLayers,
 } from './dto/PageRender';
 export type {
+  CustomPageColors,
+  PageColors,
+  PageColorScheme,
+  PageColorsPreset,
+} from './dto/PageColors';
+export { resolvePageColors } from './dto/PageColors';
+export type {
   PageExtractFlatten,
   PageExtractInput,
   PageExtractOptions,

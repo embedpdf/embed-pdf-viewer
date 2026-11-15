@@ -7,6 +7,7 @@ import type { PdfRotation } from '../geometry/primitives';
 import type { PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import { AbortablePromise } from '../promise/AbortablePromise';
+import type { PageColors } from './PageColors';
 
 export type PageRenderEncodedFormat = 'png' | 'webp' | 'bmp';
 
@@ -87,11 +88,11 @@ export interface PagePictureRights {
 /**
  * Check what a render is for, and that the caller may make that picture. A
  * print picture (`usage: 'print'`) takes a `{ kind: 'dpi', dpi }` viewport
- * with a DPI of 150 or 300, and no `target`, `rotation` or `background`: it
- * is the whole page, upright, on white. A `dpi` viewport is for print
- * pictures only. A thumbnail (a `{ kind: 'thumbnail' }` viewport) is for the
- * screen and is always the whole page, so it takes no `target`. Anything
- * else is `InvalidArg`, naming the option. With the caller's rights, a
+ * with a DPI of 150 or 300, and no `target`, `rotation`, `background` or
+ * `pageColors`: it is the whole page, upright, on white. A `dpi` viewport is
+ * for print pictures only. A thumbnail (a `{ kind: 'thumbnail' }` viewport)
+ * is for the screen and is always the whole page, so it takes no `target`.
+ * Anything else is `InvalidArg`, naming the option. With the caller's rights, a
  * picture they may not make is refused (`PermissionDenied`), each kind by its
  * own right only: a screen picture without `doc.render`, a thumbnail without
  * `doc.render.thumbnail`, any print without `doc.print` and 300 DPI without
@@ -100,7 +101,10 @@ export interface PagePictureRights {
  */
 export function checkRenderUsage<C extends Coordinates>(
   options:
-    | Pick<PageRenderOptions<C>, 'usage' | 'viewport' | 'target' | 'rotation' | 'background'>
+    | Pick<
+        PageRenderOptions<C>,
+        'usage' | 'viewport' | 'target' | 'rotation' | 'background' | 'pageColors'
+      >
     | undefined,
   may: PagePictureRights | null,
 ): void {
@@ -125,7 +129,7 @@ export function checkRenderUsage<C extends Coordinates>(
   if (viewport?.kind !== 'dpi' || (viewport.dpi !== 150 && viewport.dpi !== 300)) {
     invalid('viewport', "a print picture needs viewport: { kind: 'dpi', dpi: 150 or 300 }");
   }
-  for (const field of ['target', 'rotation', 'background'] as const) {
+  for (const field of ['target', 'rotation', 'background', 'pageColors'] as const) {
     if (options?.[field] !== undefined) {
       invalid(field, `a print picture takes no ${field}: it is the whole page, upright, on white`);
     }
@@ -207,6 +211,15 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
   rotation?: PdfRotation;
   background?: PageRenderBackground;
   /**
+   * Draw the page in other colors: a preset (`'dark'`, `'sepia'`), colors of
+   * your own, or `'normal'`, the page as the file has it (the default). The
+   * paper takes the colors' `background`, unless `background` is
+   * `'transparent'`. Text and shapes become one color each, and pictures,
+   * scans and shadings are drawn as the file has them. A print picture takes
+   * none, and the cloud engine does not draw it (`NotImplemented`).
+   */
+  pageColors?: PageColors;
+  /**
    * Draw the page's annotations into the picture, from their appearances.
    * Default: `true` when the caller may read annotations
    * (`doc.annotate.read`), so the page is drawn as the caller may see it.
@@ -230,7 +243,7 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
    * print state, and only the annotations and form fields with the `print`
    * flag (no-view ones included, hidden ones never). It needs `doc.print`
    * and a `{ kind: 'dpi', dpi }` viewport, and takes no `target`,
-   * `rotation` or `background`.
+   * `rotation`, `background` or `pageColors`.
    */
   usage?: PageFlattenUsage;
   /**

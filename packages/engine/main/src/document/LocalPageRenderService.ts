@@ -15,6 +15,7 @@ import {
   type PageRef,
   checkImageQuality,
   checkRenderUsage,
+  resolvePageColors,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 
@@ -68,6 +69,8 @@ export class LocalPageRenderService implements RawPageRenderService {
         annotations: this.guard.can('doc.annotate.read'),
         formFields: this.guard.can('doc.forms.read'),
       });
+      // Refused here, before a round trip to the worker, which checks it again.
+      resolvePageColors(options?.pageColors);
       if (options?.usage !== 'print' && options?.viewport?.kind !== 'thumbnail') {
         assertFullPageOnLattice(this.policy, options);
       }

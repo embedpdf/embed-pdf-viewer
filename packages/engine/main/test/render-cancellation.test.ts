@@ -16,7 +16,12 @@ import {
   type WorkerRequest,
   type WorkerResponse,
 } from '@embedpdf/engine-core/runtime';
-import { createPdfRuntime, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
+import {
+  createPdfRuntime,
+  type Callback,
+  type PdfRuntimeModule,
+  type Ptr,
+} from '@embedpdf/engine-runtime';
 import { WorkerHost } from '../../services/src/worker-host/WorkerHost';
 import { heavyPdf } from './helpers/heavyPdf';
 
@@ -24,28 +29,75 @@ const bytes = heavyPdf(2, 30_000);
 const FIRST = toPageRef(3);
 const SECOND = toPageRef(5);
 
-/** The runtime, counting the render slices it runs. */
+/**
+ * The runtime, counting the render slices it runs, and the memory and
+ * callbacks it hands out: a render gives every one back, aborted or not.
+ */
 function counting(runtime: PdfRuntimeModule) {
-  const counts = { starts: 0, continues: 0 };
+  const counts = {
+    starts: 0,
+    continues: 0,
+    schemeStarts: 0,
+    schemeContinues: 0,
+    allocations: 0,
+    frees: 0,
+    callbacks: 0,
+    disposals: 0,
+  };
   const fn = new Proxy(runtime.fn, {
     get(target, name, receiver) {
       const original = Reflect.get(target, name, receiver) as unknown;
-      if (name === 'EPDF_RenderPageBitmapWithMatrix_Start') {
+      const counted: Record<string, keyof typeof counts> = {
+        EPDF_RenderPageBitmapWithMatrix_Start: 'starts',
+        EPDF_RenderPage_Continue: 'continues',
+        FPDF_RenderPageBitmapWithColorScheme_Start: 'schemeStarts',
+        FPDF_RenderPage_Continue: 'schemeContinues',
+      };
+      if (typeof name === 'string' && name in counted) {
         return (...args: unknown[]) => {
-          counts.starts++;
-          return (original as (...values: unknown[]) => unknown)(...args);
-        };
-      }
-      if (name === 'EPDF_RenderPage_Continue') {
-        return (...args: unknown[]) => {
-          counts.continues++;
+          counts[counted[name]!]++;
           return (original as (...values: unknown[]) => unknown)(...args);
         };
       }
       return original;
     },
   });
-  return { runtime: Object.create(runtime, { fn: { value: fn } }) as PdfRuntimeModule, counts };
+  const mem = Object.create(runtime.mem, {
+    alloc: {
+      value: (byteCount: number) => {
+        counts.allocations++;
+        return runtime.mem.alloc(byteCount);
+      },
+    },
+    free: {
+      value: (ptr: Ptr) => {
+        counts.frees++;
+        runtime.mem.free(ptr);
+      },
+    },
+  }) as PdfRuntimeModule['mem'];
+  const cb = Object.create(runtime.cb, {
+    register: {
+      value: (...args: Parameters<PdfRuntimeModule['cb']['register']>) => {
+        counts.callbacks++;
+        return runtime.cb.register(...args);
+      },
+    },
+    dispose: {
+      value: (callback: Callback) => {
+        counts.disposals++;
+        runtime.cb.dispose(callback);
+      },
+    },
+  }) as PdfRuntimeModule['cb'];
+  return {
+    runtime: Object.create(runtime, {
+      fn: { value: fn },
+      mem: { value: mem },
+      cb: { value: cb },
+    }) as PdfRuntimeModule,
+    counts,
+  };
 }
 
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -180,5 +232,68 @@ describe('sliced page renders (wasm engine)', () => {
     expect((await host.settled(close)).kind).toBe('resolve');
     expect(host.order().slice(-2)).toEqual([job, close]);
     expect(host.reply(job)!.kind).toBe('resolve');
+  }, 120_000);
+});
+
+describe('sliced page renders in colors (wasm engine)', () => {
+  const dark = { pageColors: 'dark' };
+
+  test('render the bytes of a render in one slice, however finely sliced', async () => {
+    const whole = await openHost(60_000);
+    const finest = await openHost(0);
+    for (const options of [
+      dark,
+      { ...dark, ...tile },
+      { ...dark, rotation: 90, background: 'transparent' },
+    ]) {
+      const before = finest.counts.schemeContinues;
+      expect(await digest(finest, FIRST, options)).toBe(await digest(whole, FIRST, options));
+      expect(finest.counts.schemeContinues - before).toBeGreaterThan(10);
+    }
+    expect(whole.counts.schemeContinues).toBe(0);
+    // The render in colors is its own: the matrix render ran for none of it.
+    expect(finest.counts.starts + finest.counts.continues).toBe(0);
+  }, 120_000);
+
+  test('stop at the next slice once aborted, give back what it took, and leave the page ready to render again', async () => {
+    const host = await openHost(0);
+    const expected = await digest(await openHost(60_000), FIRST, dark);
+    const { counts } = host;
+    const [allocated, freed] = [counts.allocations, counts.frees];
+    const callbacksBefore = counts.callbacks;
+
+    const job = render(host, FIRST, dark);
+    while (counts.schemeContinues < 3) await turn();
+    host.send({ kind: 'abort', jobId: job });
+    const continuesAtAbort = counts.schemeContinues;
+
+    const aborted = await host.settled(job);
+    expect(aborted.kind).toBe('reject');
+    if (aborted.kind === 'reject') expect(aborted.error.code).toBe('Aborted');
+    // The abort landed between two slices; none ran after it.
+    expect(counts.schemeContinues).toBe(continuesAtAbort);
+    // Every allocation of the render, and its pause callback, was given back.
+    expect(counts.allocations - allocated).toBe(counts.frees - freed);
+    expect(counts.callbacks).toBe(counts.disposals);
+    expect(counts.callbacks - callbacksBefore).toBe(1);
+
+    expect(await digest(host, FIRST, dark)).toBe(expected);
+    expect(counts.callbacks).toBe(counts.disposals);
+  }, 120_000);
+
+  test('hold requests that arrive during a render in colors, and run them after it', async () => {
+    const host = await openHost(0);
+    const first = render(host, FIRST, dark);
+    while (host.counts.schemeContinues < 3) await turn();
+    const list = host.send({ kind: 'pages.list', effect: 'read' });
+    const second = render(host, SECOND, dark);
+
+    for (let i = 0; i < 20; i++) await turn();
+    expect(host.reply(list)).toBeUndefined();
+    expect(host.counts.schemeStarts).toBe(1);
+
+    await host.settled(second);
+    expect(host.order().slice(-3)).toEqual([first, list, second]);
+    for (const id of [first, list, second]) expect(host.reply(id)!.kind).toBe('resolve');
   }, 120_000);
 });

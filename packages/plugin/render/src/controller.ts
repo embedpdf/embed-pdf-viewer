@@ -11,6 +11,7 @@ import {
   toPluginErrorInfo,
   type BatchResult,
   type EventOrigin,
+  type PageColors,
   type PluginContext,
   type DocCapability,
   type EngineRenderPolicy,
@@ -49,7 +50,13 @@ import type {
   ViewDemand,
 } from './host-contract';
 import { pixelChangeOf } from './invalidation';
-import { invalidatePages, layersKeyOf, renderEpochOf, type RenderState } from './model';
+import {
+  colorsKeyOf,
+  invalidatePages,
+  layersKeyOf,
+  renderEpochOf,
+  type RenderState,
+} from './model';
 import {
   EMPTY_TILE_PLAN,
   resolveRenderOptions,
@@ -256,16 +263,18 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   // A raster's identity includes its encode format: the cloud policy arrives
   // asynchronously after open, so the resolved format can change under a
   // live store, and the key must change with it. An absent format (the
-  // engine default) adds nothing.
+  // engine default) adds nothing, and neither does the page as the file has it.
   const rasterKey = (
     pageObjectNumber: PageObjectNumber,
     width: number,
     layers: PageRenderLayers,
     format: RenderFormat | undefined,
     quality: number | undefined,
+    pageColors: PageColors | undefined,
   ): string =>
     `${pageObjectNumber}|w${width}|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
-    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
+    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}` +
+    colorsKeyOf(pageColors);
   // A thumbnail is one picture per page, whatever the screen asks: its key
   // has no width.
   const thumbnailKey = (
@@ -273,9 +282,18 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     layers: PageRenderLayers,
     format: RenderFormat | undefined,
     quality: number | undefined,
+    pageColors: PageColors | undefined,
   ): string =>
     `${pageObjectNumber}|thumbnail|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
-    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
+    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}` +
+    colorsKeyOf(pageColors);
+
+  // The colors a picture is drawn in: its own, else the setting's. The page as
+  // the file has it asks the engine for nothing: `'normal'` is its default.
+  const colorsOf = (asked: PageColors | undefined): PageColors | undefined => {
+    const colors = asked ?? settings.get().pageColors;
+    return colors === 'normal' ? undefined : colors;
+  };
 
   // ── the raster store door (shared by both render doors and the tiles) ──
   function acquireRaster(
@@ -286,6 +304,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       layers: PageRenderLayers;
       format: RenderFormat | undefined;
       quality: number | undefined;
+      pageColors: PageColors | undefined;
       /** The view whose picture it is, so the engine ranks it by where the page is there. */
       view: string | undefined;
     },
@@ -304,6 +323,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
             ...request.layers,
             ...(request.format !== undefined ? { format: request.format } : {}),
             ...(request.quality !== undefined ? { quality: request.quality } : {}),
+            ...(request.pageColors !== undefined ? { pageColors: request.pageColors } : {}),
           });
           if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
           else
@@ -347,12 +367,14 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const layers = pictureLayers(options, 'render.renderSource');
     const viewport = conformViewport(page, scale);
     const strategy = currentStrategy();
+    const pageColors = colorsOf(undefined);
     const key = rasterKey(
       page.objectNumber,
       viewport.kind === 'width' ? viewport.width : 0,
       layers,
       strategy.format,
       undefined,
+      pageColors,
     );
     return acquireRaster(
       page,
@@ -362,6 +384,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         layers,
         format: strategy.format,
         quality: strategy.quality,
+        pageColors,
         view,
       },
       signal,
@@ -380,6 +403,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     layers: PageRenderLayers,
     format: RenderFormat | undefined,
     quality: number | undefined,
+    pageColors: PageColors | undefined,
   ): Promise<PageImageHandle> {
     const rect = options.rect && intersectRects(options.rect, { x: 0, y: 0, ...pageSize });
     if (rect && !(rect.width > 0 && rect.height > 0)) {
@@ -402,6 +426,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
           ...layers,
           ...(format !== undefined ? { format } : {}),
           ...(quality !== undefined ? { quality } : {}),
+          ...(pageColors !== undefined ? { pageColors } : {}),
         });
       if (signal?.aborted) task.abort(reasonOf(signal));
       else signal?.addEventListener('abort', () => task.abort(reasonOf(signal)), { once: true });
@@ -423,17 +448,18 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const strategy = currentStrategy();
     const format = options.format ?? strategy.format;
     const quality = options.quality ?? strategy.quality;
+    const pageColors = colorsOf(options.pageColors);
     if (options.rect !== undefined || options.rotation) {
       return ctx.cancellable(
         options.signal,
-        renderPart(page, size, options, layers, format, quality),
+        renderPart(page, size, options, layers, format, quality, pageColors),
       );
     }
     const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     // Exact-size renders share the store with the conformed door: a width
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
-    const key = rasterKey(page.objectNumber, width, layers, format, options.quality);
+    const key = rasterKey(page.objectNumber, width, layers, format, options.quality, pageColors);
     return ctx.cancellable(
       options.signal,
       acquireRaster(
@@ -444,6 +470,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
           layers,
           format,
           quality,
+          pageColors,
           view: undefined,
         },
         options.signal,
@@ -459,6 +486,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       signal,
       format: askedFormat,
       quality: askedQuality,
+      pageColors: askedColors,
       ...options
     }: RenderThumbnailOptions & { view?: string | undefined },
     operation: string,
@@ -468,10 +496,11 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const strategy = currentStrategy();
     const format = askedFormat ?? strategy.format;
     const quality = askedQuality ?? strategy.quality;
+    const pageColors = colorsOf(askedColors);
     return acquireRaster(
       page,
-      thumbnailKey(page.objectNumber, layers, format, askedQuality),
-      { viewport: { kind: 'thumbnail' }, layers, format, quality, view },
+      thumbnailKey(page.objectNumber, layers, format, askedQuality, pageColors),
+      { viewport: { kind: 'thumbnail' }, layers, format, quality, pageColors, view },
       signal,
     );
   }
@@ -615,6 +644,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       const page = toPageRef(pageObjectNumber);
       if (isPending(page)) await whenHeld(page, signal);
       const strategy = currentStrategy();
+      const pageColors = colorsOf(undefined);
       const task = ctx.doc
         .with({ priority: 'high', view })
         .page(page)
@@ -624,6 +654,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
           ...layers,
           ...(strategy.format !== undefined ? { format: strategy.format } : {}),
           ...(strategy.quality !== undefined ? { quality: strategy.quality } : {}),
+          ...(pageColors !== undefined ? { pageColors } : {}),
         });
       if (signal.aborted) task.abort(reasonOf(signal));
       else signal.addEventListener('abort', () => task.abort(reasonOf(signal)), { once: true });
@@ -705,7 +736,13 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   );
 
   // A settings change reaches every view's plans at once: re-plan what they show.
-  ctx.listen(settings.api.onSettingsChanged, () => {
+  ctx.listen(settings.api.onSettingsChanged, ({ changedKeys }) => {
+    // Every picture, tiles included, is drawn in the page colors: a change
+    // makes them all stale, as a change of the pages would.
+    if (changedKeys.includes('pageColors')) {
+      invalidate();
+      return;
+    }
     const shown = new Set<PageObjectNumber>();
     for (const view of views.values()) for (const page of view.pages.keys()) shown.add(page);
     for (const page of shown) replanPage(page);
@@ -753,6 +790,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
           layersOf(options),
           currentStrategy().format,
           undefined,
+          colorsOf(undefined),
         );
       }
       const viewport = conformViewport(page, scale);
@@ -762,6 +800,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         layersOf(options),
         currentStrategy().format,
         undefined,
+        colorsOf(undefined),
       );
     },
     conformViewport,

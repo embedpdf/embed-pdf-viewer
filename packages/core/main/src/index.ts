@@ -77,6 +77,7 @@ export type {
   AnnotationAppearanceImage,
   AnnotationRef,
   EngineRenderPolicy,
+  PageColors,
   PageLayerRights,
   PageRenderLayers,
   PageRef,

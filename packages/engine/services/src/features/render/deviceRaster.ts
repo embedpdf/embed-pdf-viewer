@@ -1,4 +1,5 @@
 import type {
+  Color,
   PageBox,
   PageRaster,
   PageRenderBackground,
@@ -61,6 +62,11 @@ export interface RasterizeOptions {
   rotation: PdfRotation;
   viewport: PageRenderViewport;
   background: PageRenderBackground;
+  /**
+   * The paper's color when it is not white. A transparent background wins:
+   * the bitmap stays transparent.
+   */
+  paper?: Color;
   /**
    * Output-pixel budget: reject before allocating when the computed device
    * size exceeds it (the decode-bomb-guard pattern — the check lives where
@@ -130,7 +136,7 @@ function allocateRaster(
   opts: Omit<RasterizeOptions, 'draw'>,
 ): RasterTarget | null {
   const { fn, mem } = runtime;
-  const { rect, page, rotation, viewport, background } = opts;
+  const { rect, page, rotation, viewport, background, paper } = opts;
 
   // Degenerate (zero/negative area) has no renderable output and would divide by
   // zero in the matrix.
@@ -166,14 +172,7 @@ function allocateRaster(
       return null;
     }
 
-    fn.FPDFBitmap_FillRect(
-      bitmapPtr,
-      0,
-      0,
-      width,
-      height,
-      background === 'transparent' ? 0x00000000 : 0xffffffff,
-    );
+    fn.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, fillColorOf(background, paper));
 
     matrixPtr = mem.alloc(6 * 4);
     // The page's display matrix already turned PDF space into page space (the
@@ -209,6 +208,19 @@ function allocateRaster(
     }),
     free,
   };
+}
+
+/**
+ * The color `FPDFBitmap_FillRect` fills the bitmap with. The bitmap is
+ * created BGRA and rendered with {@link FPDF_REVERSE_BYTE_ORDER}, so the
+ * fill's red and blue are swapped to land as RGBA.
+ */
+function fillColorOf(background: PageRenderBackground, paper: Color | undefined): number {
+  if (background === 'transparent') return 0x00000000;
+  if (paper === undefined) return 0xffffffff;
+  const rgb = Number.parseInt(paper.slice(1), 16);
+  const swapped = ((rgb & 0xff) << 16) | (rgb & 0xff00) | ((rgb >> 16) & 0xff);
+  return (0xff000000 | swapped) >>> 0;
 }
 
 /**

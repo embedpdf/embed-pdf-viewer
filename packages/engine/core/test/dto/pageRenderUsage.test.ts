@@ -75,4 +75,21 @@ describe('checkRenderUsage: each picture needs its own right and no other', () =
       ),
     ).toMatchObject({ code: EngineErrorCode.InvalidArg });
   });
+
+  it('a print picture is on white: it takes no pageColors; a screen picture and a thumbnail do', () => {
+    const print = { usage: 'print', viewport: { kind: 'dpi', dpi: 150 } } as const;
+    expect(refusal(() => checkRenderUsage(print, null))).toBeNull();
+    expect(() => checkRenderUsage({ ...print, pageColors: 'dark' }, null)).toThrow(
+      expect.objectContaining({
+        code: EngineErrorCode.InvalidArg,
+        details: expect.objectContaining({ field: 'pageColors' }),
+      }),
+    );
+    expect(refusal(() => checkRenderUsage({ pageColors: 'dark' }, null))).toBeNull();
+    expect(
+      refusal(() =>
+        checkRenderUsage({ viewport: { kind: 'thumbnail' }, pageColors: 'sepia' }, null),
+      ),
+    ).toBeNull();
+  });
 });

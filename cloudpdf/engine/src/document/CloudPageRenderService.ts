@@ -20,6 +20,7 @@ import {
   renderTargetArea,
   checkImageQuality,
   checkRenderUsage,
+  resolvePageColors,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -33,6 +34,20 @@ import {
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
+
+/**
+ * Refuse a page in other colors than the file's (`NotImplemented`): the
+ * server draws pages as the file has them, on white
+ * (`renderPolicy.background`), over the network and inside the server alike.
+ */
+function refuseOtherPageColors(options: Pick<PageRenderOptions, 'pageColors'>): void {
+  if (resolvePageColors(options.pageColors) !== null) {
+    throw new EngineError(
+      EngineErrorCode.NotImplemented,
+      'the cloud engine draws pages as the file has them: pageColors is for the local engine',
+    );
+  }
+}
 
 export class CloudPageRenderService implements PageRenderService {
   constructor(
@@ -62,6 +77,11 @@ export class CloudPageRenderService implements PageRenderService {
       );
     }
     const source = this.http.renderRaw;
+    try {
+      refuseOtherPageColors(options);
+    } catch (error) {
+      return AbortablePromise.rejectReason(error);
+    }
     if (source === undefined) {
       return AbortablePromise.rejectReason(
         new EngineError(
@@ -89,6 +109,7 @@ export class CloudPageRenderService implements PageRenderService {
       // caller's rights (a tenant or API token), it asks for everything and
       // the server decides.
       checkRenderUsage(options, this.pictureRights());
+      refuseOtherPageColors(options);
       const layers = resolvePageLayers(
         options,
         this.layerRights() ?? { annotations: true, formFields: true },
