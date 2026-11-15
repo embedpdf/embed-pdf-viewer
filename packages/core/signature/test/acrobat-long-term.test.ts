@@ -36,6 +36,11 @@ interface Observation {
      */
     status: number;
     statusText: string;
+    /**
+     * Acrobat's line about long-term validation: "Signature is LTV enabled", or "is not LTV
+     * enabled and will expire after" a date. Absent where Acrobat could not check the signer.
+     */
+    longTermText?: string;
   }[];
 }
 
@@ -239,6 +244,106 @@ describe('validation data and document timestamps, as Acrobat judges them', () =
     await withDocument('iso-p2+store-only.pdf', async (doc) => {
       expect(doc.security.allows('doc.sign')).toBe(true);
       expect(doc.security.allows('doc.metadata.modify')).toBe(true);
+    });
+  });
+
+  describe('"LTV enabled", as Acrobat reports it', () => {
+    /** The root of the throwaway authority that issued every certificate in these files. */
+    let root: Uint8Array;
+    /** The day the timestamp authorities' certificates end: Acrobat's "will expire after". */
+    const AUTHORITY_ENDS = '2036-01-01T00:00:00.000Z';
+
+    beforeAll(async () => {
+      root = new Uint8Array(
+        await readFile(
+          resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/long-term/root.cer'),
+        ),
+      );
+    });
+
+    const judged = observations.cases.flatMap((observed) =>
+      observed.signatures
+        .filter((signature) => signature.longTermText)
+        .map((signature) => ({
+          file: observed.file,
+          field: signature.field,
+          acrobat: /is LTV enabled/.test(signature.longTermText!),
+          text: signature.longTermText!,
+        })),
+    );
+
+    test('Acrobat spoke about every signature but one', () => {
+      expect(judged).toHaveLength(32);
+      expect(judged.filter((row) => row.acrobat)).toHaveLength(26);
+    });
+
+    test.each(judged)('$file $field', async ({ file, field, acrobat, text }) => {
+      // The files were judged with the test authority stopped: every answer is in the file.
+      await withDocument(file, async (doc) => {
+        const verdicts = await validateSignatures(doc, { trust: { anchors: async () => [root] } });
+        const { longTerm, signature } = verdictOf(verdicts, field);
+        expect(longTerm.enabled, JSON.stringify(longTerm.missing)).toBe(acrobat);
+        if (acrobat) {
+          expect(text).toBe('Signature is LTV enabled');
+          expect(longTerm.missing).toEqual([]);
+          expect(longTerm.until).toBe(AUTHORITY_ENDS);
+        } else {
+          expect(text).toMatch(/is not LTV enabled/);
+          expect(longTerm.until).toBeNull();
+          // What is missing is an answer, never trust or a timestamp: Acrobat trusted the same
+          // root and called each of these signatures' timestamps valid.
+          expect(longTerm.missing.length).toBeGreaterThan(0);
+          expect(new Set(longTerm.missing.map((gap) => gap.reason))).toEqual(
+            new Set(['no-answer']),
+          );
+        }
+        // Judged at its timestamp, a signature that is enabled has a good answer for its signer.
+        if (acrobat && signature.kind === 'signature') {
+          const [then] = (
+            await validateSignatures(doc, {
+              trust: { anchors: async () => [root] },
+              validationTime: { kind: 'earliest-timestamp' },
+            })
+          ).filter((verdict) => verdict.signature.fieldName === field);
+          expect(then!.revocation).toBe('good');
+          expect(then!.timestamp).toMatchObject({ summary: 'valid' });
+        }
+      });
+    });
+
+    test('a document timestamp after the signature is named', async () => {
+      const read = async (file: string) =>
+        withDocument(file, async (doc) => {
+          const verdicts = await validateSignatures(doc, {
+            trust: { anchors: async () => [root] },
+          });
+          return verdictOf(verdicts, 'sig').longTerm.documentTimestamp;
+        });
+      // Validation data alone, from pyHanko and from Acrobat.
+      expect(await read('ours-b-t+lt-no-vri.pdf')).toBeNull();
+      expect(await read('acrobat-lt.pdf')).toBeNull();
+      // The same with a document timestamp over it.
+      expect(await read('ours-b-t+lt-no-vri+lta.pdf')).toBe('2026-11-14T21:29:30.387Z');
+      expect(await read('acrobat-lta.pdf')).toBe('2026-11-14T22:15:43.675Z');
+      // Of two, the later one.
+      expect(await read('acrobat-lta+acrobat-timestamp.pdf')).toBe('2026-11-14T23:37:05.107Z');
+    });
+
+    test('the answers a signature carries itself count', async () => {
+      // No store and no later revision: pyHanko put the answers inside the signature, as
+      // Acrobat did before a PDF could hold them beside it.
+      await withDocument('iso-p1-answers-in-signature.pdf', async (doc) => {
+        expect(await doc.signatures!.getValidationInfo()).toEqual({
+          certificates: [],
+          ocspResponses: [],
+          crls: [],
+        });
+        const [verdict] = await validateSignatures(doc, {
+          trust: { anchors: async () => [root] },
+          validationTime: { kind: 'earliest-timestamp' },
+        });
+        expect(verdict).toMatchObject({ revocation: 'good', longTerm: { enabled: true } });
+      });
     });
   });
 

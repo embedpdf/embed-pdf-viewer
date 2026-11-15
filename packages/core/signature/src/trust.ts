@@ -1,6 +1,6 @@
 import * as pkijs from 'pkijs';
 
-import { bytesEqual, ensureEngine } from './cms/engine';
+import { bytesEqual, ensureEngine, toHex } from './cms/engine';
 import { OID } from './cms/oids';
 import { certDer, certificateFromDer, parseCmsInternal, type ParsedCmsInternal } from './cms/parse';
 import { certificateCommonName } from './signers/self-signed';
@@ -51,6 +51,20 @@ export async function validateChain(
   trust: TrustPort | null,
   at: ValidationTime = { kind: 'now' },
 ): Promise<TrustVerdict> {
+  return validateChainAmong(cms, trust, at, []);
+}
+
+/**
+ * {@link validateChain}, with more certificates a path may pass through: those a document's
+ * validation data holds, so a path can be built from the file when the CMS leaves an issuer
+ * out. They are candidates and nothing more: a path still has to end at an anchor.
+ */
+export async function validateChainAmong(
+  cms: Uint8Array | ParsedCmsInternal,
+  trust: TrustPort | null,
+  at: ValidationTime,
+  known: readonly pkijs.Certificate[],
+): Promise<TrustVerdict> {
   if (!trust) return { status: 'unknown', reason: 'no trust anchors configured' };
   const anchors = await trust.anchors();
   if (anchors.length === 0) return { status: 'unknown', reason: 'no trust anchors configured' };
@@ -63,7 +77,7 @@ export async function validateChain(
   }
   return validatePath({
     target: internal.signerCertificate,
-    candidates: internal.certificates,
+    candidates: [...internal.certificates, ...known],
     anchors,
     at: timeOf(at),
   });
@@ -128,7 +142,8 @@ export async function validateTimestampAuthority(input: {
   });
 }
 
-function timeOf(at: ValidationTime): Date {
+/** The moment a validation time names: now, or the timestamp's time. */
+export function timeOf(at: ValidationTime): Date {
   return at.kind === 'now' ? new Date() : new Date(at.genTime);
 }
 
@@ -177,7 +192,14 @@ async function validatePath(input: {
   const { target, at } = input;
   const targetDer = certDer(target);
   const isTarget = (der: Uint8Array) => bytesEqual(der, targetDer);
-  const others = input.candidates.filter((candidate) => !isTarget(certDer(candidate)));
+  // A certificate may be offered twice, by the CMS and by the document's validation data.
+  const offered = new Map<string, pkijs.Certificate>();
+  for (const candidate of input.candidates) {
+    const der = certDer(candidate);
+    const key = toHex(der);
+    if (!isTarget(der) && !offered.has(key)) offered.set(key, candidate);
+  }
+  const others = [...offered.values()];
   const targetIsAnchor = input.anchors.some(isTarget);
   try {
     const otherAnchors = input.anchors

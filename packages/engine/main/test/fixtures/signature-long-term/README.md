@@ -7,6 +7,8 @@ typed by hand.
 
 `packages/core/signature/test/acrobat-long-term.test.ts` holds the engine to it: a signature
 Acrobat reports as altered must read `forbidden`, and one Acrobat reports as valid must not.
+`longTerm.enabled` must be what Acrobat's line about long-term validation says, for each of the
+32 signatures Acrobat spoke about.
 
 ## How they were observed
 
@@ -66,9 +68,9 @@ Two more things the files hold:
   | `acrobat-lta+acrobat-comment.pdf`       | Acrobat, a square comment and its popup: the list object grows in place.             |
   | `acrobat-lta+acrobat-timestamp.pdf`     | Acrobat, a second timestamp: the page points at a new list object, the old one stays. |
 
-  The engine agrees on the first three. On the fourth it still reads the first timestamp as
-  changed: the old list was not written in that revision, so the analysis cannot read it to see
-  that the new list kept every entry. The test lists it under `KNOWN_DIFFERENCES`.
+  The engine agrees on all four. For the fourth, no revision after the first timestamp wrote
+  the old list, so the engine reads it from the earlier revision's bytes to see that the new
+  list kept every entry.
 - **Acrobat says "LTV enabled" on a certification it calls invalid.** That line alone says
   nothing about validity.
 

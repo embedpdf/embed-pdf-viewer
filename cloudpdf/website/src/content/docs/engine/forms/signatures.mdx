@@ -834,6 +834,10 @@ time the signature is judged:
 The answers come from the file: what
 [`addValidationInfo()`](#keep-a-signature-checkable-for-years) stored, what the signature
 itself carries, and what Acrobat stored in files it signed. Nothing is asked over the network.
+Each answer is checked by its own signature, wherever in the file it sits.
+
+Only a certificate that has an issuer above it needs an answer. One you trust as it is, such as
+your own root, has nobody to withdraw it, so a signer you trust directly reads `'good'`.
 
 An answer speaks for a time. One stored when the document was signed says the certificate was
 good then, and says nothing about today. So judged now, the default, a signature from last year
@@ -873,19 +877,27 @@ a network. It always speaks for the signature's timestamp, whatever `validationT
 const { longTerm } = results[0];
 
 longTerm.enabled; // true
-longTerm.at; // '2026-11-14T21:28:37Z'
-longTerm.until; // '2036-01-01T00:00:00Z'
+longTerm.at; // '2026-11-14T21:28:37.237Z'
+longTerm.until; // '2036-01-01T00:00:00.000Z'
+longTerm.documentTimestamp; // '2026-11-14T21:29:30.387Z'
 ```
 
-| Field     | What it is                                                                                                                                                       |
-| :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled` | The signature has a timestamp you trust, its signer was trusted then, and the file holds a good answer for every certificate. What Acrobat calls "LTV enabled". |
-| `at`      | The timestamp it was judged at, or `null` when the signature has none you trust.                                                                                 |
-| `until`   | How long the file proves this by itself: the day the certificate of the last timestamp covering the signature expires. `null` when not enabled.                  |
-| `missing` | What stands in the way, one entry per certificate: its name and a `reason`, as in [All or nothing](#all-or-nothing). Empty when enabled.                         |
+| Field               | What it is                                                                                                                                                                                                  |
+| :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`           | A timestamp you trust covers the signature, its signer was trusted then, and the file holds a good answer for every certificate: the signer's and the timestamp authority's. What Acrobat calls "LTV enabled". |
+| `at`                | The time it was judged at: the earliest timestamp you trust that covers the signature, its own or a document timestamp added after it. `null` when there is none.                                              |
+| `until`             | How long the file proves this by itself: the day the certificate of the last timestamp covering the signature expires. `null` when not enabled.                                                                |
+| `documentTimestamp` | The time of the last document timestamp you trust that was added after the signature, or `null` when none covers it.                                                                                           |
+| `missing`           | What stands in the way, one entry per certificate: its name in `certificate` and a `reason`, as in [All or nothing](#all-or-nothing). Empty when enabled.                                                     |
 
-A document timestamp added later moves `until` to its own certificate's end date. That is all
-[renewing](#then-timestamp-the-document) is.
+`enabled` is the question Acrobat asks. A validator that follows the European standard asks one
+more: when were the stored answers put in the file? A
+[document timestamp](#then-timestamp-the-document) over them is the proof. So a file is finished
+when `enabled` is true and `documentTimestamp` is not `null`.
+
+A document timestamp added later also moves `until` to its own certificate's end date. That is
+all [renewing](#then-timestamp-the-document) is. A document timestamp has a `longTerm` of its
+own, for its authority's certificates.
 
 ## What changed since a signature
 

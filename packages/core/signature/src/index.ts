@@ -43,6 +43,12 @@ export {
   type TimestampVerdict,
   type ValidateSignaturesOptions,
 } from './verdict';
+export type {
+  LongTermGap,
+  LongTermGapReason,
+  LongTermVerdict,
+  RevocationVerdict,
+} from './long-term';
 export {
   createTestSigner,
   createTestTimestampAuthority,
