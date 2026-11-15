@@ -66,3 +66,9 @@ export {
   type PersonalSigner,
 } from './signers/personal';
 export { certificateCommonName, selfSignedCertificate } from './signers/self-signed';
+export {
+  createTestCertificateAuthority,
+  type TestCertificateAuthority,
+} from './signers/test-authority';
+export type { RevocationReason } from './revocation/answer';
+export type { RevocationRequest, RevocationSource } from './revocation/source';

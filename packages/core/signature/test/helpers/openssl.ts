@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -266,4 +266,279 @@ export function opensslVerifiesToken(input: {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+/**
+ * A certificate authority run by OpenSSL: its own root, a responder it certified for
+ * answering, the certificates it issues, and its OCSP responses and CRLs, all made by
+ * `openssl ca` and `openssl ocsp`. The answers a checker meets here are ones this package's
+ * code had no hand in. Call `dispose()` when done; it removes the authority's files.
+ */
+export function createOpenSslCertificateAuthority(): {
+  /** DER of the authority's own certificate. */
+  certificate: Uint8Array;
+  /** Issue a certificate that names the authority's OCSP and CRL addresses. DER. */
+  issue(commonName: string): Uint8Array;
+  /** Withdraw a certificate it issued. */
+  revoke(certificate: Uint8Array, reason?: 'keyCompromise' | 'superseded'): void;
+  /** The OCSP response to a request as a client sent it. `responderId`: how it names itself; by name unless said. */
+  answer(request: Uint8Array, responderId?: 'name' | 'key'): Uint8Array;
+  /** The CRL as it stands. DER. */
+  crl(): Uint8Array;
+  dispose(): void;
+} {
+  const directory = mkdtempSync(join(tmpdir(), 'epdf-openssl-ca-'));
+  const run = (args: string[]) => execFileSync('openssl', args, { stdio: 'pipe', cwd: directory });
+  const address = 'http://openssl-authority.invalid';
+  writeFileSync(
+    join(directory, 'ca.cnf'),
+    [
+      '[ ca ]',
+      'default_ca = authority',
+      '[ authority ]',
+      `dir = ${directory}`,
+      'database = $dir/index.txt',
+      'new_certs_dir = $dir/issued',
+      'serial = $dir/serial',
+      'crlnumber = $dir/crlnumber',
+      'certificate = $dir/ca.pem',
+      'private_key = $dir/ca.key',
+      'default_md = sha256',
+      'default_days = 365',
+      'default_crl_days = 7',
+      'policy = any',
+      'unique_subject = no',
+      'copy_extensions = none',
+      '[ any ]',
+      'commonName = supplied',
+      '[ req ]',
+      'distinguished_name = dn',
+      'prompt = no',
+      '[ dn ]',
+      'CN = OpenSSL test certificate authority',
+      '[ root ]',
+      'basicConstraints = critical, CA:TRUE',
+      'keyUsage = critical, digitalSignature, keyCertSign, cRLSign',
+      'subjectKeyIdentifier = hash',
+      '[ leaf ]',
+      'basicConstraints = critical, CA:FALSE',
+      'keyUsage = critical, digitalSignature, nonRepudiation',
+      `authorityInfoAccess = OCSP;URI:${address}/ocsp`,
+      `crlDistributionPoints = URI:${address}/crl`,
+      '[ responder ]',
+      'basicConstraints = critical, CA:FALSE',
+      'keyUsage = critical, digitalSignature',
+      'extendedKeyUsage = OCSPSigning',
+      'noCheck = ignored',
+      '',
+    ].join('\n'),
+  );
+  mkdirSync(join(directory, 'issued'));
+  writeFileSync(join(directory, 'index.txt'), '');
+  writeFileSync(join(directory, 'serial'), '1000\n');
+  writeFileSync(join(directory, 'crlnumber'), '01\n');
+  const key = (name: string) =>
+    run([
+      'genpkey',
+      '-algorithm',
+      'RSA',
+      '-pkeyopt',
+      'rsa_keygen_bits:2048',
+      '-out',
+      `${name}.key`,
+    ]);
+  key('ca');
+  run([
+    'req',
+    '-new',
+    '-x509',
+    '-key',
+    'ca.key',
+    '-config',
+    'ca.cnf',
+    '-extensions',
+    'root',
+    '-days',
+    '365',
+    '-out',
+    'ca.pem',
+  ]);
+  let issuedCount = 0;
+  const issuePem = (commonName: string, extensions: 'leaf' | 'responder'): string => {
+    const name = `cert-${issuedCount++}`;
+    key(name);
+    run([
+      'req',
+      '-new',
+      '-key',
+      `${name}.key`,
+      '-subj',
+      `/CN=${commonName}`,
+      '-out',
+      `${name}.csr`,
+    ]);
+    run([
+      'ca',
+      '-batch',
+      '-config',
+      'ca.cnf',
+      '-extensions',
+      extensions,
+      '-notext',
+      '-in',
+      `${name}.csr`,
+      '-out',
+      `${name}.pem`,
+    ]);
+    return name;
+  };
+  const responder = issuePem('OpenSSL test OCSP responder', 'responder');
+  const der = (file: string): Uint8Array => {
+    run(['x509', '-in', file, '-outform', 'DER', '-out', `${file}.der`]);
+    return new Uint8Array(readFileSync(join(directory, `${file}.der`)));
+  };
+  const issued = new Map<string, string>();
+  const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
+
+  return {
+    certificate: der('ca.pem'),
+    issue(commonName) {
+      const name = issuePem(commonName, 'leaf');
+      const certificate = der(`${name}.pem`);
+      issued.set(hex(certificate), `${name}.pem`);
+      return certificate;
+    },
+    revoke(certificate, reason = 'keyCompromise') {
+      const file = issued.get(hex(certificate));
+      if (!file) throw new Error('the OpenSSL authority did not issue this certificate');
+      run(['ca', '-config', 'ca.cnf', '-revoke', file, '-crl_reason', reason]);
+    },
+    answer(request, responderId = 'name') {
+      writeFileSync(join(directory, 'request.der'), request);
+      run([
+        'ocsp',
+        '-index',
+        'index.txt',
+        '-CA',
+        'ca.pem',
+        '-rsigner',
+        `${responder}.pem`,
+        '-rkey',
+        `${responder}.key`,
+        '-reqin',
+        'request.der',
+        '-respout',
+        'response.der',
+        '-ndays',
+        '1',
+        ...(responderId === 'key' ? ['-resp_key_id'] : []),
+      ]);
+      return new Uint8Array(readFileSync(join(directory, 'response.der')));
+    },
+    crl() {
+      run(['ca', '-config', 'ca.cnf', '-gencrl', '-out', 'crl.pem']);
+      run(['crl', '-in', 'crl.pem', '-outform', 'DER', '-out', 'crl.der']);
+      return new Uint8Array(readFileSync(join(directory, 'crl.der')));
+    },
+    dispose() {
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Run OpenSSL over files in a fresh directory, and return what it printed, whether it liked them or not. */
+function opensslOver(
+  files: Record<string, Uint8Array | string>,
+  args: string[],
+): { ok: boolean; output: string } {
+  const directory = mkdtempSync(join(tmpdir(), 'epdf-openssl-'));
+  try {
+    for (const [name, content] of Object.entries(files)) {
+      writeFileSync(join(directory, name), content);
+    }
+    const result = spawnSync('openssl', args, { cwd: directory, encoding: 'utf8' });
+    return { ok: result.status === 0, output: `${result.stdout ?? ''}${result.stderr ?? ''}` };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+/**
+ * `openssl ocsp` over a response: does its signature lead to `issuer`, and what does it say
+ * about `certificate`? `status` is OpenSSL's own word: `good`, `revoked` or `unknown`.
+ * `above` is the rest of the issuer's chain, up to a root, when the issuer is not one itself.
+ *
+ * The question here is who signed the response and what it says, not whether it is fresh: a
+ * stored answer is read years after it was made, so its dates are given all the room they need.
+ */
+export function opensslReadsOcspResponse(input: {
+  response: Uint8Array;
+  certificate: Uint8Array;
+  issuer: Uint8Array;
+  above?: Uint8Array[];
+}): { verified: boolean; status: string | null; output: string } {
+  const { output } = opensslOver(
+    {
+      'response.der': input.response,
+      'certificate.pem': pem('CERTIFICATE', input.certificate),
+      'issuer.pem': pem('CERTIFICATE', input.issuer),
+      'trusted.pem': [input.issuer, ...(input.above ?? [])]
+        .map((certificate) => pem('CERTIFICATE', certificate))
+        .join(''),
+    },
+    [
+      'ocsp',
+      '-respin',
+      'response.der',
+      '-issuer',
+      'issuer.pem',
+      '-cert',
+      'certificate.pem',
+      '-CAfile',
+      'trusted.pem',
+      '-no_nonce',
+      '-validity_period',
+      '3000000000',
+    ],
+  );
+  return {
+    verified: /Response verify OK/.test(output),
+    status: /certificate\.pem: (\w+)/.exec(output)?.[1] ?? null,
+    output,
+  };
+}
+
+/** `openssl crl`: does the list's signature verify with `issuer`, and which serial numbers does it withdraw? */
+export function opensslReadsCrl(input: { crl: Uint8Array; issuer: Uint8Array }): {
+  verified: boolean;
+  /** The withdrawn serial numbers, in upper-case hex. */
+  revoked: string[];
+  output: string;
+} {
+  const { output } = opensslOver(
+    { 'crl.der': input.crl, 'issuer.pem': pem('CERTIFICATE', input.issuer) },
+    ['crl', '-inform', 'DER', '-in', 'crl.der', '-CAfile', 'issuer.pem', '-noout', '-text'],
+  );
+  return {
+    verified: /verify OK/.test(output),
+    revoked: [...output.matchAll(/Serial Number: ([0-9A-F]+)/g)].map((match) => match[1]!),
+    output,
+  };
+}
+
+/** `openssl ocsp -req_text`: the serial numbers a request asks about, in upper-case hex. */
+export function opensslReadsOcspRequest(request: Uint8Array): {
+  serials: string[];
+  output: string;
+} {
+  const { output } = opensslOver({ 'request.der': request }, [
+    'ocsp',
+    '-reqin',
+    'request.der',
+    '-req_text',
+  ]);
+  return {
+    serials: [...output.matchAll(/Serial Number: ([0-9A-F]+)/g)].map((match) => match[1]!),
+    output,
+  };
 }

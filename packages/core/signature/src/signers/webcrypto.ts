@@ -72,7 +72,10 @@ function hashFromWebCrypto(name: string): Exclude<DigestAlgorithm, 'sha1'> {
 }
 
 export interface TestSigner extends RawSigner {
-  /** DER of the self-signed certificate — also the only trust anchor that validates it. */
+  /**
+   * DER of the signer's certificate. From `createTestSigner()` it is self-signed, and the only
+   * trust anchor that validates it; from a test certificate authority, trust the authority's.
+   */
   readonly certificate: Uint8Array;
   readonly privateKey: CryptoKey;
 }

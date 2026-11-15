@@ -32,6 +32,28 @@ export const OID = {
   /** id-kp-timeStamping: the purpose a timestamp authority's certificate carries (RFC 3161 §2.3). */
   timeStamping: '1.3.6.1.5.5.7.3.8',
   commonName: '2.5.4.3',
+  /** Where a certificate says its issuer answers about it: OCSP, and the issuer's own certificate. */
+  authorityInfoAccess: '1.3.6.1.5.5.7.1.1',
+  accessOcsp: '1.3.6.1.5.5.7.48.1',
+  accessIssuers: '1.3.6.1.5.5.7.48.2',
+  /** Where a certificate says the list of withdrawn certificates is published. */
+  crlDistributionPoints: '2.5.29.31',
+  /** id-pkix-ocsp-basic: the one OCSP response type (RFC 6960). */
+  ocspBasic: '1.3.6.1.5.5.7.48.1.1',
+  /** id-kp-OCSPSigning: the purpose of a certificate an issuer lets answer in its place. */
+  ocspSigning: '1.3.6.1.5.5.7.3.9',
+  /** id-pkix-ocsp-nocheck: a responder's certificate that is not itself asked about. */
+  ocspNoCheck: '1.3.6.1.5.5.7.48.1.5',
+  /** id-ri-ocsp-response: an OCSP response carried among a CMS's revocation information. */
+  ocspResponseInfo: '1.3.6.1.5.5.7.16.2',
+  /** adbe-revocationInfoArchival: Acrobat's older way, the answers inside the signature. */
+  revocationInfoArchival: '1.2.840.113583.1.1.8',
+  crlNumber: '2.5.29.20',
+  crlReason: '2.5.29.21',
+  deltaCrlIndicator: '2.5.29.27',
+  issuingDistributionPoint: '2.5.29.28',
+  authorityKeyIdentifier: '2.5.29.35',
+  freshestCrl: '2.5.29.46',
 } as const;
 
 export const DIGEST_BY_OID: Record<string, DigestAlgorithm> = {
