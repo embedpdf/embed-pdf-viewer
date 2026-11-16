@@ -28,6 +28,7 @@ type Call = { phase: string; page: PageRef; point: Point };
 function makeAnno(hit: 'annot' | 'empty' = 'annot') {
   const calls: Call[] = [];
   const anno = {
+    hasCreationAwaitingClick: () => false,
     getEditingId: () => null,
     text: { end: async () => {} },
     getHitKind: () => hit,
@@ -244,6 +245,7 @@ describe('annotation edit handler — double-click / long-press routing', () => 
   function makeEditAnno(freeText: boolean) {
     const calls: string[] = [];
     const anno = {
+      hasCreationAwaitingClick: () => false,
       getEditingId: () => null,
       text: { end: async () => {} },
       getHitKind: () => 'annot',
@@ -321,13 +323,40 @@ describe('distance placement — release, hover, click', () => {
     handler.onPointerUp?.(sample({ phase: 'up' }));
     expect(calls).toHaveLength(committedCalls);
   });
+});
 
-  it('lets the placement click pass through the edit handler over an existing annotation', () => {
+describe('annotation edit handler — a shape that waits for its next click', () => {
+  it('leaves the click to the draw handler, also over an existing annotation', () => {
     const { anno, calls } = makeAnno();
-    anno.getDistanceCreationPage = () => PAGE_1;
+    anno.hasCreationAwaitingClick = () => true;
     const handler = createEditHandler(anno, interaction);
     expect(handler.onPointerDown(down())).toBe(false);
     expect(calls).toHaveLength(0);
+  });
+
+  it('shows no annotation as one to grab or as hovered', () => {
+    const { anno } = makeAnno();
+    let awaitingClick = true;
+    anno.hasCreationAwaitingClick = () => awaitingClick;
+    anno.getCursorAt = () => 'move';
+    const hovers: unknown[] = [];
+    anno.hoverAt = (at) => void hovers.push(at);
+    const claims: unknown[] = [];
+    const hub = {
+      claimCursor: (_token: string, cursor: unknown) => void claims.push(cursor),
+    } as unknown as InteractionHostCapability;
+    const handler = createEditHandler(anno, hub);
+    const over = sample({ page: { ref: PAGE_1, point: { x: 300, y: 730 } } });
+
+    handler.onHover?.(over);
+    expect(claims).toEqual([null]);
+    expect(hovers).toEqual([null]);
+
+    // The shape is finished: the annotation under the pointer is one to grab again.
+    awaitingClick = false;
+    handler.onHover?.(over);
+    expect(claims).toEqual([null, 'move']);
+    expect(hovers.at(-1)).toMatchObject({ page: PAGE_1, point: { x: 300, y: 730 } });
   });
 });
 

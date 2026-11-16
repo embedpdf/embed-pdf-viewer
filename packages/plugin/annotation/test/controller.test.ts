@@ -1218,7 +1218,9 @@ describe('distance authoring and recalibration', () => {
     harness.capability.createPointer('distance', 'move', PAGE, { x: 220, y: 20 });
     harness.capability.createPointer('distance', 'up', PAGE, { x: 220, y: 20 });
     expect(harness.capability.getDistanceCreationPage()).toEqual(PAGE);
+    expect(harness.capability.hasCreationAwaitingClick()).toBe(true);
     harness.capability.createPointer('distance', 'down', PAGE, { x: 220, y: 8 });
+    expect(harness.capability.hasCreationAwaitingClick()).toBe(false);
     expect(harness.create).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: 'line-dimension',

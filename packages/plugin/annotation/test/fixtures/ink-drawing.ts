@@ -3,7 +3,11 @@
  * create with: what the tests about a pen drawing that waits for its next
  * stroke run on.
  */
-import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationDraft,
+  AnnotationFlags,
+  AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig } from '../../src/contract';
 import {
@@ -130,10 +134,19 @@ export const inkDrawingHarness = async (
   return harness;
 };
 
-/** The strokes of every ink annotation the plugin sent the engine to create. */
-export const inkCreates = (harness: AnnotationHarness): unknown[] =>
+/** What the plugin sent the engine to create, of one kind. */
+export const createsOf = <Subtype extends AnnotationDraft['subtype']>(
+  harness: AnnotationHarness,
+  subtype: Subtype,
+): Extract<AnnotationDraft, { subtype: Subtype }>[] =>
   harness.applied
     .flatMap(({ change }) => ('ops' in change ? change.ops : []))
     .flatMap((op) =>
-      op.type === 'annotations.create' && op.data.subtype === 'ink' ? [op.data.inkList] : [],
+      op.type === 'annotations.create' && op.data.subtype === subtype
+        ? [op.data as Extract<AnnotationDraft, { subtype: Subtype }>]
+        : [],
     );
+
+/** The strokes of every ink annotation the plugin sent the engine to create. */
+export const inkCreates = (harness: AnnotationHarness): unknown[] =>
+  createsOf(harness, 'ink').map((ink) => ink.inkList);

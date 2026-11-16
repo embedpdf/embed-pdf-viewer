@@ -15,7 +15,14 @@ import type {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDrawHandler, createEditHandler } from '../../src/tools/handlers';
-import { EMPTY, inkCreates, inkDrawingHarness, ON_SQUARE, SQUARE } from '../fixtures/ink-drawing';
+import {
+  createsOf,
+  EMPTY,
+  inkCreates,
+  inkDrawingHarness,
+  ON_SQUARE,
+  SQUARE,
+} from '../fixtures/ink-drawing';
 import { PAGE } from '../harness';
 
 /** The hub as the handlers see it, with the pen active. */
@@ -155,5 +162,64 @@ describe('the pen through the interaction plugin', () => {
 
     expect(inkCreates(harness)).toHaveLength(1);
     expect(hub.getActiveToolId()).toBe('ink-highlight');
+  });
+});
+
+describe('a shape made click by click, through the interaction plugin', () => {
+  /** A click: a press and its release at `point`; `clickCount` 2 is the second press of a double-click. */
+  const click = (
+    hub: InteractionHostCapability,
+    point: { x: number; y: number },
+    clickCount = 1,
+  ): void => {
+    hub.dispatchPointer({ ...at('down', point), clickCount });
+    hub.dispatchPointer(at('up', point));
+  };
+
+  it('a polygon takes a corner on another annotation, which is not selected', async () => {
+    const hub = interactionHub();
+    const harness = await inkDrawingHarness(undefined, { wired: true, interaction: hub });
+    hub.activateTool('polygon');
+    click(hub, { x: 300, y: 300 });
+    click(hub, { x: 380, y: 300 });
+
+    click(hub, ON_SQUARE);
+
+    expect(harness.model().draft).toMatchObject({ kind: 'create-poly' });
+    expect(harness.capability.draft.get()).toMatchObject({ pointCount: 3 });
+    expect(harness.model().selected).toEqual([]);
+
+    // The double-click's second press finishes the polygon with its three corners.
+    click(hub, ON_SQUARE, 2);
+    const [polygon] = createsOf(harness, 'polygon');
+    expect(polygon?.vertices).toEqual([{ x: 300, y: 300 }, { x: 380, y: 300 }, ON_SQUARE]);
+    expect(harness.model().draft).toBeNull();
+  });
+
+  it('a callout takes its knee on another annotation, which is not selected', async () => {
+    const hub = interactionHub();
+    const harness = await inkDrawingHarness(undefined, { wired: true, interaction: hub });
+    hub.activateTool('free-text-callout');
+    click(hub, EMPTY);
+
+    click(hub, ON_SQUARE);
+
+    expect(harness.model().draft).toMatchObject({
+      kind: 'create-callout',
+      step: 'box',
+      knee: ON_SQUARE,
+    });
+    expect(harness.model().selected).toEqual([]);
+  });
+
+  it('a first click on another annotation still selects it: no shape waits yet', async () => {
+    const hub = interactionHub();
+    const harness = await inkDrawingHarness(undefined, { wired: true, interaction: hub });
+    hub.activateTool('polygon');
+
+    click(hub, ON_SQUARE);
+
+    expect(harness.model().selected).toEqual([annotationKey(SQUARE)]);
+    expect(harness.capability.draft.get()).toBeNull();
   });
 });

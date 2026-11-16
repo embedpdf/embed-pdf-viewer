@@ -155,6 +155,14 @@ export function createDrafts(
       return draft?.kind === 'create-distance' && draft.step === 'offset' ? draft.page : null;
     },
     onDraftCaptured: events.draftCaptured.on,
+    hasCreationAwaitingClick: () => {
+      const draft = store.model().draft;
+      return (
+        draft?.kind === 'create-poly' ||
+        draft?.kind === 'create-callout' ||
+        (draft?.kind === 'create-distance' && draft.step === 'offset')
+      );
+    },
   };
 
   return { draft: draftApi, api, waitForNextStroke };

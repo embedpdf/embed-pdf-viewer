@@ -210,6 +210,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** A distance draft was captured (the measurement plugin turns it into a calibration). */
   readonly onDraftCaptured: EventHook<CapturedAnnotationDraft>;
   getDistanceCreationPage(): PageRef | null;
+  /**
+   * Whether a shape that is made click by click waits for its next click: a
+   * polygon's or polyline's next corner, a callout's knee or box, a distance
+   * line's placement. That click is the shape's, also where it lands on an
+   * existing annotation.
+   */
+  hasCreationAwaitingClick(): boolean;
 
   // ── render projections (page space; a view env projects for a rotated / zoomed view) ──
   /**

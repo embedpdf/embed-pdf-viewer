@@ -133,9 +133,9 @@ export function createEditHandler(
       ),
     onPointerDown: (sample) => {
       if (!sample.page) return false;
-      // The final distance-placement click belongs to its creation draft even
-      // when it lands over an existing annotation.
-      if (anno.getDistanceCreationPage?.() != null) return false;
+      // A shape that is made click by click owns its next click, also where it
+      // lands on an existing annotation: the draw handler takes it.
+      if (anno.hasCreationAwaitingClick()) return false;
       const touch = sample.pointerType === 'touch';
       // While a free-text box is being edited it owns its own pointer events, so a
       // down that reaches the hub at all is a click outside the editor — commit and
@@ -244,30 +244,25 @@ export function createEditHandler(
       anno.editPointer('up', page, downPoint, false, undefined, undefined, undefined, touch);
     },
     onHover: (sample) => {
+      // While a shape waits for its next click, a click here is the shape's:
+      // no annotation under the pointer shows as one to grab or as hovered.
+      const page = anno.hasCreationAwaitingClick() ? undefined : sample.page;
       // priority 20 → beats text-select's 'text' (10) over an annotation; null clears.
       interaction.claimCursor(
         'annotation',
-        sample.page
-          ? anno.getCursorAt(
-              sample.page.ref,
-              sample.page.point,
-              sample.page.scale,
-              sample.page.rotation,
-              sample.page.zoom,
-            )
-          : null,
+        page ? anno.getCursorAt(page.ref, page.point, page.scale, page.rotation, page.zoom) : null,
         20,
       );
       // Hover state for scene affordances (redact preview) — rides the same
       // per-move sample; the capability dispatches on change only.
       anno.hoverAt(
-        sample.page
+        page
           ? {
-              page: sample.page.ref,
-              point: sample.page.point,
-              scale: sample.page.scale,
-              rotation: sample.page.rotation,
-              zoom: sample.page.zoom,
+              page: page.ref,
+              point: page.point,
+              scale: page.scale,
+              rotation: page.rotation,
+              zoom: page.zoom,
             }
           : null,
       );

@@ -287,3 +287,40 @@ describe('the wait for the next stroke', () => {
     expect(harness.model().draft).toBeNull();
   });
 });
+
+describe('a shape that is made click by click', () => {
+  it('waits for its next click from its first corner until it is finished: a polygon', async () => {
+    const { capability } = await inkDrawingHarness();
+    expect(capability.hasCreationAwaitingClick()).toBe(false);
+
+    capability.createPointer('polygon', 'down', PAGE, { x: 300, y: 300 });
+    expect(capability.hasCreationAwaitingClick()).toBe(true);
+    capability.createPointer('polygon', 'down', PAGE, { x: 380, y: 300 });
+    capability.createPointer('polygon', 'down', PAGE, { x: 340, y: 360 });
+    expect(capability.hasCreationAwaitingClick()).toBe(true);
+
+    // The second press of a double-click finishes it.
+    capability.createPointer('polygon', 'down', PAGE, { x: 340, y: 360 }, true);
+    expect(capability.hasCreationAwaitingClick()).toBe(false);
+  });
+
+  it('waits for its next click after the tip and after the knee: a callout', async () => {
+    const { capability } = await inkDrawingHarness();
+
+    capability.createPointer('free-text-callout', 'down', PAGE, { x: 300, y: 300 });
+    expect(capability.hasCreationAwaitingClick()).toBe(true);
+    capability.createPointer('free-text-callout', 'down', PAGE, { x: 360, y: 340 });
+    expect(capability.hasCreationAwaitingClick()).toBe(true);
+
+    capability.draft.cancel();
+    expect(capability.hasCreationAwaitingClick()).toBe(false);
+  });
+
+  it('is not what a pen drawing is: its next stroke starts only on the empty page', async () => {
+    const harness = await inkDrawingHarness();
+    penDown(harness);
+    expect(harness.capability.hasCreationAwaitingClick()).toBe(false);
+    harness.capability.createPointer('ink', 'up', PAGE, { x: 380, y: 300 });
+    expect(harness.capability.hasCreationAwaitingClick()).toBe(false);
+  });
+});
