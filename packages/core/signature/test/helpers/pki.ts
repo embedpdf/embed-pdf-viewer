@@ -1,7 +1,7 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
-import { ensureEngine, toArrayBuffer } from '../../src/cms/engine';
+import { ensureEngine, randomPositiveInteger, toArrayBuffer } from '../../src/cms/engine';
 import { OID } from '../../src/cms/oids';
 import { generateSigningKeyPair, webCryptoSigner, type RawSigner } from '../../src/index';
 
@@ -34,9 +34,7 @@ export async function createIdentity(input: {
   const keys = await generateSigningKeyPair('RSA-PKCS1-v1_5', 'sha256', true);
   const cert = new pkijs.Certificate();
   cert.version = 2;
-  const serial = globalThis.crypto.getRandomValues(new Uint8Array(8));
-  serial[0]! &= 0x7f;
-  cert.serialNumber = new asn1js.Integer({ valueHex: serial.buffer });
+  cert.serialNumber = new asn1js.Integer({ valueHex: toArrayBuffer(randomPositiveInteger()) });
   cert.subject.typesAndValues.push(
     new pkijs.AttributeTypeAndValue({
       type: OID.commonName,

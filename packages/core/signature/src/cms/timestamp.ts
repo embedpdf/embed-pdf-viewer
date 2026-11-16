@@ -8,7 +8,7 @@ import {
   signedAttributesOf,
   type RawSigner,
 } from './build';
-import { ensureEngine, toArrayBuffer } from './engine';
+import { ensureEngine, randomPositiveInteger, toArrayBuffer } from './engine';
 import { DIGEST_BY_OID, DIGEST_LENGTH, OID, OID_BY_DIGEST, WEBCRYPTO_HASH } from './oids';
 import { CmsError } from './parse';
 import { signedAttributesDer } from './verify';
@@ -84,8 +84,6 @@ export async function buildTimestampToken(input: BuildTimestampTokenInput): Prom
   const authorityCert = pkijs.Certificate.fromBER(
     toArrayBuffer(input.authority.certificateChain[0]!),
   );
-  const serial = globalThis.crypto.getRandomValues(new Uint8Array(8));
-  serial[0]! &= 0x7f;
   const info = new pkijs.TSTInfo({
     version: 1,
     policy: '1.3.6.1.4.1.57264.1.1',
@@ -93,7 +91,7 @@ export async function buildTimestampToken(input: BuildTimestampTokenInput): Prom
       hashAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_BY_DIGEST[input.hash] }),
       hashedMessage: new asn1js.OctetString({ valueHex: toArrayBuffer(input.digest) }),
     }),
-    serialNumber: new asn1js.Integer({ valueHex: toArrayBuffer(serial) }),
+    serialNumber: new asn1js.Integer({ valueHex: toArrayBuffer(randomPositiveInteger()) }),
     genTime: input.genTime ?? new Date(),
   });
   const eContent = info.toSchema().toBER(false);

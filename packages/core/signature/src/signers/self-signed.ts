@@ -1,7 +1,7 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
-import { ensureEngine } from '../cms/engine';
+import { ensureEngine, randomPositiveInteger, toArrayBuffer } from '../cms/engine';
 import { OID, WEBCRYPTO_HASH } from '../cms/oids';
 
 /**
@@ -50,10 +50,7 @@ async function buildSelfSignedCertificate(
   ensureEngine();
   const cert = new pkijs.Certificate();
   cert.version = 2;
-  const serial = new Uint8Array(8);
-  globalThis.crypto.getRandomValues(serial);
-  serial[0] &= 0x7f;
-  cert.serialNumber = new asn1js.Integer({ valueHex: serial.buffer });
+  cert.serialNumber = new asn1js.Integer({ valueHex: toArrayBuffer(randomPositiveInteger()) });
   const name = new pkijs.AttributeTypeAndValue({
     type: OID.commonName,
     value: new asn1js.Utf8String({ value: input.commonName }),
