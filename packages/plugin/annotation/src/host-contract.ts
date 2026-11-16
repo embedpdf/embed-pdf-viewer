@@ -355,6 +355,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     finish?: boolean,
     displayRotation?: Rotation,
   ): void;
+  /**
+   * Make the pen drawing that waits for its next stroke an annotation now,
+   * as its tool's `afterCreate` says. A stroke still being drawn is left alone.
+   */
   finishInkDraft(): void;
   /** Place with the active tool at a click; `displayRotation` and `zoom` are the page's view there. */
   placeAt(page: PageRef, point: Point, displayRotation?: Rotation, zoom?: number): boolean;

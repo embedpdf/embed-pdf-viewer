@@ -77,6 +77,7 @@ import type {
 } from '../src/types';
 import {
   annotsInBox,
+  dropsWaitingInk,
   initialModel,
   rotateDraftDelta,
   update,
@@ -1635,6 +1636,44 @@ describe('annotation-core', () => {
       expect(geometry.inkList[0]).toHaveLength(2);
       expect(geometry.inkList[0][0].y).toBeCloseTo(geometry.inkList[0][1].y);
     }
+  });
+
+  it('says when a message took the place of ink that waited for its next stroke', () => {
+    const ink = (phase: 'down' | 'move' | 'up', x: number, y: number, page = PAGE): Message => ({
+      type: 'createPointer',
+      phase,
+      subtype: 'ink',
+      deferInkCommit: true,
+      in: { page, point: { x, y }, shift: false },
+    });
+    /** Whether `message`, run on `model`, dropped the ink that waited there. */
+    const dropped = (model: Model, message: Message): boolean =>
+      dropsWaitingInk(model, step(model, message)[0], message);
+
+    // A square to press, then one stroke of the pen.
+    const square = run(initialModel, [
+      createPtr('square', 'down', 100, 100),
+      createPtr('square', 'move', 160, 160),
+      createPtr('square', 'up', 160, 160),
+    ]);
+    const penDown = run(square, [ink('down', 300, 300), ink('move', 340, 320)]);
+    const waiting = step(penDown, ink('up', 380, 300))[0];
+    expect(waiting.draft).toMatchObject({ kind: 'create-ink', drawing: false });
+
+    // The pen is still down: nothing waits yet.
+    expect(dropped(penDown, editPtr('down', 100, 130))).toBe(false);
+    // The next stroke joins the drawing, and these leave the draft alone.
+    expect(dropped(waiting, ink('down', 300, 340))).toBe(false);
+    expect(dropped(waiting, { type: 'hover', id: square.order[0]! })).toBe(false);
+    expect(dropped(waiting, { type: 'select', ids: [square.order[0]!] })).toBe(false);
+    expect(dropped(waiting, editPtr('down', 500, 500))).toBe(false); // empty page
+    // These take its place.
+    expect(dropped(waiting, editPtr('down', 100, 130))).toBe(true); // on the square
+    expect(dropped(waiting, marqueePtr('down', 500, 500))).toBe(true);
+    expect(dropped(waiting, ink('down', 20, 20, toPageRef(2)))).toBe(true); // another page
+    // These end the drawing on purpose.
+    expect(dropped(waiting, { type: 'cancel' })).toBe(false);
+    expect(dropped(waiting, { type: 'finishInkDraft' })).toBe(false);
   });
 
   it('the stroke under the pen draws as its points, so nothing drawn moves; lifted, it draws the curves it commits with', () => {

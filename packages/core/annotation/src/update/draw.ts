@@ -20,11 +20,13 @@ import type {
   Effect,
   FieldValues,
   InkStraightenOptions,
+  Message,
   Model,
   Placement,
   PointerInput,
   Rect,
   KindName,
+  Session,
 } from '../types';
 import { draftOf, isPolySubtype, newRecord, numbersLeft } from './changes';
 import { calloutPointer } from './draw-callout';
@@ -309,6 +311,25 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
     },
     [{ type: 'create', id, draft: created.draft }],
   ];
+}
+
+/**
+ * Whether `message` took the place of an ink drawing that waited for its next
+ * stroke. Before the message, the draft held strokes with the pen up: finished
+ * work, kept there so the next stroke can join it. After it, the draft no
+ * longer holds them. Two messages end the drawing on purpose and so drop
+ * nothing: `cancel` discards it, and `finishInkDraft` makes it an annotation.
+ *
+ * The caller makes the strokes an annotation and runs the message again.
+ */
+export function dropsWaitingInk(before: Session, after: Session, message: Message): boolean {
+  const waiting = before.draft;
+  if (waiting?.kind !== 'create-ink' || waiting.drawing) return false;
+  if (message.type === 'cancel' || message.type === 'finishInkDraft') return false;
+  // The next stroke of the drawing, and a message that leaves the draft
+  // alone, both keep its first stroke as it was.
+  const next = after.draft;
+  return !(next?.kind === 'create-ink' && next.strokes[0] === waiting.strokes[0]);
 }
 
 export function finishPolyCreate(model: Model): [Model, Effect[]] {

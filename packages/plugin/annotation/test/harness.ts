@@ -77,6 +77,12 @@ export interface AnnotationHarnessOptions {
   readonly config?: AnnotationConfig;
   /** A fonts plugin to draw text boxes with (`FontsToken`). */
   readonly fonts?: object;
+  /**
+   * The interaction hub the plugin wires to: the real plugin's capability,
+   * for a test that sends its presses through the hub. By default a minimal
+   * hub that only keeps the active tool.
+   */
+  readonly interaction?: object;
 }
 
 const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -137,14 +143,15 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
 
   // A minimal interaction hub, enough for the plugin's `connect` wiring.
   const toolChanged = createEventHook<unknown>();
+  let activeToolId = 'pointer';
   const interaction = {
     activateDefaultTool: vi.fn(),
     activateTool: vi.fn(),
     registerTool: () => () => {},
     registerHandler: () => () => {},
     hasTool: () => false,
-    getActiveTool: () => ({ id: 'pointer', cursor: 'default', enables: new Set<string>() }),
-    getActiveToolId: () => 'pointer',
+    getActiveTool: () => ({ id: activeToolId, cursor: 'default', enables: new Set<string>() }),
+    getActiveToolId: () => activeToolId,
     onToolChanged: toolChanged.on,
   };
 
@@ -372,7 +379,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     state: initialAnnotationModel(),
     settings: { defaults: ANNOTATION_DEFAULTS, registered: options.config },
     capabilities: [
-      [InteractionToken, interaction],
+      [InteractionToken, options.interaction ?? interaction],
       [RenderHostToken, render.api],
       ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
       ...(options.fonts ? [[FontsToken, options.fonts] as const] : []),
@@ -414,6 +421,12 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     exportBundle,
     importBundle,
     interaction,
+    /** The user picks another tool on the minimal hub: it becomes the active one, then the hub says so. */
+    changeTool: (id: string) => {
+      const previousToolId = activeToolId;
+      activeToolId = id;
+      toolChanged.emit({ toolId: id, previousToolId });
+    },
     list,
     listAll,
     allows,

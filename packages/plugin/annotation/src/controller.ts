@@ -95,8 +95,8 @@ export function createAnnotationController(ctx: AnnotationContext) {
     crud,
   );
   const measurement = createMeasurement(ctx, services);
-  const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(ctx, services, annotations);
+  const pointer = createPointer(ctx, services, chrome, measurement, drafts);
   const markup = createMarkupWrites(ctx, services, annotations);
   const scripts = createScriptEffects(ctx, services);
 

@@ -1,4 +1,3 @@
-import type { PluginClock } from '@embedpdf/core';
 import type { KindName, Point } from '@embedpdf/core-annotation';
 import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -384,8 +383,6 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 export function createDrawHandler(
   anno: AnnotationHostCapability,
   interaction: InteractionHostCapability,
-  clock: Pick<PluginClock, 'after'>,
-  onSettle?: (flush: () => void) => void,
 ): InteractionHandler {
   // The active tool id + its routing subtype. The id is what `createPointer` takes
   // (it resolves the defaults preset — arrow vs line); the subtype is what the
@@ -404,23 +401,7 @@ export function createDrawHandler(
   // The active drag's home page (down→up): moves/ups resolve against it, so a
   // shape keeps sizing along the page edge when the cursor overshoots.
   let origin: { page: PageRef; point: Point } | null = null;
-  // An ink drawing waiting for its next stroke, and the cancel of that wait.
-  let pendingInk: {
-    tool: string;
-    page: PageRef;
-    cancelWait: () => void;
-  } | null = null;
-  const flushPendingInk = () => {
-    if (!pendingInk) return;
-    pendingInk.cancelWait();
-    pendingInk = null;
-    anno.finishInkDraft();
-  };
-  // A download finishes the drawing waiting for its next stroke. A stroke still
-  // being drawn is left alone: it's not what the user sees yet.
-  onSettle?.(flushPendingInk);
   interaction.onToolChanged(() => {
-    flushPendingInk();
     drawingPoly = false;
     drawingCallout = false;
     followPage = null;
@@ -456,17 +437,6 @@ export function createDrawHandler(
         return true;
       }
       if (!sample.page) return false;
-      if (st === 'ink' && pendingInk) {
-        if (
-          pendingInk.tool === tool &&
-          pendingInk.page.objectNumber === sample.page.ref.objectNumber
-        ) {
-          pendingInk.cancelWait();
-          pendingInk = null;
-        } else {
-          flushPendingInk();
-        }
-      }
       // A down is a fresh intent — it may legitimately start on another page
       // (the core restarts the draft there), so it re-anchors the gesture.
       origin = { page: sample.page.ref, point: sample.page.point };
@@ -518,17 +488,6 @@ export function createDrawHandler(
       if (origin && !isPolyTool(st)) {
         // Always commit the drag, even released off-page (point pins in core).
         anno.createPointer(tool, 'up', origin.page, pointOn(sample, origin.page) ?? origin.point);
-        if (st === 'ink') {
-          const groupStrokesMs = anno.getResolvedTool(tool)?.ink?.groupStrokesMs ?? 0;
-          if (groupStrokesMs > 0) {
-            const page = origin.page;
-            const cancelWait = clock.after(groupStrokesMs, () => {
-              pendingInk = null;
-              anno.finishInkDraft();
-            });
-            pendingInk = { tool, page, cancelWait };
-          }
-        }
       }
       origin = null;
       anno.clearGhost();
@@ -539,10 +498,6 @@ export function createDrawHandler(
       // whose final point teleports to the second finger. For an ink group
       // this drops the whole in-window draft (there is no partial discard);
       // a cancel is a cancel, and the grouping window is sub-second.
-      if (pendingInk) {
-        pendingInk.cancelWait();
-        pendingInk = null;
-      }
       drawingPoly = false;
       drawingCallout = false;
       followPage = null;
