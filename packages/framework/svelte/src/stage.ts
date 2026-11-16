@@ -9,6 +9,8 @@
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
+// The Stage's commands, ready to spread.
+export { stageCommands } from './command-lists';
 
 export { default as Stage } from './stage/Stage.svelte';
 export { default as StageScope } from './stage/StageScope.svelte';

@@ -2,8 +2,9 @@
  * @embedpdf/plugin-interaction/commands — a command for every tool: the
  * built-in tools with Acrobat's single keys, and `tool:<id>` for every other
  * tool the document has. `toolCommand()` is for a plugin whose tool gets a
- * command of its own, with a shortcut or a permission. The i18n plugin has
- * their labels.
+ * command of its own, with a shortcut or a permission. Each framework's
+ * `/interaction` has the list ready as `interactionCommands`. The i18n plugin
+ * has their labels.
  */
 import type { CommandContext, CommandDefinition, CommandFamily } from '@embedpdf/core';
 
@@ -46,10 +47,12 @@ const toolCommands: CommandFamily = {
 };
 
 /** The tool commands: `tool:pointer`, `tool:pan`, `tool:zoom`, and `tool:<id>` for every other tool. */
-export const interactionCommands: readonly (CommandDefinition | CommandFamily)[] = [
-  // The built-in tools have Acrobat's single keys; the family covers every other.
-  { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
-  { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
-  { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
-  toolCommands,
-];
+export function createInteractionCommands(): readonly (CommandDefinition | CommandFamily)[] {
+  return [
+    // The built-in tools have Acrobat's single keys; the family covers every other.
+    { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
+    { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
+    { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
+    toolCommands,
+  ];
+}

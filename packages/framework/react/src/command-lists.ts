@@ -1,28 +1,40 @@
 /**
- * The command lists as an app spreads them. The ones that reach the browser
- * (the clipboard, a file download) are made here, once, with the browser's
- * part: their feature entries export them, and `standardCommands` joins them
- * with the lists that need nothing from the browser. Only `/commands` entries
- * are imported, so the standard commands bring in no plugin.
+ * The command lists as an app spreads them. Each plugin ships a function that
+ * makes its list; the lists are made here, once, with the browser's part for
+ * the ones that reach it (the clipboard, a file download). Each feature entry
+ * exports its own, and `standardCommands` joins them. Only `/commands`
+ * entries are imported, so the standard commands bring in no plugin.
  */
 import type { CommandDefinition, CommandFamily } from '@embedpdf/core';
 import { createDocumentCommands } from '@embedpdf/core/commands';
-import { annotationCommands } from '@embedpdf/plugin-annotation/commands';
-import { historyCommands } from '@embedpdf/plugin-history/commands';
-import { interactionCommands } from '@embedpdf/plugin-interaction/commands';
+import { createAnnotationCommands } from '@embedpdf/plugin-annotation/commands';
+import { createHistoryCommands } from '@embedpdf/plugin-history/commands';
+import { createInteractionCommands } from '@embedpdf/plugin-interaction/commands';
 import { createRenderCommands } from '@embedpdf/plugin-render/commands';
 import { createSelectionCommands } from '@embedpdf/plugin-selection/commands';
-import { stageCommands } from '@embedpdf/plugin-stage/commands';
+import { createStageCommands } from '@embedpdf/plugin-stage/commands';
 import { standardCommandsBrowser } from '@embedpdf/web';
 
-/** The document's commands: download and print. */
-export const documentCommands = /* @__PURE__ */ createDocumentCommands(standardCommandsBrowser);
+/** The Stage's commands: zoom, the page moves and view rotation. */
+export const stageCommands = /* @__PURE__ */ createStageCommands();
+
+/** The tool commands: `tool:pointer`, `tool:pan`, `tool:zoom`, and `tool:<id>` for every other tool. */
+export const interactionCommands = /* @__PURE__ */ createInteractionCommands();
+
+/** The selection's commands: copy. */
+export const selectionCommands = /* @__PURE__ */ createSelectionCommands(standardCommandsBrowser);
+
+/** The annotation plugin's commands: delete. */
+export const annotationCommands = /* @__PURE__ */ createAnnotationCommands();
+
+/** The history plugin's commands: undo and redo. */
+export const historyCommands = /* @__PURE__ */ createHistoryCommands();
 
 /** The snapshot's commands: the snapshot tool, and copy, save and clear for the snapshot it holds. */
 export const renderCommands = /* @__PURE__ */ createRenderCommands(standardCommandsBrowser);
 
-/** The selection's commands: copy. */
-export const selectionCommands = /* @__PURE__ */ createSelectionCommands(standardCommandsBrowser);
+/** The document's commands: download and print. */
+export const documentCommands = /* @__PURE__ */ createDocumentCommands(standardCommandsBrowser);
 
 // A call, so a bundler drops the join from an app that never reads it.
 const join = (

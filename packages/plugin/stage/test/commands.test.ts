@@ -1,14 +1,15 @@
 import { createTestCommandContext } from '@embedpdf/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import { stageCommands } from '../src/commands';
+import { createStageCommands } from '../src/commands';
 import { StageToken } from '../src/contract';
 
+const stageCommands = createStageCommands();
 const command = (id: string) => stageCommands.find((item) => item.id === id)!;
 const shortcutsOf = (items: readonly { id: string; shortcut?: string | readonly string[] }[]) =>
   Object.fromEntries(items.map((item) => [item.id, item.shortcut ?? null]));
 
-describe('stageCommands', () => {
+describe('createStageCommands', () => {
   it('has zoom, the page moves and view rotation, with their shortcuts', () => {
     expect(shortcutsOf(stageCommands)).toEqual({
       'zoom:in': ['Mod+=', 'Mod+NumpadAdd'],

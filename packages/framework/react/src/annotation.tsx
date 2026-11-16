@@ -23,6 +23,8 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
+// The annotation plugin's commands, ready to spread.
+export { annotationCommands } from './command-lists';
 import type { EventHook, PageRef } from '@embedpdf/core';
 import {
   hasLiveDrawing,

@@ -1,12 +1,12 @@
 import { createTestCommandContext } from '@embedpdf/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import { annotationCommands } from '../src/commands';
+import { createAnnotationCommands } from '../src/commands';
 import { AnnotationToken } from '../src/contract';
 
-const command = (id: string) => annotationCommands.find((item) => item.id === id)!;
+const command = (id: string) => createAnnotationCommands().find((item) => item.id === id)!;
 
-describe('annotationCommands', () => {
+describe('createAnnotationCommands', () => {
   it('deletes a selection only when every annotation in it may be deleted, by hand', () => {
     const refs = [{ id: 1 }, { id: 2 }];
     const annotation = {

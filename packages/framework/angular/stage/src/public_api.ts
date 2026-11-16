@@ -10,6 +10,7 @@
 
 // The plugin's types and helpers, so app code has one import for the feature.
 export * from '@embedpdf/plugin-stage';
+export { stageCommands } from './commands';
 export * from './feature';
 export * from './templates';
 export * from './stage-ref';

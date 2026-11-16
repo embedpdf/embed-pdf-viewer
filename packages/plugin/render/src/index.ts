@@ -7,4 +7,3 @@
  */
 export { renderPlugin } from './render.plugin';
 export * from './contract';
-export * from './commands';

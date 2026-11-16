@@ -1,12 +1,13 @@
 import { createTestCommandContext } from '@embedpdf/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import { historyCommands } from '../src/commands';
+import { createHistoryCommands } from '../src/commands';
 import { HistoryToken } from '../src/contract';
 
+const historyCommands = createHistoryCommands();
 const command = (id: string) => historyCommands.find((item) => item.id === id)!;
 
-describe('historyCommands', () => {
+describe('createHistoryCommands', () => {
   it('has undo and redo, with their shortcuts', () => {
     expect(historyCommands.map((item) => [item.id, item.shortcut])).toEqual([
       ['history:undo', 'Mod+Z'],

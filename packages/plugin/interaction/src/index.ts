@@ -8,5 +8,4 @@
 export { interactionPlugin } from './interaction.plugin';
 export { interactionState, type InteractionState } from './state';
 export * from './contract';
-export * from './commands';
 export { feedbackPlugin } from './feedback';

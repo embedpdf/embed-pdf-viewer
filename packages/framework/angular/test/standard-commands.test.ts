@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { annotationCommands } from '@embedpdf/angular/annotation';
 import { standardCommands } from '@embedpdf/angular/commands';
+import { historyCommands } from '@embedpdf/angular/history';
+import { interactionCommands } from '@embedpdf/angular/interaction';
 import { renderCommands } from '@embedpdf/angular/render';
 import { documentCommands } from '@embedpdf/angular/runtime';
 import { selectionCommands } from '@embedpdf/angular/selection';
+import { stageCommands } from '@embedpdf/angular/stage';
 
 // The lists are tested where they live, in each plugin's `test/commands.test.ts`. This pins
 // the join an app spreads: which lists it has, and in which order.
@@ -37,11 +41,19 @@ describe('standardCommands', () => {
     ]);
   });
 
-  it('has the commands of the lists the feature entries export', () => {
-    const ids = new Set(standardCommands.flatMap((item) => ('id' in item ? [item.id] : [])));
-    for (const list of [selectionCommands, renderCommands, documentCommands]) {
-      expect(list.length).toBeGreaterThan(0);
-      for (const item of list) expect(ids.has(item.id)).toBe(true);
-    }
+  it('has the ids of the lists the feature entries export, in their order', () => {
+    const idOf = (item: (typeof standardCommands)[number]) =>
+      'id' in item ? item.id : `${item.prefix}*`;
+    expect(standardCommands.map(idOf)).toEqual(
+      [
+        ...stageCommands,
+        ...interactionCommands,
+        ...selectionCommands,
+        ...annotationCommands,
+        ...historyCommands,
+        ...renderCommands,
+        ...documentCommands,
+      ].map(idOf),
+    );
   });
 });

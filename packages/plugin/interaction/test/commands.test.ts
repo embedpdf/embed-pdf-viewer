@@ -3,13 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { CommandDefinition, CommandFamily } from '@embedpdf/core';
 
-import { interactionCommands, toolCommand } from '../src/commands';
+import { createInteractionCommands, toolCommand } from '../src/commands';
 import { InteractionToken } from '../src/contract';
 
+const interactionCommands = createInteractionCommands();
 const family = interactionCommands.find((item): item is CommandFamily => 'prefix' in item)!;
 const defined = interactionCommands.filter((item): item is CommandDefinition => 'id' in item);
 
-describe('interactionCommands', () => {
+describe('createInteractionCommands', () => {
   it('has the built-in tools with their keys, and a family for every other tool', () => {
     expect(defined.map((item) => [item.id, item.shortcut])).toEqual([
       ['tool:pointer', 'V'],

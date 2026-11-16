@@ -10,6 +10,8 @@
 
 // One line per feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
+// The Stage's commands, ready to spread.
+export { stageCommands } from './command-lists';
 export { default as Stage } from './stage/Stage.vue';
 export { default as StageScope } from './stage/StageScope.vue';
 export { default as Scrollbar } from './stage/Scrollbar.vue';

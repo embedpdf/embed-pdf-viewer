@@ -1,4 +1,4 @@
 # @embedpdf/plugin-commands — ./standard
 
 StandardCommandsPlatform [InterfaceDeclaration]: export interface StandardCommandsPlatform{ copySelection(selection: SelectionCapability): Promise<unknown>; copyImage(image: Promise<PageImage>): Promise<unknown>; saveFile(bytes: Uint8Array | Blob, fileName: string, contentType: string): void; }
-createStandardCommands [FunctionDeclaration]: export function createStandardCommands( platform: StandardCommandsPlatform, ): readonly (CommandDefinition | CommandFamily)[]{ return [ ...stageCommands, ...interactionCommands, ...createSelectionCommands(platform), ...annotationCommands, ...createRenderCommands(platform), ...createDocumentCommands(platform), ]; }
+createStandardCommands [FunctionDeclaration]: export function createStandardCommands( platform: StandardCommandsPlatform, ): readonly (CommandDefinition | CommandFamily)[]{ return [ ...createStageCommands(), ...createInteractionCommands(), ...createSelectionCommands(platform), ...createAnnotationCommands(), ...createRenderCommands(platform), ...createDocumentCommands(platform), ]; }

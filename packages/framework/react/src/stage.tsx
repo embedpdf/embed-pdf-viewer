@@ -10,6 +10,8 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
+// The Stage's commands, ready to spread.
+export { stageCommands } from './command-lists';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {

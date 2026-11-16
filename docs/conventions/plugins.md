@@ -187,18 +187,20 @@ The source rules are mechanical:
 A plugin ships the commands for what it does. The commands plugin runs
 commands and knows no plugin; only the shell and i18n, which it needs itself.
 
-- The list lives in `src/commands.ts`, exported as `./commands` and from the
-  package root.
+- The list lives in `src/commands.ts`, exported as `./commands`. That entry
+  is its one door: the package root does not re-export it.
 - It is typed with core's `CommandDefinition` and `CommandFamily`, and reads
   capabilities with `context.tryGet(Token)` from `./contract`. Its runtime
   import graph must not reach the implementation, as for a contract.
   `pnpm check:plugin-boundaries` checks it.
-- A list that needs nothing from the browser is a constant named after the
-  plugin: `stageCommands`. One that does is a function that takes its part of
-  the browser: `createSelectionCommands({ copySelection })`. Plugins never
-  touch the DOM.
+- A plugin exports a function that makes its list, named after the plugin:
+  `createStageCommands()`. Always a function, so a list can gain an argument
+  later without breaking anyone. It takes one only when the list reaches the
+  browser, and then only its own part of it:
+  `createSelectionCommands({ copySelection })`. Plugins never touch the DOM.
 - Each framework's feature entry exports the list ready to spread, always as
-  a constant: `selectionCommands` from `/selection`.
+  a constant, made once: `stageCommands` from `/stage`, `selectionCommands`
+  from `/selection`. That is what an app imports.
 - `standardCommands` is a join the framework packages make, of the lists of
   the owners every viewer has: Stage, interaction, selection, annotation,
   history, render and the documents (`@embedpdf/core/commands`). A plugin
