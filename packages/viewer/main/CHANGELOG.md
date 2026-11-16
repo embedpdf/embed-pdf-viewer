@@ -1,5 +1,19 @@
 # @embedpdf/viewer
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1039](https://github.com/embedpdf/embed-pdf-viewer/pull/1039) by [@bobsingor](https://github.com/bobsingor) – `plugins.stamp.libraries` gives the viewer your own stamp libraries, each `{ id, url }` or `{ id, data }`, such as a check mark and a cross for ticking off a printed form: loaded when the viewer starts, never stored in the browser, and named in `quick` as `<id>:<name>` to show in the Insert toolbar. Quick stamps now show at the button's full height, so a wide stamp no longer shrinks to a few pixels. The `StampLibraryFile` type describes one library. A stamp library of your own as the standard stamps (`plugins.stamp.standard: '/my-stamps.pdf'`) no longer shows up once more in the stamps panel on every visit: it is never stored in the browser now, like the copy that ships, and `standard:<name>` in `quick` finds its stamps. Copies already stored stay in the panel, where each can be removed. Fixes #1084.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – `plugins.signature.revocation` keeps every signature the viewer seals checkable with no network: its validation data is stored in the file right after the seal. `plugins.signature.documentTimestamp` adds a document timestamp after it. `httpRevocationSource` and `createTestCertificateAuthority` are exported beside the signers.
+
+- [#1087](https://github.com/embedpdf/embed-pdf-viewer/pull/1087) by [@bobsingor](https://github.com/bobsingor) – `plugins.signature.timestampAuthority` gives every signature the viewer seals a timestamp. `httpTimestampAuthority` and `createTestTimestampAuthority` are exported beside the signers, so the authority comes from the same import as the key.
+
+### Patch Changes
+
+- [#1092](https://github.com/embedpdf/embed-pdf-viewer/pull/1092) by [@bobsingor](https://github.com/bobsingor) – An Angular production build of an app with the viewer no longer warns that `pvtsutils` is not ESM. The signature package moved to `pkijs` 4 and `asn1js` 4, which no longer use it. An `allowedCommonJsDependencies` entry for `pvtsutils` can go.
+
 ## 3.2.0
 
 ## 3.1.0

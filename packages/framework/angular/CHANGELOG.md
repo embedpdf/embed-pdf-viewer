@@ -1,5 +1,19 @@
 # @embedpdf/angular
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1091](https://github.com/embedpdf/embed-pdf-viewer/pull/1091) by [@bobsingor](https://github.com/bobsingor) – Each feature entry exports its plugin's commands as a list: `stageCommands` from `/stage`, `interactionCommands` from `/interaction`, `selectionCommands` from `/selection`, `annotationCommands` from `/annotation`, `historyCommands` from `/history`, `renderCommands` from `/render` and `documentCommands` from `/runtime`. `standardCommands` is these lists joined. To leave some commands out, spread the lists you want in place of `standardCommands`. `/interaction` also exports `toolCommand(id)`, the command behind `tool:<id>`, to give a tool of your own a shortcut.
+
+  `standardCommands` gains `history:undo` (`Mod+Z`) and `history:redo` (`Mod+Shift+Z`, `Mod+Y`), from the history plugin's list. They run the history plugin's undo and redo, and stay disabled without `withHistory()` or while there is nothing to undo or redo. A command of your own with one of these ids still replaces the standard one when it comes after `...standardCommands` in the `commands` setting of `withCommands()`. With the standard commands in use, `registerCommand()` with one of these ids now needs `{ replace: true }`.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – `EpdfSignature` has `addValidationInfo()` and `canAddValidationInfo()`, as the signature plugin does.
+
+### Patch Changes
+
+- [#1092](https://github.com/embedpdf/embed-pdf-viewer/pull/1092) by [@bobsingor](https://github.com/bobsingor) – A production build no longer warns that `pvtsutils` is not ESM. The signature package moved to `pkijs` 4 and `asn1js` 4, which no longer use it. An `allowedCommonJsDependencies` entry for `pvtsutils` can go.
+
 ## 3.2.0
 
 ### Minor Changes

@@ -1,5 +1,18 @@
 # @cloudpdf/engine
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – Long-term validation works on the cloud engine.
+  - `doc.signatures.getValidationInfo()` reads the validation data the layer's file holds, pinned at the document version like the signature list. `doc.signatures.addValidationInfo()` stores more through a route of its own, publishes `signatures.validationInfoAdded`, and everyone else with the layer open receives the same event. So `addValidationInfo()` from `@embedpdf/core-signature` runs over the cloud engine as it does locally: the app collects the answers and the server stores them.
+  - A document timestamp needs no `field`: `sign(doc, { kind: 'timestamp', key })` and `prepare({ kind: 'timestamp' })` work, and the server makes the field.
+  - All three need a server of version 3.3. An older one is never sent them: they fail with `NotImplemented`, with `details.needs` and `details.serverVersion`. Checking signatures against an older server still works.
+
+### Patch Changes
+
+- [#1093](https://github.com/embedpdf/embed-pdf-viewer/pull/1093) by [@bobsingor](https://github.com/bobsingor) – `doc.signatures.analyze()` no longer sends the number of its judging rules (`policy`), which a server on other rules refused: the verdict then read `'indeterminate'`. It sends the server's `analysis` engine value instead, so the answer for a saved version is still cached. It works with a server of 3.0 to 3.2 as it does with a newer one.
+
 ## 3.2.0
 
 ### Minor Changes
