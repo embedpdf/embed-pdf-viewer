@@ -57,3 +57,30 @@ test('the plugin fails the build and names each copied file', () => {
   );
   assert.doesNotThrow(() => plugin.generateBundle.call(context, {}, { 'form.d.ts': output['form.d.ts'] }));
 });
+
+test('the CommonJS code may hold what epdf.bundleInCjs lists, and no other output may', () => {
+  const plugin = ownSourceOnly(
+    { name: '@embedpdf/core-signature', epdf: { bundleInCjs: ['pkijs', '@noble/hashes'] } },
+    react,
+  );
+  const own = path.join(react, 'src/index.ts');
+  const held = [nodeModules('pkijs/build/index.js'), nodeModules('@noble/hashes/sha2.js')];
+  const chunk = (fileName, moduleIds) => ({ [fileName]: { type: 'chunk', fileName, moduleIds } });
+  const context = {
+    error(message) {
+      throw new Error(message);
+    },
+  };
+  const build = (format, output) => () => plugin.generateBundle.call(context, { format }, output);
+
+  assert.doesNotThrow(build('cjs', chunk('index.cjs', [own, ...held])));
+  // The ES module output imports them, and so does every declaration the guard sees.
+  assert.throws(build('es', chunk('index.js', [own, ...held])), /dist\/index\.js <- /);
+  assert.throws(build('cjs', chunk('index.d.cts', [own, ...held])), /dist\/index\.d\.cts <- /);
+  // A package that isn't listed is still a copy.
+  assert.throws(
+    build('cjs', chunk('index.cjs', [own, nodeModules('zod/index.js')])),
+    /dist\/index\.cjs <- .*zod/,
+  );
+});
+

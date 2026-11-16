@@ -1,4 +1,9 @@
+import * as asn1js from 'asn1js';
 import { describe, expect, test } from 'vitest';
+
+import { OID } from '../src/cms/oids';
+import { certificateFromDer, parseCmsInternal } from '../src/cms/parse';
+import { x509Time } from '../src/cms/time';
 import {
   buildDetachedCms,
   createTestSigner,
@@ -8,6 +13,8 @@ import {
   verifyForCompletion,
   type RawSigner,
 } from '../src/index';
+import { derProblem, signedAttributesAsSet } from './helpers/der';
+import { createIdentity } from './helpers/pki';
 
 const digest = new Uint8Array(32).map((_, i) => (i * 7 + 3) & 0xff);
 const prepared = {
@@ -162,5 +169,57 @@ describe('detached CMS: build → parse → verify', () => {
       },
     );
     expect(early.status).toBe('untrusted');
+  });
+});
+
+describe('a time from 2050 on', () => {
+  // UTCTime has two digits for the year and ends with 2049. RFC 5652 and RFC 5280 both have a
+  // later time written as GeneralizedTime.
+  test('a signing time is UTCTime through 2049 and GeneralizedTime after', async () => {
+    const signer = await createTestSigner();
+    for (const [when, form] of [
+      ['2049-12-31T23:59:59.000Z', asn1js.UTCTime],
+      ['2050-01-01T00:00:00.000Z', asn1js.GeneralizedTime],
+      ['2071-06-15T08:30:00.000Z', asn1js.GeneralizedTime],
+    ] as const) {
+      const cms = await buildDetachedCms({
+        digest,
+        hash: 'sha256',
+        profile: 'pkcs7',
+        signer,
+        signingTime: when,
+      });
+      const written = parseCmsInternal(cms).signerInfo.signedAttrs!.attributes.find(
+        (attribute) => attribute.type === OID.signingTime,
+      )!.values[0];
+      // A GeneralizedTime is a UTCTime to `instanceof`, so the class is compared itself.
+      expect(written.constructor, when).toBe(form);
+      expect(parseDetachedCms(cms).signingTime).toBe(when);
+      expect(await verifyCmsSignature(cms)).toBe('valid');
+      expect(derProblem(cms), when).toBeNull();
+      expect(derProblem(signedAttributesAsSet(cms)), when).toBeNull();
+    }
+  });
+
+  test('a signing time is written to the second', async () => {
+    const cms = await buildDetachedCms({
+      digest,
+      hash: 'sha256',
+      profile: 'pkcs7',
+      signer: await createTestSigner(),
+      signingTime: '2050-03-01T10:00:00.750Z',
+    });
+    expect(parseDetachedCms(cms).signingTime).toBe('2050-03-01T10:00:00.000Z');
+    expect(derProblem(cms)).toBeNull();
+  });
+
+  test("a certificate's dates follow the same rule", async () => {
+    expect(x509Time(new Date('2049-12-31T23:59:59.000Z')).type).toBe(0);
+    expect(x509Time(new Date('2050-01-01T00:00:00.000Z')).type).toBe(1);
+
+    const notAfter = new Date('2061-05-04T12:00:00.000Z');
+    const identity = await createIdentity({ commonName: 'valid past 2050', notAfter });
+    expect(derProblem(identity.certificate)).toBeNull();
+    expect(certificateFromDer(identity.certificate).notAfter.value).toEqual(notAfter);
   });
 });

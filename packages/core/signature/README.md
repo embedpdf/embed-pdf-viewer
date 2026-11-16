@@ -34,6 +34,9 @@ in its own package, which works with both engines:
 npm install @embedpdf/core-signature
 ```
 
+It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19): see
+[In Node](https://www.embedpdf.com/docs/engine/forms/signatures#in-node).
+
 ## Documentation
 
 - [Digital signatures](https://www.embedpdf.com/docs/engine/forms/signatures): Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, timestamp the signature, keep it checkable for years, and certify a document.

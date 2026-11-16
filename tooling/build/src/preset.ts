@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UserConfig } from 'tsdown';
-import { ownSourceOnly } from './own-source-only.mjs';
+import { bundledNotices } from './bundle-in-cjs.mjs';
+import { isOneOf, ownSourceOnly } from './own-source-only.mjs';
 
 /**
  * The one library preset (see tooling/build/package.json for scope).
@@ -31,6 +32,17 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
   // target is a file of the package: Turbopack doesn't follow one that names
   // another package.
   const neverBundle: string[] = pkg.epdf?.neverBundle ?? [];
+  // epdf.bundleInCjs (package.json): dependencies the CommonJS output holds inside it, code and
+  // declarations, while the ES module output goes on importing them (see bundle-in-cjs.mjs).
+  // Every package that ends up inside is listed, the ones a listed package uses too: the build
+  // fails on one that isn't.
+  const bundleInCjs: string[] = pkg.epdf?.bundleInCjs ?? [];
+  const heldInCjs = (id: string) => isOneOf(bundleInCjs, id);
+  if (bundleInCjs.length > 0 && neverBundle.length > 0) {
+    throw new Error(
+      `${pkg.name}: "epdf.bundleInCjs" and "epdf.neverBundle" can't be used together`,
+    );
+  }
   const withConditions = (generated: Record<string, unknown>) => {
     const out: Record<string, unknown> = { ...generated };
     for (const [subpath, extra] of Object.entries(conditions)) {
@@ -44,7 +56,23 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
   };
   return {
     entry: entriesFromExports(pkg, raw),
-    format: ['esm', 'cjs'],
+    format:
+      bundleInCjs.length > 0
+        ? {
+            esm: {},
+            // A format's settings replace the build's, so this is the whole of `deps` for the
+            // CommonJS output, in the shape tsdown resolves it to.
+            cjs: {
+              deps: {
+                alwaysBundle: heldInCjs,
+                onlyBundle: bundleInCjs,
+                skipNodeModulesBundle: false,
+                resolveDepSubpath: true,
+                dts: { alwaysBundle: heldInCjs },
+              },
+            },
+          }
+        : ['esm', 'cjs'],
     platform: 'neutral',
     target: 'es2020',
     dts: true,
@@ -65,7 +93,10 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
     ...(neverBundle.length > 0 ? { deps: { neverBundle } } : {}),
     // dist holds the package's own files and nothing from another package; epdf.bundle
     // (package.json) lists the packages meant to ship inside it (see own-source-only.mjs).
-    plugins: [ownSourceOnly(pkg, fs.realpathSync(process.cwd()))],
+    plugins: [
+      ownSourceOnly(pkg, fs.realpathSync(process.cwd())),
+      ...(bundleInCjs.length > 0 ? [bundledNotices(pkg, fs.realpathSync(process.cwd()))] : []),
+    ],
     publint: true,
     // node16 profile: subpath exports are invisible to legacy node10 module
     // resolution; v3's documented floor is TS >= 4.7 with node16/bundler.
@@ -88,6 +119,7 @@ interface PackageJson {
     conditions?: Record<string, Record<string, string>>;
     neverBundle?: string[];
     bundle?: string[];
+    bundleInCjs?: string[];
   };
 }
 

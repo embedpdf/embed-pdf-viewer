@@ -3,6 +3,7 @@ import * as pkijs from 'pkijs';
 
 import { ensureEngine } from '../cms/engine';
 import { OID, WEBCRYPTO_HASH } from '../cms/oids';
+import { x509Time } from '../cms/time';
 
 /**
  * A self-signed certificate over a WebCrypto key pair: the shape a personal
@@ -61,8 +62,8 @@ async function buildSelfSignedCertificate(
   cert.issuer.typesAndValues.push(name);
   cert.subject.typesAndValues.push(name);
   const now = Date.now();
-  cert.notBefore.value = new Date(now - 24 * 3600 * 1000);
-  cert.notAfter.value = new Date(now + (input.validityDays ?? 365) * 24 * 3600 * 1000);
+  cert.notBefore = x509Time(new Date(now - 24 * 3600 * 1000));
+  cert.notAfter = x509Time(new Date(now + (input.validityDays ?? 365) * 24 * 3600 * 1000));
   const timestamping = purpose === 'timestamping';
   const basicConstraints = new pkijs.BasicConstraints({ cA: !timestamping });
   // A signer: digitalSignature (bit 0) | keyCertSign (bit 5). An authority: digitalSignature alone.

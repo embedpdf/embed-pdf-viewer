@@ -33,6 +33,9 @@ in its own package, which works with both engines:
 npm install @embedpdf/core-signature
 ```
 
+It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19): see
+[In Node](#in-node).
+
 ## Sign a field
 
 `sign()` signs a field in one call. It gets the digest from the engine, has your `key` sign it,
@@ -1187,6 +1190,20 @@ stamp.summary; // 'valid'
 
 It returns [a timestamp's verdict](#the-timestamp). A token that stamps another digest, or the
 same bytes under another hash, is `'invalid'`.
+
+### In Node
+
+`@embedpdf/core-signature` reads and writes certificates with `pkijs` and `asn1js`. Both are ES
+modules only, and both ask for Node 22.12 or newer, or 20.19 or newer on Node 20. npm warns
+when it installs them on an older one.
+
+CommonJS needs nothing more. `require()` does not load an ES module on every Node, or in Jest,
+so the CommonJS files of this package hold the two libraries and what they use.
+`require('@embedpdf/core-signature')` loads no ES module, and neither does a package that loads
+it, such as the signature plugin or the React package.
+
+`dist/THIRD-PARTY-NOTICES.txt` in the package lists what those files hold, with each version and
+license, and `inlinedDependencies` in its `package.json` has the versions.
 
 <Engine local>
 

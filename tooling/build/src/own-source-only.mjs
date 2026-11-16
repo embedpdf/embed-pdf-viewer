@@ -9,17 +9,22 @@ import path from 'node:path';
  * files in), so the build fails instead. The package's own files outside `src/` are its own:
  * the engine inlines the worker its build script writes to `workers/`.
  *
- * A package meant to ship inside the build is listed in package.json `epdf.bundle`.
+ * A package meant to ship inside the build is listed in package.json `epdf.bundle`. One meant
+ * to ship inside the CommonJS code only is listed in `epdf.bundleInCjs` (see bundle-in-cjs.mjs).
  */
 export function ownSourceOnly(pkg, packageDir) {
   const bundle = pkg.epdf?.bundle ?? [];
+  const bundleInCjs = pkg.epdf?.bundleInCjs ?? [];
   return {
     name: 'epdf:own-source-only',
-    generateBundle(_options, output) {
+    generateBundle(options, output) {
       const copied = [];
       for (const chunk of Object.values(output)) {
         if (chunk.type !== 'chunk') continue;
-        for (const id of foreignModules(packageDir, chunk.moduleIds, bundle)) {
+        // The CommonJS code may hold what `epdf.bundleInCjs` lists. No other output may.
+        const holdsThem = options.format === 'cjs' && !isDeclaration(chunk.fileName);
+        const allowed = holdsThem ? [...bundle, ...bundleInCjs] : bundle;
+        for (const id of foreignModules(packageDir, chunk.moduleIds, allowed)) {
           copied.push(`  dist/${chunk.fileName} <- ${path.relative(packageDir, id)}`);
         }
       }
@@ -42,16 +47,30 @@ export function foreignModules(packageDir, moduleIds, bundle = []) {
     // A virtual module (rolldown's runtime helpers) has no file.
     if (!path.isAbsolute(id)) return false;
     if (id.startsWith(own) && !id.startsWith(installed)) return false;
-    const name = nodeModulesPackage(id);
-    return name === null || !bundle.includes(name);
+    const name = nodeModulesPackage(id)?.name;
+    return name === undefined || !bundle.includes(name);
   });
 }
 
-/** The package a file under `node_modules` belongs to, or null for a file outside one. */
-function nodeModulesPackage(id) {
+/** Is `specifier` one of the packages in `names`, or a file of one? */
+export function isOneOf(names, specifier) {
+  return names.some((name) => specifier === name || specifier.startsWith(`${name}/`));
+}
+
+/** A declaration file: `.d.ts`, `.d.cts` or `.d.mts`. */
+export function isDeclaration(fileName) {
+  return /\.d\.[cm]?ts$/.test(fileName);
+}
+
+/**
+ * The package a file under `node_modules` belongs to, with the folder it is installed in, or
+ * null for a file outside one.
+ */
+export function nodeModulesPackage(id) {
   const marker = `${path.sep}node_modules${path.sep}`;
   const at = id.lastIndexOf(marker);
   if (at < 0) return null;
-  const [scope, name] = id.slice(at + marker.length).split(path.sep);
-  return scope.startsWith('@') ? `${scope}/${name}` : scope;
+  const [scope, rest] = id.slice(at + marker.length).split(path.sep);
+  const name = scope.startsWith('@') ? `${scope}/${rest}` : scope;
+  return { name, root: path.join(id.slice(0, at + marker.length), ...name.split('/')) };
 }

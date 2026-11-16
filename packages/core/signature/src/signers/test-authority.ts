@@ -9,6 +9,7 @@ import * as pkijs from 'pkijs';
 
 import { bytesEqual, ensureEngine, toArrayBuffer } from '../cms/engine';
 import { OID } from '../cms/oids';
+import { x509Time } from '../cms/time';
 import type { RevocationReason } from '../revocation/answer';
 import type { RevocationRequest, RevocationSource } from '../revocation/source';
 import { generateSigningKeyPair, webCryptoSigner, type TestSigner } from './webcrypto';
@@ -96,8 +97,8 @@ export async function issueCertificate(input: {
     }),
   );
   certificate.issuer = input.issuer ? input.issuer.certificate.subject : certificate.subject;
-  certificate.notBefore.value = input.notBefore ?? new Date(Date.now() - DAY);
-  certificate.notAfter.value = input.notAfter ?? new Date(Date.now() + 365 * DAY);
+  certificate.notBefore = x509Time(input.notBefore ?? new Date(Date.now() - DAY));
+  certificate.notAfter = x509Time(input.notAfter ?? new Date(Date.now() + 365 * DAY));
 
   const authority = input.kind === 'authority';
   const constraints = new pkijs.BasicConstraints({ cA: authority });
@@ -300,14 +301,14 @@ export async function buildCrl(input: {
   const crl = new pkijs.CertificateRevocationList();
   crl.version = 1;
   crl.issuer = input.issuer.certificate.subject;
-  crl.thisUpdate = new pkijs.Time({ type: 0, value: input.thisUpdate });
-  if (input.nextUpdate) crl.nextUpdate = new pkijs.Time({ type: 0, value: input.nextUpdate });
+  crl.thisUpdate = x509Time(input.thisUpdate);
+  if (input.nextUpdate) crl.nextUpdate = x509Time(input.nextUpdate);
   if (input.revoked.length > 0) {
     crl.revokedCertificates = input.revoked.map(
       (entry) =>
         new pkijs.RevokedCertificate({
           userCertificate: entry.serialNumber,
-          revocationDate: new pkijs.Time({ type: 0, value: entry.at }),
+          revocationDate: x509Time(entry.at),
           ...(entry.reason
             ? {
                 crlEntryExtensions: new pkijs.Extensions({

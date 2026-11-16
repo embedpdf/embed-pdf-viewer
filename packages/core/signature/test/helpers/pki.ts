@@ -3,6 +3,7 @@ import * as pkijs from 'pkijs';
 
 import { ensureEngine, toArrayBuffer } from '../../src/cms/engine';
 import { OID } from '../../src/cms/oids';
+import { x509Time } from '../../src/cms/time';
 import { generateSigningKeyPair, webCryptoSigner, type RawSigner } from '../../src/index';
 
 /** A key pair and its certificate, for building the small hierarchies a trust test needs. */
@@ -46,8 +47,8 @@ export async function createIdentity(input: {
   cert.issuer = input.issuer
     ? pkijs.Certificate.fromBER(toArrayBuffer(input.issuer.certificate)).subject
     : cert.subject;
-  cert.notBefore.value = input.notBefore ?? new Date(Date.now() - DAY);
-  cert.notAfter.value = input.notAfter ?? new Date(Date.now() + 365 * DAY);
+  cert.notBefore = x509Time(input.notBefore ?? new Date(Date.now() - DAY));
+  cert.notAfter = x509Time(input.notAfter ?? new Date(Date.now() + 365 * DAY));
 
   const basicConstraints = new pkijs.BasicConstraints({ cA: input.ca === true });
   const keyUsage = input.ca
