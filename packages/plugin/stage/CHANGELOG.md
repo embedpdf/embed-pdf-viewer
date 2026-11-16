@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stage
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1091](https://github.com/embedpdf/embed-pdf-viewer/pull/1091) by [@bobsingor](https://github.com/bobsingor) – The Stage ships its own commands: `createStageCommands()` makes the list of zoom, the page moves and view rotation. It comes from a new `@embedpdf/plugin-stage/commands` entry. They are the commands `@embedpdf/plugin-commands/standard` held, unchanged. The entry reads the plugin through its contract, so the list brings no plugin code with it. Each framework package has the list ready as `stageCommands`.
+
 ## 3.2.0
 
 ### Minor Changes

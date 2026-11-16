@@ -1,5 +1,11 @@
 # @embedpdf/plugin-form
 
+## 3.3.0
+
+### Patch Changes
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – A widget whose box has no size shows nowhere, and is now treated that way. This is how a PDF keeps an invisible signature and the field of a document timestamp. Tab no longer stops at it, `focus()` answers `false` for its field, it gets no fill control, and in design mode it is not lent to the annotation tools, so a click or a marquee can no longer select it.
+
 ## 3.2.0
 
 ### Minor Changes

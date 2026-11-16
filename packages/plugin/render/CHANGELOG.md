@@ -1,5 +1,11 @@
 # @embedpdf/plugin-render
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1091](https://github.com/embedpdf/embed-pdf-viewer/pull/1091) by [@bobsingor](https://github.com/bobsingor) – The render plugin ships the snapshot's commands: `createRenderCommands()` makes the list of `tool:snapshot`, `snapshot:copy`, `snapshot:save` and `snapshot:clear`, and takes the browser's clipboard write and file download as an argument. It comes from a new `@embedpdf/plugin-render/commands` entry. They are the commands `@embedpdf/plugin-commands/standard` held, unchanged. The entry reads the plugin through its contract, so the list brings no plugin code with it. Each framework package has the list ready as `renderCommands`.
+
 ## 3.2.0
 
 ## 3.1.0

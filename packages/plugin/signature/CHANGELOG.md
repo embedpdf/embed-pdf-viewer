@@ -1,5 +1,32 @@
 # @embedpdf/plugin-signature
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – Verdicts say whether a certificate was withdrawn and whether the file is "LTV enabled", and a signature is judged at its timestamp by default.
+  - Every verdict from `validate()` and `validateField()` carries `revocation` (`'good'`, `'revoked'` or `'unknown'`, with `revocationReason`) and `longTerm` (`{ enabled, provenAt, expiresAt, documentTimestampedAt, missing }`), read from the answers the file holds. A signer you trust whose certificate is proven withdrawn reads `'invalid'`.
+  - `validate()` and `validateField()` judge each certificate at the earliest trusted timestamp that covers what it signed, and as of now when there is none. A signature whose signer's certificate expired after it was signed, and that carries a timestamp from an authority you trust, reads `'valid'` where it read `'valid-untrusted'`. Pass `validationTime: { kind: 'now' }` to judge every certificate as of now.
+  - A verdict's `validationTime` names a timestamp's time `stampedAt`. `genTime`, its name until now, is there beside it and is still taken by `validate()`, until 4.0. `AppliedValidationTime`, the type of what a verdict reports, comes with the plugin's exports.
+
+  **Signatures that stay checkable.** Two settings and two methods keep what the plugin seals checkable with no network.
+  - `revocation` is where revocation answers come from, such as `httpRevocationSource({ url })`. With it, every signature the plugin seals gets its validation data right after: the answers that say its certificates were good at its timestamp, stored in the file. It needs `trust`. `documentTimestamp: true` then adds a document timestamp from `timestampAuthority`.
+  - The signature is sealed first, so a failure afterwards can't undo it. `sign()`, `completeSignature()` and `placeMark()` still resolve, and the result says what happened: `validationInfo` is `{ added, documentTimestamp }`, or `null` when nothing was to be added, and `validationInfoError` is the error that kept the data or the document timestamp out, or `null`.
+  - Only the signature just made is covered. A session without `doc.sign`, such as a signer of one group's fields, signs without the follow-up.
+  - `addValidationInfo(field?)` does the same for a signed field, or for every signature, and rejects when one can't be covered. `canAddValidationInfo()` says whether it can: the `revocation` and `trust` settings, and `doc.sign`.
+  - The verdicts are read again when anyone adds validation data to the document. Checking asks nobody: only what the file holds counts.
+  - `httpRevocationSource` and `createTestCertificateAuthority` come with the plugin's exports, beside the signers.
+
+- [#1087](https://github.com/embedpdf/embed-pdf-viewer/pull/1087) by [@bobsingor](https://github.com/bobsingor) – The `timestampAuthority` setting: every signature the plugin seals then carries a timestamp from that authority, in one step and in two, and a timestamp that can't be had fails the signing. `sign()` and `prepareSignature()` take a per-call `timestampAuthority`; `null` seals that one without a timestamp. With the `trust` setting set, a timestamp from an authority it doesn't cover is not sealed.
+
+  `completeSignature()` checks the CMS against what was prepared before it seals anything, where it handed it to the engine as it was: a CMS that doesn't sign the prepared digest is refused instead of written. When it fails, the signing stays prepared, to complete again or to cancel.
+
+  `validate()` takes `validationTime: { kind: 'earliest-timestamp' }`, and a verdict carries its signature's timestamp in `timestamp`. `httpTimestampAuthority` and `createTestTimestampAuthority` come with the plugin's exports, beside the signers.
+
+### Patch Changes
+
+- [#1090](https://github.com/embedpdf/embed-pdf-viewer/pull/1090) by [@bobsingor](https://github.com/bobsingor) – A PKCS#7 signature's signed attributes are in DER order. With `subFilter: 'adbe.pkcs7.detached'` the signing time was written after the message digest, where DER puts it before. A reader that encodes the attributes again before it checks the signature now gets the bytes that were signed. Signatures made before still verify.
+
 ## 3.2.0
 
 ## 3.1.0

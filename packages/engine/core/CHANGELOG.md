@@ -1,5 +1,50 @@
 # @embedpdf/engine-core
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1093](https://github.com/embedpdf/embed-pdf-viewer/pull/1093) by [@bobsingor](https://github.com/bobsingor) – An analysis URL names the server's `analysis` engine value, and no policy number.
+  - `encodeAnalysisToken()` no longer writes `policy`, and `decodeAnalysisToken()` reads past one. `AnalysisToken.policyVersion` is deprecated and ignored; it goes in 4.0.
+  - `analysisQueryString()` no longer writes `policy`. It takes `engine`, the server's `analysis` value, and writes it as a query parameter.
+  - `VersionAnalysisQuerySchema` has `engine` in place of `policy`.
+  - `wirePaths.layerVersionSignatures()` takes `engine`, the server's `signatures` value, and writes it as a query parameter. `VersionSignaturesQuerySchema` is its query.
+
+  `SIGNATURE_POLICY_VERSION` and `policyVersion` on an analysis are as they were.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – Read and store the validation data of a document, timestamp a document with no field made first, and judge two cases the way Acrobat does.
+
+  **`doc.signatures.getValidationInfo()` and `doc.signatures.addValidationInfo()`.** A PDF keeps what a reader needs to check its signatures later with no network in its document security store (`/DSS`): certificates, OCSP responses and CRLs.
+  - `getValidationInfo()` returns them as `{ certificates, ocspResponses, crls }`, each entry as DER bytes, once. It reads the document as it is now, so an entry that was added and not yet saved is among them. It needs `doc.forms.read`.
+  - `addValidationInfo(input)` stores entries and returns `{ added, meta }`, where `added` counts the new ones of each kind. An entry the document already holds, byte for byte, is not stored again.
+    - Each entry must be one DER object of at most 16 MiB (`VALIDATION_INFO_LIMITS.entryBytes`). Otherwise the call fails with `InvalidArg`, `details.field` names the entry, and nothing is stored. What an entry says is not checked.
+    - It is a change of the document: it is in the file at the next save, as a revision after the signatures, and a signature made after it seals it in. It has no undo (`meta.undoable` is `false`), and undoing another change leaves it in place.
+    - It needs `doc.sign`. After a certification that allows no changes it fails with `ProtectedDocument`.
+    - It fires `signatures.validationInfoAdded`, with `added`, when it stored something.
+  - New exports: the types `ValidationInfo`, `ValidationInfoAddResult`, `ValidationInfoCounts` and `ValidationInfoKind`, `VALIDATION_INFO_KINDS`, `VALIDATION_INFO_LIMITS`, and `validationInfoEntryProblem()`, which says why bytes are not an entry the engine stores.
+
+  **A document timestamp needs no field.** `doc.signatures.prepare({ kind: 'timestamp' })` may leave `field` out: the engine then makes a signature field for it, with a name no other field has (`Timestamp1`, `Timestamp2`, and so on) and one widget of no size on the first page, in the same revision as the timestamp. `SignaturePrepareInput.field` is optional for that reason, and `SignaturePrepared.field` names the field the engine made. A signature with no `field` fails with `InvalidArg`. It needs `doc.sign`, not the right to sign a group's fields.
+
+  **A certification that allows no changes (`permission: 1`) allows no later revision.** The PDF standard lets validation data and a document timestamp follow one, and the engine did too. Acrobat reports such a certification as invalid once anything is added, so:
+  - `analyze()` and `validateSignatures()` read every object written after it as `forbidden`, with the rule `no-changes-certification`. Validation data and a document information dictionary read `permitted` before.
+  - The engine refuses signing, a document timestamp included, and metadata changes on such a document, with `ProtectedDocument`. `doc.security.allows('doc.sign')` is `false` there. `signedDocumentPolicy: 'permit'` still turns the refusals off.
+  - A document timestamp that was added after such a certification is judged on its own, as Acrobat judges it: the certification reads changed, the timestamp does not inherit its limit.
+
+  **What Acrobat adds to a page no longer reads as a forbidden change because of where the page keeps its annotation list.** Acrobat keeps a page's `/Annots` as an object of its own. A document timestamp, a signature in a new field or a comment added after a signature read `forbidden` for the earlier signature in three cases, and now read `permitted`, as they do when the list is an array inside the page:
+  - the list moves out of the page into an object of its own, with the new signature field's widget (what Acrobat does the first time);
+  - the list already is an object of its own and grows there;
+  - the page is pointed at a new list object and the old one stays in the file, unwritten (what Acrobat does for a second timestamp). No later revision holds the old list, so the engine reads it from the earlier revision.
+
+  For that third case an engine hands the rules the objects they ask for: `unwrittenObjectsToRead()` names them, and `StepInput.unwritten` carries them (`UnwrittenObject`). Without them such a page reads `forbidden`, with a reason that says the earlier list could not be read.
+
+  `SIGNATURE_POLICY_VERSION` is 5. For a certification at level 2 or 3 and for approval signatures nothing changes.
+
+  **On the wire, for the cloud (3.3).** `@embedpdf/engine-core/wire` has the schemas for validation data as base64 (`ValidationInfoWireSchema`, `ValidationInfoAddBodySchema`, `ValidationInfoAddResultSchema`, with `encodeValidationInfo()` and `decodeValidationInfo()`), a cached read kind `validationInfo` with its paths and resource, and `VALIDATION_INFO_SINCE`, the version these arrived in. A prepare's body may leave `field` out, and its answer may carry the `field` the engine made. The worker's answer to a prepare says the object number of the field the signing goes in.
+
+### Patch Changes
+
+- [#1080](https://github.com/embedpdf/embed-pdf-viewer/pull/1080) by [@bobsingor](https://github.com/bobsingor) – An app that imports `@embedpdf/engine` builds with Parcel again. The check behind the development warnings read `process?.env?.NODE_ENV`, which Parcel does not replace: it took it for a use of Node's `process` and stopped the build with `Node builtin polyfill "process/" is not installed`. The check now reads `process.env.NODE_ENV` as written, the expression every bundler replaces.
+
 ## 3.2.0
 
 ### Minor Changes

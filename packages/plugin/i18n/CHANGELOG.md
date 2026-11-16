@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1089](https://github.com/embedpdf/embed-pdf-viewer/pull/1089) by [@bobsingor](https://github.com/bobsingor) – EmbedPDF's own strings gain `commands.history.undo` and `commands.history.redo`, the labels of the standard undo and redo commands, in all eight languages.
+
 ## 3.2.0
 
 ## 3.1.0

@@ -1,5 +1,15 @@
 # @cloudpdf/contract
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1093](https://github.com/embedpdf/embed-pdf-viewer/pull/1093) by [@bobsingor](https://github.com/bobsingor) – `doc.versions.analysis` takes `engine` in place of `policy`. `engine` is the `analysis` value of the layer's head: with it, a settled answer is cached. Without it, or with another value, the answer is the server's own and is not cached. A server ignores `policy`, and no longer refuses a request for it.
+
+  `doc.versions.signatures` takes `engine` as well, the `signatures` value of the layer's head, with the same rule for caching.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – Two operations, `doc.signatures.validationInfo` and `doc.signatures.addValidationInfo`, read and store the validation data a file holds for checking its signatures with no network. `doc.signatures.prepare` takes a document timestamp with no `field`, and its answer may carry the `field` the engine made. All of it arrived in 3.3.
+
 ## 3.2.0
 
 ### Minor Changes

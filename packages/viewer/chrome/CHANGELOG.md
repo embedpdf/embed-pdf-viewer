@@ -1,5 +1,21 @@
 # @embedpdf/viewer-chrome
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1039](https://github.com/embedpdf/embed-pdf-viewer/pull/1039) by [@bobsingor](https://github.com/bobsingor) – `plugins.stamp.libraries` gives the viewer your own stamp libraries, each `{ id, url }` or `{ id, data }`: loaded when the viewer starts, never stored in the browser, listed in the stamps panel without a way to remove them, and named in `quick` as `<id>:<name>`. Quick stamps in the Insert toolbar now show at the button's full height, so a wide stamp no longer shrinks to a few pixels. A stamp library of your own as the standard stamps (`plugins.stamp.standard: '/my-stamps.pdf'`) is no longer stored in the browser: it went in under the id its file names, or a fresh one for a file that names none (an Acrobat stamp file), so it was stored and imported again beside the stored copy on every visit. It now goes in under the standard id, like the copy that ships, so `standard:<name>` in `quick` finds its stamps. Copies already stored stay in the stamps panel, where each can be removed. Fixes #1084.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – The signature inspector says how a signature will hold up. A **Revocation** line shows when the file holds an answer about the signer's certificate: not revoked, or revoked. A **Long-term validation** line says whether the file holds everything a reader needs to check the signature with no network: enabled, with the day that proof runs out, or not enabled, with what is missing. For a signature that isn't enabled, **Add verification information** asks for the answers and stores them, when the `revocation` and `trust` settings are set and the person may sign.
+
+  When a signature is sealed and its verification information can't be added, the sign dialog and the signatures panel say so: the document is signed, and the inspector offers to add it later.
+
+  The details of a signature whose box has no size, such as a document timestamp's, open at the corner of the viewer and no longer at a point on the page.
+
+  Seventeen new strings, in all fifteen languages. `httpRevocationSource` and `createTestCertificateAuthority` are exported beside the signers.
+
+- [#1087](https://github.com/embedpdf/embed-pdf-viewer/pull/1087) by [@bobsingor](https://github.com/bobsingor) – The signature inspector shows a signature's timestamp: the time its timestamp authority vouches for and the authority's name, in the tone of the timestamp's verdict. When a signing fails at its timestamp, the sign dialog says so in the viewer's language: the timestamp service did not answer, or it refused. Three new strings, in all fifteen languages. `httpTimestampAuthority` and `createTestTimestampAuthority` are exported beside the signers.
+
 ## 3.2.0
 
 ### Minor Changes

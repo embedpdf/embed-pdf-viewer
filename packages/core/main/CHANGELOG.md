@@ -1,5 +1,11 @@
 # @embedpdf/core
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1091](https://github.com/embedpdf/embed-pdf-viewer/pull/1091) by [@bobsingor](https://github.com/bobsingor) – `CommandDefinition`, `CommandFamily`, `CommandContext` and `IconAccent` are core types now, so a plugin can ship commands without depending on the commands plugin, which still exports them. `@embedpdf/core/commands` has `createDocumentCommands()`: download and print, which take the browser's file download as an argument. `@embedpdf/core/testing` gains `createTestCommandContext()`, a command context over stand-in capabilities for testing a plugin's commands.
+
 ## 3.2.0
 
 ### Minor Changes

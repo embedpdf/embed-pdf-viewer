@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stamp
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1039](https://github.com/embedpdf/embed-pdf-viewer/pull/1039) by [@bobsingor](https://github.com/bobsingor) – `importLibrary(bytes, { id })` imports a library under the id you give it, over the one the file names, so its stamps have ids you know ahead (`<id>:<name>`). A taken id still gets a fresh one.
+
 ## 3.2.0
 
 ## 3.1.0

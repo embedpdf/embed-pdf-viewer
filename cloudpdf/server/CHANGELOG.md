@@ -1,5 +1,25 @@
 # @cloudpdf/server
 
+## 3.3.0
+
+### Minor Changes
+
+- [#1093](https://github.com/embedpdf/embed-pdf-viewer/pull/1093) by [@bobsingor](https://github.com/bobsingor) – A change analysis is never refused for the rules it was asked under. The rules that judge what a signature allows after it are now a part of the `analysis` engine value in `/head`, as the API evolution convention has every rule the server computes with.
+
+  Before, a client put the number of those rules in the analysis URL (`policy`), and the server answered `InvalidArg` for any number but its own. A server on new rules refused every older viewer, which then showed "what changed since the signature" as indeterminate.
+  - `GET …/signatures/analysis@<token>`: a token that carries `policy`, as a client of 3.0 to 3.2 writes it, is answered like any other. The token's engine value decides whether the answer is cached.
+  - `GET …/versions/analysis/:sha256` takes `engine`, the `analysis` value from `/head`. With this server's value a settled answer is `immutable`. With another value, or with none, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`. A `policy` parameter is ignored.
+  - An analysis that a worker judged under other rules, in the middle of a deploy, is answered uncached. It was an error.
+  - `GET …/versions/signatures/:sha256` takes `engine` too, the `signatures` value from `/head`, with the same rule: `immutable` with this server's value, `no-store` with another or with none. It was `immutable` whatever the server read from the file, so a field added to that answer could not have reached a cache that held the old one.
+  - The `analysis` engine value changes once with this release, so cached analyses are computed again.
+
+- [#1088](https://github.com/embedpdf/embed-pdf-viewer/pull/1088) by [@bobsingor](https://github.com/bobsingor) – Validation data for signatures, and a document timestamp with no field.
+  - `GET /v1/docs/:docId/layers/:layerName/signatures/validation-info` answers the certificates, OCSP responses and CRLs the layer's file holds, each as base64. Its `@token` form is pinned at `docVersion` and cached like the signature list. It needs `doc.forms.read`.
+  - `POST` to the same path stores more. Each entry is checked to be one DER object of at most 16 MiB, an entry the file already holds is not stored again, and the answer counts the new ones. It needs `doc.sign` for the document, and a certification that allows no changes forbids it. The document version moves, and the audit row, of the new kind `signature.addValidationInfo`, carries the counts and never the entries. A client older than 3.3 gets a full refresh in its place.
+  - The server asks no certificate authority: it stores what it is given.
+  - `POST …/signatures/prepare` takes a document timestamp with no `field`. The worker makes the field, the answer names it in `field`, and it needs `doc.sign` for the document.
+  - Changing the metadata of a layer is now refused after a certification that allows no changes, before the write reaches a worker.
+
 ## 3.2.0
 
 ### Minor Changes
