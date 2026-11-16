@@ -50,9 +50,25 @@
   },
   "license": "Apache-2.0",
   "sideEffects": false,
+  "epdf": {
+    "bundleInCjs": [
+      "pkijs",
+      "asn1js",
+      "bytestreamjs",
+      "@peculiar/utils",
+      "@noble/hashes"
+    ]
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
     "directory": "packages/core/signature"
+  },
+  "inlinedDependencies": {
+    "@noble/hashes": "2.4.0",
+    "@peculiar/utils": "4.1.0",
+    "asn1js": "4.0.0",
+    "bytestreamjs": "3.0.0",
+    "pkijs": "4.0.1"
   }
 }

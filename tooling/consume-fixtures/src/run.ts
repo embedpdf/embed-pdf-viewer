@@ -162,12 +162,16 @@ const FIXTURES: Fixture[] = [
       '@embedpdf/engine-core',
       '@embedpdf/engine-services',
       '@embedpdf/engine',
+      '@embedpdf/core-signature',
       '@embedpdf/plugin-annotation',
+      '@embedpdf/plugin-signature',
       '@embedpdf/plugin-stage',
       '@embedpdf/react',
     ],
     deps: { react: '^18.3.1', 'react-dom': '^18.3.1' },
-    check: 'node main.cjs',
+    // Jest's CommonJS mode, an older Node and Electron don't load an ES module through
+    // `require()`. Node does since 22.12, so that is turned off here.
+    check: 'node --no-experimental-require-module main.cjs',
   },
   {
     name: 'vite-app',

@@ -51,6 +51,15 @@ plugin authors; this file is the law for how packages BUILD.
    exported by a dependency (a plugin's state is its `XState` interface, never
    an inferred object), or an import from a dependency. A package meant to
    ship inside the build is listed in `epdf.bundle`.
+7. **A dependency that is an ES module only ships inside the CommonJS output.**
+   `require()` loads an ES module on a recent Node, and not on an older one, in
+   Jest or in Electron, so a CommonJS build that requires one stops working
+   there. `epdf.bundleInCjs` lists such dependencies: the ES module output goes
+   on importing them, and the CommonJS output holds them, code and
+   declarations (`src/bundle-in-cjs.mjs`). The build writes each held
+   package's license to `dist/THIRD-PARTY-NOTICES.txt` and its version to
+   `inlinedDependencies` in `package.json`, and fails when the CommonJS side of
+   `dist` still names one.
 
 ## Package setup
 
@@ -82,7 +91,11 @@ plugin authors; this file is the law for how packages BUILD.
     // runs (engine's `#inline-transport`, js-sandbox's `#quickjs-variant`).
     "neverBundle": ["#inline-transport"],
     // Packages from node_modules shipped inside dist (law 6). None today.
-    "bundle": []
+    "bundle": [],
+    // Dependencies the CommonJS output holds and the ES module output imports
+    // (law 7): ES-module-only ones. Every package that ends up inside is
+    // listed, the ones a listed package uses too (core-signature's `pkijs`).
+    "bundleInCjs": ["pkijs"]
   }
 }
 ```

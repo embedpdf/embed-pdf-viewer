@@ -34,8 +34,8 @@ in its own package, which works with both engines:
 npm install @embedpdf/core-signature
 ```
 
-It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19). See
-[In Node](https://www.embedpdf.com/docs/engine/forms/signatures#in-node) for CommonJS, TypeScript and Jest.
+It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19): see
+[In Node](https://www.embedpdf.com/docs/engine/forms/signatures#in-node).
 
 ## Documentation
 

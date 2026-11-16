@@ -35,8 +35,8 @@ in its own package, which works with both engines:
 npm install @embedpdf/core-signature
 ```
 
-It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19). See
-[In Node](#in-node) for CommonJS, TypeScript and Jest.
+It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19): see
+[In Node](#in-node).
 
 ## Sign a field
 
@@ -1196,27 +1196,16 @@ same bytes under another hash, is `'invalid'`.
 ### In Node
 
 `@embedpdf/core-signature` reads and writes certificates with `pkijs` and `asn1js`. Both are ES
-modules only, and both ask for Node 22.12 or newer, or 20.19 or newer on Node 20.
+modules only, and both ask for Node 22.12 or newer, or 20.19 or newer on Node 20. npm warns
+when it installs them on an older one.
 
-- **`import`** needs nothing else.
-- **`require()`** works on those Node versions, where Node loads an ES module through
-  `require()`. An older Node fails with `ERR_REQUIRE_ESM`.
-- **TypeScript that compiles to CommonJS** needs `"module": "node20"` or `"nodenext"`. With
-  `"node16"` it reports `TS1479` in this package's type declarations, unless `skipLibCheck` is on.
-- **Jest** in its CommonJS mode does not load an ES module through `require()`. Have it transform
-  the libraries this package uses:
+CommonJS needs nothing more. `require()` does not load an ES module on every Node, or in Jest,
+so the CommonJS files of this package hold the two libraries and what they use.
+`require('@embedpdf/core-signature')` loads no ES module, and neither does a package that loads
+it, such as the signature plugin or the React package.
 
-```js
-// jest.config.js
-module.exports = {
-  transformIgnorePatterns: [
-    '/node_modules/(?!(pkijs|asn1js|bytestreamjs|@peculiar/utils|@noble/hashes)/)',
-  ],
-};
-```
-
-A package that loads this one as soon as it is required has the same needs: the signature
-plugin, and the React and Vue packages.
+`dist/THIRD-PARTY-NOTICES.txt` in the package lists what those files hold, with each version and
+license, and `inlinedDependencies` in its `package.json` has the versions.
 
 <Engine local>
 
