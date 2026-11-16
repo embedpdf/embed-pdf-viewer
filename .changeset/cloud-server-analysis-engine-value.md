@@ -9,4 +9,5 @@ Before, a client put the number of those rules in the analysis URL (`policy`), a
 - `GET …/signatures/analysis@<token>`: a token that carries `policy`, as a client of 3.0 to 3.2 writes it, is answered like any other. The token's engine value decides whether the answer is cached.
 - `GET …/versions/analysis/:sha256` takes `engine`, the `analysis` value from `/head`. With this server's value a settled answer is `immutable`. With another value, or with none, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`. A `policy` parameter is ignored.
 - An analysis that a worker judged under other rules, in the middle of a deploy, is answered uncached. It was an error.
+- `GET …/versions/signatures/:sha256` takes `engine` too, the `signatures` value from `/head`, with the same rule: `immutable` with this server's value, `no-store` with another or with none. It was `immutable` whatever the server read from the file, so a field added to that answer could not have reached a cache that held the old one.
 - The `analysis` engine value changes once with this release, so cached analyses are computed again.

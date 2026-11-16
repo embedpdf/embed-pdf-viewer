@@ -325,19 +325,26 @@ describe('digital signatures over the wire (native runtime)', () => {
       sizeBytes: completed.version.sizeBytes,
     });
 
-    // Immutable version reads: snapshot, contents, digest, download, revision prefix.
-    const vsig = await call(
-      'GET',
-      `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}`,
-      docId,
-      'alice',
-    );
+    // Version reads: snapshot, contents, digest, download, revision prefix. The snapshot is
+    // computed, so it is cached under the engine value its URL names.
+    const vsigUrl = `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}`;
+    const vsig = await call('GET', `${vsigUrl}?engine=${ENGINE.signatures}`, docId, 'alice');
     expect(vsig.headers.get('cache-control')).toContain('immutable');
+    expect(vsig.headers.get('embedpdf-engine')).toBeNull();
     const vsnap = await json<{
       revisions: Array<{ end: number }>;
       signatures: Array<{ fieldName: string; contentsSizeBytes: number }>;
     }>(vsig);
     expect(vsnap.revisions).toHaveLength(2);
+    // Under no engine value, or under another, the answer is the same one, uncached, with the
+    // current value beside it.
+    for (const query of ['', '?engine=0ther']) {
+      const other = await call('GET', `${vsigUrl}${query}`, docId, 'alice');
+      expect(await json(other), query).toEqual(vsnap);
+      expect(other.headers.get('cache-control'), query).toContain('no-store');
+      expect(other.headers.get('cache-control'), query).not.toContain('immutable');
+      expect(other.headers.get('embedpdf-engine'), query).toBe(ENGINE.signatures);
+    }
     const contents = await call(
       'GET',
       `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/contents`,

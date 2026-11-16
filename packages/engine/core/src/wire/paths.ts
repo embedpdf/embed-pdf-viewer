@@ -280,9 +280,13 @@ export const wirePaths = {
   /** A layer's versions, oldest first: the upload, then its signatures' (grows; never cached). */
   layerVersions: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions`,
-  /** Immutable: the signature snapshot of one of a layer's versions. */
-  layerVersionSignatures: (docId: string, layerName: string, sha256: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}`,
+  /**
+   * The signature snapshot of one of a layer's versions. With `engine`, the server's
+   * `signatures` engine value (`/head`), the answer can be cached.
+   */
+  layerVersionSignatures: (docId: string, layerName: string, sha256: string, engine?: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}` +
+    (engine === undefined ? '' : `?engine=${encodeURIComponent(engine)}`),
   /** Immutable: a signed field's DER `/Contents` in one of a layer's versions (`application/pkcs7-signature`). */
   layerVersionSignatureContents: (
     docId: string,
@@ -300,7 +304,10 @@ export const wirePaths = {
     algorithm: 'sha1' | 'sha256' | 'sha384' | 'sha512',
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/digest/${algorithm}`,
-  /** Immutable: history between two revisions of one of a layer's versions. */
+  /**
+   * History between two revisions of one of a layer's versions. With `engine` in the query,
+   * the server's `analysis` engine value, the answer can be cached.
+   */
   layerVersionAnalysis: (
     docId: string,
     layerName: string,

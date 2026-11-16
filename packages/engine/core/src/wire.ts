@@ -20,6 +20,7 @@ export {
   SignatureAppearanceBodySchema,
   LayerAnalysisQuerySchema,
   VersionAnalysisQuerySchema,
+  VersionSignaturesQuerySchema,
   analyzeInputFromQuery,
   LayerVersionSchema,
   LayerVersionsSchema,

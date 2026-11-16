@@ -14,7 +14,7 @@
  *   content-addressed by base sha; immutable; the resource comes before the
  *   sha so each family keeps its own CDN prefix):
  *     GET  …/layers/:layerName/versions                                   the list (no-store)
- *     GET  …/layers/:layerName/versions/signatures/:sha256
+ *     GET  …/layers/:layerName/versions/signatures/:sha256?engine=
  *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents
  *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm
  *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=&engine=
@@ -49,6 +49,7 @@ import {
   SignaturePrepareBodySchema,
   ValidationInfoAddBodySchema,
   VersionAnalysisQuerySchema,
+  VersionSignaturesQuerySchema,
   analyzeInputFromQuery,
   encodePrepared,
   encodeValidationInfo,
@@ -504,6 +505,7 @@ export async function registerSignatureRoutes(
       sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
+    const query = parseOrInvalidArg(VersionSignaturesQuerySchema, req.query, 'query');
     const snapshot = await versionSignatures(
       ctx,
       docId,
@@ -511,6 +513,12 @@ export async function registerSignatureRoutes(
       requireSha(sha),
       abortSignalOf(reply),
     );
+    await answerAtEngine({
+      documentService: service,
+      reply,
+      kind: 'signatures',
+      requested: query.engine,
+    });
     setImmutableCache(reply);
     return snapshot;
   });

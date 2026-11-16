@@ -359,9 +359,12 @@ export class VersionsClient {
     }
 
     /**
+     * A version never changes, but what the server reads from it can: with `engine`, the `signatures` value of the layer's head, the answer is `immutable`. Without it, or with another value, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`.
+     *
      * @param {CloudPDF.doc.SignaturesVersionsRequest} request
      * @param {VersionsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link CloudPDF.BadRequestError}
      * @throws {@link CloudPDF.NotFoundError}
      * @throws {@link errors.CloudPDFError}
      * @throws {@link errors.CloudPDFTimeoutError}
@@ -384,7 +387,10 @@ export class VersionsClient {
         request: CloudPDF.doc.SignaturesVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocVersionsSignaturesResponse>> {
-        const { docId, layerName, sha256, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, engine, "X-Document-Password": documentPassword } = request;
+        const _queryParams: Record<string, unknown> = {
+            engine,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -404,7 +410,11 @@ export class VersionsClient {
             ),
             method: "GET",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -420,6 +430,11 @@ export class VersionsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
                     throw new CloudPDF.NotFoundError(
                         _response.error.body as CloudPDF.ErrorResponse,

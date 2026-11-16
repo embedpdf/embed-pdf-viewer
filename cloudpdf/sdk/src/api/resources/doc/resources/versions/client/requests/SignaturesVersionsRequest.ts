@@ -12,6 +12,8 @@ export interface SignaturesVersionsRequest {
     docId: string;
     layerName: string;
     sha256: string;
+    /** The `signatures` engine value from the layer's head (`engine.signatures`): what the answer is computed with besides the file. With it, the answer is cached. */
+    engine?: string;
     /** Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead. */
     "X-Document-Password"?: string;
 }

@@ -461,12 +461,17 @@ that kind). A new cached read adds a row here.
 
 A stored version of a layer (`/layers/:layer/versions/…/:sha256`) never changes,
 so a read of one pins no versions and has no token. Most of these reads return
-bytes of the file, which no rule of the server changes. One is computed:
-`/versions/analysis/:sha256`, what changed between two revisions of the
-version. Its URL names what the server computed it with, as a token does:
-`engine`, the `analysis` value from `/head`, as a query parameter.
+bytes of the file, or a digest of them, which no rule of the server changes.
+Two are computed. Each names what the server computed it with, as a token
+does: `engine`, its kind's value from `/head`, as a query parameter.
+
+| Read                           | Kind         | What it gives                                     |
+| :----------------------------- | :----------- | :------------------------------------------------ |
+| `/versions/signatures/:sha256` | `signatures` | the version's signatures                          |
+| `/versions/analysis/:sha256`   | `analysis`   | what changed between two revisions of the version |
 
 ```text
+/v1/docs/doc_123/layers/main/versions/signatures/3f1c…a9?engine=51d3fe08
 /v1/docs/doc_123/layers/main/versions/analysis/3f1c…a9?since.signature=0&engine=7a2e90c4
 ```
 

@@ -4920,6 +4920,20 @@ await client.doc.versions.revision({
 <dl>
 <dd>
 
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A version never changes, but what the server reads from it can: with `engine`, the `signatures` value of the layer's head, the answer is `immutable`. Without it, or with another value, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`.
+</dd>
+</dl>
+</dd>
+</dl>
+
 #### 🔌 Usage
 
 <dl>

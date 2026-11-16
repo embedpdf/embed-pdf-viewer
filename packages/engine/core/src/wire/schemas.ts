@@ -2349,6 +2349,14 @@ export const LayerAnalysisQuerySchema = z
 export type LayerAnalysisQuery = z.infer<typeof LayerAnalysisQuerySchema>;
 
 /**
+ * The query of a stored version's signature list: `engine`, the `signatures` engine value the
+ * caller read from `/head`. The answer is cached under the server's own value, and never
+ * refused under another or under none.
+ */
+export const VersionSignaturesQuerySchema = z.object({ engine: z.string().optional() });
+export type VersionSignaturesQuery = z.infer<typeof VersionSignaturesQuerySchema>;
+
+/**
  * Version analysis query: as the layer's, plus `until` (a revision index; default the last) and
  * `engine`. A query parameter this schema doesn't name is dropped, so the `policy` a client of
  * 3.0 to 3.2 sends is read past.
