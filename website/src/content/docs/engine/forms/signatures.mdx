@@ -35,6 +35,9 @@ in its own package, which works with both engines:
 npm install @embedpdf/core-signature
 ```
 
+It runs in every modern browser, and in Node from 22.12 on (on Node 20, from 20.19). See
+[In Node](#in-node) for CommonJS, TypeScript and Jest.
+
 ## Sign a field
 
 `sign()` signs a field in one call. It gets the digest from the engine, has your `key` sign it,
@@ -1189,6 +1192,31 @@ stamp.summary; // 'valid'
 
 It returns [a timestamp's verdict](#the-timestamp). A token that stamps another digest, or the
 same bytes under another hash, is `'invalid'`.
+
+### In Node
+
+`@embedpdf/core-signature` reads and writes certificates with `pkijs` and `asn1js`. Both are ES
+modules only, and both ask for Node 22.12 or newer, or 20.19 or newer on Node 20.
+
+- **`import`** needs nothing else.
+- **`require()`** works on those Node versions, where Node loads an ES module through
+  `require()`. An older Node fails with `ERR_REQUIRE_ESM`.
+- **TypeScript that compiles to CommonJS** needs `"module": "node20"` or `"nodenext"`. With
+  `"node16"` it reports `TS1479` in this package's type declarations, unless `skipLibCheck` is on.
+- **Jest** in its CommonJS mode does not load an ES module through `require()`. Have it transform
+  the libraries this package uses:
+
+```js
+// jest.config.js
+module.exports = {
+  transformIgnorePatterns: [
+    '/node_modules/(?!(pkijs|asn1js|bytestreamjs|@peculiar/utils|@noble/hashes)/)',
+  ],
+};
+```
+
+A package that loads this one as soon as it is required has the same needs: the signature
+plugin, and the React and Vue packages.
 
 <Engine local>
 

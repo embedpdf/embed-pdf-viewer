@@ -449,6 +449,13 @@ file as it was opened.
 `signature.readRevision({ revisionIndex })` gives you the exact version of the file a signature
 covers, for an audit trail.
 
+### In Node and in Jest
+
+The plugin loads `@embedpdf/core-signature`, which needs Node 22.12 or newer (on Node 20, 20.19
+or newer) and is built on ES modules. Server rendering through `require()`, TypeScript that
+compiles to CommonJS, and Jest each need one thing:
+[In Node](/docs/engine/forms/signatures#in-node) has them.
+
 <Callout type="info">
   How signatures are stored, and what each certification allows, is on
   [Digital signatures](/docs/engine/forms/signatures).

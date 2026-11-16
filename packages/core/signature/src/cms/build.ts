@@ -5,6 +5,7 @@ import * as pkijs from 'pkijs';
 import { ensureEngine, toArrayBuffer } from './engine';
 import { DIGEST_LENGTH, OID, OID_BY_DIGEST } from './oids';
 import { derOrder } from './splice';
+import { cmsTime } from './time';
 import { signedAttributesDer } from './verify';
 
 export type SignatureProfile = 'pkcs7' | 'cades-b';
@@ -90,7 +91,7 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
     attributes.push(
       new pkijs.Attribute({
         type: OID.signingTime,
-        values: [new asn1js.UTCTime({ valueDate: new Date(input.signingTime) })],
+        values: [cmsTime(new Date(input.signingTime))],
       }),
     );
   }

@@ -39,8 +39,8 @@
   },
   "dependencies": {
     "@embedpdf/engine-core": "workspace:*",
-    "asn1js": "^3.0.5",
-    "pkijs": "^3.2.4"
+    "asn1js": "^4.0.0",
+    "pkijs": "^4.0.1"
   },
   "devDependencies": {
     "@embedpdf/engine": "workspace:*",
