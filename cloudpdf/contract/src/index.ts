@@ -2349,10 +2349,22 @@ export const LayerSignaturesAnalysisQuerySchema = z.object({
   'since.revision': z.coerce.number().int().min(0).optional(),
   level: z.enum(['none', 'lta', 'fill', 'annotate']).optional(),
 });
+export const VersionSignaturesQuerySchema = z.object({
+  engine: z
+    .string()
+    .describe(
+      "The `signatures` engine value from the layer's head (`engine.signatures`): what the answer is computed with besides the file. With it, the answer is cached.",
+    )
+    .optional(),
+});
 export const VersionAnalysisQuerySchema = LayerSignaturesAnalysisQuerySchema.extend({
   until: z.coerce.number().int().min(0).optional(),
-  /** The judging policy version the caller expects — a cache key on this immutable URL, not an input. */
-  policy: z.coerce.number().int().min(1).optional(),
+  engine: z
+    .string()
+    .describe(
+      "The `analysis` engine value from the layer's head (`engine.analysis`): the rules the answer is judged with. With it, a settled answer is cached.",
+    )
+    .optional(),
 });
 
 export const docOperations = {
@@ -2730,7 +2742,7 @@ export const docOperations = {
   'doc.versions.signatures': {
     operationId: 'doc.versions.signatures',
     title: 'Version signatures',
-    summary: "The signature snapshot of one of a layer's versions (immutable).",
+    summary: "The signature snapshot of one of a layer's versions.",
     method: 'GET',
     path: wireTemplates.layerVersionSignatures,
     credentials: docCredentials,
@@ -2738,10 +2750,17 @@ export const docOperations = {
     docCapabilities: ['doc.forms.read'],
     requestHeaders: [documentPasswordHeader],
     params: DocVersionParamsSchema,
+    query: VersionSignaturesQuerySchema,
     responses: {
       200: { contentType: 'application/json', schema: SignatureSnapshotSchema },
+      400: errorResponse,
       404: errorResponse,
     },
+    notes:
+      'A version never changes, but what the server reads from it can: ' +
+      "with `engine`, the `signatures` value of the layer's head, the answer is `immutable`. " +
+      "Without it, or with another value, the answer is this server's own, with `no-store` and " +
+      'the current value in `EmbedPDF-Engine`.',
   },
   'doc.versions.signatureContents': {
     operationId: 'doc.versions.signatureContents',
@@ -2781,7 +2800,7 @@ export const docOperations = {
   'doc.versions.analysis': {
     operationId: 'doc.versions.analysis',
     title: 'Analyze version history',
-    summary: "What changed between two revisions of one of a layer's versions (immutable).",
+    summary: "What changed between two revisions of one of a layer's versions.",
     method: 'GET',
     path: wireTemplates.layerVersionAnalysis,
     credentials: docCredentials,
@@ -2797,7 +2816,10 @@ export const docOperations = {
     },
     notes:
       'Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. ' +
-      'The same answer for every caller.',
+      'The same answer for every caller. A version never changes, but the rules that judge it can: ' +
+      "with `engine`, the `analysis` value of the layer's head, a settled answer is `immutable`. " +
+      "Without it, or with another value, the answer is this server's own, with `no-store` and " +
+      'the current value in `EmbedPDF-Engine`.',
   },
   'doc.versions.download': {
     operationId: 'doc.versions.download',

@@ -232,6 +232,29 @@ describe("VersionsClient", () => {
             .mockEndpoint()
             .get("/v1/docs/docId/layers/layerName/versions/signatures/sha256")
             .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.versions.signatures({
+                docId: "docId",
+                layerName: "layerName",
+                sha256: "sha256",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("signatures (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/versions/signatures/sha256")
+            .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
             .build();

@@ -5178,8 +5178,8 @@
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "analysis",
         "x-docs-title": "Analyze version history",
-        "summary": "What changed between two revisions of one of a layer's versions (immutable).",
-        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.",
+        "summary": "What changed between two revisions of one of a layer's versions.",
+        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller. A version never changes, but the rules that judge it can: with `engine`, the `analysis` value of the layer's head, a settled answer is `immutable`. Without it, or with another value, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`.",
         "security": [
           {
             "apiToken": []
@@ -5258,12 +5258,12 @@
             }
           },
           {
-            "name": "policy",
+            "name": "engine",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 1
+              "type": "string",
+              "description": "The `analysis` engine value from the layer's head (`engine.analysis`): the rules the answer is judged with. With it, a settled answer is cached."
             }
           },
           {
@@ -5521,7 +5521,8 @@
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "signatures",
         "x-docs-title": "Version signatures",
-        "summary": "The signature snapshot of one of a layer's versions (immutable).",
+        "summary": "The signature snapshot of one of a layer's versions.",
+        "description": "A version never changes, but what the server reads from it can: with `engine`, the `signatures` value of the layer's head, the answer is `immutable`. Without it, or with another value, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`.",
         "security": [
           {
             "apiToken": []
@@ -5564,6 +5565,15 @@
             }
           },
           {
+            "name": "engine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The `signatures` engine value from the layer's head (`engine.signatures`): what the answer is computed with besides the file. With it, the answer is cached."
+            }
+          },
+          {
             "name": "X-Document-Password",
             "in": "header",
             "required": false,
@@ -5580,6 +5590,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocVersionsSignaturesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

@@ -1,7 +1,6 @@
 import { decodeToken, encodeToken, type TokenInput, type TokenQuery } from './token';
 
 export type { TokenInput } from './token';
-import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
   AnalysisTokenSchema,
   AnnotationAppearancesRenderTokenSchema,
@@ -45,7 +44,10 @@ export interface AnalysisToken {
   pin: TokenPin;
   since: { signatureIndex: number } | { revisionIndex: number };
   exploratoryLevel?: ModificationLevel;
-  /** The judging policy version the caller expects (`SIGNATURE_POLICY_VERSION`); keys the cache. */
+  /**
+   * @deprecated Neither written nor read: the token's engine value names the rules an analysis
+   * is judged with. Goes in 4.0.
+   */
   policyVersion?: number;
   /** `full` carries every pairwise step; default `summary`. */
   detail?: 'summary' | 'full';
@@ -58,7 +60,6 @@ export const encodeAnalysisToken = (input: AnalysisToken): string =>
     'since.signature': 'signatureIndex' in input.since ? input.since.signatureIndex : undefined,
     'since.revision': 'revisionIndex' in input.since ? input.since.revisionIndex : undefined,
     level: input.exploratoryLevel,
-    policy: input.policyVersion ?? SIGNATURE_POLICY_VERSION,
     detail: input.detail,
   });
 
@@ -77,7 +78,6 @@ export const decodeAnalysisToken = (raw: string): AnalysisToken => {
         ? { signatureIndex: decodeNonNegativeInteger(sinceSignature, 'since.signature') }
         : { revisionIndex: decodeNonNegativeInteger(sinceRevision!, 'since.revision') },
     ...(t.level !== undefined ? { exploratoryLevel: decodeModificationLevel(t.level) } : {}),
-    ...(t.policy !== undefined ? { policyVersion: decodePositiveInteger(t.policy, 'policy') } : {}),
     ...(t.detail !== undefined ? { detail: decodeDetail(t.detail) } : {}),
   };
 };

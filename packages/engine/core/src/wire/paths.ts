@@ -1,7 +1,6 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { TokenPin } from './cachedReads';
 import type { ModificationLevel } from '../signature/types';
-import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -281,9 +280,13 @@ export const wirePaths = {
   /** A layer's versions, oldest first: the upload, then its signatures' (grows; never cached). */
   layerVersions: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions`,
-  /** Immutable: the signature snapshot of one of a layer's versions. */
-  layerVersionSignatures: (docId: string, layerName: string, sha256: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}`,
+  /**
+   * The signature snapshot of one of a layer's versions. With `engine`, the server's
+   * `signatures` engine value (`/head`), the answer can be cached.
+   */
+  layerVersionSignatures: (docId: string, layerName: string, sha256: string, engine?: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}` +
+    (engine === undefined ? '' : `?engine=${encodeURIComponent(engine)}`),
   /** Immutable: a signed field's DER `/Contents` in one of a layer's versions (`application/pkcs7-signature`). */
   layerVersionSignatureContents: (
     docId: string,
@@ -301,7 +304,10 @@ export const wirePaths = {
     algorithm: 'sha1' | 'sha256' | 'sha384' | 'sha512',
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/digest/${algorithm}`,
-  /** Immutable: history between two revisions of one of a layer's versions. */
+  /**
+   * History between two revisions of one of a layer's versions. With `engine` in the query,
+   * the server's `analysis` engine value, the answer can be cached.
+   */
   layerVersionAnalysis: (
     docId: string,
     layerName: string,
@@ -879,6 +885,8 @@ export interface AnalysisQueryInput {
   until?: number;
   exploratoryLevel?: ModificationLevel;
   detail?: 'summary' | 'full';
+  /** The server's `analysis` engine value (`/head`): with it the answer can be cached. */
+  engine?: string;
 }
 
 export function analysisQueryString(query: AnalysisQueryInput): string {
@@ -889,9 +897,9 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
   if (query.until !== undefined) params.set('until', String(query.until));
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
   if (query.detail !== undefined) params.set('detail', query.detail);
-  // The judging policy version: a cache key on the immutable version URL, so
-  // a policy bump never serves a verdict judged under another policy.
-  params.set('policy', String(SIGNATURE_POLICY_VERSION));
+  // What the server computes the answer with, as a token names it: a version never changes,
+  // but the rules that judge it can.
+  if (query.engine !== undefined) params.set('engine', query.engine);
   return params.toString();
 }
 

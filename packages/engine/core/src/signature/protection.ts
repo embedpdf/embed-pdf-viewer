@@ -11,8 +11,9 @@ import type {
 
 /**
  * Bumped whenever the derivation below (or a judgement rule) changes meaning.
- * Rides every protection and every analysis, and keys the cloud's immutable
- * analysis URLs. The current policy is calibrated on the 91 Acrobat
+ * Rides every protection and every analysis. On the cloud it is a rule of the
+ * `analysis` engine value, so raising it gives every cached analysis a new URL
+ * and refuses no client. The current policy is calibrated on the 91 Acrobat
  * observations in `packages/engine/main/test/fixtures/signature-compat`:
  * each signature is judged on the net state of the document against the
  * revision it sealed; an object written again with the sealed value is not

@@ -3,6 +3,7 @@ import {
   LINE_BREAKS_VERSION,
   PAGE_TEXT_VERSION,
   SEARCH_FOLD_VERSION,
+  SIGNATURE_POLICY_VERSION,
 } from '@embedpdf/engine-core/runtime';
 import { CACHED_READ_KINDS, type CachedReadKind } from '@embedpdf/engine-core/wire';
 
@@ -19,6 +20,7 @@ const RULES = {
   pageText: PAGE_TEXT_VERSION,
   searchFold: SEARCH_FOLD_VERSION,
   lineBreaks: LINE_BREAKS_VERSION,
+  signaturePolicy: SIGNATURE_POLICY_VERSION,
 } as const;
 
 /** A rule, or `fonts`: the fingerprint of the server's fonts, which changes with `CLOUDPDF_FONTS`. */
@@ -65,6 +67,7 @@ const INPUTS: Partial<Readonly<Record<CachedReadKind, readonly Input[]>>> = {
   search: ['pageText', 'searchFold'],
   annotations: ['lineBreaks'],
   annotationsAll: ['lineBreaks'],
+  analysis: ['signaturePolicy'],
 };
 
 /**

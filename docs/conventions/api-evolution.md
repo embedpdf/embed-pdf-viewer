@@ -329,6 +329,7 @@ const RULES = {
   pageText: PAGE_TEXT_VERSION, // engine-core text/charmap.ts (toPageText)
   searchFold: SEARCH_FOLD_VERSION, // engine-core search/fold.ts
   lineBreaks: LINE_BREAKS_VERSION, // engine-core text/lineBreaks.ts (contents, rich text)
+  signaturePolicy: SIGNATURE_POLICY_VERSION, // engine-core signature/protection.ts (what a signature allows after it)
 };
 
 // One number per kind. Raise it in the pull request that adds a field to the
@@ -351,6 +352,7 @@ const INPUTS = {
   search: ['pageText', 'searchFold'],
   annotations: ['lineBreaks'],
   annotationsAll: ['lineBreaks'],
+  analysis: ['signaturePolicy'],
   // every other kind: none
 };
 
@@ -374,6 +376,7 @@ a deploy or a restart that raises nothing keeps every cached response.
 | Page text is read differently (lines end in `\n`, no `U+FFFE`)   | `pageText`: text, search                              | pictures, annotations, the rest       |
 | `contents` and rich text are read with `\n`                      | `lineBreaks`: annotations, annotationsAll             | everything else                       |
 | Search ignores more characters                                   | `searchFold`: search                                  | everything else                       |
+| What a signature allows after it is judged by other rules        | `signaturePolicy`: analysis                           | everything else                       |
 | Annotations gain a response field                                | `FIELDS.annotations`: annotations                     | everything else                       |
 | A runtime upgrade changes any pixel of the test PDFs             | `drawing`: render, both appearance kinds              | text, search, the font list, the rest |
 | A runtime upgrade renders the test PDFs pixel for pixel the same | none                                                  | everything                            |
@@ -445,7 +448,7 @@ parameter, not a shape.
 | `fonts`                 | `/fonts@`                                                              | `fontsVersion`                                                      |                                             |
 | `search`                | `/layers/:layer/search/:tier/data@`                                    | `contentsVersion`, `layoutVersion`                                  | query, options, `from`, `skip`, limits      |
 | `signatures`            | `/layers/:layer/signatures@`                                           | `docVersion`                                                        |                                             |
-| `analysis`              | `/layers/:layer/signatures/analysis@`                                  | `docVersion`                                                        | since, level, policy, detail                |
+| `analysis`              | `/layers/:layer/signatures/analysis@`                                  | `docVersion`                                                        | since, level, detail                        |
 | `validationInfo`        | `/layers/:layer/signatures/validation-info@`                           | `docVersion`                                                        |                                             |
 | `download`              | `/layers/:layer/download@`                                             | `docVersion`                                                        | mode                                        |
 
@@ -453,6 +456,34 @@ Routes are under `/v1/docs/:docId`, and each document route has a
 `/layers/:layer/…` twin with the same token. Every row's token also carries
 `engine` (that kind's value from `/head`) and `shape` (the client's number for
 that kind). A new cached read adds a row here.
+
+### A stored version
+
+A stored version of a layer (`/layers/:layer/versions/…/:sha256`) never changes,
+so a read of one pins no versions and has no token. Most of these reads return
+bytes of the file, or a digest of them, which no rule of the server changes.
+Two are computed. Each names what the server computed it with, as a token
+does: `engine`, its kind's value from `/head`, as a query parameter.
+
+| Read                           | Kind         | What it gives                                     |
+| :----------------------------- | :----------- | :------------------------------------------------ |
+| `/versions/signatures/:sha256` | `signatures` | the version's signatures                          |
+| `/versions/analysis/:sha256`   | `analysis`   | what changed between two revisions of the version |
+
+```text
+/v1/docs/doc_123/layers/main/versions/signatures/3f1c…a9?engine=51d3fe08
+/v1/docs/doc_123/layers/main/versions/analysis/3f1c…a9?since.signature=0&engine=7a2e90c4
+```
+
+- **With the server's own value** the answer is `immutable`.
+- **With another value, or with none,** the answer is the server's own, with
+  `no-store` and the current value in `EmbedPDF-Engine`. It is not refused.
+
+The rules that judge what a signature allows after it are an engine value like
+any other: their number, `SIGNATURE_POLICY_VERSION`, is an input of `analysis`.
+Clients of 3.0 to 3.2 put that number in the analysis URLs themselves, as
+`policy`, and a server refused any number but its own. Since 3.3 a client sends
+no `policy`, and a server ignores one it is sent.
 
 ## What's left
 

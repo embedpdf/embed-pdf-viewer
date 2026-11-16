@@ -73,9 +73,8 @@ export const FontsTokenSchema = {
  * only in exploratory mode.
  */
 export const AnalysisTokenSchema = {
-  // `policy`: the judging policy version the caller expects — part of the
-  // cache key, so a policy bump never serves a verdict judged under another
-  // policy.
+  // `policy` is what a client of 3.0 to 3.2 writes. It is a known field so that such a token
+  // still reads, and its value is never looked at: `engine` names the rules.
   fields: [
     'docVersion',
     'engine',

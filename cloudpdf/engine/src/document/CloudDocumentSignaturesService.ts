@@ -183,6 +183,9 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
           signal,
         );
       }
+      // A saved version never changes, but the rules that judge it can: the URL names the
+      // server's `analysis` engine value, as a token does, so its answer can be cached.
+      const engine = manifest.engine.analysis;
       return this.http.getJson(
         wirePaths.layerVersionAnalysis(this.docId, this.layerName, manifest.baseSha256, {
           since: input.since,
@@ -191,6 +194,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
             ? { exploratoryLevel: input.exploratoryLevel }
             : {}),
           ...(input.detail !== undefined ? { detail: input.detail } : {}),
+          ...(engine !== undefined ? { engine } : {}),
         }),
         (raw) => ChangeAnalysisSchema.parse(raw),
         signal,

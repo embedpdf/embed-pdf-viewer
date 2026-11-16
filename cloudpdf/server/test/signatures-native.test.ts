@@ -35,7 +35,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
-import { pinOf } from './_helpers/pins';
+import { ENGINE, pinOf } from './_helpers/pins';
 // What a signing service might hand over is built from the signature package's own parts.
 import { timestampTokenAttribute } from '../../../packages/core/signature/src/cms/attach';
 import { parseCmsInternal } from '../../../packages/core/signature/src/cms/parse';
@@ -325,19 +325,26 @@ describe('digital signatures over the wire (native runtime)', () => {
       sizeBytes: completed.version.sizeBytes,
     });
 
-    // Immutable version reads: snapshot, contents, digest, download, revision prefix.
-    const vsig = await call(
-      'GET',
-      `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}`,
-      docId,
-      'alice',
-    );
+    // Version reads: snapshot, contents, digest, download, revision prefix. The snapshot is
+    // computed, so it is cached under the engine value its URL names.
+    const vsigUrl = `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}`;
+    const vsig = await call('GET', `${vsigUrl}?engine=${ENGINE.signatures}`, docId, 'alice');
     expect(vsig.headers.get('cache-control')).toContain('immutable');
+    expect(vsig.headers.get('embedpdf-engine')).toBeNull();
     const vsnap = await json<{
       revisions: Array<{ end: number }>;
       signatures: Array<{ fieldName: string; contentsSizeBytes: number }>;
     }>(vsig);
     expect(vsnap.revisions).toHaveLength(2);
+    // Under no engine value, or under another, the answer is the same one, uncached, with the
+    // current value beside it.
+    for (const query of ['', '?engine=0ther']) {
+      const other = await call('GET', `${vsigUrl}${query}`, docId, 'alice');
+      expect(await json(other), query).toEqual(vsnap);
+      expect(other.headers.get('cache-control'), query).toContain('no-store');
+      expect(other.headers.get('cache-control'), query).not.toContain('immutable');
+      expect(other.headers.get('embedpdf-engine'), query).toBe(ENGINE.signatures);
+    }
     const contents = await call(
       'GET',
       `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/contents`,
@@ -469,7 +476,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(JSON.parse(audit[0]!.payload_json)).toMatchObject({ signingId: prepared.signingId });
   });
 
-  test('analysis URLs: the policy version is a served cache key, and only settled verdicts are immutable', async () => {
+  test('analysis URLs name the engine value, a policy number is read past, and only settled verdicts are immutable', async () => {
     const docId = 'doc-sign-native-analysis';
     await seed(docId);
     const layer = `/v1/docs/${docId}/layers/alice`;
@@ -507,71 +514,88 @@ describe('digital signatures over the wire (native runtime)', () => {
     const versionUrl = (q: string) =>
       `/v1/docs/${docId}/layers/alice/versions/analysis/${sha}?${q}`;
 
-    // The current policy: a settled verdict, cached for a year.
+    // With this server's engine value: a settled verdict, cached for a year.
     const ok = await call(
       'GET',
-      versionUrl(`since.signature=0&policy=${SIGNATURE_POLICY_VERSION}`),
+      versionUrl(`since.signature=0&engine=${ENGINE.analysis}`),
       docId,
       'alice',
     );
     expect(ok.headers.get('cache-control')).toContain('immutable');
+    expect(ok.headers.get('embedpdf-engine')).toBeNull();
     const analysis = await json<{ policyVersion: number; mode: string; verdict: string }>(ok);
     expect(analysis).toMatchObject({
       policyVersion: SIGNATURE_POLICY_VERSION,
       mode: 'authoritative',
       verdict: 'unchanged',
     });
-    // No policy at all (an older client): served, since it asked for nothing in particular.
-    expect((await call('GET', versionUrl('since.signature=0'), docId, 'alice')).status).toBe(200);
-    // Another policy: refused, and never cached under that key.
-    const stale = await call(
-      'GET',
-      versionUrl(`since.signature=0&policy=${SIGNATURE_POLICY_VERSION + 1}`),
-      docId,
-      'alice',
-    );
-    expect(stale.status).toBe(400);
-    expect(stale.headers.get('cache-control')).toContain('no-store');
-    expect(stale.headers.get('cache-control')).not.toContain('immutable');
+    // Every other request gets the same verdict, uncached, with the current value beside it:
+    // one that names no engine value, one that names another, and what a client of 3.0 to 3.2
+    // sends, a policy number, whichever number it is.
+    for (const query of [
+      'since.signature=0',
+      'since.signature=0&engine=0ther',
+      `since.signature=0&policy=${SIGNATURE_POLICY_VERSION}`,
+      `since.signature=0&policy=${SIGNATURE_POLICY_VERSION - 1}`,
+      `since.signature=0&policy=${SIGNATURE_POLICY_VERSION + 1}`,
+    ]) {
+      const other = await call('GET', versionUrl(query), docId, 'alice');
+      expect(await json(other), query).toEqual(analysis);
+      expect(other.headers.get('cache-control'), query).toContain('no-store');
+      expect(other.headers.get('cache-control'), query).not.toContain('immutable');
+      expect(other.headers.get('embedpdf-engine'), query).toBe(ENGINE.analysis);
+    }
     // Exploratory: an answer to a what-if, not a verdict; never immutable.
     const exploratory = await call(
       'GET',
-      versionUrl(`since.signature=0&level=fill&policy=${SIGNATURE_POLICY_VERSION}`),
+      versionUrl(`since.signature=0&level=fill&engine=${ENGINE.analysis}`),
       docId,
       'alice',
     );
     expect((await json<{ mode: string }>(exploratory)).mode).toBe('exploratory');
     expect(exploratory.headers.get('cache-control')).toContain('no-store');
 
-    // The layer twin: the token carries the policy.
+    // The layer twin: its token names the engine value, as every cached read's does, and no
+    // policy.
     const manifest = await json<{ docVersion: number }>(
       await call('GET', `${layer}/manifest`, docId, 'alice'),
     );
-    const tokenFor = (policyVersion: number) =>
-      encodeAnalysisToken({
-        docVersion: manifest.docVersion,
-        pin: pinOf('analysis'),
-        since: { signatureIndex: 0 },
-        policyVersion,
-      });
-    const layerOk = await call(
-      'GET',
-      `${layer}/signatures/analysis@${tokenFor(SIGNATURE_POLICY_VERSION)}`,
-      docId,
-      'alice',
-    );
+    const token = encodeAnalysisToken({
+      docVersion: manifest.docVersion,
+      pin: pinOf('analysis'),
+      since: { signatureIndex: 0 },
+    });
+    expect(token).not.toContain('policy');
+    const layerOk = await call('GET', `${layer}/signatures/analysis@${token}`, docId, 'alice');
     expect(layerOk.headers.get('cache-control')).toContain('immutable');
-    expect((await json<{ policyVersion: number }>(layerOk)).policyVersion).toBe(
+    const layerAnalysis = await json<{ policyVersion: number }>(layerOk);
+    expect(layerAnalysis.policyVersion).toBe(SIGNATURE_POLICY_VERSION);
+    // The token of a client of 3.0 to 3.2 also carries a policy number. It is read past: the
+    // answer is the same one, cached under the engine value the token names.
+    for (const policy of [
+      SIGNATURE_POLICY_VERSION - 1,
       SIGNATURE_POLICY_VERSION,
-    );
-    const layerStale = await call(
+      SIGNATURE_POLICY_VERSION + 1,
+    ]) {
+      const older = await call(
+        'GET',
+        `${layer}/signatures/analysis@${token.replace(',shape=', `,policy=${policy},shape=`)}`,
+        docId,
+        'alice',
+      );
+      expect(await json(older), `policy=${policy}`).toEqual(layerAnalysis);
+      expect(older.headers.get('cache-control'), `policy=${policy}`).toContain('immutable');
+    }
+    // A token that names another engine value is answered too, uncached.
+    const layerOther = await call(
       'GET',
-      `${layer}/signatures/analysis@${tokenFor(SIGNATURE_POLICY_VERSION + 1)}`,
+      `${layer}/signatures/analysis@${token.replace(`engine=${ENGINE.analysis}`, 'engine=0ther')}`,
       docId,
       'alice',
     );
-    expect(layerStale.status).toBe(400);
-    expect(layerStale.headers.get('cache-control')).toContain('no-store');
+    expect(await json(layerOther)).toEqual(layerAnalysis);
+    expect(layerOther.headers.get('cache-control')).not.toContain('immutable');
+    expect(layerOther.headers.get('embedpdf-engine')).toBe(ENGINE.analysis);
   });
 
   test("cancel frees the layer; expiry is swept; another layer's signature moves only that layer", async () => {
