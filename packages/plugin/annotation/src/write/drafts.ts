@@ -1,6 +1,7 @@
 import {
   creationDraftAnchor,
   type CreationDraftAnchor,
+  type Draft,
   type Model,
 } from '@embedpdf/core-annotation';
 import type { Annotation } from '@embedpdf/engine-core/runtime';
@@ -10,12 +11,13 @@ import type { AnnotationContext, AnnotationServices } from '../services';
 import { createdRefOf } from './outcomes';
 
 /**
- * Creation drafts: the polygon or polyline a click per point builds (and the
- * buffered ink strokes), its finish and cancel doors, and the captured-draft
- * seam the measurement plugin calibrates from.
+ * Creation drafts: the polygon or polyline a click per point builds, its
+ * finish and cancel doors, and the captured-draft seam the measurement plugin
+ * calibrates from. Also the pen drawing that waits for its next stroke: the
+ * wait, and everything that ends it.
  */
 export function createDrafts(
-  ctx: Pick<AnnotationContext, 'cancellable'>,
+  ctx: Pick<AnnotationContext, 'cancellable' | 'clock' | 'onSettle'>,
   {
     store,
     events,
@@ -64,6 +66,76 @@ export function createDrafts(
     return annotation ? { annotation } : null;
   };
 
+  // ── the pen drawing that waits for its next stroke ───────────────────────
+
+  /**
+   * The wait that is running: the draft as the pen left it, the tool that
+   * drew it, the tool that was active then, and the wait's cancel. It speaks
+   * for the drawing only while the model's draft is that same object: the
+   * next stroke, and whatever ends the drawing, put another draft there.
+   */
+  let wait: {
+    readonly draft: Draft;
+    readonly toolId: string | undefined;
+    readonly activeToolId: string | undefined;
+    readonly cancel: () => void;
+  } | null = null;
+
+  /** The ink draft whose pen is up, or null: a stroke still being drawn is not waiting. */
+  const waitingInk = (): Draft | null => {
+    const draft = store.model().draft;
+    return draft?.kind === 'create-ink' && !draft.drawing ? draft : null;
+  };
+
+  /**
+   * Make the drawing that waits an annotation now, as its tool's
+   * `afterCreate` says. With `selects: false` the selection stays as it is:
+   * what ended the wait decides it.
+   */
+  const finishWaitingInk = ({ selects = true }: { selects?: boolean } = {}): void => {
+    const draft = waitingInk();
+    if (!draft) return;
+    const running = wait?.draft === draft ? wait : null;
+    wait?.cancel();
+    wait = null;
+    const toolId = running ? running.toolId : tools.activeTool()?.id;
+    const { selected } = store.model();
+    const commit = store.commit(
+      { type: 'finishInkDraft' },
+      {
+        adjust: selects
+          ? afterCreate.shape(toolId)
+          : (result) => ({ ...result, session: { ...result.session, selected } }),
+      },
+    );
+    // Going back to the default tool is for a user still on the tool they
+    // drew with. After a tool change the choice is theirs.
+    if (!running || running.activeToolId === tools.activeTool()?.id) {
+      afterCreate.done(toolId, commit);
+    }
+  };
+
+  /**
+   * The pen is up and its stroke is held back: wait `delayMs` for the next
+   * stroke of the same drawing. When none comes, the drawing is finished.
+   */
+  const waitForNextStroke = (toolId: string | undefined, delayMs: number): void => {
+    const draft = waitingInk();
+    if (!draft) return;
+    wait?.cancel();
+    const cancel = ctx.clock.after(delayMs, () => {
+      // Only the drawing this wait was started for.
+      if (store.model().draft === draft) finishWaitingInk();
+    });
+    wait = { draft, toolId, activeToolId: tools.activeTool()?.id, cancel };
+  };
+
+  // A message that takes the drawing's place in the draft finishes it first.
+  store.onWaitingInk(() => finishWaitingInk({ selects: false }));
+  // A download finishes it too. A stroke still being drawn is left alone: it
+  // is not what the user sees as done yet.
+  ctx.onSettle(() => finishWaitingInk());
+
   /** The `draft` noun. */
   const draftApi = {
     get: () => draftAnchorOf(),
@@ -74,13 +146,7 @@ export function createDrafts(
   };
 
   const api = {
-    finishInkDraft: () => {
-      const toolId = tools.activeTool()?.id;
-      afterCreate.done(
-        toolId,
-        store.commit({ type: 'finishInkDraft' }, { adjust: afterCreate.shape(toolId) }),
-      );
-    },
+    finishInkDraft: () => finishWaitingInk(),
     cancel: () => {
       store.commit({ type: 'cancel' });
     },
@@ -89,7 +155,17 @@ export function createDrafts(
       return draft?.kind === 'create-distance' && draft.step === 'offset' ? draft.page : null;
     },
     onDraftCaptured: events.draftCaptured.on,
+    hasCreationAwaitingClick: () => {
+      const draft = store.model().draft;
+      return (
+        draft?.kind === 'create-poly' ||
+        draft?.kind === 'create-callout' ||
+        (draft?.kind === 'create-distance' && draft.step === 'offset')
+      );
+    },
   };
 
-  return { draft: draftApi, api };
+  return { draft: draftApi, api, waitForNextStroke };
 }
+
+export type Drafts = ReturnType<typeof createDrafts>;

@@ -321,8 +321,11 @@ of the [scope](../concepts/permissions).
 
 ## Shapes with many points
 
-A polygon or a polyline takes a click per point, and a double-click ends it. While it's being drawn,
-`<AnnotationDraftMenu>` can show buttons to finish or cancel it, which helps on touch screens:
+A polygon or a polyline takes a click per point, and a double-click ends it. Each of those clicks
+is the shape's, also where it lands on another annotation: that annotation isn't selected, and the
+point is placed. The same holds for the clicks of a callout and of a distance line. While the shape
+is being drawn, `<AnnotationDraftMenu>` can show buttons to finish or cancel it, which helps on
+touch screens:
 
 <Snippet name="annotations/selecting/draft-menu" />
 

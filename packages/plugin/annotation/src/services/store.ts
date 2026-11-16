@@ -37,6 +37,7 @@ import {
 } from '@embedpdf/core';
 import {
   creationDraftAnchor,
+  dropsWaitingInk,
   type Effect,
   type Id,
   type Message,
@@ -209,6 +210,10 @@ export interface AnnotationStore {
    * A message that may create needs object numbers. When the document's pool
    * has none left (rare: it refills as it goes), the message runs once it
    * has; its commit then reports no effects, and `written` settles after it ran.
+   *
+   * An ink drawing that waits for its next stroke is finished work held in
+   * the draft. A message that would take its place runs after the drawing
+   * became an annotation (`onWaitingInk`); only `cancel` drops it.
    */
   commit(
     message: Message,
@@ -235,6 +240,12 @@ export interface AnnotationStore {
   onEffect<K extends Effect['type']>(kind: K, build: OpBuilder<K>): void;
   /** Claim what follows an update (one; last wins). */
   onUpdate(followUp: FollowUp): void;
+  /**
+   * Claim what makes an ink drawing that waits for its next stroke an
+   * annotation (one; last wins). `commit` calls it before a message that
+   * would take the drawing's place in the draft, so the strokes are kept.
+   */
+  onWaitingInk(finish: () => void): void;
   /** Resolves once every change staged so far has its answer. */
   whenWritten(): Promise<void>;
 }
@@ -264,6 +275,7 @@ export function createStore(
   copySources: Pick<CopySources, 'note'>,
 ): AnnotationStore {
   let followUp: FollowUp | null = null;
+  let finishWaitingInk: (() => void) | null = null;
   // Keyed by effect type, so a builder only ever receives effects of its own kind.
   const builders = new Map<
     Effect['type'],
@@ -365,6 +377,12 @@ export function createStore(
       result = update(before, message);
     } catch (error) {
       throw toPluginError('annotation', error);
+    }
+    if (finishWaitingInk && dropsWaitingInk(before, result.session, message)) {
+      finishWaitingInk();
+      // The drawing is an annotation now: the message runs on that model. When
+      // its create still waits for an object number, the message goes ahead.
+      if (model().draft !== before.draft) return commit(message, options);
     }
     if (options.adjust) result = options.adjust(result);
     const after = modelAfter(before, result);
@@ -596,6 +614,9 @@ export function createStore(
     hold,
     onUpdate: (next) => {
       followUp = next;
+    },
+    onWaitingInk: (finish) => {
+      finishWaitingInk = finish;
     },
     onEffect: (kind, build) => {
       builders.set(kind, (effect, current, before) =>

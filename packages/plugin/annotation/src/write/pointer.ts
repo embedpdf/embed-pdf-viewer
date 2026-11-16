@@ -17,6 +17,7 @@ import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/con
 
 import type { ChromeReads } from '../read/chrome';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import type { Drafts } from './drafts';
 import type { Measurement } from './measurement';
 import { createAnnotationHoverFeed } from '../tools/hover-feed';
 
@@ -42,6 +43,7 @@ export function createPointer(
   >,
   chrome: Pick<ChromeReads, 'chromeGeomAt' | 'grabBoost' | 'hitAt'>,
   measurement: Pick<Measurement, 'viewportsOf'>,
+  drafts: Pick<Drafts, 'waitForNextStroke'>,
 ) {
   // The E/X trigger feed (actions plugin present): driven only from the
   // pointer-driven hoverAt diff below — see hover-feed.ts for the law.
@@ -129,6 +131,8 @@ export function createPointer(
       // input bag; the core captures them on the draft at down.
       const laidOut = geometry.sizeOf(pageObjectNumber) !== null;
       const cache = measurement.viewportsOf(pageObjectNumber);
+      // A pen that groups strokes keeps each one in the draft for this long.
+      const groupStrokesMs = resolvedTool?.ink?.groupStrokesMs ?? 0;
       const draft = store.model().draft;
       const continuingMeasurement =
         (draft?.kind === 'create-distance' || draft?.kind === 'create-poly') &&
@@ -201,7 +205,7 @@ export function createPointer(
           intent: intent === 'ink-highlight' ? intent : undefined,
           clickCreate: resolvedTool?.clickCreate,
           flags: resolvedTool?.flags,
-          deferInkCommit: (resolvedTool?.ink?.groupStrokesMs ?? 0) > 0,
+          deferInkCommit: groupStrokesMs > 0,
           straightenInk: resolvedTool?.ink?.straighten,
           in: {
             page,
@@ -216,6 +220,10 @@ export function createPointer(
         { adjust: afterCreate.shape(resolvedTool?.id) },
       );
       afterCreate.done(resolvedTool?.id, committed);
+      // The pen's stroke was held back: the next one may join the same drawing.
+      if (phase === 'up' && groupStrokesMs > 0) {
+        drafts.waitForNextStroke(resolvedTool?.id, groupStrokesMs);
+      }
     },
     hoverAt: (
       at: { page: PageRef; point: Point; scale?: number; rotation?: number; zoom?: number } | null,

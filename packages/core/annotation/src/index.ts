@@ -12,6 +12,7 @@ export {
   initialModel,
   initialSession,
   sameSession,
+  dropsWaitingInk,
   EMPTY_CHANGE,
   defaultsFor,
   lineEndingsOf,

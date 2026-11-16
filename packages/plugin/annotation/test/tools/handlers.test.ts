@@ -6,14 +6,13 @@
  * (a release over the page gap must not strand the move draft, or the
  * annotation snaps back on the next interaction).
  */
-import { timerClock } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-annotation';
 import { pageRefsEqual, toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import type {
   InteractionHostCapability,
   PointerSample,
 } from '@embedpdf/plugin-interaction/contract/host';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AnnotationHostCapability } from '../../src/host-contract';
 import { createDrawHandler, createEditHandler, createPlaceHandler } from '../../src/tools/handlers';
@@ -29,6 +28,7 @@ type Call = { phase: string; page: PageRef; point: Point };
 function makeAnno(hit: 'annot' | 'empty' = 'annot') {
   const calls: Call[] = [];
   const anno = {
+    hasCreationAwaitingClick: () => false,
     getEditingId: () => null,
     text: { end: async () => {} },
     getHitKind: () => hit,
@@ -163,86 +163,6 @@ describe('the tool ghost follows the hover of the handler that takes the click',
   });
 });
 
-describe('annotation draw handler — grouped ink', () => {
-  it('restarts the grouping window and flushes the accumulated ink once', () => {
-    vi.useFakeTimers();
-    try {
-      const calls: string[] = [];
-      const anno = {
-        ...GHOST_SEAMS,
-        getToolSubtype: () => 'ink',
-        getResolvedTool: () => ({ ink: { groupStrokesMs: 800 } }),
-        createPointer: (_tool: string, phase: string) => calls.push(phase),
-        finishInkDraft: () => calls.push('finish'),
-      } as unknown as AnnotationHostCapability;
-      const inkInteraction = {
-        getActiveToolId: () => 'ink',
-        hasCursorClaim: () => false,
-        onToolChanged: () => () => {},
-        claimCursor: () => {},
-      } as unknown as InteractionHostCapability;
-      const handler = createDrawHandler(anno, inkInteraction, timerClock);
-      const at = (phase: PointerSample['phase'], x: number) =>
-        sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
-
-      handler.onPointerDown(at('down', 10));
-      handler.onPointerMove?.(at('move', 30));
-      handler.onPointerUp?.(at('up', 30));
-      vi.advanceTimersByTime(400);
-      handler.onPointerDown(at('down', 40));
-      handler.onPointerMove?.(at('move', 60));
-      handler.onPointerUp?.(at('up', 60));
-
-      vi.advanceTimersByTime(799);
-      expect(calls.filter((call) => call === 'finish')).toHaveLength(0);
-      vi.advanceTimersByTime(1);
-      expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
-      expect(calls.filter((call) => call === 'up')).toHaveLength(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('a download finishes the drawing waiting for its next stroke, never a stroke being drawn', () => {
-    vi.useFakeTimers();
-    try {
-      const calls: string[] = [];
-      const anno = {
-        ...GHOST_SEAMS,
-        getToolSubtype: () => 'ink',
-        getResolvedTool: () => ({ ink: { groupStrokesMs: 800 } }),
-        createPointer: (_tool: string, phase: string) => calls.push(phase),
-        finishInkDraft: () => calls.push('finish'),
-      } as unknown as AnnotationHostCapability;
-      const inkInteraction = {
-        getActiveToolId: () => 'ink',
-        hasCursorClaim: () => false,
-        onToolChanged: () => () => {},
-        claimCursor: () => {},
-      } as unknown as InteractionHostCapability;
-      let settle = () => {};
-      const handler = createDrawHandler(anno, inkInteraction, timerClock, (flush) => {
-        settle = flush;
-      });
-      const at = (phase: PointerSample['phase'], x: number) =>
-        sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
-
-      handler.onPointerDown(at('down', 10));
-      handler.onPointerMove?.(at('move', 30));
-      settle(); // mid-stroke: not what the user sees yet
-      expect(calls).not.toContain('finish');
-
-      handler.onPointerUp?.(at('up', 30));
-      settle(); // between strokes: finished at once, not after the grouping window
-      expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
-      vi.advanceTimersByTime(800);
-      expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
 describe('annotation edit handler — touch consent + cancel', () => {
   it('claimsTouch delegates to the capability predicate, page-gated', () => {
     const asked: Array<{ page: PageRef; point: Point }> = [];
@@ -302,7 +222,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
 
   it('onCancel drops the draft — no up, no commit at the cancelling finger', () => {
     const { anno, calls } = makeDrawAnno();
-    const handler = createDrawHandler(anno, drawInteraction, timerClock);
+    const handler = createDrawHandler(anno, drawInteraction);
     expect(handler.onPointerDown(down())).toBe(true);
     handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
     // the cancel sample carries the second finger's position — it must never
@@ -325,6 +245,7 @@ describe('annotation edit handler — double-click / long-press routing', () => 
   function makeEditAnno(freeText: boolean) {
     const calls: string[] = [];
     const anno = {
+      hasCreationAwaitingClick: () => false,
       getEditingId: () => null,
       text: { end: async () => {} },
       getHitKind: () => 'annot',
@@ -382,7 +303,7 @@ describe('distance placement — release, hover, click', () => {
       hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
-    const handler = createDrawHandler(anno, drawInteraction, timerClock);
+    const handler = createDrawHandler(anno, drawInteraction);
 
     handler.onPointerDown(down());
     handler.onPointerUp?.(
@@ -402,13 +323,40 @@ describe('distance placement — release, hover, click', () => {
     handler.onPointerUp?.(sample({ phase: 'up' }));
     expect(calls).toHaveLength(committedCalls);
   });
+});
 
-  it('lets the placement click pass through the edit handler over an existing annotation', () => {
+describe('annotation edit handler — a shape that waits for its next click', () => {
+  it('leaves the click to the draw handler, also over an existing annotation', () => {
     const { anno, calls } = makeAnno();
-    anno.getDistanceCreationPage = () => PAGE_1;
+    anno.hasCreationAwaitingClick = () => true;
     const handler = createEditHandler(anno, interaction);
     expect(handler.onPointerDown(down())).toBe(false);
     expect(calls).toHaveLength(0);
+  });
+
+  it('shows no annotation as one to grab or as hovered', () => {
+    const { anno } = makeAnno();
+    let awaitingClick = true;
+    anno.hasCreationAwaitingClick = () => awaitingClick;
+    anno.getCursorAt = () => 'move';
+    const hovers: unknown[] = [];
+    anno.hoverAt = (at) => void hovers.push(at);
+    const claims: unknown[] = [];
+    const hub = {
+      claimCursor: (_token: string, cursor: unknown) => void claims.push(cursor),
+    } as unknown as InteractionHostCapability;
+    const handler = createEditHandler(anno, hub);
+    const over = sample({ page: { ref: PAGE_1, point: { x: 300, y: 730 } } });
+
+    handler.onHover?.(over);
+    expect(claims).toEqual([null]);
+    expect(hovers).toEqual([null]);
+
+    // The shape is finished: the annotation under the pointer is one to grab again.
+    awaitingClick = false;
+    handler.onHover?.(over);
+    expect(claims).toEqual([null, 'move']);
+    expect(hovers.at(-1)).toMatchObject({ page: PAGE_1, point: { x: 300, y: 730 } });
   });
 });
 
@@ -428,7 +376,7 @@ describe('multi-click placement — hover off the page', () => {
       hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
-    return { handler: createDrawHandler(anno, drawInteraction, timerClock), calls };
+    return { handler: createDrawHandler(anno, drawInteraction), calls };
   }
 
   // Cursor over another page, or off every page: the projection onto page 1

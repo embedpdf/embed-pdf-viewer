@@ -1,4 +1,3 @@
-import type { PluginClock } from '@embedpdf/core';
 import type { KindName, Point } from '@embedpdf/core-annotation';
 import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -134,9 +133,9 @@ export function createEditHandler(
       ),
     onPointerDown: (sample) => {
       if (!sample.page) return false;
-      // The final distance-placement click belongs to its creation draft even
-      // when it lands over an existing annotation.
-      if (anno.getDistanceCreationPage?.() != null) return false;
+      // A shape that is made click by click owns its next click, also where it
+      // lands on an existing annotation: the draw handler takes it.
+      if (anno.hasCreationAwaitingClick()) return false;
       const touch = sample.pointerType === 'touch';
       // While a free-text box is being edited it owns its own pointer events, so a
       // down that reaches the hub at all is a click outside the editor — commit and
@@ -245,30 +244,25 @@ export function createEditHandler(
       anno.editPointer('up', page, downPoint, false, undefined, undefined, undefined, touch);
     },
     onHover: (sample) => {
+      // While a shape waits for its next click, a click here is the shape's:
+      // no annotation under the pointer shows as one to grab or as hovered.
+      const page = anno.hasCreationAwaitingClick() ? undefined : sample.page;
       // priority 20 → beats text-select's 'text' (10) over an annotation; null clears.
       interaction.claimCursor(
         'annotation',
-        sample.page
-          ? anno.getCursorAt(
-              sample.page.ref,
-              sample.page.point,
-              sample.page.scale,
-              sample.page.rotation,
-              sample.page.zoom,
-            )
-          : null,
+        page ? anno.getCursorAt(page.ref, page.point, page.scale, page.rotation, page.zoom) : null,
         20,
       );
       // Hover state for scene affordances (redact preview) — rides the same
       // per-move sample; the capability dispatches on change only.
       anno.hoverAt(
-        sample.page
+        page
           ? {
-              page: sample.page.ref,
-              point: sample.page.point,
-              scale: sample.page.scale,
-              rotation: sample.page.rotation,
-              zoom: sample.page.zoom,
+              page: page.ref,
+              point: page.point,
+              scale: page.scale,
+              rotation: page.rotation,
+              zoom: page.zoom,
             }
           : null,
       );
@@ -384,8 +378,6 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 export function createDrawHandler(
   anno: AnnotationHostCapability,
   interaction: InteractionHostCapability,
-  clock: Pick<PluginClock, 'after'>,
-  onSettle?: (flush: () => void) => void,
 ): InteractionHandler {
   // The active tool id + its routing subtype. The id is what `createPointer` takes
   // (it resolves the defaults preset — arrow vs line); the subtype is what the
@@ -404,23 +396,7 @@ export function createDrawHandler(
   // The active drag's home page (down→up): moves/ups resolve against it, so a
   // shape keeps sizing along the page edge when the cursor overshoots.
   let origin: { page: PageRef; point: Point } | null = null;
-  // An ink drawing waiting for its next stroke, and the cancel of that wait.
-  let pendingInk: {
-    tool: string;
-    page: PageRef;
-    cancelWait: () => void;
-  } | null = null;
-  const flushPendingInk = () => {
-    if (!pendingInk) return;
-    pendingInk.cancelWait();
-    pendingInk = null;
-    anno.finishInkDraft();
-  };
-  // A download finishes the drawing waiting for its next stroke. A stroke still
-  // being drawn is left alone: it's not what the user sees yet.
-  onSettle?.(flushPendingInk);
   interaction.onToolChanged(() => {
-    flushPendingInk();
     drawingPoly = false;
     drawingCallout = false;
     followPage = null;
@@ -456,17 +432,6 @@ export function createDrawHandler(
         return true;
       }
       if (!sample.page) return false;
-      if (st === 'ink' && pendingInk) {
-        if (
-          pendingInk.tool === tool &&
-          pendingInk.page.objectNumber === sample.page.ref.objectNumber
-        ) {
-          pendingInk.cancelWait();
-          pendingInk = null;
-        } else {
-          flushPendingInk();
-        }
-      }
       // A down is a fresh intent — it may legitimately start on another page
       // (the core restarts the draft there), so it re-anchors the gesture.
       origin = { page: sample.page.ref, point: sample.page.point };
@@ -518,17 +483,6 @@ export function createDrawHandler(
       if (origin && !isPolyTool(st)) {
         // Always commit the drag, even released off-page (point pins in core).
         anno.createPointer(tool, 'up', origin.page, pointOn(sample, origin.page) ?? origin.point);
-        if (st === 'ink') {
-          const groupStrokesMs = anno.getResolvedTool(tool)?.ink?.groupStrokesMs ?? 0;
-          if (groupStrokesMs > 0) {
-            const page = origin.page;
-            const cancelWait = clock.after(groupStrokesMs, () => {
-              pendingInk = null;
-              anno.finishInkDraft();
-            });
-            pendingInk = { tool, page, cancelWait };
-          }
-        }
       }
       origin = null;
       anno.clearGhost();
@@ -539,10 +493,6 @@ export function createDrawHandler(
       // whose final point teleports to the second finger. For an ink group
       // this drops the whole in-window draft (there is no partial discard);
       // a cancel is a cancel, and the grouping window is sub-second.
-      if (pendingInk) {
-        pendingInk.cancelWait();
-        pendingInk = null;
-      }
       drawingPoly = false;
       drawingCallout = false;
       followPage = null;
