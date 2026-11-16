@@ -9,6 +9,8 @@
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-render';
+// The snapshot's commands, made with the browser's clipboard and file download.
+export { renderCommands } from './command-lists';
 
 export { default as RenderLayer } from './render/RenderLayer.svelte';
 export { default as SnapshotLayer } from './render/SnapshotLayer.svelte';

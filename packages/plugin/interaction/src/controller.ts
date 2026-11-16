@@ -214,6 +214,10 @@ export function createInteractionController(
     listTools,
     getTool: (id) => tools.get(id) ?? null,
     hasTool: (id) => tools.has(id),
+    canUseTool: (id) => {
+      const tool = tools.get(id);
+      return !!tool && (tool.canUse?.() ?? true);
+    },
     activateTool: (id) => arm(id, (current) => activateTool(current, id)),
     activateDefaultTool: () => {
       const id = settings.get().defaultTool;

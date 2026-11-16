@@ -1,22 +1,20 @@
 /**
- * @embedpdf/plugin-commands/standard — the commands every viewer has: zoom,
- * pages, view rotation, a command for every tool, copy, the snapshot, delete,
- * undo and redo, download and print, with shortcuts, and labels in EmbedPDF's
- * eight languages (the i18n plugin has the strings). Some of them reach the browser
- * (the clipboard, a file download), which plugins never touch, so each
- * framework's `/commands` builds them with its platform: that is the
- * `standardCommands` an app imports. Print goes through the kernel, which has
- * the host's printer.
+ * @embedpdf/plugin-commands/standard — the commands that were standard up to
+ * 3.2, joined from the lists their owners ship now (`createStageCommands()`
+ * in `@embedpdf/plugin-stage/commands`, and so on). Kept so code written against
+ * `createStandardCommands()` keeps working; nothing new joins it. An app
+ * spreads its framework package's `standardCommands`, which also has the
+ * history plugin's undo and redo.
  */
-import { DocumentsToken } from '@embedpdf/core';
-import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
-import { HistoryToken } from '@embedpdf/plugin-history/contract';
-import { InteractionToken, type Tool } from '@embedpdf/plugin-interaction/contract';
-import { RenderToken, SNAPSHOT_TOOL, type PageImage } from '@embedpdf/plugin-render/contract';
-import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
-import { StageToken } from '@embedpdf/plugin-stage/contract';
-
-import type { CommandContext, CommandDefinition, CommandFamily } from './contract';
+import { createDocumentCommands } from '@embedpdf/core/commands';
+import type { CommandDefinition, CommandFamily } from '@embedpdf/core';
+import { createAnnotationCommands } from '@embedpdf/plugin-annotation/commands';
+import { createInteractionCommands } from '@embedpdf/plugin-interaction/commands';
+import { createRenderCommands } from '@embedpdf/plugin-render/commands';
+import type { PageImage } from '@embedpdf/plugin-render/contract';
+import { createSelectionCommands } from '@embedpdf/plugin-selection/commands';
+import type { SelectionCapability } from '@embedpdf/plugin-selection/contract';
+import { createStageCommands } from '@embedpdf/plugin-stage/commands';
 
 /** What the standard commands need from the browser. */
 export interface StandardCommandsPlatform {
@@ -31,328 +29,23 @@ export interface StandardCommandsPlatform {
   saveFile(bytes: Uint8Array | Blob, fileName: string, contentType: string): void;
 }
 
-const stageOf = (context: CommandContext) => context.tryGet(StageToken);
-const snapshotOf = (context: CommandContext) => context.tryGet(RenderToken)?.getSnapshot() ?? null;
-const interactionOf = (context: CommandContext) => context.tryGet(InteractionToken);
-const historyOf = (context: CommandContext) => context.tryGet(HistoryToken);
-
-/** Enabled while the document has a Stage. */
-const hasStage = (context: CommandContext): boolean => stageOf(context) !== null;
-
-/** The ids of a tool list, made once per list, which keeps its identity while the tools don't change. */
-const toolIds = new WeakMap<readonly Tool[], readonly string[]>();
-const idsOf = (tools: readonly Tool[]): readonly string[] => {
-  let ids = toolIds.get(tools);
-  if (!ids) {
-    ids = tools.map((tool) => tool.id);
-    toolIds.set(tools, ids);
-  }
-  return ids;
-};
-
 /**
- * Whether the user may use a tool: one that draws annotations needs permission to create them.
- * A tool another plugin owns asks nothing here; that plugin refuses its own gesture.
+ * The Stage's, the tools', the selection's, the annotation plugin's, the
+ * snapshot's and the document's commands, with the browser's part from
+ * `platform`.
+ *
+ * @deprecated Spread your framework package's `standardCommands`, or the
+ * lists you need: each plugin ships its own from its `/commands` entry.
  */
-const mayUseTool = (context: CommandContext, toolId: string): boolean => {
-  const annotation = context.tryGet(AnnotationToken);
-  return !annotation?.tools.get(toolId) || annotation.canCreate();
-};
-
-/** Switching to a tool: active while it's the tool, there only when the document has it. */
-const toolCommand = (toolId: string): Omit<CommandDefinition, 'id' | 'shortcut'> => ({
-  labelKey: `commands.tool.${toolId}`,
-  label: toolId,
-  icon: toolId,
-  categories: ['tool'],
-  run: (context) => interactionOf(context)?.activateTool(toolId),
-  active: (context) => interactionOf(context)?.getActiveToolId() === toolId,
-  visible: (context) => interactionOf(context)?.hasTool(toolId) ?? false,
-  enabled: (context) => mayUseTool(context, toolId),
-});
-
-/** `tool:<id>` for every tool the document has. */
-const toolCommands: CommandFamily = {
-  prefix: 'tool:',
-  names: (context) => {
-    const interaction = interactionOf(context);
-    return interaction ? idsOf(interaction.listTools()) : [];
-  },
-  command: toolCommand,
-};
-
-/** The standard commands, with the browser's part from `platform`. */
 export function createStandardCommands(
   platform: StandardCommandsPlatform,
 ): readonly (CommandDefinition | CommandFamily)[] {
   return [
-    // ── zoom ──
-    {
-      id: 'zoom:in',
-      labelKey: 'commands.zoom.in',
-      label: 'Zoom in',
-      icon: 'zoom-in',
-      shortcut: ['Mod+=', 'Mod+NumpadAdd'],
-      categories: ['zoom'],
-      run: (context) => stageOf(context)?.zoomIn(),
-      enabled: (context) => stageOf(context)?.canZoomIn() ?? false,
-    },
-    {
-      id: 'zoom:out',
-      labelKey: 'commands.zoom.out',
-      label: 'Zoom out',
-      icon: 'zoom-out',
-      shortcut: ['Mod+-', 'Mod+NumpadSubtract'],
-      categories: ['zoom'],
-      run: (context) => stageOf(context)?.zoomOut(),
-      enabled: (context) => stageOf(context)?.canZoomOut() ?? false,
-    },
-    {
-      id: 'zoom:fit-width',
-      labelKey: 'commands.zoom.fitWidth',
-      label: 'Fit width',
-      icon: 'fit-width',
-      categories: ['zoom'],
-      run: (context) => stageOf(context)?.fitWidth(),
-      active: (context) => stageOf(context)?.getZoomMode() === 'fit-width',
-      enabled: hasStage,
-    },
-    {
-      id: 'zoom:fit-page',
-      labelKey: 'commands.zoom.fitPage',
-      label: 'Fit page',
-      icon: 'fit-page',
-      categories: ['zoom'],
-      run: (context) => stageOf(context)?.fitPage(),
-      active: (context) => stageOf(context)?.getZoomMode() === 'fit-page',
-      enabled: hasStage,
-    },
-
-    // ── pages ──
-    {
-      id: 'page:next',
-      labelKey: 'commands.page.next',
-      label: 'Next page',
-      icon: 'next-page',
-      shortcut: 'ArrowRight',
-      categories: ['page'],
-      run: (context) => stageOf(context)?.nextPage(),
-      enabled: (context) => stageOf(context)?.canGoNext() ?? false,
-    },
-    {
-      id: 'page:previous',
-      labelKey: 'commands.page.previous',
-      label: 'Previous page',
-      icon: 'previous-page',
-      shortcut: 'ArrowLeft',
-      categories: ['page'],
-      run: (context) => stageOf(context)?.previousPage(),
-      enabled: (context) => stageOf(context)?.canGoPrevious() ?? false,
-    },
-    {
-      id: 'page:first',
-      labelKey: 'commands.page.first',
-      label: 'First page',
-      icon: 'first-page',
-      shortcut: 'Home',
-      categories: ['page'],
-      run: (context) => stageOf(context)?.goToFirstPage(),
-      enabled: (context) => stageOf(context)?.canGoPrevious() ?? false,
-    },
-    {
-      id: 'page:last',
-      labelKey: 'commands.page.last',
-      label: 'Last page',
-      icon: 'last-page',
-      shortcut: 'End',
-      categories: ['page'],
-      run: (context) => stageOf(context)?.goToLastPage(),
-      enabled: (context) => stageOf(context)?.canGoNext() ?? false,
-    },
-
-    // ── view rotation: how the pages show, nothing written to the PDF ──
-    {
-      id: 'view:rotate-clockwise',
-      labelKey: 'commands.view.rotateClockwise',
-      label: 'Rotate clockwise',
-      icon: 'rotate-clockwise',
-      categories: ['view'],
-      run: (context) => stageOf(context)?.rotateViewBy(90),
-      enabled: hasStage,
-    },
-    {
-      id: 'view:rotate-counterclockwise',
-      labelKey: 'commands.view.rotateCounterclockwise',
-      label: 'Rotate counterclockwise',
-      icon: 'rotate-counterclockwise',
-      categories: ['view'],
-      run: (context) => stageOf(context)?.rotateViewBy(-90),
-      enabled: hasStage,
-    },
-
-    // ── tools: the built-in ones have Acrobat's single keys; the family covers every other ──
-    { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
-    { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
-    { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
-    {
-      ...toolCommand(SNAPSHOT_TOOL),
-      id: 'tool:snapshot',
-      allowed: (context) => context.tryGet(RenderToken)?.canSnapshot() ?? true,
-      notAllowedKey: 'commands.notAllowed.doc-content-copy',
-    },
-    toolCommands,
-
-    // ── selections ──
-    {
-      id: 'selection:copy',
-      labelKey: 'commands.selection.copy',
-      label: 'Copy',
-      icon: 'copy',
-      shortcut: 'Mod+C',
-      categories: ['selection'],
-      run: (context) => platform.copySelection(context.get(SelectionToken)),
-      // `canCopy()` in `enabled`, not `allowed`: a refused command keeps its keys, and Mod+C
-      // with nothing selected in the viewer belongs to the page. The clipboard wiring says
-      // when a selection may not be copied.
-      enabled: (context) => {
-        const selection = context.tryGet(SelectionToken);
-        return !!selection && selection.hasSelection() && selection.canCopy();
-      },
-    },
-    {
-      id: 'annotation:delete',
-      labelKey: 'commands.annotation.delete',
-      label: 'Delete',
-      icon: 'delete',
-      shortcut: ['Delete', 'Backspace'],
-      categories: ['annotation'],
-      run: (context) => context.get(AnnotationToken).selection.delete({ signal: context.signal }),
-      enabled: (context) => {
-        const annotation = context.tryGet(AnnotationToken);
-        if (!annotation) return false;
-        const selected = annotation.selection.getSelected();
-        // `isEditable`: the annotation plugin's `editable` setting lets people change it by hand.
-        return (
-          selected.length > 0 &&
-          selected.every(({ ref }) => annotation.canDelete(ref) && annotation.isEditable(ref))
-        );
-      },
-    },
-
-    // ── history: without the history plugin, both stay disabled ──
-    // Focus in a text field keeps its own undo: shortcuts skip text fields.
-    {
-      id: 'history:undo',
-      labelKey: 'commands.history.undo',
-      label: 'Undo',
-      icon: 'undo',
-      shortcut: 'Mod+Z',
-      categories: ['history'],
-      run: (context) => historyOf(context)?.undo(),
-      enabled: (context) => historyOf(context)?.canUndo() ?? false,
-    },
-    {
-      id: 'history:redo',
-      labelKey: 'commands.history.redo',
-      label: 'Redo',
-      icon: 'redo',
-      shortcut: ['Mod+Shift+Z', 'Mod+Y'],
-      categories: ['history'],
-      run: (context) => historyOf(context)?.redo(),
-      enabled: (context) => historyOf(context)?.canRedo() ?? false,
-    },
-
-    // ── the snapshot the snapshot tool holds ──
-    {
-      id: 'snapshot:copy',
-      labelKey: 'commands.snapshot.copy',
-      label: 'Copy',
-      icon: 'copy',
-      shortcut: 'Mod+C',
-      categories: ['snapshot'],
-      // Straight to the clipboard, in the press itself: the picture follows when it's there.
-      run: (context) => {
-        const snapshot = snapshotOf(context);
-        return snapshot ? platform.copyImage(snapshot.image) : undefined;
-      },
-      enabled: (context) => snapshotOf(context) !== null,
-    },
-    {
-      id: 'snapshot:save',
-      labelKey: 'commands.snapshot.save',
-      label: 'Save image',
-      icon: 'download',
-      categories: ['snapshot'],
-      run: async (context) => {
-        const snapshot = snapshotOf(context);
-        if (!snapshot) return;
-        const documents = context.get(DocumentsToken);
-        const id = context.documentId ?? undefined;
-        const blob = await (await snapshot.image).blob();
-        const number =
-          documents
-            .listPages(id)
-            .findIndex((page) => page.ref.objectNumber === snapshot.page.objectNumber) + 1;
-        platform.saveFile(blob, snapshotFileNameOf(documents.get(id)?.name, number), 'image/png');
-      },
-      enabled: (context) => snapshotOf(context) !== null,
-    },
-    {
-      id: 'snapshot:clear',
-      labelKey: 'commands.snapshot.clear',
-      label: 'Clear snapshot',
-      shortcut: 'Escape',
-      categories: ['snapshot'],
-      run: (context) => context.get(RenderToken).clearSnapshot(),
-      enabled: (context) => snapshotOf(context) !== null,
-    },
-
-    // ── the document ──
-    {
-      id: 'document:download',
-      labelKey: 'commands.document.download',
-      label: 'Download',
-      icon: 'download',
-      shortcut: 'Mod+S',
-      categories: ['document'],
-      allowed: (context) => context.tryGet(DocumentsToken)?.canDownload() ?? true,
-      notAllowedKey: 'commands.notAllowed.doc-download',
-      run: async (context) => {
-        const documents = context.get(DocumentsToken);
-        const id = context.documentId ?? undefined;
-        const bytes = await documents.download(id, { signal: context.signal });
-        platform.saveFile(bytes, fileNameOf(documents.get(id)?.name), 'application/pdf');
-      },
-      enabled: (context) => context.documentId !== null,
-    },
-    {
-      id: 'document:print',
-      labelKey: 'commands.document.print',
-      label: 'Print',
-      icon: 'print',
-      shortcut: 'Mod+P',
-      categories: ['document'],
-      allowed: (context) => context.tryGet(DocumentsToken)?.canPrint() ?? true,
-      notAllowedKey: 'commands.notAllowed.doc-print',
-      // The kernel prints the document's pages, and runs the document's own
-      // print actions around the dialog when the actions plugin is there.
-      run: async (context) => {
-        const documents = context.get(DocumentsToken);
-        await documents.print(context.documentId ?? undefined, { signal: context.signal });
-      },
-      enabled: (context) => context.documentId !== null,
-    },
+    ...createStageCommands(),
+    ...createInteractionCommands(),
+    ...createSelectionCommands(platform),
+    ...createAnnotationCommands(),
+    ...createRenderCommands(platform),
+    ...createDocumentCommands(platform),
   ];
-}
-
-/** The download's file name: the document's name, ending in `.pdf`. */
-function fileNameOf(name: string | undefined): string {
-  if (!name) return 'document.pdf';
-  return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
-}
-
-/** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
-function snapshotFileNameOf(name: string | undefined, pageNumber: number): string {
-  const base = (name ?? 'document').replace(/\.pdf$/i, '');
-  return `${base} p${pageNumber}.png`;
 }

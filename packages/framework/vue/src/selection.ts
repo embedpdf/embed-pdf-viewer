@@ -13,6 +13,8 @@ export * from '@embedpdf/plugin-selection';
 // The clipboard write lives in @embedpdf/web (the plugin never touches the
 // DOM); re-exported so the whole feature is one import.
 export { copySelection } from '@embedpdf/web';
+// The selection's commands, made with the browser's clipboard.
+export { selectionCommands } from './command-lists';
 export { default as SelectionLayer } from './selection/SelectionLayer.vue';
 export { default as SelectionMenu } from './selection/SelectionMenu.vue';
 export { default as SelectionHandles } from './selection/SelectionHandles.vue';

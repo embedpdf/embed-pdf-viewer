@@ -11,6 +11,7 @@
 
 // The plugin's types and helpers, so app code has one import for the feature.
 export * from '@embedpdf/plugin-render';
+export { renderCommands } from './commands';
 export * from './render';
 export { EpdfRenderLayer } from './render-layer';
 export { EpdfSnapshotLayer } from './snapshot-layer';

@@ -20,8 +20,7 @@ import type {
   CommandsCapability,
 } from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
-import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
-import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
+import { bindCommandShortcuts, isMacPlatform } from '@embedpdf/web';
 import {
   useCapability,
   useCapabilityEvent,
@@ -37,13 +36,6 @@ import {
   type CurrentValue,
   type MaybeGetter,
 } from '../runtime/values.svelte';
-
-/**
- * The commands every viewer has: zoom, pages, view rotation, `tool:<id>` for every tool, copy,
- * delete, download and print, with shortcuts and labels in EmbedPDF's eight languages. Spread
- * them into `commandsPlugin({ commands })`.
- */
-export const standardCommands = /* @__PURE__ */ createStandardCommands(standardCommandsBrowser);
 
 /** The commands API: `execute`, `searchCommands`, `registerCommand`, the categories, the settings calls. */
 export function useCommands(): CommandsCapability {

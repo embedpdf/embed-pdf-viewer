@@ -7,4 +7,5 @@
 
 // The plugin's types and helpers, so app code has one import for the feature.
 export * from '@embedpdf/plugin-history';
+export { historyCommands } from './commands';
 export * from './history';

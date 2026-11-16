@@ -1,0 +1,4 @@
+# @embedpdf/plugin-interaction — ./commands
+
+createInteractionCommands [FunctionDeclaration]: export function createInteractionCommands(): readonly (CommandDefinition | CommandFamily)[]{ return [{ ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V'} , { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H'} , { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z'} , toolCommands, ]; }
+toolCommand [VariableDeclaration]: toolCommand = (toolId: string): Omit<CommandDefinition, 'id' | 'shortcut'> => ({ labelKey: `commands.tool.${ toolId} `, label: toolId, icon: toolId, categories: ['tool'], run: (context) => interactionOf(context)?.activateTool(toolId), active: (context) => interactionOf(context)?.getActiveToolId() === toolId, visible: (context) => interactionOf(context)?.hasTool(toolId) ?? false, enabled: (context) => interactionOf(context)?.canUseTool(toolId) ?? true, } )

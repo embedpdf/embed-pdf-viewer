@@ -10,6 +10,8 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-history';
+// Undo and redo as commands, ready to spread.
+export { historyCommands } from './command-lists';
 import type { EventHook } from '@embedpdf/core';
 import { HistoryToken, historyState, type HistoryCapability } from '@embedpdf/plugin-history';
 

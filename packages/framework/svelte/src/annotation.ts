@@ -23,6 +23,8 @@
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
+// The annotation plugin's commands, ready to spread.
+export { annotationCommands } from './command-lists';
 export type {
   CreationDraftAnchor,
   RenderItem,

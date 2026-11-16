@@ -1,0 +1,3 @@
+# @embedpdf/plugin-history — ./commands
+
+createHistoryCommands [FunctionDeclaration]: export function createHistoryCommands(): readonly CommandDefinition[]{ return [{ id: 'history:undo', labelKey: 'commands.history.undo', label: 'Undo', icon: 'undo', shortcut: 'Mod+Z', categories: ['history'], run: (context) => historyOf(context)?.undo(), enabled: (context) => historyOf(context)?.canUndo() ?? false, } , { id: 'history:redo', labelKey: 'commands.history.redo', label: 'Redo', icon: 'redo', shortcut: ['Mod+Shift+Z', 'Mod+Y'], categories: ['history'], run: (context) => historyOf(context)?.redo(), enabled: (context) => historyOf(context)?.canRedo() ?? false, } , ]; }

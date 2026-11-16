@@ -30,7 +30,7 @@ import type { AnnotationStore } from '../services/store';
  * spec. `tools.register` applies one more entry to the same table.
  */
 export function createToolRegistry(
-  ctx: Pick<AnnotationContext, 'tryGet'>,
+  ctx: Pick<AnnotationContext, 'tryGet' | 'allows'>,
   settingTools: readonly AnnotationToolInput[],
   store: AnnotationStore,
   events: Pick<AnnotationEvents, 'toolDefaultsChanged'>,
@@ -132,7 +132,9 @@ export function createToolRegistry(
   /** Put `tool` on the hub, in place of any tool with its id. */
   const registerOnHub = (tool: ResolvedTool) => {
     const { id, cursor, enables } = tool;
-    const hubTool = { id, cursor, enables, touch: toolTouchOf(enables) };
+    // Like the tools `connect.ts` registers: making an annotation needs the permission.
+    const canUse = () => ctx.allows('annotations:create');
+    const hubTool = { id, cursor, enables, touch: toolTouchOf(enables), canUse };
     return ctx.tryGet(InteractionToken)?.registerTool(hubTool, { replace: true });
   };
 

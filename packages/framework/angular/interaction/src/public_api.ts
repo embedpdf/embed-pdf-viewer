@@ -8,6 +8,7 @@
 
 // The plugin's types and helpers, so app code has one import for the feature.
 export * from '@embedpdf/plugin-interaction';
+export { interactionCommands, toolCommand } from './commands';
 // The browser helpers live in @embedpdf/web (the plugin has no DOM); here for one import.
 export { svgCursor, vibrationFeedback, wkFeedback } from '@embedpdf/web';
 export type { SvgCursorOptions } from '@embedpdf/web';

@@ -9,5 +9,7 @@
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-history';
+// Undo and redo as commands, ready to spread.
+export { historyCommands } from './command-lists';
 
 export { useHistory, useHistoryEvent, useHistoryState } from './history/readers';

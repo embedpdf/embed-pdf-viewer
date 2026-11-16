@@ -16,6 +16,7 @@ export * from '@embedpdf/plugin-selection';
 // The clipboard write lives in @embedpdf/web (the plugin never touches the DOM); re-exported so
 // the whole feature is one import.
 export { copySelection } from '@embedpdf/web';
+export { selectionCommands } from './commands';
 export * from './selection';
 export { EpdfSelectionLayer } from './selection-layer';
 export { EpdfSelectionMenu } from './selection-menu';

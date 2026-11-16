@@ -10,7 +10,6 @@ export * from '@embedpdf/plugin-commands';
 
 export {
   formatShortcut,
-  standardCommands,
   useCommand,
   useCommandShortcuts,
   useCommands,
@@ -18,3 +17,4 @@ export {
   useCommandsSettings,
 } from './commands/readers.svelte';
 export type { CommandShortcutsOptions } from './commands/readers.svelte';
+export { standardCommands } from './command-lists';

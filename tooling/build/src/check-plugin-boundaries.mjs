@@ -279,10 +279,35 @@ function contractChecksUnder(pluginRoot, violations) {
     for (const entryFile of contractEntries) {
       checkContractClosure(entryFile, violations);
     }
+
+    // A plugin's commands read capabilities through their contracts, so the
+    // entry stops short of the implementation, as a contract does. That is
+    // what lets the standard commands name a plugin without bringing it in.
+    const commandsEntry = manifest.exports?.['./commands'];
+    if (commandsEntry) {
+      const commandsFile = path.resolve(packageRoot, 'src', 'commands.ts');
+      if (commandsEntry !== './src/commands.ts') {
+        violations.push({
+          file: manifestFile,
+          line: 1,
+          column: 1,
+          message: 'plugin commands entries must export from "./src/commands.ts"',
+        });
+      } else if (!fs.existsSync(commandsFile)) {
+        violations.push({
+          file: commandsFile,
+          line: 1,
+          column: 1,
+          message: 'declared plugin commands entry does not exist',
+        });
+      } else {
+        checkContractClosure(commandsFile, violations, 'commands');
+      }
+    }
   }
 }
 
-function checkContractClosure(entryFile, violations) {
+function checkContractClosure(entryFile, violations, kind = 'contract') {
   const entrySource = parse(entryFile);
   const inspectTokenFactory = (node) => {
     if (
@@ -321,7 +346,7 @@ function checkContractClosure(entryFile, violations) {
           file,
           line,
           column,
-          message: `contract runtime graph reaches implementation module "${reference.specifier}"`,
+          message: `${kind} runtime graph reaches implementation module "${reference.specifier}"`,
         });
         continue;
       }

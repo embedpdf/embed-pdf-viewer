@@ -39,6 +39,7 @@ export type {
 export { mergeSettings } from './settings';
 export { defineState, shallowEqual } from './state';
 export type { StateDeclaration } from './state';
+export type { CommandContext, CommandDefinition, CommandFamily, IconAccent } from './command-types';
 export { documentState, documentsState } from './documents-state';
 export type { DocumentsState } from './documents-state';
 export { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, viewerSettingsOf } from './viewer-settings';

@@ -161,6 +161,8 @@ Every plugin package publishes deliberate dependency doors:
 - Named entries such as `/destination`, `/authoring` or `/scripting` expose a
   deliberate pure helper feature that is neither a contract nor the full
   implementation.
+- `@embedpdf/plugin-<name>/commands` is optional. It holds the plugin's
+  commands. See [Commands](#commands).
 
 The source rules are mechanical:
 
@@ -179,6 +181,39 @@ The source rules are mechanical:
    never called twice.
 
 `pnpm check:plugin-boundaries` checks these rules locally and in CI.
+
+## Commands
+
+A plugin ships the commands for what it does. The commands plugin runs
+commands and knows no plugin; only the shell and i18n, which it needs itself.
+
+- The list lives in `src/commands.ts`, exported as `./commands`. That entry
+  is its one door: the package root does not re-export it.
+- It is typed with core's `CommandDefinition` and `CommandFamily`, and reads
+  capabilities with `context.tryGet(Token)` from `./contract`. Its runtime
+  import graph must not reach the implementation, as for a contract.
+  `pnpm check:plugin-boundaries` checks it.
+- A plugin exports a function that makes its list, named after the plugin:
+  `createStageCommands()`. Always a function, so a list can gain an argument
+  later without breaking anyone. It takes one only when the list reaches the
+  browser, and then only its own part of it:
+  `createSelectionCommands({ copySelection })`. Plugins never touch the DOM.
+- Each framework's feature entry exports the list ready to spread, always as
+  a constant, made once: `stageCommands` from `/stage`, `selectionCommands`
+  from `/selection`. That is what an app imports.
+- `standardCommands` is a join the framework packages make, of the lists of
+  the owners every viewer has: Stage, interaction, selection, annotation,
+  history, render and the documents (`@embedpdf/core/commands`). A plugin
+  that is not in every viewer never joins it. Its app spreads its list next
+  to `standardCommands`.
+- A command another plugin's state decides asks that plugin through its
+  contract, never by name of a third: a tool says whether it may be used
+  (`Tool.canUse()`), so the tool commands ask the interaction plugin, not the
+  plugin that owns the tool.
+- Tests sit beside the list, in `test/commands.test.ts`, on
+  `createTestCommandContext()` from `@embedpdf/core/testing`.
+- `@embedpdf/plugin-commands/standard` is the list as it was at 3.2, kept for
+  code written against it. Nothing new joins it.
 
 ## The controller
 

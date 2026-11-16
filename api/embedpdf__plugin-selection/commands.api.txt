@@ -1,0 +1,4 @@
+# @embedpdf/plugin-selection — ./commands
+
+SelectionCommandsPlatform [InterfaceDeclaration]: export interface SelectionCommandsPlatform{ copySelection(selection: SelectionCapability): Promise<unknown>; }
+createSelectionCommands [FunctionDeclaration]: export function createSelectionCommands( platform: SelectionCommandsPlatform, ): readonly CommandDefinition[]{ return [{ id: 'selection:copy', labelKey: 'commands.selection.copy', label: 'Copy', icon: 'copy', shortcut: 'Mod+C', categories: ['selection'], run: (context) => platform.copySelection(context.get(SelectionToken)), enabled: (context) =>{ const selection = context.tryGet(SelectionToken); return !!selection && selection.hasSelection() && selection.canCopy(); } , } , ]; }

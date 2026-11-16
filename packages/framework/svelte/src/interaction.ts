@@ -7,6 +7,9 @@
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-interaction';
+// The tool commands, ready to spread, and the command behind `tool:<id>` to build your own on.
+export { interactionCommands } from './command-lists';
+export { toolCommand } from '@embedpdf/plugin-interaction/commands';
 // The browser helpers live in @embedpdf/web (the plugin has no DOM); they're here too, so app
 // code has one import for the feature.
 export { createClickCounter, svgCursor, vibrationFeedback, wkFeedback } from '@embedpdf/web';

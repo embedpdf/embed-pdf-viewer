@@ -20,6 +20,8 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
+// The snapshot's commands, made with the browser's clipboard and file download.
+export { renderCommands } from './command-lists';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 // The layer is a host of the render plugin: it paints conformed sources and
