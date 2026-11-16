@@ -6,10 +6,11 @@
  */
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { attachSignatureTimestamp } from '../src/cms/attach';
 import { buildDetachedCms } from '../src/cms/build';
+import { randomPositiveInteger, toArrayBuffer } from '../src/cms/engine';
 import { OID } from '../src/cms/oids';
 import { certificateFromDer, readCmsParts } from '../src/cms/parse';
 import {
@@ -119,5 +120,45 @@ describe('what the package writes is DER', () => {
     ca.revoke(await ca.issueSigner());
     ca.revoke(await ca.issueSigner());
     expect(derProblem(await list())).toBeNull();
+  });
+});
+
+describe('a serial number, whatever the random octets are', () => {
+  // Eight random octets with only the top bit cleared start with a zero octet about once in
+  // 256. Written as they are, that integer has an octet DER leaves out, and OpenSSL refuses the
+  // certificate or the token it is in.
+  const randomOctetsAre = (octet: number) =>
+    vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation((array) => {
+      (array as Uint8Array).fill(octet);
+      return array;
+    });
+  afterEach(() => vi.restoreAllMocks());
+
+  test('the octets are a positive DER integer', () => {
+    for (const octet of [0x00, 0x3f, 0x80, 0xff]) {
+      randomOctetsAre(octet);
+      const octets = randomPositiveInteger();
+      expect(octets[0], `from ${octet}`).toBeGreaterThanOrEqual(0x40);
+      expect(octets[0], `from ${octet}`).toBeLessThanOrEqual(0x7f);
+      const integer = new asn1js.Integer({ valueHex: toArrayBuffer(octets) });
+      expect(derProblem(new Uint8Array(integer.toBER(false))), `from ${octet}`).toBeNull();
+      vi.restoreAllMocks();
+    }
+  });
+
+  test('a self-signed certificate, an issued one and a timestamp token are DER', async () => {
+    randomOctetsAre(0x00);
+    expect(derProblem((await createTestSigner()).certificate)).toBeNull();
+
+    const ca = await createTestCertificateAuthority({ url: AUTHORITY });
+    for (const der of (await ca.issueSigner()).certificateChain) {
+      expect(derProblem(der)).toBeNull();
+    }
+
+    const authority = await createTestTimestampAuthority();
+    expect(derProblem(authority.certificate)).toBeNull();
+    const token = await authority.sign({ digest, algorithm: 'sha256', subFilter: 'ETSI.RFC3161' });
+    expect(derProblem(token)).toBeNull();
+    expect(derProblem(readCmsParts(token, 'tst-info').eContent!)).toBeNull();
   });
 });

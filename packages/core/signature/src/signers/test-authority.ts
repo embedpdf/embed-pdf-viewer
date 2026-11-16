@@ -7,7 +7,7 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
-import { bytesEqual, ensureEngine, toArrayBuffer } from '../cms/engine';
+import { bytesEqual, ensureEngine, randomPositiveInteger, toArrayBuffer } from '../cms/engine';
 import { OID } from '../cms/oids';
 import { x509Time } from '../cms/time';
 import type { RevocationReason } from '../revocation/answer';
@@ -86,10 +86,9 @@ export async function issueCertificate(input: {
   ensureEngine();
   const certificate = new pkijs.Certificate();
   certificate.version = 2;
-  const serial = globalThis.crypto.getRandomValues(new Uint8Array(8));
-  serial[0]! &= 0x7f;
-  serial[0]! |= 0x01;
-  certificate.serialNumber = new asn1js.Integer({ valueHex: serial.buffer });
+  certificate.serialNumber = new asn1js.Integer({
+    valueHex: toArrayBuffer(randomPositiveInteger()),
+  });
   certificate.subject.typesAndValues.push(
     new pkijs.AttributeTypeAndValue({
       type: OID.commonName,

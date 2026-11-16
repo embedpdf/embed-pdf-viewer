@@ -121,9 +121,8 @@ export function httpTimestampAuthority(options: HttpTimestampAuthorityOptions): 
         import('../cms/timestamp'),
         import('../cms/engine'),
       ]);
-      const nonce = globalThis.crypto.getRandomValues(new Uint8Array(8));
       // Positive, and without a leading zero octet, so it reads back as it was sent.
-      nonce[0] = (nonce[0]! & 0x7f) | 0x40;
+      const nonce = engine.randomPositiveInteger();
       const query = protocol.buildTimestampRequest({ digest, algorithm, policy, nonce });
 
       let reply: Uint8Array;

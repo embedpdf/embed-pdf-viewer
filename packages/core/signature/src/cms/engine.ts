@@ -21,6 +21,18 @@ export function ensureEngine(): pkijs.ICryptoEngine {
   return pkijs.getCrypto(true);
 }
 
+/**
+ * Random octets that are a positive integer in DER as they are, for a serial number or a
+ * nonce. DER writes an integer in the fewest octets: a first octet of zero in front of a
+ * positive number is one too many, and a strict reader refuses it. A first octet with its top
+ * bit set makes the number negative. So the first octet is between `40` and `7f`.
+ */
+export function randomPositiveInteger(): Uint8Array {
+  const octets = globalThis.crypto.getRandomValues(new Uint8Array(8));
+  octets[0] = (octets[0]! & 0x7f) | 0x40;
+  return octets;
+}
+
 export function toArrayBuffer(view: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(view.byteLength);
   copy.set(view);
