@@ -73,14 +73,27 @@ export function createDrafts(
     },
   };
 
+  const finishInkDraft = (): void => {
+    const toolId = tools.activeTool()?.id;
+    afterCreate.done(
+      toolId,
+      store.commit({ type: 'finishInkDraft' }, { adjust: afterCreate.shape(toolId) }),
+    );
+  };
+
+  /**
+   * Finish the ink drawing that waits for its next stroke. A press or a text
+   * edit that takes the draft's place calls this first, so the strokes become
+   * an annotation, as when the wait runs out, instead of being dropped. A
+   * stroke still under the pen is left alone.
+   */
+  const finishWaitingInk = (): void => {
+    const draft = store.model().draft;
+    if (draft?.kind === 'create-ink' && !draft.drawing) finishInkDraft();
+  };
+
   const api = {
-    finishInkDraft: () => {
-      const toolId = tools.activeTool()?.id;
-      afterCreate.done(
-        toolId,
-        store.commit({ type: 'finishInkDraft' }, { adjust: afterCreate.shape(toolId) }),
-      );
-    },
+    finishInkDraft,
     cancel: () => {
       store.commit({ type: 'cancel' });
     },
@@ -91,5 +104,7 @@ export function createDrafts(
     onDraftCaptured: events.draftCaptured.on,
   };
 
-  return { draft: draftApi, api };
+  return { draft: draftApi, api, finishWaitingInk };
 }
+
+export type Drafts = ReturnType<typeof createDrafts>;

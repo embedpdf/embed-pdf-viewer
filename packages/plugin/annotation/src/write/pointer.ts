@@ -17,6 +17,7 @@ import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/con
 
 import type { ChromeReads } from '../read/chrome';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import type { Drafts } from './drafts';
 import type { Measurement } from './measurement';
 import { createAnnotationHoverFeed } from '../tools/hover-feed';
 
@@ -42,6 +43,7 @@ export function createPointer(
   >,
   chrome: Pick<ChromeReads, 'chromeGeomAt' | 'grabBoost' | 'hitAt'>,
   measurement: Pick<Measurement, 'viewportsOf'>,
+  drafts: Pick<Drafts, 'finishWaitingInk'>,
 ) {
   // The E/X trigger feed (actions plugin present): driven only from the
   // pointer-driven hoverAt diff below — see hover-feed.ts for the law.
@@ -61,6 +63,7 @@ export function createPointer(
       zoom?: number,
       touch?: boolean,
     ) => {
+      if (phase === 'down') drafts.finishWaitingInk();
       store.commit({
         type: 'editPointer',
         phase,
@@ -90,6 +93,7 @@ export function createPointer(
       rotation?: Rotation,
       zoom?: number,
     ) => {
+      if (phase === 'down') drafts.finishWaitingInk();
       store.commit({
         type: 'marqueePointer',
         phase,

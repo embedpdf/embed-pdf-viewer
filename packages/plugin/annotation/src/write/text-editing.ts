@@ -27,6 +27,7 @@ import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
 import { textCommitPatch, type EditorSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import type { Drafts } from './drafts';
 import type { Commit, StoreHold, Written } from '../services/store';
 
 const TEXT_WRITE_DELAY_MS = 250;
@@ -35,6 +36,7 @@ export function createTextEditing(
   ctx: Pick<AnnotationContext, 'state' | 'clock' | 'cancellable'>,
   { store, fonts, textFonts }: Pick<AnnotationServices, 'store' | 'fonts' | 'textFonts'>,
   chrome: Pick<ChromeReads, 'textBoxAt'>,
+  drafts: Pick<Drafts, 'finishWaitingInk'>,
 ) {
   /** What is being typed: the record, the change it goes into, how it settles, and the pause before it is sent. */
   let typing: {
@@ -115,11 +117,15 @@ export function createTextEditing(
     return [{ type: 'annotations.update', ref, patch: { subtype: 'free-text', ...patch } }];
   });
 
+  /** Open the record's text for typing; an ink drawing that waits for its next stroke is finished first. */
+  const beginTextEdit = (id: Id): void => {
+    drafts.finishWaitingInk();
+    store.commit({ type: 'beginTextEdit', id });
+  };
+
   /** The `text` noun (its `getEditing` and `toggleFormat` come from the reads and the selection). */
   const text = {
-    begin: (ref: AnnotationRef) => {
-      store.commit({ type: 'beginTextEdit', id: annotationKey(ref) });
-    },
+    begin: (ref: AnnotationRef) => beginTextEdit(annotationKey(ref)),
     end: async (options: { signal?: AbortSignal } = {}) => {
       const sent = sendTyping();
       if (ctx.state.get().textSelection) {
@@ -140,7 +146,7 @@ export function createTextEditing(
     ) => {
       const id = chrome.textBoxAt(page, point, { scale, rotation, zoom });
       if (id != null) {
-        store.commit({ type: 'beginTextEdit', id });
+        beginTextEdit(id);
         // A box whose text may not change (`lockedContents`, the `editable`
         // setting) stays out of the editor.
         if (store.model().editing === id) return true;

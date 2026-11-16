@@ -57,7 +57,8 @@ export function createAnnotationController(ctx: AnnotationContext) {
 
   // Writes: every change goes through the store, a gesture's through `commit`,
   // one stated in code through `apply`, and each is one change on the queue.
-  const text = createTextEditing(ctx, services, chrome);
+  const drafts = createDrafts(ctx, services, annotations);
+  const text = createTextEditing(ctx, services, chrome, drafts);
   // Before an export reads the document, send the words typed in the last
   // moment, and wait for every change on its way. (A download does the same
   // through the kernel's queue.)
@@ -95,8 +96,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
     crud,
   );
   const measurement = createMeasurement(ctx, services);
-  const pointer = createPointer(ctx, services, chrome, measurement);
-  const drafts = createDrafts(ctx, services, annotations);
+  const pointer = createPointer(ctx, services, chrome, measurement, drafts);
   const markup = createMarkupWrites(ctx, services, annotations);
   const scripts = createScriptEffects(ctx, services);
 
