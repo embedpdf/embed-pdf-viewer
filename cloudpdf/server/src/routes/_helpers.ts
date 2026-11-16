@@ -152,6 +152,28 @@ export async function readAtPins<T>(input: {
 }
 
 /**
+ * A read of a stored version has no token: the version never changes. What
+ * the server computed the answer with is in the query instead (`engine`), and
+ * follows the rule a token's does. Under another value than this server's, or
+ * under none, the answer goes out with `no-store` and the current value in
+ * {@link ENGINE_HEADER}, and is never refused. Call it before the cache
+ * header is set: {@link setImmutableCache} keeps `no-store` once that header
+ * is there.
+ */
+export async function answerAtEngine(input: {
+  documentService: { readonly engineValues: { of(kind: CachedReadKind): Promise<string> } };
+  reply: FastifyReply;
+  kind: CachedReadKind;
+  /** The value the request names; `undefined` when it names none. */
+  requested: string | undefined;
+}): Promise<void> {
+  const engine = await input.documentService.engineValues.of(input.kind);
+  if (input.requested === engine) return;
+  input.reply.header(ENGINE_HEADER, engine);
+  setNoStore(input.reply);
+}
+
+/**
  * The body of every error response (`ErrorResponseSchema`): a code from the
  * one list, the message, and what the code carries.
  */

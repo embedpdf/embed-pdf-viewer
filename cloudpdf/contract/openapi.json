@@ -5178,8 +5178,8 @@
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "analysis",
         "x-docs-title": "Analyze version history",
-        "summary": "What changed between two revisions of one of a layer's versions (immutable).",
-        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.",
+        "summary": "What changed between two revisions of one of a layer's versions.",
+        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller. A version never changes, but the rules that judge it can: with `engine`, the `analysis` value of the layer's head, a settled answer is `immutable`. Without it, or with another value, the answer is this server's own, with `no-store` and the current value in `EmbedPDF-Engine`.",
         "security": [
           {
             "apiToken": []
@@ -5258,12 +5258,12 @@
             }
           },
           {
-            "name": "policy",
+            "name": "engine",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 1
+              "type": "string",
+              "description": "The `analysis` engine value from the layer's head (`engine.analysis`): the rules the answer is judged with. With it, a settled answer is cached."
             }
           },
           {

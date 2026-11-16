@@ -59,13 +59,23 @@ afterAll(async () => {
   await teardownDbSeededFixture(fx);
 });
 
+/** Opens a layer, and keeps the URL of every request the engine sends with how its answer may be cached. */
 async function openLayer(layer: string, docId = DOC_ID) {
+  const requests: { url: string; cacheControl: string | null }[] = [];
   const engine = cloudEngine({
     baseUrl: fx!.baseUrl,
     token: docScopedToken(fx!, TENANT_ID, docId, ['*'], layer),
+    fetch: async (input, init) => {
+      const response = await fetch(input, init);
+      requests.push({
+        url: input instanceof Request ? input.url : String(input),
+        cacheControl: response.headers.get('cache-control'),
+      });
+      return response;
+    },
   });
   const doc = await engine.open({ kind: 'id', id: docId, layerName: layer });
-  return { engine, doc };
+  return { engine, doc, requests };
 }
 
 async function fetchJson<T>(path: string, layer: string, docId = DOC_ID): Promise<T> {
@@ -272,6 +282,18 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       const history = await alice.doc.signatures.analyze({ since: { signatureIndex: 0 } });
       expect(history.verdict).toBe('unchanged');
       expect(history.basis.version.sha256).toBe(result.version.sha256);
+      // The request names the server's `analysis` engine value, so the answer is cached, and
+      // it names no policy number: the rules are the server's.
+      const head = await fetchJson<{ engine: { analysis: string } }>(
+        `/v1/docs/${DOC_ID}/layers/alice/head`,
+        'alice',
+      );
+      const asked = alice.requests.filter(({ url }) => url.includes('/versions/analysis/'));
+      expect(asked).toHaveLength(1);
+      const query = new URL(asked[0]!.url).searchParams;
+      expect(query.get('engine')).toBe(head.engine.analysis);
+      expect(query.has('policy')).toBe(false);
+      expect(asked[0]!.cacheControl).toContain('immutable');
 
       // Bob is still over the upload, owning only the plane he wrote, and can sign.
       const bobManifest = await fetchJson<{ baseSha256: string; scopes: Record<string, string> }>(
@@ -318,6 +340,11 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       });
       expect(analysis.basis.source).toBe('working-copy');
       expect(analysis.verdict).toBe('permitted');
+      // Its token names the engine value too, and no policy number.
+      const asked = alice.requests.filter(({ url }) => url.includes('/signatures/analysis@'));
+      expect(asked).toHaveLength(1);
+      expect(decodeURIComponent(asked[0]!.url)).toMatch(/engine=[^,]+/);
+      expect(asked[0]!.url).not.toContain('policy');
 
       // A second signature needs a second field; preparing on the signed one is refused.
       expect(

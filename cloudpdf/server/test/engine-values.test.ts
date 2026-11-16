@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { SIGNATURE_POLICY_VERSION } from '@embedpdf/engine-core/runtime';
 import { CACHED_READ_KINDS } from '@embedpdf/engine-core/wire';
 import { engineValuesFor } from '../src/services/EngineValues';
 import {
@@ -23,6 +24,25 @@ describe('engine values', () => {
     const moved = CACHED_READ_KINDS.filter((kind) => before[kind] !== after[kind]).sort();
     expect(moved).toEqual(['annotationAppearances', 'fonts', 'render', 'widgetAppearances']);
     expect(engineValuesFor('a1b2c3')).toEqual(before);
+  });
+
+  test('the rules that judge what a signature allows move the analysis value, and no other', async () => {
+    const before = engineValuesFor('a1b2c3');
+    vi.resetModules();
+    vi.doMock('@embedpdf/engine-core/runtime', async (original) => ({
+      ...(await original<typeof import('@embedpdf/engine-core/runtime')>()),
+      SIGNATURE_POLICY_VERSION: SIGNATURE_POLICY_VERSION + 1,
+    }));
+    try {
+      const raised = await import('../src/services/EngineValues');
+      const after = raised.engineValuesFor('a1b2c3');
+      expect(CACHED_READ_KINDS.filter((kind) => before[kind] !== after[kind])).toEqual([
+        'analysis',
+      ]);
+    } finally {
+      vi.doUnmock('@embedpdf/engine-core/runtime');
+      vi.resetModules();
+    }
   });
 });
 

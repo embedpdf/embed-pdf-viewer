@@ -1,7 +1,6 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { TokenPin } from './cachedReads';
 import type { ModificationLevel } from '../signature/types';
-import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -879,6 +878,8 @@ export interface AnalysisQueryInput {
   until?: number;
   exploratoryLevel?: ModificationLevel;
   detail?: 'summary' | 'full';
+  /** The server's `analysis` engine value (`/head`): with it the answer can be cached. */
+  engine?: string;
 }
 
 export function analysisQueryString(query: AnalysisQueryInput): string {
@@ -889,9 +890,9 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
   if (query.until !== undefined) params.set('until', String(query.until));
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
   if (query.detail !== undefined) params.set('detail', query.detail);
-  // The judging policy version: a cache key on the immutable version URL, so
-  // a policy bump never serves a verdict judged under another policy.
-  params.set('policy', String(SIGNATURE_POLICY_VERSION));
+  // What the server computes the answer with, as a token names it: a version never changes,
+  // but the rules that judge it can.
+  if (query.engine !== undefined) params.set('engine', query.engine);
   return params.toString();
 }
 

@@ -2348,7 +2348,11 @@ export const LayerAnalysisQuerySchema = z
   });
 export type LayerAnalysisQuery = z.infer<typeof LayerAnalysisQuerySchema>;
 
-/** Version analysis query: as the layer's, plus `until` (a revision index; default the last). */
+/**
+ * Version analysis query: as the layer's, plus `until` (a revision index; default the last) and
+ * `engine`. A query parameter this schema doesn't name is dropped, so the `policy` a client of
+ * 3.0 to 3.2 sends is read past.
+ */
 export const VersionAnalysisQuerySchema = z
   .object({
     'since.signature': optionalIndex,
@@ -2356,8 +2360,12 @@ export const VersionAnalysisQuerySchema = z
     until: optionalIndex,
     level: ModificationLevelSchema.optional(),
     detail: AnalysisDetailSchema.optional(),
-    /** The judging policy version the caller expects — a cache key, not an input (version responses are immutable). */
-    policy: optionalIndex,
+    /**
+     * The `analysis` engine value the caller read from `/head`: what the answer is computed
+     * with besides the file. The answer is cached under the server's own value, and never
+     * refused under another or under none.
+     */
+    engine: z.string().optional(),
   })
   .refine((q) => (q['since.signature'] === undefined) !== (q['since.revision'] === undefined), {
     message: 'exactly one of since.signature / since.revision is required',

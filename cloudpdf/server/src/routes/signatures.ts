@@ -17,7 +17,7 @@
  *     GET  …/layers/:layerName/versions/signatures/:sha256
  *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents
  *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm
- *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=
+ *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=&engine=
  *     GET  …/layers/:layerName/versions/download/:sha256
  *     GET  …/layers/:layerName/versions/revisions/:sha256/:index
  *
@@ -58,6 +58,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
   abortSignalOf,
+  answerAtEngine,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   readAtPins,
@@ -173,7 +174,6 @@ export async function registerSignatureRoutes(
       permissionFlags,
     );
     const requested = parseTokenOrInvalidArg(decodeAnalysisToken, token, 'analysis token');
-    requireServedPolicy(reply, requested.policyVersion);
     const input: AnalyzeInput = {
       since: requested.since,
       until: 'working-copy',
@@ -622,7 +622,6 @@ export async function registerSignatureRoutes(
       req.query,
       'query',
     );
-    requireServedPolicy(reply, query.policy);
     const input = analyzeInputFromQuery(
       query,
       query.until !== undefined ? { revisionIndex: query.until } : 'persisted',
@@ -645,6 +644,12 @@ export async function registerSignatureRoutes(
     if (payload.tag !== 'signatures.analyze') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
     }
+    await answerAtEngine({
+      documentService: service,
+      reply,
+      kind: 'analysis',
+      requested: query.engine,
+    });
     return finishAnalysisReply(reply, payload.analysis);
   });
 
@@ -732,40 +737,20 @@ function fieldRefFromPath(fieldKey: string): FormFieldRef {
 }
 
 /**
- * The policy version a caller puts in an analysis URL is the cache key that
- * keeps a verdict judged under one set of rules from being served under
- * another. A request for a policy this server does not run is refused, never
- * answered with the current policy under the requested key.
- */
-function requireServedPolicy(reply: FastifyReply, requested: number | undefined): void {
-  if (requested !== undefined && requested !== SIGNATURE_POLICY_VERSION) {
-    setNoStore(reply);
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `signature policy ${requested} is not served here (current=${SIGNATURE_POLICY_VERSION})`,
-    );
-  }
-}
-
-/**
  * Cache an analysis only when it is a settled, authoritative verdict judged
- * under this server's policy: a worker at another policy (a mixed fleet), an
- * exploratory run, or a verdict that could not be established must not live
- * for a year under an immutable URL.
+ * under this server's rules. An exploratory run, a verdict that could not be
+ * established, and one a worker judged under other rules (a fleet in the
+ * middle of a deploy) must not live for a year under an immutable URL. Such an
+ * answer still goes out: it says itself which rules judged it
+ * (`policyVersion`).
  */
 function finishAnalysisReply(reply: FastifyReply, analysis: ChangeAnalysis): ChangeAnalysis {
-  if (analysis.policyVersion !== SIGNATURE_POLICY_VERSION) {
-    setNoStore(reply);
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `analysis judged under policy ${analysis.policyVersion}, this server serves ${SIGNATURE_POLICY_VERSION}`,
-    );
-  }
-  if (analysis.mode === 'exploratory' || analysis.verdict === 'indeterminate') {
-    setNoStore(reply);
-  } else {
-    setImmutableCache(reply);
-  }
+  const settled =
+    analysis.policyVersion === SIGNATURE_POLICY_VERSION &&
+    analysis.mode !== 'exploratory' &&
+    analysis.verdict !== 'indeterminate';
+  if (settled) setImmutableCache(reply);
+  else setNoStore(reply);
   return analysis;
 }
 
