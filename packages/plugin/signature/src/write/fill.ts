@@ -48,7 +48,7 @@ export function createFills(
     mark: Mark,
     options?: OperationOptions,
   ): Promise<void> => {
-    authority.assertAllowedField('fill', field, 'signature.fillField');
+    authority.assertAllowedField('sign', field, 'signature.fillField');
     return withBusy(async () => {
       await setAppearance(field, await markBytes(mark), options);
       target.clearIfTarget(field);
@@ -57,7 +57,7 @@ export function createFills(
   };
 
   const clearField = async (field: FormFieldRef, options?: OperationOptions): Promise<void> => {
-    authority.assertAllowedField('fill', field, 'signature.clearField');
+    authority.assertAllowedField('sign', field, 'signature.clearField');
     return withBusy(async () => {
       await setAppearance(field, blankPagePdf(), options);
       cleared.emit({ field });

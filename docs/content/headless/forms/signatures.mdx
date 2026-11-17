@@ -329,9 +329,10 @@ a normal PDF, so Acrobat can open it too.
 
 ## "Sign here" in a form
 
-With the [form layer](../forms), an empty signature field shows a "sign here" button. Clicking it makes
-the field the **target**: the next mark the person picks goes there. A signed field, clicked, asks your
-UI to show its details:
+With the [form layer](../forms), an empty signature field can be clicked. The layer draws no "sign
+here" text in it: the field is a button with nothing in it, named after the field for screen readers.
+Clicking it makes the field the **target**: the next mark the person picks goes there. A signed field,
+clicked, asks your UI to show its details:
 
 ```ts
 signature.setTarget(toFieldRef('approval')); // the next mark goes here; null clears
@@ -429,11 +430,12 @@ for the last three.
 | `doc.sign`         | Signing                                     | `signature.canSign(field)`    |
 | `doc.sign`         | Adding validation data and a document timestamp | `signature.canAddValidationInfo()` |
 | `doc.sign.certify` | Signing a certification                     | `signature.canCertify()`      |
-| `doc.forms.fill`   | Drawing a mark into a field without signing | `signature.canFill(field)`    |
+| `doc.sign`         | Drawing a mark into a field without signing | `signature.canFill(field)`    |
 | `doc.download`     | Reading the exact bytes a signature covers  | `signature.canReadRevision()` |
 
-A user with a `fields:sign` (`fields:fill`) permission for one group signs (fills in) that group's
-fields only, so the checks take the field. See [Signers and groups](/docs/engine/forms/groups). On a
+A mark in a signature field is its signer's to place, so drawing one takes what signing takes. A user
+with a `fields:sign` permission for one group signs that group's fields only, and draws marks only into
+them, so the checks take the field. See [Signers and groups](/docs/engine/forms/groups). On a
 signed document, the engine also refuses what its signatures forbid.
 
 ## Good to know

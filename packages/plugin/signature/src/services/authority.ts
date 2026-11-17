@@ -54,7 +54,8 @@ export function createAuthority(ctx: SignatureContext, { form }: Pick<SignatureS
     timestampTrust,
     assertAllowedField,
     canSign: (field: FormFieldRef) => allowsField('sign', field),
-    canFill: (field: FormFieldRef) => allowsField('fill', field),
+    // A mark in a signature field is its signer's to place: what the engine asks for.
+    canFill: (field: FormFieldRef) => allowsField('sign', field),
     canCertify: () => settings.get().allowCertify && ctx.allows('doc.sign.certify'),
     canReadRevision: () => ctx.allows('doc.download'),
     /** Whether validation data can be added: someone to ask, someone to trust, and `doc.sign`. */

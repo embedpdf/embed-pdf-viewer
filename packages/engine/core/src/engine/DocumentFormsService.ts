@@ -201,8 +201,9 @@ export interface DocumentFormsService {
   /**
    * Draw a PDF page into every widget of an unsigned signature field — the
    * visual "sign" of a viewer that has no signer. The field's value stays
-   * empty and nothing is sealed; a signed field is refused. Gated by
-   * `doc.forms.fill`. Emits `forms.updated`.
+   * empty and nothing is sealed; a signed field is refused. The mark is the
+   * field's signer's to place: gated by `doc.sign`, or `fields:sign` for the
+   * field's group. Emits `forms.updated`.
    */
   setSignatureAppearance(
     ref: FormFieldRef,
