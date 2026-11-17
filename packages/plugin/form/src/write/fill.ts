@@ -35,7 +35,7 @@ import { fieldByKey, fieldKeyOf, type FieldIndex } from '../model';
 import type { FormScriptResult, FormScripts } from '../scripting/controller';
 import { scriptError } from '../scripting/results';
 import type { FormContext, FormServices } from '../services';
-import { fieldsNamedBy, predictFormOp, undoLookOf, withFieldsFrom } from '../sync/predict';
+import { fieldsNamedBy, withFieldsFrom } from '../sync/predict';
 
 /** The scripts a fill runs before it is sent, when the document's scripts run. */
 export type FillScripts =
@@ -102,7 +102,12 @@ const sameValue = (left: FormField | null, right: FormField | null): boolean =>
 
 export function createFill(
   ctx: FormContext,
-  { fields, scripting, enqueue }: Pick<FormServices, 'fields' | 'scripting' | 'enqueue'>,
+  {
+    fields,
+    predictor,
+    scripting,
+    enqueue,
+  }: Pick<FormServices, 'fields' | 'predictor' | 'scripting' | 'enqueue'>,
 ) {
   const labelOf = (request: FillRequest, index: FieldIndex, ops: readonly ChangeOp[]) =>
     request.label ?? { key: 'form.fill', count: fieldsNamedBy(index, ops).length };
@@ -110,10 +115,10 @@ export function createFill(
   /** Step 1: what the user did shows at once. */
   const begin = (request: FillRequest): Begun => {
     const before = fields.view();
-    const shown = request.ops.reduce(predictFormOp, before);
+    const shown = request.ops.reduce(predictor.predict, before);
     if (request.ops.length === 0) return { request, before, shown, hold: null };
     const hold = ctx.changes.hold(labelOf(request, before, request.ops));
-    hold.set(request.ops, undoLookOf(before, request.ops));
+    hold.set(request.ops, predictor.undoLook(before, request.ops));
     return { request, before, shown, hold };
   };
 
@@ -144,11 +149,15 @@ export function createFill(
     }
     if (!hold) {
       const label = labelOf(request, fields.view(), ops);
-      const change = ctx.changes.stage({ label, ops, undo: undoLookOf(baseOf(begun), ops) });
+      const change = ctx.changes.stage({
+        label,
+        ops,
+        undo: predictor.undoLook(baseOf(begun), ops),
+      });
       return { script, changes: [change], after: fields.view() };
     }
     if (hold.open) {
-      hold.set(ops, undoLookOf(baseOf(begun), ops));
+      hold.set(ops, predictor.undoLook(baseOf(begun), ops));
       const change = hold.send();
       return { script, changes: change ? [change] : [], after: fields.view() };
     }
@@ -159,7 +168,9 @@ export function createFill(
     const changes = sent ? [sent] : [];
     if (rest.length > 0) {
       const label = labelOf(request, fields.view(), rest);
-      changes.push(ctx.changes.stage({ label, ops: rest, undo: undoLookOf(fields.view(), rest) }));
+      changes.push(
+        ctx.changes.stage({ label, ops: rest, undo: predictor.undoLook(fields.view(), rest) }),
+      );
     }
     return { script, changes, after: fields.view() };
   };

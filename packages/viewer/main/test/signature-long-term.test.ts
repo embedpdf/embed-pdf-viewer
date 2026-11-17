@@ -36,7 +36,8 @@ const MARK = readFileSync(
  * The viewer over the signature fixture, signing with a key a throwaway certificate authority
  * issued. `?revocation=` picks where the answers come from: the authority itself, or a source
  * nobody answers through; `?documentTimestamp` adds a document timestamp; `?mode=` is the
- * signature mode and `?locale=` the viewer's language.
+ * signature mode, `?locale=` the viewer's language and `?scope=` what the session may do, as a
+ * comma-separated list.
  */
 const page = `<!doctype html><html><head><meta charset="utf-8">
 <title>long-term validation</title>
@@ -72,6 +73,7 @@ const page = `<!doctype html><html><head><meta charset="utf-8">
     src: bytes('${SIGNATURE_FIELD}'),
     theme: 'light',
     ...(query.get('locale') ? { locale: query.get('locale') } : {}),
+    ...(query.get('scope') ? { scope: query.get('scope').split(',') } : {}),
     plugins: {
       signature: {
         signingKey: signer,
@@ -218,38 +220,49 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))(
       await tab.close();
     });
 
-    it('the sign dialog says when the verification information could not be added', async () => {
-      const signThroughDialog = async (tab: Page): Promise<void> => {
-        await tab.evaluate(
-          (field) => window.element.viewer.get('signature').placeMark(window.mark, { field }),
-          FIELD,
-        );
-        await tab.waitForFunction(
-          () => !!window.element.shadowRoot!.querySelector('[role="dialog"]'),
-          null,
-          { timeout: 20_000 },
-        );
-        await tab.evaluate(() => {
-          const dialog = window.element.shadowRoot!.querySelector('[role="dialog"]')!;
-          // The last button seals; the one before it only draws the mark in.
-          [...dialog.querySelectorAll('button')].at(-1)!.click();
-        });
-      };
-      const dialogShows = (tab: Page, text: string): Promise<unknown> =>
-        tab.waitForFunction(
-          (wanted) =>
-            window.element
-              .shadowRoot!.querySelector('[role="dialog"]')
-              ?.textContent?.includes(wanted),
-          text,
-          { timeout: 20_000 },
-        );
-      const isSigned = (tab: Page): Promise<boolean> =>
-        tab.evaluate(
-          (field) => window.element.viewer.get('signature').getSignature(field)?.signed === true,
-          FIELD,
-        );
+    const signThroughDialog = async (tab: Page): Promise<void> => {
+      await tab.evaluate(
+        (field) => window.element.viewer.get('signature').placeMark(window.mark, { field }),
+        FIELD,
+      );
+      await tab.waitForFunction(
+        () => !!window.element.shadowRoot!.querySelector('[role="dialog"]'),
+        null,
+        { timeout: 20_000 },
+      );
+      await tab.evaluate(() => {
+        const dialog = window.element.shadowRoot!.querySelector('[role="dialog"]')!;
+        // The last button seals; the one before it only draws the mark in.
+        [...dialog.querySelectorAll('button')].at(-1)!.click();
+      });
+    };
+    const dialogShows = (tab: Page, text: string): Promise<unknown> =>
+      tab.waitForFunction(
+        (wanted) =>
+          window.element
+            .shadowRoot!.querySelector('[role="dialog"]')
+            ?.textContent?.includes(wanted),
+        text,
+        { timeout: 20_000 },
+      );
+    const isSigned = (tab: Page): Promise<boolean> =>
+      tab.evaluate(
+        (field) => window.element.viewer.get('signature').getSignature(field)?.signed === true,
+        FIELD,
+      );
 
+    it('the sign dialog says so when the session may not add the verification information', async () => {
+      // Signing fields is not `doc.sign`, which storing the validation data takes: the sealing
+      // then reports nothing added and nothing failed, and the signer still has to be told.
+      const tab = await open('?mode=ask&scope=doc.open,doc.render,doc.forms.read,fields:sign:all');
+      await signThroughDialog(tab);
+      await dialogShows(tab, 'Signed. The verification information could not be added.');
+      expect(await isSigned(tab)).toBe(true);
+      expect((await longTermOf(tab)).enabled).toBe(false);
+      await tab.close();
+    });
+
+    it('the sign dialog says when the verification information could not be added', async () => {
       const english = await open('?revocation=silent&mode=ask');
       await signThroughDialog(english);
       await dialogShows(english, 'Signed. The verification information could not be added.');

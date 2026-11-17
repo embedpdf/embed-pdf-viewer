@@ -9,6 +9,7 @@ import type {
   SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 import {
+  authorizeCapability,
   authorizeFieldWrite,
   EngineError,
   EngineErrorCode,
@@ -166,7 +167,10 @@ export class SignatureMutator {
     const groupId = field
       ? groupOfField(this.runtime, this.session, field.fieldObjectNumber)
       : null;
-    authorizeFieldWrite(authority, groupId, 'sign');
+    // A timestamp with no field is the document's to sign, not a group's: a caller whose
+    // signing is narrowed to a group's fields still adds it, when they hold `doc.sign`.
+    if (field) authorizeFieldWrite(authority, groupId, 'sign');
+    else authorizeCapability(authority, 'doc.sign');
     const lock: FieldLockSpec | undefined =
       input.lock ??
       (groupId !== null
@@ -276,6 +280,7 @@ export class SignatureMutator {
       this.session.pendingSigning = {
         prepared,
         fieldObjectNumber,
+        madeField: made !== null,
         saved,
         contentsOffset: sealed.contentsOffset,
         contentsHexLength: sealed.contentsHexLength,
@@ -311,11 +316,16 @@ export class SignatureMutator {
       }
       throw new EngineError(EngineErrorCode.NotFound, `no pending signing '${input.signingId}'`);
     }
-    authorizeFieldWrite(
-      authority,
-      groupOfField(this.runtime, this.session, pending.fieldObjectNumber),
-      'sign',
-    );
+    // The right `prepare` took: the document's for a field made for a timestamp, else the field's.
+    if (pending.madeField) {
+      authorizeCapability(authority, 'doc.sign');
+    } else {
+      authorizeFieldWrite(
+        authority,
+        groupOfField(this.runtime, this.session, pending.fieldObjectNumber),
+        'sign',
+      );
+    }
     if (!sameVersion(pending.prepared.expectedVersion, input.expectedVersion)) {
       throw new EngineError(
         EngineErrorCode.SigningVersionMismatch,

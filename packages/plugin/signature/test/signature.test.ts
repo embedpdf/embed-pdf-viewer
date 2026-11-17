@@ -237,8 +237,9 @@ describe('settings, permissions and cancelling', () => {
       await expect(
         signature.sign({ field: SIG, mark: { assetId: 'people:signature' } }),
       ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.sign' });
+      // A mark in a signature field is its signer's to place: it takes what signing takes.
       await expect(signature.fillField(SIG, { assetId: 'people:signature' })).rejects.toMatchObject(
-        { code: 'permission-denied', permission: 'doc.forms.fill' },
+        { code: 'permission-denied', permission: 'doc.sign' },
       );
       await expect(signature.readRevision({ revisionIndex: 0 })).rejects.toMatchObject({
         code: 'permission-denied',
@@ -247,6 +248,44 @@ describe('settings, permissions and cancelling', () => {
       expect(signature.isBusy()).toBe(false);
     } finally {
       await doc.close();
+    }
+  });
+
+  it('draws a mark with the right to sign the field, not the right to fill fields in', async () => {
+    // Filling in only: the engine refuses a mark there, so the plugin says no before it asks.
+    const filler = await engine.open(
+      { kind: 'bytes', id: `sig-plugin-${++openCount}`, bytes: base },
+      { scope: ['doc.open', 'doc.render', 'doc.forms.read', 'doc.forms.fill'] },
+    );
+    try {
+      const { signature } = makeSignature(filler, {}, { stamp: stampStub(artwork) });
+      expect(signature.canFill(SIG)).toBe(false);
+      await expect(signature.fillField(SIG, { assetId: 'people:signature' })).rejects.toMatchObject(
+        { code: 'permission-denied', permission: 'doc.sign' },
+      );
+      await expect(signature.clearField(SIG)).rejects.toMatchObject({
+        code: 'permission-denied',
+        permission: 'doc.sign',
+      });
+    } finally {
+      await filler.close();
+    }
+    // Signing only: the mark goes in, and comes out again.
+    const signer = await engine.open(
+      { kind: 'bytes', id: `sig-plugin-${++openCount}`, bytes: base },
+      { scope: ['doc.open', 'doc.render', 'doc.forms.read', 'doc.sign'] },
+    );
+    try {
+      const { signature } = makeSignature(signer, {}, { stamp: stampStub(artwork) });
+      await signature.refresh();
+      expect(signature.canFill(SIG)).toBe(true);
+      await signature.fillField(SIG, { assetId: 'people:signature' });
+      const marked = (await signer.forms.list()).widgets.filter((widget) => widget.hasMark);
+      expect(marked).toHaveLength(1);
+      await signature.clearField(SIG);
+      expect((await signer.signatures.list()).signatures[0]!.signed).toBe(false);
+    } finally {
+      await signer.close();
     }
   });
 

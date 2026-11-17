@@ -269,6 +269,39 @@ export function runFieldGroupsConformance(
       });
     });
 
+    test('a signer who also holds doc.sign adds a document timestamp, and signs no more fields for it', async () => {
+      // The right to sign a group's fields is not the right to add a timestamp to the document.
+      await as('buyer', async (doc) => {
+        const refused = await refusal(doc.signatures.prepare({ kind: 'timestamp' }));
+        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+      });
+      const { scope, identity } = FIELD_GROUP_TOKENS.buyer;
+      const doc = await options.open(engine, [...scope, 'doc.sign'], identity);
+      try {
+        // The timestamp names no field, so it is the document's to sign: `doc.sign` gives it,
+        // though the same caller's field signing is narrowed to one group.
+        const prepared = await doc.signatures.prepare({ kind: 'timestamp' });
+        expect(prepared.subFilter).toBe('ETSI.RFC3161');
+        if (options.completesSignings === false) {
+          await doc.signatures.cancel(prepared.signingId);
+        } else {
+          const result = await doc.signatures.complete({
+            signingId: prepared.signingId,
+            cms: PLACEHOLDER_CMS,
+            expectedVersion: prepared.expectedVersion,
+          });
+          expect(result.signature.kind).toBe('timestamp');
+        }
+        // `doc.sign` widens nothing else: the other group's field is still not theirs.
+        const other = await refusal(doc.signatures.prepare({ field: field('seller_sig') }));
+        expect(codeOf(other)).toBe(EngineErrorCode.Forbidden);
+        expect(doc.security.allowsField('sign', { groupId: 'seller' })).toBe(false);
+        expect(doc.security.allowsField('sign', { groupId: null })).toBe(false);
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('signing a grouped field locks the rest of its group, for everyone', async () => {
       if (options.completesSignings === false) return;
       // The lock follows the field's group, whoever signs: here a token that

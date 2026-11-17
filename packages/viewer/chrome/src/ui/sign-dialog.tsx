@@ -14,6 +14,7 @@ import { useT } from '@embedpdf/react/i18n';
 import { useStampAssetPreviewUrl } from '@embedpdf/react/stamp';
 import { useSignature, type FormFieldRef, type Mark } from '@embedpdf/react/signature';
 import { Dialog } from './dialog';
+import { lacksValidationInfo, validationInfoReason } from './signature-result';
 
 /**
  * The words for a signing that failed at its timestamp, or null for any other failure. An
@@ -71,10 +72,10 @@ export function SignDialog() {
             ? { certify: { permission: Number(signKind.slice(-1)) as 1 | 2 | 3 } }
             : {}),
         });
-        if (result.validationInfoError) {
+        if (lacksValidationInfo(signature, result)) {
           console.error(
             '[embedpdf] verification information not added:',
-            result.validationInfoError,
+            validationInfoReason(result),
           );
           setNotice(t('demo.signedWithoutValidationInfo'));
           return;

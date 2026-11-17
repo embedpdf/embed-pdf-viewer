@@ -11,6 +11,7 @@ import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 
 import { canonicalKey, type FieldIndex, type FieldKey } from '../model';
 import { createFieldsMirror } from '../sync/fields';
+import { createFormPredictor, type FormPredictor } from '../sync/predict';
 import type { FormContext } from './context';
 import { createCursor, type FormCursor } from './cursor';
 import { createDesign, type FormDesign } from './design';
@@ -26,6 +27,11 @@ export type { FormContext } from './context';
 
 export interface FormServices {
   readonly fields: Mirror<FieldIndex>;
+  /**
+   * How this session's changes show before the engine answers. A field placed without a group
+   * shows in the session's own, where the engine puts it.
+   */
+  readonly predictor: FormPredictor;
   /** Who may fill in which field. */
   readonly rights: FillRights;
   readonly events: FormEvents;
@@ -53,11 +59,15 @@ export interface FormServices {
 export function createServices(ctx: FormContext): FormServices {
   const siblings = resolveSiblings(ctx);
   const events = createEvents(ctx);
-  const fields = createFieldsMirror(ctx, events);
+  const predictor = createFormPredictor(() => ({
+    groupId: ctx.doc.security.identity?.groupId ?? null,
+  }));
+  const fields = createFieldsMirror(ctx, events, predictor);
   const design = createDesign(ctx, siblings);
   const formatted = createFormattedTexts(ctx, fields);
   return {
     fields,
+    predictor,
     rights: createFillRights(ctx, fields),
     events,
     cursor: createCursor(ctx, fields, events),

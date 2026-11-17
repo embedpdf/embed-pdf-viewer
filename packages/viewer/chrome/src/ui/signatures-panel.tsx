@@ -32,6 +32,7 @@ import {
 } from '@embedpdf/react/signature';
 import { useSignatureSettings } from '../config-context';
 import { Icon } from './icons';
+import { lacksValidationInfo, validationInfoReason } from './signature-result';
 import { restoreStampLibrariesOnce } from './stamp-store';
 import { TooltipButton } from './tooltip';
 
@@ -88,10 +89,10 @@ export function SignaturesPanel() {
         .placeMark({ assetId: asset.id }, { field: target })
         .then((placed) => {
           // Signed, without the verification information the settings ask for: say so here.
-          if (placed.status === 'signed' && placed.result.validationInfoError) {
+          if (placed.status === 'signed' && lacksValidationInfo(signature, placed.result)) {
             console.error(
               '[embedpdf] verification information not added:',
-              placed.result.validationInfoError,
+              validationInfoReason(placed.result),
             );
             setError(t('demo.signedWithoutValidationInfo'));
           }

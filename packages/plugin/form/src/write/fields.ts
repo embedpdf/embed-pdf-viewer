@@ -34,7 +34,6 @@ import type {
 import { fieldByRef, fieldKeyOf, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { createObjectNumbers } from '../services/object-numbers';
-import { undoLookOf } from '../sync/predict';
 import { widgetDuplicateOf, type DuplicatePlacement } from './duplicate';
 import { isMerged, nextChoiceOf } from './new-widget';
 import { nextInLine } from './next-in-line';
@@ -86,7 +85,7 @@ type ItemOf<T extends ChangeItem['type']> = Extract<ChangeItem, { type: T }>;
 
 export function createFieldWrites(
   ctx: FormContext,
-  { fields, enqueue }: Pick<FormServices, 'fields' | 'enqueue'>,
+  { fields, predictor, enqueue }: Pick<FormServices, 'fields' | 'predictor' | 'enqueue'>,
 ) {
   const numbers = createObjectNumbers(ctx);
 
@@ -101,7 +100,7 @@ export function createFieldWrites(
     ctx.changes.stage({
       label: { key: `form.${verb}` } satisfies ChangeLabel,
       ops: [op],
-      undo: undoLookOf(fields.view(), [op]),
+      undo: predictor.undoLook(fields.view(), [op]),
     });
 
   /** Stage the ops of one design verb as one change, one step of the history. */
@@ -109,7 +108,7 @@ export function createFieldWrites(
     ctx.changes.stage({
       label: { key: `form.${verb}` } satisfies ChangeLabel,
       ops: [...ops],
-      undo: undoLookOf(fields.view(), ops),
+      undo: predictor.undoLook(fields.view(), ops),
     });
 
   /** The engine's answer to a staged design change: its one item. */

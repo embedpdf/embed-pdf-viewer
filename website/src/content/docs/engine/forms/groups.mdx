@@ -127,6 +127,23 @@ apps. Name a [`lock`](/docs/engine/forms/signatures#lock-fields) to choose the f
 
 The engine doesn't order the signers. Give the seller their permissions when the buyer is done.
 
+Validation data, and the document timestamp that follows it, belong to the document and not to a
+group, so they take `doc.sign`. A signer who should leave a file that can be checked for years gets
+it beside their group:
+
+```ts
+const buyer = [
+  'doc.open',
+  'doc.render',
+  'doc.sign',
+  'fields:fill:group=buyer',
+  'fields:sign:group=buyer',
+];
+```
+
+It lets them sign nothing more. While the list has a `fields:sign` permission, that alone decides
+which fields they sign: not the seller's, and not a field in no group.
+
 ## Build the interface from it
 
 Ask before you show a control:

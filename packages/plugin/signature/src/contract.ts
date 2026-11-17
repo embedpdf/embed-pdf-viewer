@@ -389,7 +389,7 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   cancelPending(options?: OperationOptions): Promise<void>;
   /**
    * Draw a mark into a field without signing. Fires `onFilled`. Rejects
-   * `permission-denied` for a field you may not fill in (`canFill`),
+   * `permission-denied` for a field that isn't yours to sign (`canFill`),
    * `conflict` on a signed field.
    */
   fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
@@ -459,8 +459,9 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
    */
   canSign(field: FormFieldRef): boolean;
   /**
-   * Whether drawing a mark into this field without signing is allowed:
-   * `doc.forms.fill`, or a `fields:fill` permission for its group.
+   * Whether drawing a mark into this field without signing is allowed. A
+   * mark in a signature field is its signer's to place, so it takes what
+   * signing takes: `doc.sign`, or a `fields:sign` permission for its group.
    */
   canFill(field: FormFieldRef): boolean;
   /** Whether a certification may be offered: the `allowCertify` setting and `doc.sign.certify`. */
