@@ -56,6 +56,8 @@ export type SavedCandidate =
 export interface PendingSigning {
   readonly prepared: SignaturePrepared;
   readonly fieldObjectNumber: number;
+  /** The field was made on the candidate, for a document timestamp that named none. */
+  readonly madeField: boolean;
   readonly saved: SavedCandidate;
   readonly contentsOffset: number;
   readonly contentsHexLength: number;
