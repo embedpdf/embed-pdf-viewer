@@ -52,7 +52,13 @@ import {
   applyFreeTextPatch,
   isFreeTextSubtype,
 } from './writeFreeTextAnnotation';
-import { applyInkDraft, applyInkPatch, isInkSubtype } from './writeInkAnnotation';
+import {
+  applyInkDraft,
+  applyInkPatch,
+  drawInkAppearance,
+  isInkSubtype,
+  preflightInkAppearance,
+} from './writeInkAnnotation';
 import { applyLineDraft, applyLinePatch, isLineSubtype } from './writeLineAnnotation';
 import { applyLinkDraft, applyLinkPatch, isLinkSubtype } from './writeLinkAnnotation';
 import { applyPopupDraft, applyPopupPatch, isPopupSubtype } from './writePopupAnnotation';
@@ -107,6 +113,7 @@ export function preflightDraft(
   if (isRedactSubtype(draft.subtype)) {
     preflightRedactDraft(draft as RedactDraft<PdfCoordinates>);
   }
+  if (isInkSubtype(draft.subtype)) preflightInkAppearance(ctx);
 }
 
 /** Validate subtype inputs before AnnotationMutator performs any native write. */
@@ -117,6 +124,21 @@ export function preflightPatch(
   if (isStampSubtype(subtypeOf(patch))) {
     preflightStampPatch(patch as StampPatch<PdfCoordinates>, ctx);
   }
+  if (isInkSubtype(subtypeOf(patch))) preflightInkAppearance(ctx);
+}
+
+/**
+ * After the generator: a kind whose `appearance` resource is drawn over
+ * what the generator made (ink) draws it. `true` when one was drawn.
+ */
+export function drawAppearanceResource(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  subtype: string,
+  ctx?: AnnotationWriteContext,
+): boolean {
+  return isInkSubtype(subtype) && drawInkAppearance(fn, mem, annotPtr, ctx);
 }
 
 /**

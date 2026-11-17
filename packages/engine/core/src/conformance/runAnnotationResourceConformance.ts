@@ -508,6 +508,40 @@ export function runAnnotationResourceConformance(
       });
     });
 
+    test("an ink's appearance is drawn in place of its segments, on create and update", async () => {
+      await onPage('authoring', async (page) => {
+        const ink = (y: number) => ({
+          subtype: 'ink' as const,
+          strokeWidth: 4,
+          inkList: [
+            [
+              { x: 100, y },
+              { x: 180, y: y + 40 },
+              { x: 260, y },
+            ],
+          ],
+        });
+        const plain = (await page.annotations.create(ink(100))).annotation;
+        const drawn = (
+          await page.annotations.create(ink(200), { resources: { appearance: BANDS_PDF } })
+        ).annotation;
+        const plainRaster = await rasterOf(page, plain.ref);
+        const drawnRaster = await rasterOf(page, drawn.ref);
+        expect([drawnRaster.width, drawnRaster.height]).toEqual([
+          plainRaster.width,
+          plainRaster.height,
+        ]);
+        expect(maxDifference(drawnRaster, plainRaster) > 3).toBe(true);
+
+        await page.annotations.update(plain.ref, {}, { resources: { appearance: BANDS_PDF } });
+        expectSameDrawing(await rasterOf(page, plain.ref), drawnRaster);
+
+        await expect(
+          page.annotations.create(ink(300), { resources: { appearance: BANDS_PNG } }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      });
+    });
+
     test('a role the kind does not take is refused', async () => {
       await onPage('authoring', async (page) => {
         const rect: PageBox = { x: 300, y: 300, width: 60, height: 40 };
