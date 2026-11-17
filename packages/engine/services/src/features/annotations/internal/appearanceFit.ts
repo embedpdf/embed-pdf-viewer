@@ -1,4 +1,4 @@
-import type { StampFit } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, type StampFit } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readEmbedMetadataString } from './read/readEmbedMetadata';
@@ -11,7 +11,14 @@ import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './write/
  */
 export const KEY_APPEARANCE_FIT = 'AppearanceFit';
 
-const FITS: readonly string[] = ['contain', 'cover', 'fill'];
+/** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
+export const APPEARANCE_FIT_CODE: Record<StampFit, number> = {
+  contain: 0, // EPDF_STAMP_FIT_CONTAIN
+  cover: 1, // EPDF_STAMP_FIT_COVER
+  fill: 2, // EPDF_STAMP_FIT_STRETCH
+};
+
+const FITS: readonly string[] = Object.keys(APPEARANCE_FIT_CODE);
 
 /** The fit an annotation records, or `null` when it records none (or one we don't know). */
 export function readAppearanceFit(
@@ -38,4 +45,18 @@ export function writeAppearanceFit(
     fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, 'SchemaVersion', EMBD_METADATA_SCHEMA_VERSION);
   }
   writeEmbedMetadataString(fn, mem, annotPtr, KEY_APPEARANCE_FIT, fit);
+}
+
+/**
+ * Fit the drawing an annotation holds into its box again, as the box now
+ * stands and turns: a stamp's box and turn are the ones our keys record, a
+ * widget's the ones `/Rect` and `/MK /R` give.
+ */
+export function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {
+  if (!fn.EPDFAnnot_UpdateAppearanceToRect(annotPtr, APPEARANCE_FIT_CODE[fit])) {
+    throw new EngineError(
+      EngineErrorCode.Unknown,
+      'EPDFAnnot_UpdateAppearanceToRect returned false',
+    );
+  }
 }

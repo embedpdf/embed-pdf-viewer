@@ -12,7 +12,12 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readAppearanceFit, writeAppearanceFit } from '../appearanceFit';
+import {
+  APPEARANCE_FIT_CODE,
+  readAppearanceFit,
+  refitAppearance,
+  writeAppearanceFit,
+} from '../appearanceFit';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotOpacity } from './annotationWritePrimitives';
 import { drawingFor } from './stampDrawing';
@@ -20,13 +25,6 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 import { readAnnotationBox, type AnnotationBox } from '../read/readAnnotationTurn';
-
-/** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
-const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
-  contain: 0, // EPDF_STAMP_FIT_CONTAIN
-  cover: 1, // EPDF_STAMP_FIT_COVER
-  fill: 2, // EPDF_STAMP_FIT_STRETCH
-};
 
 /** The stamp's drawing: the `appearance` resource that came with the write. */
 type StampAppearance = NonNullable<WireAnnotationResources['appearance']>;
@@ -161,7 +159,7 @@ function requireStampName(name: string): void {
 }
 
 function requireStampFit(fit: StampFit): void {
-  if (STAMP_FIT_TO_CODE[fit] === undefined) {
+  if (APPEARANCE_FIT_CODE[fit] === undefined) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       `unknown stamp fit '${String(fit)}'; expected contain, cover, or fill`,
@@ -281,22 +279,13 @@ function setStampContent(
   // nothing of it stays reachable in the saved file, and a drawing other
   // stamps place is never changed.
   const drawing = drawingFor(fn, mem, target.docPtr, target.drawings, bytes, meta);
-  if (!fn.EPDFAnnot_SetStampDrawing(annotPtr, drawing, STAMP_FIT_TO_CODE[fit])) {
+  if (!fn.EPDFAnnot_SetStampDrawing(annotPtr, drawing, APPEARANCE_FIT_CODE[fit])) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampDrawing returned false');
   }
 }
 
 function setStampOpacity(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit, opacity: number): void {
-  if (!fn.EPDFAnnot_SetStampOpacity(annotPtr, STAMP_FIT_TO_CODE[fit], opacity)) {
+  if (!fn.EPDFAnnot_SetStampOpacity(annotPtr, APPEARANCE_FIT_CODE[fit], opacity)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampOpacity returned false');
-  }
-}
-
-function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {
-  if (!fn.EPDFAnnot_UpdateAppearanceToRect(annotPtr, STAMP_FIT_TO_CODE[fit])) {
-    throw new EngineError(
-      EngineErrorCode.Unknown,
-      'EPDFAnnot_UpdateAppearanceToRect returned false',
-    );
   }
 }

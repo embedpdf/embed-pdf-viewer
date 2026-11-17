@@ -47,4 +47,7 @@ runWidgetRotationConformance(runner, {
     const token = docScopedToken(fx, TENANT_ID, docId, ['*']);
     return engine.open({ kind: 'token', token });
   },
+  // The server judges a completion's CMS, so a placeholder can't complete
+  // one; the mark's fit is the worker's, which both engines share.
+  completesSignings: false,
 });
