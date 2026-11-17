@@ -72,6 +72,15 @@ function withFields(index: FieldIndex, parts: readonly FieldWithWidgets[]): Fiel
   );
 }
 
+/** What a prediction takes from the session the change is staged in. */
+export interface PredictionContext {
+  /** The session's own group, where a new field goes when its draft names none; `null` for none. */
+  readonly groupId: string | null;
+}
+
+/** No session: a new field whose draft names no group shows in none. */
+const NO_SESSION: PredictionContext = { groupId: null };
+
 /** The fields a reset of the whole form puts back: the ones that hold a value. */
 const resetTargets = (index: FieldIndex): FormField[] =>
   (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.kind));
@@ -92,19 +101,25 @@ const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbo
  * same op over the same form gives the same form, so a field keeps its object
  * while nothing about it changed.
  */
-export function predictFormOp(index: FieldIndex, op: PredictedOp): FieldIndex {
+export function predictFormOp(
+  index: FieldIndex,
+  op: PredictedOp,
+  context: PredictionContext = NO_SESSION,
+): FieldIndex {
   let byOp = predictions.get(index);
   const known = byOp?.get(op);
   if (known) return known;
-  const next = predictOnce(index, op);
+  const next = predictOnce(index, op, context);
   if (!byOp) predictions.set(index, (byOp = new WeakMap()));
   byOp.set(op, next);
   return next;
 }
 
+// Kept by form and op alone. Both belong to one session, whose context never changes, so every
+// prediction of a session has to be made with that session's context: `createFormPredictor`.
 const predictions = new WeakMap<FieldIndex, WeakMap<PredictedOp, FieldIndex>>();
 
-function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
+function predictOnce(index: FieldIndex, op: PredictedOp, context: PredictionContext): FieldIndex {
   try {
     switch (op.type) {
       case 'forms.setValue': {
@@ -134,9 +149,9 @@ function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
         return op.field ? upsertFields(restored, [op.field]) : restored;
       }
       case 'forms.create':
-        return createdField(index, op);
+        return createdField(index, op, context);
       case 'forms.copy':
-        return copiedFields(index, op);
+        return copiedFields(index, op, context);
       case 'forms.addWidget':
         return addedWidget(index, op);
       case 'forms.update': {
@@ -209,6 +224,7 @@ const sameField = (left: FormFieldRef | null, right: FormFieldRef): boolean =>
 function createdField(
   index: FieldIndex,
   op: Extract<PredictedOp, { type: 'forms.create' }>,
+  context: PredictionContext,
 ): FieldIndex {
   const placements = op.draft.widgets ?? [];
   const numbers = op.widgetObjectNumbers ?? [];
@@ -224,6 +240,8 @@ function createdField(
       page: placement.page,
       objectNumber: numbers[at]!,
     })),
+    // A draft that names no group goes in the session's own, as the engine puts it.
+    groupId: context.groupId,
   });
   // The first field of a document without a form creates its /AcroForm.
   const formed =
@@ -291,17 +309,22 @@ function copiesOf(
 function copiedFields(
   index: FieldIndex,
   op: Extract<PredictedOp, { type: 'forms.copy' }>,
+  context: PredictionContext,
 ): FieldIndex {
   let next = index;
   for (const copy of copiesOf(index, op)) {
     const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: copy.objectNumber };
     if (fieldByRef(next, ref)) continue;
-    next = createdField(next, {
-      type: 'forms.create',
-      draft: copy.draft,
-      objectNumber: copy.objectNumber,
-      widgetObjectNumbers: copy.widgetObjectNumbers,
-    });
+    next = createdField(
+      next,
+      {
+        type: 'forms.create',
+        draft: copy.draft,
+        objectNumber: copy.objectNumber,
+        widgetObjectNumbers: copy.widgetObjectNumbers,
+      },
+      context,
+    );
     const made = fieldByRef(next, ref);
     if (!made) continue;
     next = upsertWidgets(
@@ -480,12 +503,36 @@ function undoOfOp(index: FieldIndex, op: PredictedOp): PredictedOp[] {
  * op's first. Drawing only: the engine undoes a change by its own record of
  * it.
  */
-export function undoLookOf(before: FieldIndex, ops: readonly PredictedOp[]): PredictedOp[] {
+export function undoLookOf(
+  before: FieldIndex,
+  ops: readonly PredictedOp[],
+  context: PredictionContext = NO_SESSION,
+): PredictedOp[] {
   const undo: PredictedOp[][] = [];
   let current = before;
   for (const op of ops) {
     undo.push(undoOfOp(current, op));
-    current = predictFormOp(current, op);
+    current = predictFormOp(current, op, context);
   }
   return undo.reverse().flat();
+}
+
+/** The predictions of one session. */
+export interface FormPredictor {
+  /** {@link predictFormOp}, as this session's change shows. */
+  readonly predict: (index: FieldIndex, op: PredictedOp) => FieldIndex;
+  /** {@link undoLookOf}, over this session's changes. */
+  readonly undoLook: (before: FieldIndex, ops: readonly PredictedOp[]) => PredictedOp[];
+}
+
+/**
+ * The predictions of one session, whose context `session` reads. Everything in the plugin that
+ * predicts goes through it: a prediction is kept by its form and op, so one made without the
+ * session's context would be the one the view then shows.
+ */
+export function createFormPredictor(session: () => PredictionContext): FormPredictor {
+  return {
+    predict: (index, op) => predictFormOp(index, op, session()),
+    undoLook: (before, ops) => undoLookOf(before, ops, session()),
+  };
 }
