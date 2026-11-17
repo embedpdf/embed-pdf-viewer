@@ -25,6 +25,7 @@ export {
   gesturePlacement,
   isDrag,
   MIN_DRAG,
+  placedBoxFields,
   placedShape,
   resolveClickPlacement,
   type GestureForm,
@@ -187,6 +188,7 @@ export {
   rotatedHandleCursor,
   rotatedAabb,
   normalizeDeg,
+  standingRect,
   transposedAboutCenter,
   type RectHandle,
 } from './rect';
@@ -225,6 +227,7 @@ export {
   irtOf,
   kindOf,
   linkChildRects,
+  orientationPatch,
   refOf,
   shapeOf,
   styleOf,

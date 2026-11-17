@@ -7,7 +7,7 @@ import { canChangeKind, siblingKindsOf, type Annotation } from '@embedpdf/engine
 
 import { isEditableByHand } from './editable';
 import type { AnnotationKind, AnnotationProperty } from './kinds';
-import { FLAG_PROPERTIES, kindChoice } from './kinds/fields';
+import { FLAG_PROPERTIES, ORIENTATION, kindChoice } from './kinds/fields';
 import { kindOf } from './record';
 import type { Session, TextStyle } from './types';
 
@@ -81,15 +81,32 @@ function kindChoiceOf(
 }
 
 /**
+ * `properties` with a selection of widgets' Orientation after their look,
+ * before the flags: offered when every selected kind turns by quarter turns
+ * (`quarterTurns`). A tool has none: what it places reads upright.
+ */
+function withOrientation(
+  properties: readonly AnnotationProperty[],
+  kinds: readonly AnnotationKind[],
+): readonly AnnotationProperty[] {
+  if (!kinds.length || !kinds.every((kind) => kind.caps.quarterTurns)) return properties;
+  const flags = properties.findIndex((property) => property.control === 'flag');
+  const at = flags < 0 ? properties.length : flags;
+  return [...properties.slice(0, at), ORIENTATION, ...properties.slice(at)];
+}
+
+/**
  * Everything a style panel edits for the selected `annotations`: the
  * properties their kinds share (`sharedProperties`), led by the kind they can
- * become when they can (`kindChoiceOf`).
+ * become when they can (`kindChoiceOf`), with a selection of form widgets'
+ * Orientation (`withOrientation`).
  */
 export function selectionProperties(
   model: Pick<Session, 'editable'>,
   annotations: readonly Annotation[],
 ): readonly AnnotationProperty[] {
-  const shared = sharedProperties(annotations.map((annotation) => kindOf(annotation)));
+  const kinds = annotations.map((annotation) => kindOf(annotation));
+  const shared = withOrientation(sharedProperties(kinds), kinds);
   const choice = kindChoiceOf(model, annotations);
   return choice ? [choice, ...shared] : shared;
 }

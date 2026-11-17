@@ -5,7 +5,10 @@
  * and never re-derive scale.
  *
  * Where a widget is and how it looks come from the form's widget rows (`/Rect`
- * and `/MK`), identity, value and behavior from its field.
+ * and `/MK`), identity, value and behavior from its field. A widget's place is
+ * its frame, its quarter turn and the rect it stands in (`WidgetPlace`): a
+ * layer puts its control in the frame and turns it about its middle, so the
+ * control reads the way the field does.
  */
 import type {
   AnnotationRef,
@@ -16,17 +19,17 @@ import type {
 
 import {
   fieldKeyOf,
-  type Box,
   type FieldIndex,
   type FieldKey,
   type FormWidgetLook,
   type PageWidget,
   type PageWidgets,
+  type WidgetPlace,
 } from '../model';
 
-export type { Box, FormWidgetLook } from '../model';
+export type { Box, FormWidgetLook, WidgetPlace } from '../model';
 
-interface FormWidgetItemBase {
+interface FormWidgetItemBase extends WidgetPlace {
   key: FieldKey;
   /** The field this widget belongs to: what the write verbs take. */
   fieldRef: FormFieldRef;
@@ -34,8 +37,6 @@ interface FormWidgetItemBase {
   annotObjectNumber: number;
   /** The widget's annotation address (null until the engine has placed it). */
   annotationRef: AnnotationRef | null;
-  /** Where the widget is on its page. */
-  box: Box;
   /** How the widget looks in the PDF. */
   look: FormWidgetLook;
   /** A read-only field, no permission to fill, filling it turned off (`fillable`), or a write on its way: draw it, don't take input. */
@@ -99,6 +100,8 @@ export function projectWidget(
     annotationRef:
       field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber)?.ref ?? null,
     box: widget.box,
+    rotation: widget.rotation,
+    rect: widget.rect,
     look: widget.look,
     disabled: field.readOnly || !fillable,
     label: field.alternateName ?? field.name,

@@ -63,6 +63,7 @@ export function connectForm(
             cursor: tool.cursor,
             enables: [...PLACE_TAGS],
             clickCreate: tool.clickCreate,
+            upright: tool.upright,
             defaults: tool.defaults,
             // Click-first: the field a click places follows the pointer.
             ghost: true,

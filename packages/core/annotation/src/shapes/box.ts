@@ -1,9 +1,10 @@
 /**
- * The box family: squares, circles and stamps, and the kinds whose shape is
- * their `rect` (note and attachment icons, links, widgets, an area
+ * The box family: squares, circles, stamps and form widgets, and the kinds
+ * whose shape is their `rect` (note and attachment icons, links, an area
  * redaction). Its shape is the engine's own fields: the box before any turn
  * (`box`, or `rect` for a kind that never turns) and the turn about the box's
- * middle (`rotation`, degrees clockwise).
+ * middle (`rotation`, degrees clockwise). A widget's box is the frame its
+ * contents are laid out in, and its turn a quarter turn (`/MK /R`).
  *
  * A cloudy border reaches out from the box, as the engine draws it: the box
  * is where the bumps start, and the engine's `rect` takes them in. The
@@ -29,6 +30,7 @@ import {
   rotatePoint,
   rotatedAabb,
   rotatedHandleCursor,
+  standingRect,
   transposedAboutCenter,
   type RectHandle,
 } from '../rect';
@@ -51,9 +53,15 @@ export interface BoxShape extends TurnedBox {
 }
 
 /** The kinds that keep their box in `box` and turn it by `rotation`; the rest keep it in `rect`. */
-const TURNING_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'stamp']);
+const TURNING_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'stamp', 'widget']);
 
-type TurningAnnotation = Extract<Annotation, { subtype: 'square' | 'circle' | 'stamp' }>;
+type TurningAnnotation = Extract<Annotation, { subtype: 'square' | 'circle' | 'stamp' | 'widget' }>;
+
+/**
+ * The kinds whose drawing reads one way, so a box placed by an upright tool
+ * keeps its turn: a stamp's image, and a widget's contents.
+ */
+const READS_ONE_WAY: ReadonlySet<string> = new Set(['stamp', 'widget']);
 
 /** Whether a box kind draws the ellipse in its box: a circle, and a radio button (the engine draws one round). */
 const drawsEllipse = (annotation: Annotation): boolean =>
@@ -65,20 +73,27 @@ function readBox(annotation: Annotation): BoxShape {
   if (!TURNING_KINDS.has(annotation.subtype)) {
     return { kind: 'box', box: annotation.rect, rotation: 0, ellipse: drawsEllipse(annotation) };
   }
-  const { box, rotation } = annotation as TurningAnnotation;
-  return { kind: 'box', box, rotation: rotation ?? 0, ellipse: drawsEllipse(annotation) };
+  const { box, rect, rotation } = annotation as TurningAnnotation;
+  // A widget not yet read by the engine has no `box`: its `rect` is one, unturned.
+  return {
+    kind: 'box',
+    box: box ?? rect,
+    rotation: box ? (rotation ?? 0) : 0,
+    ellipse: drawsEllipse(annotation),
+  };
 }
 
 /**
  * A box kind's shape where a create gesture places a box. An upright tool's
  * turn (`placement.rot`, quarter turns) matters only to a drawing that reads
- * one way: a stamp's image keeps it. Every other box (a square, a circle, a
- * widget) takes the region the turned box covers, a quarter turn swapping
- * its sides, and stores no turn: it shows as the author saw it, unturned.
+ * one way: a stamp's image and a widget's contents keep it. Every other box
+ * (a square, a circle) takes the region the turned box covers, a quarter
+ * turn swapping its sides, and stores no turn: it shows as the author saw
+ * it, unturned.
  */
 function placeBox(placement: Placement, annotation: Annotation): BoxShape | null {
   if (placement.kind !== 'box') return null;
-  const keepsTurn = annotation.subtype === 'stamp';
+  const keepsTurn = READS_ONE_WAY.has(annotation.subtype);
   const quarter = placement.rot % 180 !== 0;
   return {
     kind: 'box',
@@ -112,9 +127,17 @@ function boxDrawnBounds(shape: BoxShape, stroke: Stroke): Rect {
     : shape.box;
 }
 
-/** The upright page box around what it paints: what it draws, turned about the box's middle. */
+/**
+ * The upright page box around what it paints: what it draws, turned about the
+ * box's middle. A box that draws inside itself stands exactly where the
+ * engine states it at a quarter turn (`standingRect`): its sides swapped,
+ * with no rounding.
+ */
 function boxRect(shape: BoxShape, stroke: Stroke): Rect {
-  return rotatedAabb(boxDrawnBounds(shape, stroke), shape.rotation, rectCenter(shape.box));
+  const drawn = boxDrawnBounds(shape, stroke);
+  return drawn === shape.box
+    ? standingRect(drawn, shape.rotation)
+    : rotatedAabb(drawn, shape.rotation, rectCenter(shape.box));
 }
 
 /** The box's corners as the page shows them (nw, ne, se, sw), turned about its middle. */

@@ -354,7 +354,9 @@ export interface Behavior {
  * a tool, they are its kind's, with its defaults over the engine's. The
  * border's value is three keys (`borderStyle`, `dashArray`,
  * `cloudyIntensity`); a text's font, size, colour and alignment read as the
- * text shows (a free text's `fontColor` follows its `color` when it has none).
+ * text shows (a free text's `fontColor` follows its `color` when it has none);
+ * a selection of form widgets has `orientation`, their `rotation` as the
+ * choice's value (`'0'` upright), written with `orientationPatch`.
  */
 export interface AnnotationProperties {
   readonly properties: readonly AnnotationProperty[];

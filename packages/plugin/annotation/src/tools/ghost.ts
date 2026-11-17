@@ -159,9 +159,11 @@ export function createGhost(
       placingTool &&
       isDrag('box', placing.from, placing.to)
     ) {
-      // The box the sibling's commit places: the same call, the same page box.
+      // The box the sibling's commit places: the same call, the same page box, the same turn.
       const placement = gesturePlacement('box', placing.from, placing.to, placingTool.clickCreate, {
         pageBox: geometry.pageBoxOf(pageObjectNumber),
+        upright: placingTool.upright,
+        displayRotation: placing.displayRotation,
       });
       const annotation = annotationOfTool(model, placingTool);
       const shape = placement && placedShape(annotation, placement);
@@ -206,8 +208,20 @@ export function createGhost(
   const api = {
     hoverGhostAt,
     clearGhost,
-    previewPlacement: (toolId: string, page: PageRef, from: Point, to: Point) => {
-      ctx.state.update(setPlacing, { toolId, page, from, to });
+    previewPlacement: (
+      toolId: string,
+      page: PageRef,
+      from: Point,
+      to: Point,
+      displayRotation?: Rotation,
+    ) => {
+      ctx.state.update(setPlacing, {
+        toolId,
+        page,
+        from,
+        to,
+        ...(displayRotation !== undefined ? { displayRotation } : {}),
+      });
     },
     clearPlacementPreview: () => {
       ctx.state.update(setPlacing, null);

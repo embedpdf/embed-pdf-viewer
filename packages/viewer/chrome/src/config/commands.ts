@@ -187,6 +187,15 @@ const selectionEditable = (commandContext: Ctx): boolean => {
     annotation!.isEditable(ref),
   );
 };
+/**
+ * Whether the selection is form fields that turn by quarter turns: the
+ * selection's properties list `orientation` for exactly those (a field with a
+ * mark in it, or an annotation beside the fields, has none).
+ */
+const selectionTurnsByQuarters = (commandContext: Ctx): boolean =>
+  (anno(commandContext)?.selection.getProperties().properties ?? []).some(
+    (property) => property.key === 'orientation',
+  );
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
@@ -1095,6 +1104,31 @@ export const defaultCommands: CommandDefinition[] = [
     // A copy of a locked annotation would be locked too: nobody could move
     // or delete it by hand, so the button shows greyed out, as Delete does.
     enabled: (commandContext) => anno(commandContext)?.selection.canDuplicate() ?? false,
+  },
+  // A quarter turn of the selected form fields, each box with its contents:
+  // a field turns by quarter turns only, so it has no rotation handle.
+  {
+    id: 'annotation:rotate-counterclockwise',
+    labelKey: 'commands.annotate.rotateCounterclockwise',
+    icon: 'rotateCounterClockwise',
+    categories: ['annotations'],
+    // A refusal reaches the user as any failed write does (`onWriteFailed`).
+    run: (commandContext) =>
+      void anno(commandContext)
+        ?.selection.rotateBy(-90)
+        .catch(() => {}),
+    visible: selectionTurnsByQuarters,
+  },
+  {
+    id: 'annotation:rotate-clockwise',
+    labelKey: 'commands.annotate.rotateClockwise',
+    icon: 'rotateClockwise',
+    categories: ['annotations'],
+    run: (commandContext) =>
+      void anno(commandContext)
+        ?.selection.rotateBy(90)
+        .catch(() => {}),
+    visible: selectionTurnsByQuarters,
   },
   {
     id: 'annotation:group',

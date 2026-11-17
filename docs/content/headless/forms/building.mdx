@@ -32,6 +32,20 @@ clicks.
 > **Try it:** the form was printed without fields. Click a printed box to put a text field on it,
 > pick another kind for the circles, then press **Fill in** to type in your form.
 
+### On a turned page
+
+On a page that is shown turned, such as a scan saved sideways, a field is placed the way its
+author sees the page: a click makes the tool's size as the page shows it, and the field is turned
+so that what's typed into it reads upright there. The turn is saved with the field as a quarter
+turn, the one turn a PDF form field can hold, so every PDF app shows it and fills it in the same
+way. `upright: false` on a tool places its fields along the page instead; see
+[Rotated pages](../annotations/tools#rotated-pages).
+
+Turn the page, not the view, before you place fields: a page turned with
+[`pageEdit.rotateBy()`](../documents/pages#rotate-pages) is saved with the document, and a view rotation is this
+session's only. Turn pages before the first signature too, since turning a page afterwards is a
+change to a signed document.
+
 ## Design mode
 
 The `form-edit` tool is design mode: fields stop being fillable and become boxes you can select, move
@@ -91,6 +105,30 @@ annotation's, with the [style panel](../annotations/selecting#a-style-panel), or
 `form.updateWidget(widget.ref, { color: '#1d4ed8' })`.
 
 <Example name="form/field-settings" />
+
+## Turn a field
+
+A field turns by quarter turns, in two ways:
+
+```ts
+// The whole box: it stands the other way, and its contents turn with it
+await annotation.selection.rotateBy(90); // -90 the other way; resetRotation() for upright
+
+// Only its contents: the box stays where it stands, as Acrobat's Orientation does
+await annotation.selection.update((widget) => orientationPatch(widget, 90));
+```
+
+`rotateBy()` turns the selected fields as it turns a stamp, about each box's middle (several
+together turn about their middle). A field has no rotation handle, because a quarter turn is all it
+can hold. `orientationPatch()` comes with the annotation plugin: it gives the `box` and `rotation`
+that turn a field's contents where it stands.
+
+The [style panel](../annotations/selecting#a-style-panel) lists the second as `orientation` for a
+selection of fields: a choice of `'0'`, `'90'`, `'180'` and `'270'`, clockwise. Without a
+selection, `form.updateWidget(widget.ref, orientationPatch(widget, 90))` does the same for one
+box, and `form.updateWidget(widget.ref, { rotation: 90 })` turns the whole box. A box reads its
+turn as `rotation`, with `box`, the frame its contents are laid out in, and `rect`, where it
+stands; see [Turned fields](../forms#turned-fields).
 
 ## Add fields from code
 
@@ -253,7 +291,7 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `duplicate(fields, options?)`           | Copies whole fields, each as a new field. Resolves `{ fields, widgets, dropped }`. [Copy fields](#copy-fields)                                                                                        |
 | `duplicateWidgets(widgets, options?)`   | Copies boxes: a radio button joins its group, any other box becomes a new field. Resolves `{ fields, widgets, dropped }`. [Copy fields](#copy-fields)                                                 |
 | `delete(ref)`                           | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
-| `updateWidget(widget, patch)`           | Changes one box's place or look; pass only what changes. Resolves `{ widget }`. [Change a field's settings](#change-a-fields-settings)                                                                |
+| `updateWidget(widget, patch)`           | Changes one box's place, turn or look; pass only what changes. Resolves `{ widget }`. [Change a field's settings](#change-a-fields-settings), [Turn a field](#turn-a-field)                            |
 | `getFieldSettings(ref)`                 | A field's settings described for a panel: `{ properties, values }`, or `null`. [Change a field's settings](#change-a-fields-settings)                                                                 |
 | `deleteWidget(widget)`                  | Removes one box from its page, and from its field when it has one. Resolves `{ field }`, or `{ field: null }` for a box in no field. [Remove a field](#remove-a-field)                                |
 | `removeWidget(ref, widget)`             | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |

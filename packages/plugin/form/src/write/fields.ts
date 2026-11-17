@@ -164,7 +164,8 @@ export function createFieldWrites(
       placement.box ??
       (size && onPage.length > 0
         ? nextInLine(
-            onPage.map((row) => row.box),
+            // Where each stands: the next one takes its place in line, and the last one's turn.
+            onPage.map((row) => row.rect),
             size,
           )
         : undefined);

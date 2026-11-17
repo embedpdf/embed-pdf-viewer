@@ -187,17 +187,25 @@ export function setFlags(
 }
 
 /**
+ * Does the kind of `record` take a turn of `deltaDeg`: any turn for a kind
+ * that rotates, a quarter turn for one that turns only so (a form widget).
+ */
+const takesTurn = (record: ModelAnnotation, deltaDeg: number): boolean => {
+  const { rotatable, quarterTurns } = kindOf(record.annotation).caps;
+  return rotatable || (quarterTurns && deltaDeg % 90 === 0);
+};
+
+/**
  * Rotate the current selection by `deltaDeg` (clockwise) — the toolbar
  * "rotate 90°" affordance. A single shape turns about its own centre; a
- * multi-target group about the union-box centre (gated by `groupRotatable` for
- * groups, `rotatable` for a single shape). Emits one patch per rotated member.
+ * multi-target group about the union-box centre. Each member turns when its
+ * kind takes the turn (`takesTurn`: `rotatable`, or `quarterTurns` for a
+ * quarter turn). Emits one patch per rotated member.
  */
 export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
     const record = model.byId[id];
-    return (
-      record && isTransformableByHand(model, record) && kindOf(record.annotation).caps.rotatable
-    );
+    return record && isTransformableByHand(model, record) && takesTurn(record, deltaDeg);
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -236,12 +244,8 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   let turned = false;
   for (const id of model.selected) {
     const record = byId[id];
-    if (
-      !record ||
-      !isTransformableByHand(model, record) ||
-      !kindOf(record.annotation).caps.rotatable
-    )
-      continue;
+    // Upright is a quarter turn away for a kind that turns only so.
+    if (!record || !isTransformableByHand(model, record) || !takesTurn(record, 0)) continue;
     const geometry = shapeOf(record.annotation);
     if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(record);

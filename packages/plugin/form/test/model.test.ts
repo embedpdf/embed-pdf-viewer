@@ -90,8 +90,11 @@ const LOOK: FormWidgetLook = {
   fontSize: 12,
   textAlign: 'left',
 };
+/** An unturned widget on its page: its frame is the rect it stands in. */
 const placed = (box: { x: number; y: number; width: number; height: number }) => ({
   box,
+  rotation: 0 as const,
+  rect: box,
   look: LOOK,
 });
 const BOXES: PageWidgets = { 4: placed({ x: 10, y: 20, width: 200, height: 24 }) };
@@ -166,6 +169,50 @@ describe('field index', () => {
     ).toEqual([4, 7]);
     expect(Object.keys(pageWidgetsOf(index, 3))).toEqual(['4', '7']);
     expect(shownWidgetsOf(index, 99)).toEqual([]);
+  });
+
+  test("a widget's place is its frame, its quarter turn and the rect it stands in", () => {
+    const FRAME = { x: 20, y: 88, width: 160, height: 24 };
+    const STANDS = { x: 88, y: 20, width: 24, height: 160 };
+    const row = (objectNumber: number, place: object) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber },
+        page: toPageRef(3),
+        hidden: false,
+        noView: false,
+        appearanceState: null,
+        ...place,
+      }) as unknown as WidgetAnnotation;
+    const index = indexFields({
+      ...snapshot([text()]),
+      widgets: [
+        // Turned a quarter: its frame's sides are its rect's, swapped.
+        row(4, { box: FRAME, rotation: 270, rect: STANDS }),
+        // Upright, as the engine reads it: no turn, frame and rect the same.
+        row(7, { box: FRAME, rotation: null, rect: FRAME }),
+      ],
+    });
+    const widgets = pageWidgetsOf(index, 3);
+    expect(widgets[4]).toMatchObject({ box: FRAME, rotation: 270, rect: STANDS });
+    expect(widgets[7]).toMatchObject({ box: FRAME, rotation: 0, rect: FRAME });
+    expect(
+      shownWidgetsOf(index, 3).map(({ box, rotation, rect }) => ({ box, rotation, rect })),
+    ).toEqual([
+      { box: FRAME, rotation: 270, rect: STANDS },
+      { box: FRAME, rotation: 0, rect: FRAME },
+    ]);
+    // A fill item carries the same place: the control goes in the frame, turned.
+    const [item] = fillItems(index, 3, widgets, ALWAYS);
+    expect(item).toMatchObject({ box: FRAME, rotation: 270, rect: STANDS });
+    // A point is on a widget where it stands, not where its frame lies before the turn.
+    expect(widgetAt(index, widgets, { x: 100, y: 30 })).toMatchObject({
+      annotObjectNumber: 4,
+      box: FRAME,
+      rotation: 270,
+      rect: STANDS,
+    });
+    expect(widgetAt(index, widgets, { x: 30, y: 100 })).toBeNull();
   });
 
   test('folds value, structural and batch events from their data', () => {

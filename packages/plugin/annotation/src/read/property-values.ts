@@ -1,9 +1,10 @@
 /**
  * The values a style panel shows for a list of properties: the annotation's
- * (or a tool's defaults') engine fields by name. Three read differently: the
+ * (or a tool's defaults') engine fields by name. Four read differently: the
  * border's value is `borderStyle`, `dashArray` and `cloudyIntensity`; a text's
- * font, size, colour, alignment and formats read as the text shows them; and
- * the link is an attached link's target, not a field.
+ * font, size, colour, alignment and formats read as the text shows them; the
+ * link is an attached link's target, not a field; and a form widget's
+ * orientation is its `rotation`, as the choice's value (`'0'` upright).
  */
 import type { AnnotationProperty, FieldValues, TextStyle } from '@embedpdf/core-annotation';
 
@@ -36,6 +37,7 @@ export function propertyValue(
   { data, text, link }: PropertySources,
 ): unknown {
   if (spec.key === 'link') return link ?? null;
+  if (spec.key === 'orientation') return String(data.rotation ?? 0);
   if (spec.key === 'borderStyle') {
     return {
       borderStyle: data.borderStyle ?? 'solid',

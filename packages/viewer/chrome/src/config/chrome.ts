@@ -227,6 +227,8 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:save-file',
             'annotation:remove-link',
             'annotation:duplicate',
+            'annotation:rotate-counterclockwise',
+            'annotation:rotate-clockwise',
             'annotation:group',
             'annotation:ungroup',
           ],

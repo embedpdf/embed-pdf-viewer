@@ -46,7 +46,7 @@ export { FormToken } from './token';
 export { toFieldRef } from '@embedpdf/engine-core/runtime';
 export { FormTransfer } from '@embedpdf/engine-core/public';
 export type { FormWidgetItem, FormWidgetLook } from './read/fill-items';
-export type { Box, WidgetHit } from './model';
+export type { Box, WidgetHit, WidgetPlace } from './model';
 export type {
   FormBundle,
   FormFieldDraft,
@@ -432,11 +432,13 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /**
    * Each widget on a page (its ref or its index), with its place, its look,
    * its control, its value and whether it can be filled: for drawing the
-   * fields yourself. The same array while nothing changes; empty for a page
-   * that isn't in the document.
+   * fields yourself. Its place is its frame (`box`), its quarter turn
+   * (`rotation`) and the rect it stands in (`rect`): a control goes in the
+   * frame, turned about its middle. The same array while nothing changes;
+   * empty for a page that isn't in the document.
    */
   listWidgets(page: PageRef | number): readonly FormWidgetItem[];
-  /** The widget under a point on a page, with its field, or `null`. */
+  /** The widget under a point on a page, with its field and its place, or `null`. */
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /**
    * The field whose widgets are selected (in design mode): one widget, or several of the same

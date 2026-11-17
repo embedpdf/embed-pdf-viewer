@@ -172,6 +172,122 @@ describe('<FormLayer> over fields made from code', () => {
 });
 
 /**
+ * A field turned a quarter (`/MK /R`): its control sits in the field's frame,
+ * turned with it about its middle, so what's typed reads the way the field
+ * does. An unturned field's control is placed as it always was.
+ */
+describe('<FormLayer> over a turned field', () => {
+  afterEach(cleanup);
+
+  it(
+    'places the control in the field’s frame and turns it with the field',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const wasmBinary = new Uint8Array(await readFile(wasm));
+      const engine = await createLocalEngine({ runtime: { prefer: 'wasm', wasmBinary } });
+      const plugins = [interactionPlugin(), formPlugin()];
+
+      let kernel: Kernel | null = null;
+      let setPage!: (page: PageContextValue) => void;
+      function Grab() {
+        const current = useKernel();
+        useEffect(() => {
+          kernel = current;
+        }, [current]);
+        return null;
+      }
+      function Page() {
+        const [page, set] = useState<PageContextValue | null>(null);
+        setPage = set;
+        return page ? (
+          <PageProvider value={page}>
+            <FormLayer />
+          </PageProvider>
+        ) : null;
+      }
+
+      const view = render(
+        <Viewer
+          engine={engine}
+          plugins={plugins}
+          initialDocuments={[{ source: { kind: 'bytes', id: 'blank', bytes } }]}
+        >
+          <Grab />
+          <Page />
+        </Viewer>,
+      );
+
+      try {
+        await waitFor(() => expect(kernel?.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel!.capability(FormToken);
+        await form.refresh();
+        const page = kernel!.documents.getPage(0, 'blank')!.ref;
+        // Its frame is 160 × 20; turned 270° it stands 20 wide and 160 tall.
+        await form.create({
+          kind: 'text',
+          name: 'side',
+          widgets: [{ page, box: { x: 72, y: 300, width: 160, height: 20 }, rotation: 270 }],
+        });
+        await form.create({
+          kind: 'text',
+          name: 'flat',
+          widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+
+        const transform = pageTransform({
+          pageSize: { width: 612, height: 792 },
+          rotation: 0,
+          scale: 1,
+          dpr: 1,
+        });
+        setPage(
+          makePageContext(
+            'blank',
+            'test-view',
+            page,
+            0,
+            { top: 0, right: 0, bottom: 0, left: 0 },
+            transform,
+            () => new DOMRect(0, 0, 612, 792),
+          ),
+        );
+
+        const side = (await waitFor(() => screen.getByLabelText('side'))) as HTMLInputElement;
+        const box = side.parentElement as HTMLElement;
+        expect(box.style.left).toBe('72px');
+        expect(box.style.top).toBe('300px');
+        expect(box.style.width).toBe('160px');
+        expect(box.style.height).toBe('20px');
+        expect(box.style.transform).toBe('rotate(270deg)');
+        // The item says where it stands: the frame turned about its middle.
+        const item = form.listWidgets(page).find((each) => each.label === 'side')!;
+        expect(item.rotation).toBe(270);
+        expect(item.rect).toEqual({ x: 142, y: 230, width: 20, height: 160 });
+
+        const flat = (await waitFor(() => screen.getByLabelText('flat'))) as HTMLInputElement;
+        expect((flat.parentElement as HTMLElement).style.transform).toBe('');
+        expect((flat.parentElement as HTMLElement).style.left).toBe('72px');
+
+        // Typing into the turned field fills it in, and it keeps its turn.
+        fireEvent.focus(side);
+        fireEvent.change(side, { target: { value: 'Up the page' } });
+        fireEvent.blur(side);
+        await waitFor(() =>
+          expect(form.getValue(toFieldRef('side'))).toEqual({ value: 'Up the page' }),
+        );
+        expect(form.listWidgets(page).find((each) => each.label === 'side')!.rotation).toBe(270);
+      } finally {
+        view.unmount();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
  * With the render plugin, `<FormLayer>` paints each field as the engine draws
  * it: one picture per widget, the one of the state it shows. The engine
  * encodes pictures with a 2D canvas, which happy-dom doesn't have, so the

@@ -57,6 +57,81 @@ const letterPage = (documentId: string, ref: PageRef): PageContextValue =>
     () => new DOMRect(0, 0, 612, 792),
   );
 
+/**
+ * A field turned a quarter (`/MK /R`): its control sits in the field's frame, turned with it
+ * about its middle, so what's typed reads the way the field does. An unturned field's control
+ * is placed as it always was.
+ */
+describe('<FormLayer> over a turned field', () => {
+  it(
+    'places the control in the field’s frame and turns it with the field',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await wasmEngine();
+      const page = signal<PageContextValue | null>(null);
+      const { kernel, view } = await viewerWith(
+        [interactionPlugin(), formPlugin()],
+        FormHarness,
+        { page, stagePresses: [] },
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const ref = kernel.documents.getPage(0, 'blank')!.ref;
+        // Its frame is 160 × 20; turned 270° it stands 20 wide and 160 tall.
+        await form.create({
+          kind: 'text',
+          name: 'side',
+          widgets: [{ page: ref, box: { x: 72, y: 300, width: 160, height: 20 }, rotation: 270 }],
+        });
+        await form.create({
+          kind: 'text',
+          name: 'flat',
+          widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+        page.value = letterPage('blank', ref);
+        flushSync();
+
+        const side = (await waitFor(() => view.getByLabelText('side'))) as HTMLInputElement;
+        const box = side.parentElement as HTMLElement;
+        expect(box.style.left).toBe('72px');
+        expect(box.style.top).toBe('300px');
+        expect(box.style.width).toBe('160px');
+        expect(box.style.height).toBe('20px');
+        expect(box.style.transform).toBe('rotate(270deg)');
+        // The item says where it stands: the frame turned about its middle.
+        const item = form.listWidgets(ref).find((each) => each.label === 'side')!;
+        expect(item.rotation).toBe(270);
+        expect(item.rect).toEqual({ x: 142, y: 230, width: 20, height: 160 });
+
+        const flat = (await waitFor(() => view.getByLabelText('flat'))) as HTMLInputElement;
+        expect((flat.parentElement as HTMLElement).style.transform).toBe('');
+        expect((flat.parentElement as HTMLElement).style.left).toBe('72px');
+
+        // Typing into the turned field fills it in, and it keeps its turn.
+        await fireEvent.focus(side);
+        await fireEvent.input(side, { target: { value: 'Up the page' } });
+        await fireEvent.blur(side);
+        await waitFor(() =>
+          expect(form.getValue(toFieldRef('side'))).toEqual({ value: 'Up the page' }),
+        );
+        expect(form.listWidgets(ref).find((each) => each.label === 'side')!.rotation).toBe(270);
+      } finally {
+        view.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
 describe('<FormLayer> over fields made from code', () => {
   it(
     'fills in a text box and a checkbox, and draws the edge of a field without a border',

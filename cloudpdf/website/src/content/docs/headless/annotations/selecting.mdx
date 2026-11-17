@@ -100,6 +100,11 @@ shows both:
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
 | `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
 
+A selection of [form fields](../forms/building#turn-a-field) also has `orientation`: a `'choice'`
+of the direction their contents read in, `'0'`, `'90'`, `'180'` or `'270'` clockwise, with each box
+staying where it stands. Write it with
+`annotation.selection.update((widget) => orientationPatch(widget, 90))`.
+
 Marks over text, and rectangles and ellipses, also have `subtype`: a `'choice'` of the kinds they
 can become, such as highlight, underline, squiggly and strikeout. Choosing one turns each selected
 annotation into that kind, as the same annotation. A strikeout that is part of a replacement has no
@@ -236,6 +241,9 @@ what an annotation snaps to are `--epdf-annotation-guide`.
 annotation.selection.rotateBy(90); // a quarter turn clockwise; -90 the other way
 annotation.selection.resetRotation(); // upright again
 ```
+
+Both turn every selected annotation that can turn, a [form field](../forms/building#turn-a-field)
+in design mode among them: it turns by quarter turns only, so it has no rotation handle.
 
 Grouping makes several annotations select and move as one. The group is saved in the PDF the way
 Acrobat saves it, so it stays a group there too:

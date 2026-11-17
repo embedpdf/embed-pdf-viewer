@@ -290,6 +290,25 @@ const KIND_OPTIONS: readonly AnnotationOption[] = [
   { value: 'circle', label: 'Circle', labelKey: 'annotation.circle' },
 ];
 
+/**
+ * A form widget's Orientation: the direction its contents read in, a quarter
+ * turn clockwise, the widget staying where it stands (Acrobat's Orientation).
+ * Its value is the widget's `rotation` as a string; `orientationPatch`
+ * writes it. Offered over a selection of widgets (`selectionProperties`).
+ */
+export const ORIENTATION: AnnotationProperty = {
+  key: 'orientation',
+  control: 'choice',
+  label: 'Orientation',
+  labelKey: 'annotation.style.orientation',
+  options: [
+    { value: '0', label: '0°', labelKey: 'annotation.orientations.0' },
+    { value: '90', label: '90°', labelKey: 'annotation.orientations.90' },
+    { value: '180', label: '180°', labelKey: 'annotation.orientations.180' },
+    { value: '270', label: '270°', labelKey: 'annotation.orientations.270' },
+  ],
+};
+
 /** The `subtype` choice over `kinds`: the kind the selected annotations become. */
 export function kindChoice(kinds: readonly string[]): AnnotationProperty {
   return {

@@ -133,6 +133,51 @@ describe('a click tool’s ghost', () => {
     harness.capability.clearGhost();
     expect(harness.capability.listPageItems(PAGE)).toEqual([]);
   });
+
+  it('an upright form tool on a page shown turned: the ghost and the drag read upright there', () => {
+    const harness = annotationHarness();
+    harness.capability.tools.register({
+      id: 'form-text',
+      subtype: 'widget-text',
+      enables: ['form-place', 'annotation-edit'],
+      clickCreate: { width: 160, height: 24 },
+      upright: true,
+      defaults: { interiorColor: '#ffffff', color: '#6b7280', strokeWidth: 1, fontSize: 12 },
+      ghost: true,
+    });
+    // A page shown turned 90°: the field keeps its frame, 160 × 24 about the pointer, and
+    // takes the turn that undoes the page's, so it shows 160 × 24 as the author sees it.
+    harness.capability.hoverGhostAt('form-text', PAGE, { x: 200, y: 200 }, 90);
+    expect(ghostOf(harness)).toMatchObject({
+      subtype: 'widget-text',
+      geometry: { box: { x: 120, y: 188, width: 160, height: 24 }, rotation: 270 },
+      frame: { box: { x: 120, y: 188, width: 160, height: 24 }, rotation: 270 },
+    });
+    // A drag keeps the region the author dragged (40 × 120 on the page), its contents turned.
+    harness.capability.previewPlacement(
+      'form-text',
+      PAGE,
+      { x: 100, y: 200 },
+      { x: 140, y: 320 },
+      90,
+    );
+    expect(harness.capability.listPageItems(PAGE)).toMatchObject([
+      {
+        source: 'draft',
+        geometry: { box: { x: 60, y: 240, width: 120, height: 40 }, rotation: 270 },
+      },
+    ]);
+    // Without the page's view, the drag is laid out along the page, unturned.
+    harness.capability.previewPlacement('form-text', PAGE, { x: 100, y: 200 }, { x: 140, y: 320 });
+    expect(harness.capability.listPageItems(PAGE)).toMatchObject([
+      {
+        source: 'draft',
+        geometry: { box: { x: 100, y: 200, width: 40, height: 120 }, rotation: 0 },
+      },
+    ]);
+    harness.capability.clearPlacementPreview();
+    harness.capability.clearGhost();
+  });
 });
 
 describe('the frame a painter draws into', () => {

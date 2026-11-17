@@ -55,7 +55,8 @@ function useFormDesign() {
       // The widgets are lent only while a form is designed.
       if (!isFormDesignTool(activeTool)) interaction?.activateTool(FORM_DESIGN_TOOL);
       annotation?.selection.select([widget.ref]);
-      stage.reveal(widget.page, { rect: widget.box });
+      // Where the widget stands: a turned one's `box` is its frame before the turn.
+      stage.reveal(widget.page, { rect: widget.rect });
     },
     /** Several widgets as the selection (a group just copied), so one drag moves them all. */
     selectAll(widgets: readonly WidgetAnnotation[]) {
@@ -63,7 +64,7 @@ function useFormDesign() {
       if (!first) return;
       if (!isFormDesignTool(activeTool)) interaction?.activateTool(FORM_DESIGN_TOOL);
       annotation?.selection.select(widgets.map((widget) => widget.ref));
-      stage.reveal(first.page, { rect: first.box });
+      stage.reveal(first.page, { rect: first.rect });
     },
     clear() {
       annotation?.selection.select([]);
@@ -102,8 +103,8 @@ function FieldList() {
     rows.sort(
       (left, right) =>
         left.index - right.index ||
-        left.place.box.y - right.place.box.y ||
-        left.place.box.x - right.place.box.x,
+        left.place.rect.y - right.place.rect.y ||
+        left.place.rect.x - right.place.rect.x,
     );
     const byPage = new Map<number, typeof rows>();
     for (const row of rows) byPage.set(row.index, [...(byPage.get(row.index) ?? []), row]);
@@ -211,9 +212,9 @@ function Buttons({ field }: { field: FormField & { kind: 'radio' | 'checkbox' } 
     const step = (axis: 'x' | 'y', side: 'width' | 'height'): number => {
       const leaves = places.some((place) => {
         const size = sizes.get(place.page.objectNumber);
-        return !!size && place.box[axis] + place.box[side] + COPY_STEP > size[side];
+        return !!size && place.rect[axis] + place.rect[side] + COPY_STEP > size[side];
       });
-      return leaves && places.every((place) => place.box[axis] - COPY_STEP >= 0)
+      return leaves && places.every((place) => place.rect[axis] - COPY_STEP >= 0)
         ? -COPY_STEP
         : COPY_STEP;
     };
