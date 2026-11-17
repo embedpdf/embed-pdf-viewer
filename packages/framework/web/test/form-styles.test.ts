@@ -64,6 +64,7 @@ describe('textFieldEditorStyleOf', () => {
       transform: 'none',
       transformOrigin: '0 0',
       border: 'none',
+      borderRadius: '0',
       outline: '2px solid F',
       outlineOffset: '-2px',
       padding: '0 2px',
@@ -171,7 +172,6 @@ describe('listBoxControlStyleOf', () => {
     expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors, font)).toEqual({
       ...FORM_CONTROL_FILL,
       padding: '0',
-      borderRadius: '0',
       outline: 'none',
       ...font,
       fontSize: '20px',
@@ -190,6 +190,22 @@ describe('listBoxControlStyleOf', () => {
       cursor: 'default',
       pointerEvents: 'none',
     });
+  });
+});
+
+describe('square corners', () => {
+  // The layer draws in the page, so the page's rule for its own inputs and buttons reaches the
+  // controls: one that rounds a focused input would round the field and its focus ring.
+  it('pins every native control’s corners, so a rule of the page’s never rounds one', () => {
+    const field = { box, look, multiline: false, comb: false, maxLength: null, disabled: false };
+    // The dropdown and the buttons take the fill as it is.
+    expect(FORM_CONTROL_FILL.borderRadius).toBe('0');
+    expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors).borderRadius).toBe(
+      '0',
+    );
+    for (const focused of [true, false]) {
+      expect(textFieldEditorStyleOf(field, frame, colors, focused).borderRadius).toBe('0');
+    }
   });
 });
 

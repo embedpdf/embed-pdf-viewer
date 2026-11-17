@@ -13,7 +13,12 @@ import type { CssFont, FieldLook, FormColors, ListBoxStyle, TextFieldStyle } fro
 import { legibleScaleOf, legibleShrinkOf } from './legible-text';
 import type { PixelRect } from './page-pixels';
 
-/** A control that fills the widget's box it sits in: every native control the layer draws. */
+/**
+ * A control that fills the widget's box it sits in: every native control the
+ * layer draws. Its corners are square, as the widget's are: the layer draws in
+ * the page, where a rule of the page's own for its inputs and buttons (a
+ * radius on the focused one, say) would round the control and its focus ring.
+ */
 export const FORM_CONTROL_FILL = Object.freeze({
   position: 'absolute',
   inset: '0',
@@ -21,6 +26,7 @@ export const FORM_CONTROL_FILL = Object.freeze({
   height: '100%',
   boxSizing: 'border-box',
   margin: '0',
+  borderRadius: '0',
 } as const);
 
 /** {@link FORM_CONTROL_FILL}'s shape. */
@@ -100,6 +106,8 @@ export type TextFieldEditorStyle = TextFieldStyle & {
   transform: string;
   transformOrigin: '0 0';
   border: 'none';
+  /** Square corners, whatever the page gives its inputs: the ring follows them. */
+  borderRadius: '0';
   outline: string;
   outlineOffset: string;
   padding: string;
@@ -160,6 +168,7 @@ export function textFieldEditorStyleOf(
     transform: legibleShrinkOf(legible) ?? 'none',
     transformOrigin: '0 0',
     border: 'none',
+    borderRadius: '0',
     outline: focused ? `${px(2)} solid ${colors.focus}` : 'none',
     outlineOffset: px(-2),
     padding: `0 ${px(2)}`,
@@ -197,7 +206,6 @@ export function textFieldEditorStyleOf(
 export type ListBoxControlStyle = FormControlFill &
   ListBoxStyle & {
     padding: string;
-    borderRadius: string;
     outline: 'none';
     cursor: 'default' | 'pointer';
     /** `none` for a disabled field: the box below runs the widget's action. */
@@ -218,7 +226,6 @@ export function listBoxControlStyleOf(
   return {
     ...FORM_CONTROL_FILL,
     padding: '0',
-    borderRadius: '0',
     outline: 'none',
     ...listBoxStyleOf(field, frame, colors, font),
     cursor: field.disabled ? 'default' : 'pointer',
