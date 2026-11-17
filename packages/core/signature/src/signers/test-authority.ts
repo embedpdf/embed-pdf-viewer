@@ -372,7 +372,8 @@ export interface TestCertificateAuthority {
  * certified, as real ones do, and publishes a CRL; both say the same.
  *
  * `url` is the address its certificates name. Nothing listens there: `revocation` answers for
- * it. `now` is the clock its answers are dated by, for a test that needs another time.
+ * it. `now` is the authority's clock, for a test that needs another time: its certificates and
+ * its answers are dated by it, so an answer is never from before the responder's certificate.
  */
 export async function createTestCertificateAuthority(
   options: { commonName?: string; url?: string; now?: () => Date } = {},
@@ -382,6 +383,11 @@ export async function createTestCertificateAuthority(
   const url = (options.url ?? 'http://test-authority.example').replace(/\/$/, '');
   const addresses = { ocsp: `${url}/ocsp`, crl: `${url}/crl`, issuer: `${url}/issuer` };
   const commonName = options.commonName ?? 'EmbedPDF test certificate authority';
+  /** The dates of a certificate issued now, by the authority's clock: from a day before, for a year. */
+  const dates = () => ({
+    notBefore: new Date(now().getTime() - DAY),
+    notAfter: new Date(now().getTime() + 365 * DAY),
+  });
 
   const rootKeys = await generateSigningKeyPair('RSA-PKCS1-v1_5', 'sha256', true);
   const root: Issuer = {
@@ -390,6 +396,7 @@ export async function createTestCertificateAuthority(
       commonName,
       publicKey: rootKeys.publicKey,
       privateKey: rootKeys.privateKey,
+      ...dates(),
     }),
     privateKey: rootKeys.privateKey,
   };
@@ -400,6 +407,7 @@ export async function createTestCertificateAuthority(
       commonName: `${commonName} (OCSP responder)`,
       publicKey: responderKeys.publicKey,
       issuer: root,
+      ...dates(),
     }),
     privateKey: responderKeys.privateKey,
   };
@@ -477,6 +485,7 @@ export async function createTestCertificateAuthority(
         // What can't be withdrawn has nowhere to ask about it.
         addresses: unrevocable ? { issuer: addresses.issuer } : addresses,
         ...(unrevocable ? { unrevocable } : {}),
+        ...dates(),
       });
       issued.push(certificate);
       if (unrevocable) unrevocableOnes.add(certificate);

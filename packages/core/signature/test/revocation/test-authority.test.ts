@@ -78,6 +78,27 @@ describe('createTestCertificateAuthority', () => {
     });
   });
 
+  test('its certificates are dated by its clock, whatever day the test runs', async () => {
+    // Years before and after today: an answer from the authority's time is checked against
+    // the responder's certificate, which has to be from that time too.
+    for (const at of ['2019-03-01T08:00:00Z', '2041-06-30T20:00:00Z']) {
+      const now = new Date(at);
+      const authority = await createTestCertificateAuthority({ now: () => now });
+      const signer = await authority.issueSigner();
+      for (const der of [authority.certificate, signer.certificate]) {
+        const certificate = certificateFromDer(der);
+        expect(certificate.notBefore.value, at).toEqual(new Date(now.getTime() - DAY));
+        expect(certificate.notAfter.value, at).toEqual(new Date(now.getTime() + 365 * DAY));
+      }
+      for (const kind of ['ocsp', 'crl'] as const) {
+        expect(await ask(authority, signer.certificate, kind), `${kind} at ${at}`).toMatchObject({
+          says: 'good',
+          thisUpdate: now,
+        });
+      }
+    }
+  });
+
   test('a withdrawn certificate: both answers say so, with the time and the reason', async () => {
     let now = new Date('2026-11-15T12:00:00Z');
     const authority = await createTestCertificateAuthority({ now: () => now });
