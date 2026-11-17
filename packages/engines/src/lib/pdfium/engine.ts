@@ -10451,11 +10451,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private readPageBoxes(
-    docPtr: number,
-    index: number,
-    boxPtr: number,
-  ): PdfPageBoxes | undefined {
+  private readPageBoxes(docPtr: number, index: number, boxPtr: number): PdfPageBoxes | undefined {
     const readBox = (boxType: number): Box | undefined => {
       const ok = this.pdfiumModule.EPDF_GetPageBoxByIndex(docPtr, index, boxType, boxPtr);
       if (!ok) {
@@ -10599,12 +10595,14 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
-   * Convert coordinate of rectangle from page coordinate to device coordinate
+   * Convert a page-space rectangle to a device-space axis-aligned bounding box.
+   * Every corner is transformed. On /Rotate 90 and 270 the sides swap, and the
+   * transformed `(left, top)` corner is not the device-space origin.
+   *
    * @param doc - pdf document object
-   * @param page  - pdf page infor
-   * @param pagePtr - pointer to pdf page object
-   * @param pageRect - rectangle that needs to be converted
-   * @returns converted rectangle
+   * @param page - pdf page info
+   * @param pageRect - rectangle in page space
+   * @returns device-space rectangle
    *
    * @private
    */
@@ -10618,22 +10616,24 @@ export class PdfiumNative implements IPdfiumExecutor {
       bottom: number;
     },
   ): Rect {
-    const { x, y } = this.convertPagePointToDevicePoint(doc, page, {
-      x: pageRect.left,
-      y: pageRect.top,
-    });
-    const rect = {
-      origin: {
-        x,
-        y,
-      },
+    const corners = [
+      this.convertPagePointToDevicePoint(doc, page, { x: pageRect.left, y: pageRect.top }),
+      this.convertPagePointToDevicePoint(doc, page, { x: pageRect.right, y: pageRect.top }),
+      this.convertPagePointToDevicePoint(doc, page, { x: pageRect.right, y: pageRect.bottom }),
+      this.convertPagePointToDevicePoint(doc, page, { x: pageRect.left, y: pageRect.bottom }),
+    ];
+    const xs = corners.map((point) => point.x);
+    const ys = corners.map((point) => point.y);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+
+    return {
+      origin: { x, y },
       size: {
-        width: Math.abs(pageRect.right - pageRect.left),
-        height: Math.abs(pageRect.top - pageRect.bottom),
+        width: Math.max(...xs) - x,
+        height: Math.max(...ys) - y,
       },
     };
-
-    return rect;
   }
 
   /**
