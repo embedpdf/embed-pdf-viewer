@@ -38,12 +38,13 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           annotation.tools.updateDefaults(tool.id, tool.defaults);
         }
       }
-      annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });
-      annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 100 });
-      annotation.createPointer('distance', 'up', page.ref, { x: 250, y: 100 });
+      // Drawn with room to turn: a turn keeps what it turned on its page.
+      annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 200 });
+      annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 200 });
+      annotation.createPointer('distance', 'up', page.ref, { x: 250, y: 200 });
       expect(annotation.selection.getSelected()).toHaveLength(0);
-      annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
-      annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
+      annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 188 });
+      annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 188 });
       // Written and confirmed: its ref is the engine's.
       await vi.waitFor(() =>
         expect(annotation.selection.getSelected()[0]?.ref.kind).toBe('objectNumber'),
@@ -66,15 +67,15 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         intent: 'line-dimension',
         contents: '10.00 m',
         linePoints: {
-          start: { x: 50, y: 100 },
-          end: { x: 250, y: 100 },
+          start: { x: 50, y: 200 },
+          end: { x: 250, y: 200 },
         },
         leader: { length: 12 },
       });
       // The offset handle changes /LL without moving either measured endpoint.
-      annotation.editPointer('down', page.ref, { x: 250, y: 88 }, false);
-      annotation.editPointer('move', page.ref, { x: 250, y: 64 }, false);
-      annotation.editPointer('up', page.ref, { x: 250, y: 64 }, false);
+      annotation.editPointer('down', page.ref, { x: 250, y: 188 }, false);
+      annotation.editPointer('move', page.ref, { x: 250, y: 164 }, false);
+      annotation.editPointer('up', page.ref, { x: 250, y: 164 }, false);
       await vi.waitFor(() =>
         expect(annotation.get(created.ref)).toMatchObject({
           contents: '10.00 m',
@@ -84,9 +85,9 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       );
       expectVector();
       // Caption-only drag: +15 along, +25 perpendicular, in the line's own axes (/CO).
-      annotation.editPointer('down', page.ref, { x: 150, y: 64 }, false);
-      annotation.editPointer('move', page.ref, { x: 165, y: 39 }, false);
-      annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
+      annotation.editPointer('down', page.ref, { x: 150, y: 164 }, false);
+      annotation.editPointer('move', page.ref, { x: 165, y: 139 }, false);
+      annotation.editPointer('up', page.ref, { x: 165, y: 139 }, false);
       await vi.waitFor(() =>
         expect(annotation.get(created.ref)).toMatchObject({
           captionOffset: { along: 15, perpendicular: 25 },
