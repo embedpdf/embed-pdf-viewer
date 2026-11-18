@@ -47,9 +47,9 @@ export function middleware(request: NextRequest) {
 
   // Public Markdown representations are served by a statically generated
   // Route Handler.
-  const markdownOf = (page: string) => {
+  const markdownOf = (page: string, inline = false) => {
     const url = request.nextUrl.clone();
-    url.pathname = `/api/docs/markdown${page}`;
+    url.pathname = `/api/docs/markdown${inline ? '/inline' : ''}${page}`;
     return NextResponse.rewrite(url);
   };
 
@@ -57,7 +57,10 @@ export function middleware(request: NextRequest) {
   // top-level path, hence the matcher's second entry and the explicit
   // equality check here.
   if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && isMarkdown)) {
-    return markdownOf(docsPath);
+    const accept = request.headers.get('accept');
+    // Browsers can display Markdown source inline as plain text.
+    const inline = request.headers.get('sec-fetch-mode') === 'navigate' && !prefersMarkdown(accept);
+    return markdownOf(docsPath, inline);
   }
 
   // A file under `/docs` (a screenshot) has a dot in its name, and one answer.

@@ -1,60 +1,40 @@
 ---
 title: How it works
-description: The CloudPDF server architecture — the HTTP API, the native worker pool, the storage and database layers, and how a request flows through them.
+description: How your app gets a document token and how CloudPDF verifies requests, renders PDFs, and stores documents.
 ---
 
 import { Callout } from '@/components/docs/callout';
 import { Cards, Card } from '@/components/docs/cards';
+import { ServerRequestFlow } from '@/components/docs/server-request-flow';
 
 # How it works
 
-The server is a single Node process with three responsibilities: speak HTTP,
-render PDFs, and persist documents. Understanding the pieces makes every
-configuration choice obvious.
+CloudPDF serves PDF pages and document data over HTTP. Your backend decides
+which documents a user can open and what they can do with them.
 
 ## The big picture
 
-```
-        ┌──────────────┐        Bearer JWT        ┌───────────────────────────┐
-        │ Your frontend│ ───────────────────────▶ │     @cloudpdf/server      │
-        │ @cloudpdf/   │                           │                           │
-        │   engine     │ ◀─────────────────────── │  Fastify HTTP API         │
-        └──────────────┘   pages, text, metadata   │      │                    │
-                                                    │      ▼                    │
-        ┌──────────────┐   mints doc-scoped JWT     │  Worker pool (PDFium)     │
-        │ Your backend │ ─────────────────────────▶│      │                    │
-        └──────────────┘                            │      ▼                    │
-                                                    │  Database   Object store  │
-                                                    └───────┼──────────┼────────┘
-                                                            ▼          ▼
-                                                   SQLite/Postgres  disk / S3 /
-                                                                    GCS / Azure
-```
+<ServerRequestFlow />
 
-1. **Your backend mints a token.** When a user needs a document, your backend
-   issues a short-lived, document-scoped JWT signed with the shared
-   `CLOUDPDF_JWT_SECRET`.
-2. **The frontend calls the server** with that token via
-   [`@cloudpdf/engine`](/docs/engine). The token says *which* document and
-   *what* the caller may do.
-3. **The server verifies the token, loads the document** from the object store
-   (caching it locally), and hands the work to a native PDFium worker.
-4. **Results come back as JSON or images** — rendered pages, extracted text,
-   annotations, metadata.
+CloudPDF checks the JWT's signature, document ID, and permissions before serving
+the request.
+
+The bundled npm and Docker server use HS256 with `CLOUDPDF_JWT_SECRET`. To use a
+public key or a JWKS URL, set `verifier` in `buildApp` in a custom Node deployment.
+See [Signing modes](/docs/api-reference/authentication#signing-modes).
 
 ## The HTTP API
 
-A [Fastify](https://fastify.dev) server exposes two route families:
+The [Fastify](https://fastify.dev) server exposes these routes.
 
 | Routes | Auth | Purpose |
 | --- | --- | --- |
-| `/v1/docs/*` | Document-scoped JWT | Render pages, extract text, read/write annotations and metadata, unlock encrypted PDFs. This is what `@cloudpdf/engine` calls. |
-| `/v1/admin/*` | Admin JWT | Create documents, upload files, mint and revoke tokens. This is what your backend calls. |
+| `/v1/docs/*` | Document JWT in the browser | Render pages, extract text, work with annotations and metadata, and unlock encrypted PDFs. |
+| `/v1/tenants/*` | API token or tenant JWT with the required scope | Create documents, upload files, and manage tokens from your backend. The issue token API is available in HS256 mode. |
 | `/healthz`, `/readyz` | None | Liveness and readiness probes. |
 
-Every document and admin route requires a valid token; an unauthenticated call
-returns `401`. See [Authentication](/docs/server/configuration/authentication)
-for how tokens are scoped.
+See [API authentication](/docs/api-reference/authentication) for accepted
+credentials and the permissions each can carry.
 
 ## The native worker pool
 
