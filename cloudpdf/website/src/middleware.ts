@@ -45,11 +45,12 @@ export function middleware(request: NextRequest) {
     return redirectToVariant('viewer', integrationForProduct('viewer', persistedIntegration()));
   }
 
-  // Public Markdown representations are served by a statically generated
-  // Route Handler.
-  const markdownOf = (page: string, inline = false) => {
+  // Public Markdown representations are served by statically generated Route
+  // Handlers: `markdown` as `text/markdown`, `markdown-text` the same body as
+  // `text/plain`.
+  const markdownOf = (page: string, route: 'markdown' | 'markdown-text' = 'markdown') => {
     const url = request.nextUrl.clone();
-    url.pathname = `/api/docs/markdown${inline ? '/inline' : ''}${page}`;
+    url.pathname = `/api/docs/${route}${page}`;
     return NextResponse.rewrite(url);
   };
 
@@ -57,10 +58,14 @@ export function middleware(request: NextRequest) {
   // top-level path, hence the matcher's second entry and the explicit
   // equality check here.
   if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && isMarkdown)) {
-    const accept = request.headers.get('accept');
-    // Browsers can display Markdown source inline as plain text.
-    const inline = request.headers.get('sec-fetch-mode') === 'navigate' && !prefersMarkdown(accept);
-    return markdownOf(docsPath, inline);
+    // A person who opens the link in a browser reads the source as text; Copy
+    // page and agents fetch it as `text/markdown`.
+    const opened =
+      request.headers.get('sec-fetch-mode') === 'navigate' &&
+      !prefersMarkdown(request.headers.get('accept'));
+    const response = markdownOf(docsPath, opened ? 'markdown-text' : 'markdown');
+    response.headers.append('Vary', 'Accept, Sec-Fetch-Mode');
+    return response;
   }
 
   // A file under `/docs` (a screenshot) has a dot in its name, and one answer.
