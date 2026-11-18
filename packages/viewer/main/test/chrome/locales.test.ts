@@ -63,7 +63,7 @@ function entriesOf(
 const pluralFormsOf = (code: string): string[] =>
   [...new Intl.PluralRules(code).resolvedOptions().pluralCategories].sort();
 
-/** The fifteen languages the Translations page lists. */
+/** The sixteen languages the Translations page lists. */
 const LANGUAGES = [
   'en',
   'de',
@@ -71,7 +71,8 @@ const LANGUAGES = [
   'es',
   'it',
   'nl',
-  'pt',
+  'pt-BR',
+  'pt-PT',
   'pl',
   'sv',
   'ja',
@@ -89,13 +90,20 @@ const packs = async (): Promise<Locale[]> => [
 ];
 
 describe('the language packs', () => {
-  it('are the fifteen languages, English loaded from the start and each other one when shown', async () => {
+  it('are the sixteen languages, English loaded from the start and each other one when shown', async () => {
     expect(['en', ...Object.keys(LOCALE_LOADERS)].sort()).toEqual([...LANGUAGES].sort());
     const loaded = await packs();
     expect(loaded.map((pack) => pack.code).sort()).toEqual([...LANGUAGES].sort());
     for (const [code, load] of Object.entries(LOCALE_LOADERS)) {
       expect((await load()).code).toBe(code);
     }
+  });
+
+  it('matches the Portuguese region and defaults an unregioned request to Brazil', () => {
+    const { codes } = localesOf();
+    expect(localeCodeOf('pt-BR', codes)).toBe('pt-BR');
+    expect(localeCodeOf('pt-PT', codes)).toBe('pt-PT');
+    expect(localeCodeOf('pt', codes)).toBe('pt-BR');
   });
 
   it('each have exactly the English keys, with the same slots in every string', async () => {
@@ -254,6 +262,15 @@ describe('localesOf', () => {
     );
   });
 
+  it('keeps unregioned Portuguese strings on the Brazilian pack', async () => {
+    const { loaders, codes } = localesOf({ pt: { commands: { open: 'Abrir ficheiro' } } });
+    expect(codes).not.toContain('pt');
+    expect(codes).toContain('pt-BR');
+    const brazilianPortuguese = await loaders['pt-BR']!();
+    expect(stringsOf(brazilianPortuguese.translations).get('commands.open')).toBe('Abrir ficheiro');
+    expect(stringsOf(brazilianPortuguese.translations).get('commands.download')).toBe('Baixar');
+  });
+
   it('makes a language of its own from strings for any other code, reading as its code says', () => {
     const { locales, codes } = localesOf({
       da: { 'zoom:in': 'Zoom ind', 'acme.send': 'Send' },
@@ -269,7 +286,6 @@ describe('localesOf', () => {
     expect(localeCodeOf('sv-FI', codes)).toBe('sv');
     expect(localeCodeOf('ar-EG', codes)).toBe('ar');
     expect(localeCodeOf('zh-Hans', codes)).toBe('zh-CN');
-    expect(localeCodeOf('pt-BR', codes)).toBe('pt');
     expect(localeCodeOf('tlh', codes)).toBe('en');
   });
 
@@ -352,7 +368,8 @@ describe('formatLocaleOf', () => {
   it("writes in the reader's region of the language shown", () => {
     expect(formatLocaleOf('en', codes, ['en-GB', 'en'])).toBe('en-GB');
     expect(formatLocaleOf('de', codes, ['de-CH'])).toBe('de-CH');
-    expect(formatLocaleOf('pt', codes, ['pt-BR'])).toBe('pt-BR');
+    expect(formatLocaleOf('pt-BR', codes, ['pt-BR'])).toBe('pt-BR');
+    expect(formatLocaleOf('pt-PT', codes, ['pt-PT'])).toBe('pt-PT');
     expect(formatLocaleOf('zh-TW', codes, ['zh-HK'])).toBe('zh-HK');
     // A language without a region says nothing about where its reader is: the next one does.
     expect(formatLocaleOf('en', codes, ['en', 'en-AU', 'en-GB'])).toBe('en-AU');

@@ -33,7 +33,8 @@ export const LOCALE_LOADERS: Readonly<Record<string, LocalePackLoader>> = {
   es: () => import('./es').then((module) => module.es),
   it: () => import('./it').then((module) => module.it),
   nl: () => import('./nl').then((module) => module.nl),
-  pt: () => import('./pt').then((module) => module.pt),
+  'pt-BR': () => import('./pt-br').then((module) => module.ptBR),
+  'pt-PT': () => import('./pt-pt').then((module) => module.ptPT),
   pl: () => import('./pl').then((module) => module.pl),
   sv: () => import('./sv').then((module) => module.sv),
   ja: () => import('./ja').then((module) => module.ja),
@@ -231,8 +232,10 @@ export interface ViewerLocales {
  */
 export function localesOf(strings: Readonly<Record<string, LanguageStrings>> = {}): ViewerLocales {
   const builtInCodes = ['en', ...Object.keys(LOCALE_LOADERS)];
+  // An override without a Portuguese region belongs to the Brazilian pack.
   const builtInCodeOf = (code: string) =>
-    builtInCodes.find((builtIn) => builtIn.toLowerCase() === code.toLowerCase());
+    builtInCodes.find((builtIn) => builtIn.toLowerCase() === code.toLowerCase()) ??
+    (code.toLowerCase() === 'pt' ? 'pt-BR' : undefined);
   // The app's strings by the code they're shown under, a built-in language's code as the viewer
   // spells it.
   const byCode = new Map<string, LanguageStrings[]>();
