@@ -1,7 +1,7 @@
 /**
  * The Translations page (`docs/content/viewer/customize/translations.mdx`) in a running viewer:
  * without a `locale`, or with `'auto'`, it follows the browser's languages, Traditional Chinese
- * included; its fifteen languages each load the first time they show, Hebrew right to left; your
+ * included; its sixteen languages each load the first time they show, Hebrew right to left; your
  * command's `labelKey` and a panel's and a mode bar's `titleKey` read per language, English where
  * a language has no words; one string, or one layout title, renames a panel's button and its
  * header; the style panel's words change through `strings`; a language of your
@@ -373,7 +373,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     await close(british);
   });
 
-  it('speaks fifteen languages, each loaded the first time it shows, Hebrew right to left', async () => {
+  it('speaks sixteen languages, each loaded the first time it shows, Hebrew right to left', async () => {
     const tab = await open('/english.html', 'en');
     const requested: string[] = [];
     tab.on('request', (request) => requested.push(new URL(request.url()).pathname));
@@ -392,7 +392,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
         'es',
         'it',
         'nl',
-        'pt',
+        'pt-BR',
+        'pt-PT',
         'pl',
         'sv',
         'ja',
