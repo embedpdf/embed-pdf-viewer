@@ -1,4 +1,4 @@
-import { prefersMarkdown } from '@embedpdf/docs-kit/accept';
+import { prefersMarkdown, shouldShowMarkdownAsText } from '@embedpdf/docs-kit/accept';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import {
@@ -44,11 +44,12 @@ export function middleware(request: NextRequest) {
     return redirectToVariant('viewer', integrationForProduct('viewer', persistedIntegration()));
   }
 
-  // Public Markdown representations are served by a statically generated
-  // Route Handler.
-  const markdownOf = (page: string) => {
+  // Public Markdown representations are served by statically generated Route
+  // Handlers: `markdown` as `text/markdown`, `markdown-text` the same body as
+  // `text/plain`.
+  const markdownOf = (page: string, route: 'markdown' | 'markdown-text' = 'markdown') => {
     const url = request.nextUrl.clone();
-    url.pathname = `/api/docs/markdown${page}`;
+    url.pathname = `/api/docs/${route}${page}`;
     return NextResponse.rewrite(url);
   };
 
@@ -56,7 +57,10 @@ export function middleware(request: NextRequest) {
   // top-level path, hence the matcher's second entry and the explicit
   // equality check here.
   if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && isMarkdown)) {
-    return markdownOf(docsPath);
+    const asText = shouldShowMarkdownAsText(request.headers);
+    const response = markdownOf(docsPath, asText ? 'markdown-text' : 'markdown');
+    response.headers.append('Vary', 'Accept, Sec-Fetch-Mode');
+    return response;
   }
 
   // A file under `/docs` (a screenshot) has a dot in its name, and one answer.

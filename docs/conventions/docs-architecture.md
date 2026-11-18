@@ -297,6 +297,14 @@ it and AI agents read it, so it is read away from its page:
   `other_integrations` on a viewer page), so a reader working in Vue who lands
   on React's page can switch.
 
+The `.md` URL answers `text/markdown`, except to a browser that opens it: a
+navigation (`Sec-Fetch-Mode: navigate`) that doesn't prefer Markdown gets the
+same text as `text/plain`, which every browser shows as text (docs-kit
+`accept`). Each site answers from two Route Handlers that share one response,
+`/api/docs/markdown` and `/api/docs/markdown-text`. Both build every page with
+the site and render nothing on request, so a path that isn't a page is a 404.
+The `.md` answer carries `Vary: Accept, Sec-Fetch-Mode`.
+
 A reader that doesn't know the `.md` address gets the Markdown two ways:
 
 - **The page's own URL serves it to a request that asks.** A request whose

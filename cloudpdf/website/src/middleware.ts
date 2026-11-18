@@ -1,4 +1,4 @@
-import { prefersMarkdown } from '@embedpdf/docs-kit/accept';
+import { prefersMarkdown, shouldShowMarkdownAsText } from '@embedpdf/docs-kit/accept';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import {
@@ -58,12 +58,8 @@ export function middleware(request: NextRequest) {
   // top-level path, hence the matcher's second entry and the explicit
   // equality check here.
   if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && isMarkdown)) {
-    // A person who opens the link in a browser reads the source as text; Copy
-    // page and agents fetch it as `text/markdown`.
-    const opened =
-      request.headers.get('sec-fetch-mode') === 'navigate' &&
-      !prefersMarkdown(request.headers.get('accept'));
-    const response = markdownOf(docsPath, opened ? 'markdown-text' : 'markdown');
+    const asText = shouldShowMarkdownAsText(request.headers);
+    const response = markdownOf(docsPath, asText ? 'markdown-text' : 'markdown');
     response.headers.append('Vary', 'Accept, Sec-Fetch-Mode');
     return response;
   }

@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { middleware } from './middleware';
 
 /**
- * The docs middleware's Markdown answers: a page's Markdown at `<page>.md`, and at the page's own
- * URL for a request that asks for it in its `Accept` header.
+ * The docs middleware's Markdown answers: a page's Markdown at `<page>.md` (as text to a browser
+ * that opens it), and at the page's own URL for a request that asks for it in its `Accept` header.
  */
 
 const ORIGIN = 'https://www.embedpdf.com';
@@ -13,8 +13,15 @@ const AGENT = 'text/markdown, text/html, */*';
 const BROWSER = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
 const QUICK_START = '/docs/headless/react/quick-start';
 
-const answer = (path: string, accept?: string) =>
-  middleware(new NextRequest(`${ORIGIN}${path}`, { headers: accept ? { accept } : {} }));
+const answer = (path: string, accept?: string, fetchMode?: string) =>
+  middleware(
+    new NextRequest(`${ORIGIN}${path}`, {
+      headers: {
+        ...(accept ? { accept } : {}),
+        ...(fetchMode ? { 'sec-fetch-mode': fetchMode } : {}),
+      },
+    }),
+  );
 
 /** The route the middleware answers from in place of the request's own, if it names one. */
 const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
@@ -29,7 +36,7 @@ describe('the docs middleware', () => {
   });
 
   it('serves the page to a browser, and says the answer depends on the header', () => {
-    const response = answer(QUICK_START, BROWSER);
+    const response = answer(QUICK_START, BROWSER, 'navigate');
 
     expect(rewrite(response)).toBeNull();
     expect(response.headers.get('x-middleware-next')).toBe('1');
@@ -49,14 +56,32 @@ describe('the docs middleware', () => {
     );
   });
 
-  it('keeps `<page>.md` as it is, whatever the request asks for', () => {
-    for (const accept of [AGENT, BROWSER, undefined]) {
-      const response = answer(`${QUICK_START}.md`, accept);
+  it('serves `<page>.md` as Markdown to a fetch and to an agent', () => {
+    for (const fetchMode of ['cors', 'same-origin', undefined]) {
+      for (const accept of [AGENT, BROWSER, undefined]) {
+        const response = answer(`${QUICK_START}.md`, accept, fetchMode);
 
-      expect(rewrite(response)).toBe(`${ORIGIN}/api/docs/markdown${QUICK_START}`);
-      expect(response.headers.get('vary')).toBeNull();
+        expect(rewrite(response)).toBe(`${ORIGIN}/api/docs/markdown${QUICK_START}`);
+        expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Mode');
+      }
     }
     expect(rewrite(answer('/docs.md'))).toBe(`${ORIGIN}/api/docs/markdown/docs`);
+  });
+
+  it('serves `<page>.md` as text to a browser that opens it', () => {
+    const response = answer(`${QUICK_START}.md`, BROWSER, 'navigate');
+
+    expect(rewrite(response)).toBe(`${ORIGIN}/api/docs/markdown-text${QUICK_START}`);
+    expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Mode');
+    expect(rewrite(answer('/docs.md', BROWSER, 'navigate'))).toBe(
+      `${ORIGIN}/api/docs/markdown-text/docs`,
+    );
+  });
+
+  it('serves `<page>.md` as Markdown to a navigation that asks for it', () => {
+    expect(rewrite(answer(`${QUICK_START}.md`, AGENT, 'navigate'))).toBe(
+      `${ORIGIN}/api/docs/markdown${QUICK_START}`,
+    );
   });
 
   it('leaves a file under /docs alone', () => {

@@ -1,6 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
-import { prefersMarkdown } from '../src/accept';
+import { prefersMarkdown, shouldShowMarkdownAsText } from '../src/accept';
+
+const BROWSER = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+
+const request = (headers: Record<string, string>) => new Headers(headers);
+
+describe('shouldShowMarkdownAsText', () => {
+  it('is true for a browser that opens the link', () => {
+    expect(
+      shouldShowMarkdownAsText(request({ 'sec-fetch-mode': 'navigate', accept: BROWSER })),
+    ).toBe(true);
+    expect(shouldShowMarkdownAsText(request({ 'sec-fetch-mode': 'navigate' }))).toBe(true);
+  });
+
+  it('is false for a fetch, as Copy page sends', () => {
+    for (const mode of ['cors', 'same-origin', 'no-cors']) {
+      expect(shouldShowMarkdownAsText(request({ 'sec-fetch-mode': mode, accept: '*/*' }))).toBe(
+        false,
+      );
+    }
+  });
+
+  it('is false without fetch metadata, as agents send', () => {
+    expect(shouldShowMarkdownAsText(request({ accept: BROWSER }))).toBe(false);
+    expect(shouldShowMarkdownAsText(request({}))).toBe(false);
+  });
+
+  it('is false for a navigation that asks for Markdown', () => {
+    expect(
+      shouldShowMarkdownAsText(request({ 'sec-fetch-mode': 'navigate', accept: 'text/markdown' })),
+    ).toBe(false);
+  });
+});
 
 describe('prefersMarkdown', () => {
   it('is true for a header that names Markdown', () => {

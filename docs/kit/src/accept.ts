@@ -4,6 +4,7 @@
  * A page's Markdown has its own address (`<page>.md`), and the page's URL serves it too to a
  * request that asks for it in its `Accept` header (docs/conventions/docs-architecture.md). AI
  * coding agents ask this way; a browser never names Markdown, so a person always gets the page.
+ * A person who opens the `.md` itself gets it as text.
  *
  * Free of Node and React, so a site's middleware can import it.
  */
@@ -42,4 +43,14 @@ export function prefersMarkdown(accept: string | null | undefined): boolean {
   const entries = acceptEntries(accept);
   const markdown = entries.find((entry) => entry.range === MARKDOWN)?.quality ?? 0;
   return markdown > 0 && markdown >= qualityOf(entries, HTML);
+}
+
+/**
+ * True for a browser that opens a `<page>.md` link: a navigation (`Sec-Fetch-Mode: navigate`,
+ * which only the browser sets) that doesn't prefer Markdown. It gets the Markdown as
+ * `text/plain`, which every browser shows as text; a fetch (Copy page) and a request without
+ * fetch metadata (an agent) get `text/markdown`.
+ */
+export function shouldShowMarkdownAsText(headers: Headers): boolean {
+  return headers.get('sec-fetch-mode') === 'navigate' && !prefersMarkdown(headers.get('accept'));
 }
