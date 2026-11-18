@@ -251,10 +251,16 @@ describe('turned fields, on a real engine', () => {
   it('the quarter-turn command turns a selected field, and an undo turns it back', async () => {
     const booted = await boot();
     try {
-      const { form, annotation, interaction, history, widgetOf } = booted;
+      const { form, annotation, interaction, history } = booted;
       interaction.activateTool('form-edit');
+      // A field in the middle of the page, with room to turn where it stands.
+      const { field } = await form.create({
+        kind: 'text',
+        name: 'roomy',
+        widgets: [{ page: FIRST, box: { x: 70, y: 138, width: 160, height: 24 } }],
+      });
       await annotation.whenSynced();
-      const ref = widgetOf('upright');
+      const ref = field.widgets[0]!.ref!;
       const before = form.getWidget(ref)!;
       expect(before.rotation ?? 0).toBe(0);
       annotation.selection.select([ref]);
@@ -271,6 +277,29 @@ describe('turned fields, on a real engine', () => {
       expect(form.getWidget(ref)!.rotation).toBe(90);
       await annotation.selection.resetRotation();
       expect(form.getWidget(ref)!.rotation ?? 0).toBe(0);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('a quarter turn at the edge of the page keeps the field on its page', async () => {
+    const booted = await boot();
+    try {
+      const { form, annotation, interaction, widgetOf } = booted;
+      interaction.activateTool('form-edit');
+      await annotation.whenSynced();
+      // The file's upright field: 160 wide, 24 tall, 16 below the top of its page.
+      const ref = widgetOf('upright');
+      expect(rounded(form.getWidget(ref)!.rect)).toEqual({ x: 20, y: 16, width: 160, height: 24 });
+      annotation.selection.select([ref]);
+      await annotation.selection.rotateBy(90);
+      const turned = form.getWidget(ref)!;
+      expect(turned.rotation).toBe(90);
+      // About its middle it would stand 52 past the top edge: it lands against the edge.
+      expect(rounded(turned.rect)).toEqual({ x: 88, y: 0, width: 24, height: 160 });
+      // Upright again there is room, so it turns where it stands.
+      await annotation.selection.resetRotation();
+      expect(rounded(form.getWidget(ref)!.rect)).toEqual({ x: 20, y: 68, width: 160, height: 24 });
     } finally {
       await booted.destroy();
     }

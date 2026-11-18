@@ -154,6 +154,107 @@ describe('the quarter-turn command on a widget', () => {
   });
 });
 
+describe('a turn at the edge of the page', () => {
+  /** The page's box, by the page's object number: what the plugin gives a turn. */
+  const PAGE_BOXES = { 1: { x: 0, y: 0, width: 600, height: 800 } };
+  /** A field against the top edge: its turned box would reach 64 past it. */
+  const AT_TOP: Rect = { x: 20, y: 4, width: 160, height: 24 };
+
+  const turn = (model: Model, pageBoxes?: Record<number, Rect>) =>
+    step(model, { type: 'rotateSelection', degrees: 90, pageBoxes });
+  const rectOf = (model: Model, id = 'W1') => rounded(model.byId[id]!.annotation.rect);
+
+  it('with room to turn, the widget turns about its middle and stays there', () => {
+    const [after, effects] = turn(selected(widget(0)), PAGE_BOXES);
+    expect(effects).toEqual([
+      { type: 'patch', id: 'W1', patch: { subtype: 'widget', rotation: 90 } },
+    ]);
+    expect(rectOf(after)).toEqual(STANDING);
+  });
+
+  it('where the turn would carry it past the edge, it lands against the edge', () => {
+    const [after, effects] = turn(selected(widget(0, AT_TOP)), PAGE_BOXES);
+    // Turned about its middle it would stand at y -64; it is moved down by that much.
+    expect(rectOf(after)).toEqual({ x: 88, y: 0, width: 24, height: 160 });
+    expect(shapeOf(after.byId['W1']!.annotation)).toMatchObject({
+      box: { x: 20, y: 68, width: 160, height: 24 },
+      rotation: 90,
+    });
+    // One write: the turn and the new place together.
+    expect(effects).toHaveLength(1);
+    expect(effects[0]).toMatchObject({
+      type: 'patch',
+      id: 'W1',
+      patch: { rotation: 90, box: { x: 20, y: 68, width: 160, height: 24 } },
+    });
+  });
+
+  it('a turned widget is found on the page at any edge', () => {
+    const page = PAGE_BOXES[1];
+    const edges: Rect[] = [
+      AT_TOP,
+      { x: 20, y: page.height - 28, width: 160, height: 24 },
+      { x: 4, y: 300, width: 24, height: 160 },
+      { x: page.width - 28, y: 300, width: 24, height: 160 },
+    ];
+    for (const box of edges) {
+      const [after] = turn(selected(widget(0, box)), PAGE_BOXES);
+      const rect = rectOf(after);
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(page.width);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(page.height);
+      // It moved along one axis only: the other still runs through the old middle.
+      const middle = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const turned = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      expect(turned.x === middle.x || turned.y === middle.y).toBe(true);
+    }
+  });
+
+  it('several widgets turn about their common middle and move together', () => {
+    const left = widget(0, AT_TOP, 'W1');
+    const right = widget(0, { ...AT_TOP, x: 200 }, 'W2');
+    const model: Model = {
+      ...initialModel,
+      byId: { W1: left, W2: right },
+      order: ['W1', 'W2'],
+      selected: ['W1', 'W2'],
+    };
+    const [free] = turn(model);
+    const [kept] = turn(model, PAGE_BOXES);
+    // Without a page they stand past the top edge; with one, both moved down by the same.
+    const moved = rectOf(kept, 'W1').y - rectOf(free, 'W1').y;
+    expect(moved).toBeGreaterThan(0);
+    expect(rectOf(kept, 'W2').y - rectOf(free, 'W2').y).toBe(moved);
+    expect(rectOf(kept, 'W1').x).toBe(rectOf(free, 'W1').x);
+    expect(Math.min(rectOf(kept, 'W1').y, rectOf(kept, 'W2').y)).toBe(0);
+  });
+
+  it('a turned box larger than the page is pinned to its top left, as a move pins it', () => {
+    // 160 tall once turned, on a page 120 high.
+    const [after] = turn(selected(widget(0)), { 1: { x: 0, y: 0, width: 200, height: 120 } });
+    expect(rectOf(after)).toEqual({ x: 88, y: 0, width: 24, height: 160 });
+  });
+
+  it('reset rotation keeps the widget on its page too', () => {
+    // Turned 270° it stands 2 from the left edge; upright again its frame would start at -66.
+    const turned = widget(270, { x: -66, y: 88, width: 160, height: 24 });
+    expect(rounded(turned.annotation.rect)).toEqual({ x: 2, y: 20, width: 24, height: 160 });
+    const [after] = step(selected(turned), { type: 'resetRotation', pageBoxes: PAGE_BOXES });
+    expect(rectOf(after)).toEqual({ x: 0, y: 88, width: 160, height: 24 });
+  });
+
+  it('without a page box the turn leaves the widget where it turned', () => {
+    const [after] = turn(selected(widget(0, AT_TOP)));
+    expect(rectOf(after)).toEqual({ x: 88, y: -64, width: 24, height: 160 });
+  });
+
+  it('a page with no box in the list is left alone', () => {
+    const [after] = turn(selected(widget(0, AT_TOP)), { 2: PAGE_BOXES[1] });
+    expect(rectOf(after).y).toBe(-64);
+  });
+});
+
 describe('Orientation', () => {
   it('is offered over a selection of widgets, after their look and before the flags', () => {
     const { annotation } = widget(0);

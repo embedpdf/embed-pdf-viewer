@@ -119,9 +119,10 @@ await annotation.selection.update((widget) => orientationPatch(widget, 90));
 ```
 
 `rotateBy()` turns the selected fields as it turns a stamp, about each box's middle (several
-together turn about their middle). A field has no rotation handle, because a quarter turn is all it
-can hold. `orientationPatch()` comes with the annotation plugin: it gives the `box` and `rotation`
-that turn a field's contents where it stands.
+together turn about their middle). A field near the edge of its page stays on the page: where the
+turn would carry it past the edge, it lands against the edge. A field has no rotation handle,
+because a quarter turn is all it can hold. `orientationPatch()` comes with the annotation plugin:
+it gives the `box` and `rotation` that turn a field's contents where it stands.
 
 The [style panel](../annotations/selecting#a-style-panel) lists the second as `orientation` for a
 selection of fields: a choice of `'0'`, `'90'`, `'180'` and `'270'`, clockwise. Without a

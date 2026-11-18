@@ -677,6 +677,13 @@ export type Placement =
   | { kind: 'box'; rect: Rect; rot: number }
   | { kind: 'segment'; a: Point; b: Point };
 
+/**
+ * The box of each page a command acts on (`{0, 0, width, height}`), by the
+ * page's object number. Per-command context, as `pageBox` is a pointer
+ * sample's: never stored on the model.
+ */
+export type PageBoxes = Readonly<Record<number, Rect>>;
+
 export type Message =
   | { type: 'editPointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
   | { type: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
@@ -770,10 +777,13 @@ export type Message =
   // Turn the selection a quarter turn, clockwise (90) or back (-90): the
   // toolbar's rotate buttons. A single shape turns about its own pivot, a
   // multi-selection about the middle of the box around it; locked members stay.
-  | { type: 'rotateSelection'; degrees: 90 | -90 }
+  // With `pageBoxes`, what turned stays on its page: on each page it moves
+  // together, by the least that puts it back on the page, as a move keeps it.
+  | { type: 'rotateSelection'; degrees: 90 | -90; pageBoxes?: PageBoxes }
   // Reset rotation to the as-authored orientation: box `rot → 0`; vertex points
   // spun by `-rot` about their centroid, `rot → 0`. One patch effect per member.
-  | { type: 'resetRotation' }
+  // `pageBoxes` keeps what turned on its page, as for `rotateSelection`.
+  | { type: 'resetRotation'; pageBoxes?: PageBoxes }
   | { type: 'delete' }
   | { type: 'cancel' }
   /** These records left the view (deleted elsewhere, a refused create): drop every reference to them. */

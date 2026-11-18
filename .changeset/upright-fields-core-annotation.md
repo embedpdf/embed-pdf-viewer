@@ -9,3 +9,4 @@ Read a form widget as a turned box: its `box` is the frame its contents are laid
 - New `orientationPatch(annotation, rotation)`: the `box` and `rotation` that turn a widget's contents where it stands, and the `orientation` choice `selectionProperties` lists for a selection of widgets.
 - New `placedBoxFields(placement)` and `standingRect(box, degrees)`.
 - A box's `rect` at a quarter turn is exact: its sides swapped, with no rounding.
+- A turn keeps what it turned on its page. The `rotateSelection` and `resetRotation` messages take `pageBoxes`, the box of each page by its object number (new type `PageBoxes`): where the turn would carry a selection past its page's edge, it moves the least that puts it back on the page, as a move keeps it there. Without `pageBoxes` a turn is what it was.

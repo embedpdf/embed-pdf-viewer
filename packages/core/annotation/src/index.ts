@@ -274,6 +274,7 @@ export type {
   Message,
   ClickCreate,
   Placement,
+  PageBoxes,
   PointerInput,
   FieldValues,
   QuadRing,

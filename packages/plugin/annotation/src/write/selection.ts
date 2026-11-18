@@ -8,6 +8,7 @@ import {
   type Id,
   isSelectable,
   type ModelAnnotation,
+  type PageBoxes,
   type Rect,
   refOf,
   richDocOf,
@@ -89,6 +90,16 @@ export function createSelectionWrites(
       x: flips('x', 'width') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
       y: flips('y', 'height') ? -DUPLICATE_OFFSET : DUPLICATE_OFFSET,
     };
+  };
+
+  /** The box of each page the selection is on: where a turn keeps what it turned. */
+  const selectionPageBoxes = (): PageBoxes => {
+    const boxes: Record<number, Rect> = {};
+    for (const { annotation } of annotations.selectedRecords()) {
+      const box = geometry.pageBoxOf(annotation.page.objectNumber);
+      if (box) boxes[annotation.page.objectNumber] = box;
+    }
+    return boxes;
   };
 
   /** Commit a selection message; resolves with its outcome over the refs that were selected. */
@@ -213,11 +224,15 @@ export function createSelectionWrites(
     delete: (options: OperationOptions = {}) =>
       commitOverSelection(() => [store.commit({ type: 'delete' })], options.signal),
     rotateBy: async (degrees: 90 | -90, options: OperationOptions = {}) => {
-      const commit = store.commit({ type: 'rotateSelection', degrees });
+      const commit = store.commit({
+        type: 'rotateSelection',
+        degrees,
+        pageBoxes: selectionPageBoxes(),
+      });
       throwIfFailed(await ctx.cancellable(options.signal, commit.written));
     },
     resetRotation: async (options: OperationOptions = {}) => {
-      const commit = store.commit({ type: 'resetRotation' });
+      const commit = store.commit({ type: 'resetRotation', pageBoxes: selectionPageBoxes() });
       throwIfFailed(await ctx.cancellable(options.signal, commit.written));
     },
     getAnchor: () => chrome.selectionAnchor(),
