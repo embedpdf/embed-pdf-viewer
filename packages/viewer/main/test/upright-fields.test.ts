@@ -71,6 +71,17 @@ const until = (tab: Page, test: () => unknown, what: string) =>
     throw new Error(`timed out waiting for ${what}`);
   });
 
+/** The labels of the buttons the bar over the selection shows. */
+const selectionBarButtons = (tab: Page): Promise<string[]> =>
+  tab.evaluate(() => {
+    const bar = [...window.element.shadowRoot!.querySelectorAll('[role="toolbar"]')].find(
+      (element) => element.parentElement?.hasAttribute('data-placement'),
+    );
+    return [...(bar?.querySelectorAll('button') ?? [])]
+      .filter((button) => !button.closest('[aria-hidden="true"]'))
+      .map((button) => button.getAttribute('aria-label') ?? button.getAttribute('title') ?? '');
+  });
+
 /** The field the text tool placed last (`text_<n>`), or null. */
 const placedField = (tab: Page): Promise<Placed | null> =>
   tab.evaluate(() => {
@@ -244,6 +255,18 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('fields on a page shown 
         label: 'Rotate counterclockwise',
       },
     ]);
+    // Both are commands; the menu over the field shows one direction.
+    await until(
+      tab,
+      () =>
+        [...window.element.shadowRoot!.querySelectorAll('[role="toolbar"]')].some((bar) =>
+          bar.parentElement?.hasAttribute('data-placement'),
+        ),
+      'the menu over the field',
+    );
+    const shown = await selectionBarButtons(tab);
+    expect(shown).toContain('Rotate clockwise');
+    expect(shown).not.toContain('Rotate counterclockwise');
 
     await execute(tab, 'annotation:rotate-clockwise');
     await until(
