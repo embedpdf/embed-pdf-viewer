@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer-chrome",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": false,
   "description": "The interface of the EmbedPDF viewer as one React component: its toolbars, panels, document tabs and theme.",
   "type": "module",

@@ -1,5 +1,11 @@
 # @embedpdf/plugin-signature
 
+## 3.4.0
+
+### Patch Changes
+
+- [#1102](https://github.com/embedpdf/embed-pdf-viewer/pull/1102) by [@bobsingor](https://github.com/bobsingor) – `canFill()`, `fillField()` and `clearField()` now ask for the right the engine has always asked for: the right to sign the field (`doc.sign`, or `fields:sign` for its group), not the right to fill fields in. A mark in a signature field is its signer's to place. Before, a session that could only fill fields in was told `canFill()` and then refused by the engine, and a session that could only sign was refused by the plugin although the engine allowed it.
+
 ## 3.3.0
 
 ### Minor Changes

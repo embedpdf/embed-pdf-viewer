@@ -1,5 +1,13 @@
 # @embedpdf/web
 
+## 3.4.0
+
+### Patch Changes
+
+- [#1101](https://github.com/embedpdf/embed-pdf-viewer/pull/1101) by [@bobsingor](https://github.com/bobsingor) – Keep a form field's control square when the page rounds its own inputs. The form layer draws in your page, so a rule such as `input:focus-visible { border-radius: 8px }` rounded a focused text field and its focus ring, while the field in the PDF is square. Every native control the layer draws now sets its own corners: the text box, the dropdown, the list and the buttons.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Turn a form field's control with the field. `widgetBoxStyleOf()` places the box at the field's frame and turns it by the field's `rotation` about its middle, so the text box, checkbox, list or button over a turned field reads the way the field does, in every framework's `<FormLayer>`. A control over a turned field used to be laid out unturned across the field. Nothing changes for a field that isn't turned.
+
 ## 3.3.0
 
 ## 3.2.0

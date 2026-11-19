@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/react",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": false,
   "description": "React components and hooks for building your own PDF viewer with EmbedPDF.",
   "type": "module",

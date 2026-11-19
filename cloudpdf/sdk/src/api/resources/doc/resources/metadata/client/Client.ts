@@ -60,7 +60,7 @@ export class MetadataClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
