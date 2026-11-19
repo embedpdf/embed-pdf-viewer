@@ -1,5 +1,13 @@
 # @embedpdf/engine-services
 
+## 3.4.0
+
+### Patch Changes
+
+- [#1102](https://github.com/embedpdf/embed-pdf-viewer/pull/1102) by [@bobsingor](https://github.com/bobsingor) – Let a signer whose signing is limited to a group add a document timestamp when they hold `doc.sign`. A document timestamp names no field, so it is the document's to sign, but it was checked as a field in no group: with any `fields:sign` permission in the scope it failed with `permission denied (target): doc.sign`, also when the scope had `doc.sign`. The validation data was stored and the timestamp after it was refused. Signing fields stays as narrow as before: `doc.sign` beside a `fields:sign` permission signs no field in another group or in none.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Keep the mark in a signature field fitted when the field changes. A mark, a signature's or one drawn in with `forms.setSignatureAppearance()`, is a drawing fitted into the field's box. Until now a resize stretched it to the new size and a new turn left it as it was. It is now fitted again whenever the widget's box or its turn (`rotation`) changes, the way a stamp's drawing is: by the fit it records, and a signature's by `contain`. A move alone still writes nothing but where the widget stands.
+
 ## 3.3.0
 
 ### Minor Changes

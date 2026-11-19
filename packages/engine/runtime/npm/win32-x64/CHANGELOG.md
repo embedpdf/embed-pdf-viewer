@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime-win32-x64
 
+## 3.4.0
+
 ## 3.3.0
 
 ## 3.2.0
