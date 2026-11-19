@@ -17,6 +17,7 @@ export {
 export { Toc, useSectionSpy, type TocItem } from './toc';
 export { DocsMobileBar } from './mobile-bar';
 export { pageSupportsEngine, type DocsEngine, type DocsSiteBinding } from './axis';
+export { sidebarPageMap } from './page-map';
 export { Heading, createHeading, HEADING_STYLES } from './heading';
 export { MethodBadge, methodStyle } from './method-badge';
 export { Pre } from './pre';
