@@ -36,10 +36,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  CHILD_PROCESS_FRAMEWORKS,
   compile,
   contentRoot,
   FRAMEWORK_LABELS,
   FRAMEWORKS,
+  readJson,
   removeRunDirectory,
   repoRoot,
   runDirectory,
@@ -606,49 +608,80 @@ const verdicts = (results, integrations) =>
   );
 
 /**
- * Compile the headless snippets, one framework at a time, as written: a per-site version under
- * its own name beside the shared one (`x.cloud.tsx`).
+ * Run groups of compile jobs (`{ framework, run }`) side by side, and return each group's results
+ * by framework. The child-process compilers (`CHILD_PROCESS_FRAMEWORKS`) start first and work
+ * while the others compile here, one after another.
  */
-async function checkHeadless(runRoot, snippets) {
-  const results = {};
-  for (const framework of FRAMEWORKS) {
-    results[framework] = await compileStaged(
-      framework,
-      stage(framework, snippets, path.join(runRoot, framework)),
-    );
+async function compileSideBySide(groups) {
+  const jobs = groups.flat();
+  const running = new Map();
+  for (const job of jobs) {
+    if (CHILD_PROCESS_FRAMEWORKS.has(job.framework)) running.set(job, job.run());
   }
-  return results;
+  for (const job of jobs) {
+    if (!running.has(job)) running.set(job, job.run());
+  }
+  const results = new Map(
+    await Promise.all([...running].map(async ([job, result]) => [job, await result])),
+  );
+  return groups.map((group) =>
+    Object.fromEntries(group.map((job) => [job.framework, results.get(job)])),
+  );
 }
 
 /**
- * Compile the viewer's snippets as `engine`'s site shows them (`siteSnippets`, from `forSite`):
- * the frameworks' against that site's viewer at its source, and the plain HTML pages, with the
- * code the pages show themselves (`viewer.mjs`).
+ * The headless snippets' compile jobs, one per framework, as written: a per-site version under its
+ * own name beside the shared one (`x.cloud.tsx`).
  */
-async function checkViewer(runRoot, siteSnippets, pages, engine) {
+function headlessJobs(runRoot, snippets) {
+  return FRAMEWORKS.map((framework) => ({
+    framework,
+    run: () => compileStaged(framework, stage(framework, snippets, path.join(runRoot, framework))),
+  }));
+}
+
+/**
+ * The viewer's snippets as `engine`'s site shows them (`siteSnippets`, from `forSite`): its
+ * compile jobs, the frameworks' against that site's viewer at its source and the plain HTML pages
+ * with the code the pages show themselves (`viewer.mjs`), and `status(results)`, each page's
+ * status from what they report.
+ */
+function viewerCheck(runRoot, siteSnippets, pages, engine) {
   const read = (snippet) =>
     engine === 'local'
       ? readSnippet(snippet.file) // as written, so an error's line is the file's
       : transformViewerFile(readSnippet(snippet.file), engine, snippet.emitAs);
-  const results = {};
-  for (const framework of FRAMEWORKS) {
-    const root = path.join(runRoot, `viewer-${engine}-${framework}`);
-    results[framework] = await compileStaged(
-      framework,
-      stage(framework, siteSnippets, root, { viewer: true, read }),
-    );
-  }
   const byFile = new Map(siteSnippets.map((snippet) => [snippet.file, snippet]));
   const readFile = (file) => read(byFile.get(file));
-  results.vanilla = await checkVanilla(
-    siteSnippets,
-    pages,
-    path.join(runRoot, `viewer-${engine}-vanilla`),
-    snippetsRoot,
-    { engine, read: readFile },
-  );
-  addInstallErrors(siteSnippets, results, readFile);
-  return { results, status: viewerPageStatus(pages, siteSnippets, results, engine) };
+  const jobs = [
+    ...FRAMEWORKS.map((framework) => ({
+      framework,
+      run: () =>
+        compileStaged(
+          framework,
+          stage(framework, siteSnippets, path.join(runRoot, `viewer-${engine}-${framework}`), {
+            viewer: true,
+            read,
+          }),
+        ),
+    })),
+    {
+      framework: 'vanilla',
+      run: () =>
+        checkVanilla(
+          siteSnippets,
+          pages,
+          path.join(runRoot, `viewer-${engine}-vanilla`),
+          snippetsRoot,
+          { engine, read: readFile },
+        ),
+    },
+  ];
+  const status = (results) => {
+    addInstallErrors(siteSnippets, results, readFile);
+    return viewerPageStatus(pages, siteSnippets, results, engine);
+  };
+  return { jobs, status };
 }
 
 /**
@@ -686,13 +719,15 @@ function viewerPageStatus(pages, snippets, results, engine) {
 }
 
 /**
- * Compile every framework's snippets, write `generated/snippet-status.json` and print a summary.
- * Returns the status per site (`sites.local` is embedpdf.com, `sites.cloud` cloudpdf.com): for
- * each, `headless` and `viewer`, each with `frameworks` (the compilers' verdicts) and `pages`
- * (the viewer's named `viewer/setup`). Snippets that don't compile never fail it; a compiler that
- * crashes leaves its framework "not compiling", with why.
+ * Compile the snippets of the sites `engines` names (every site unless told), write their part of
+ * `generated/snippet-status.json` and print a summary; another site's part stays as it was, so a
+ * site's build checks only its own. Returns the status per site checked (`sites.local` is
+ * embedpdf.com, `sites.cloud` cloudpdf.com): for each, `headless` and `viewer`, each with
+ * `frameworks` (the compilers' verdicts) and `pages` (the viewer's named `viewer/setup`). Snippets
+ * that don't compile never fail it; a compiler that crashes leaves its framework "not compiling",
+ * with why.
  */
-export async function checkSnippets() {
+export async function checkSnippets({ engines = SITES } = {}) {
   const started = performance.now();
   const snippets = readSnippets();
   const headlessSnippets = snippets.filter((s) => DOCS.headless.owns(s.file));
@@ -704,13 +739,26 @@ export async function checkSnippets() {
   const summaries = [];
   const shownOn = { headless: [], viewer: [] };
   try {
-    const headless = await checkHeadless(runRoot, headlessSnippets);
-    for (const engine of SITES) {
-      const headlessPages = readPages(DOCS.headless, engine);
+    const checked = engines.map((engine) => {
       const viewerPages = readPages(DOCS.viewer, engine);
-      const siteHeadless = forSite(headlessSnippets, engine);
       const siteViewer = forSite(viewerSnippets, engine);
-      const viewer = await checkViewer(runRoot, siteViewer, viewerPages, engine);
+      return {
+        engine,
+        headlessPages: readPages(DOCS.headless, engine),
+        siteHeadless: forSite(headlessSnippets, engine),
+        viewerPages,
+        siteViewer,
+        viewer: viewerCheck(runRoot, siteViewer, viewerPages, engine),
+      };
+    });
+    const [headless, ...viewerResults] = await compileSideBySide([
+      headlessJobs(runRoot, headlessSnippets),
+      ...checked.map((site) => site.viewer.jobs),
+    ]);
+    checked.forEach((site, index) => {
+      const { engine, headlessPages, siteHeadless, viewerPages, siteViewer } = site;
+      const viewer = viewerResults[index];
+      const viewerPageStatuses = site.viewer.status(viewer);
       shownOn.headless.push(headlessPages);
       shownOn.viewer.push(viewerPages);
       sites[engine] = {
@@ -719,33 +767,30 @@ export async function checkSnippets() {
           pages: headlessPageStatus(headlessPages, siteHeadless, headless),
         },
         viewer: {
-          frameworks: verdicts(viewer.results, VIEWER_INTEGRATIONS),
-          pages: viewer.status,
+          frameworks: verdicts(viewer, VIEWER_INTEGRATIONS),
+          pages: viewerPageStatuses,
         },
       };
       const label = SITE_LABELS[engine];
       summaries.push(
         [`Headless on ${label}`, sites[engine].headless.pages, headless, siteHeadless, FRAMEWORKS],
-        [
-          `Viewer on ${label}`,
-          sites[engine].viewer.pages,
-          viewer.results,
-          siteViewer,
-          VIEWER_INTEGRATIONS,
-        ],
+        [`Viewer on ${label}`, viewerPageStatuses, viewer, siteViewer, VIEWER_INTEGRATIONS],
       );
-    }
+    });
   } finally {
     removeRunDirectory(runRoot);
   }
 
   const status = { sites };
-  writeJson(statusFile, status);
+  writeJson(statusFile, { sites: { ...readJson(statusFile, {}).sites, ...sites } });
   const seconds = (performance.now() - started) / 1000;
   console.log(`Snippets, ${seconds.toFixed(1)}s:`);
   for (const summary of summaries) printSummary(...summary);
-  printUnused('Headless', headlessSnippets, shownOn.headless);
-  printUnused('Viewer', viewerSnippets, shownOn.viewer);
+  // A snippet no page shows can be told only from every site's pages.
+  if (engines.length === SITES.length) {
+    printUnused('Headless', headlessSnippets, shownOn.headless);
+    printUnused('Viewer', viewerSnippets, shownOn.viewer);
+  }
   console.log(`Wrote ${path.relative(process.cwd(), statusFile) || statusFile}.`);
   return status;
 }

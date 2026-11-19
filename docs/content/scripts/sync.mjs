@@ -33,9 +33,10 @@
  *
  * `--check` also runs the headless reference check (`reference.mjs`): the pages
  * list every public member of every plugin, and nothing the code doesn't have.
- * Then it compiles the snippets and writes which pages are live, per site
- * (`publish-gate.mjs`), which the site's build reads. That part only reports: a
- * snippet that doesn't compile holds its page back, never the build.
+ * Then it compiles the snippets the `--engine` site shows and writes which of
+ * its pages are live (`publish-gate.mjs`), which the site's build reads. That
+ * part only reports: a snippet that doesn't compile holds its page back, never
+ * the build.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -694,7 +695,7 @@ async function main() {
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);
     await checkReference();
-    await writePublishStatus();
+    await writePublishStatus({ engines: [args.engine] });
     return;
   }
 

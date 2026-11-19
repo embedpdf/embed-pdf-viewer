@@ -10,9 +10,9 @@
     "docs:check": "node ../docs/content/scripts/sync.mjs --target . --engine local --check && tsx ../docs/content/scripts/readmes.mjs --engine local --check",
     "docs:sync": "node ../docs/content/scripts/sync.mjs --target . --engine local && tsx ../docs/content/scripts/readmes.mjs --engine local",
     "og:preview": "node ../docs/kit/scripts/collect-og-cards.mjs",
-    "prebuild": "pnpm run docs:check",
-    "search:index": "node ../docs/content/scripts/publish-gate.mjs --if-missing && tsx scripts/build-search-index.ts",
-    "search:index:build": "node ../docs/content/scripts/publish-gate.mjs --if-missing && tsx scripts/build-search-index.ts --if-configured",
+    "prebuild": "pnpm run docs:check && pnpm run search:index:build",
+    "search:index": "node ../docs/content/scripts/publish-gate.mjs --engine local --if-missing && tsx scripts/build-search-index.ts",
+    "search:index:build": "node ../docs/content/scripts/publish-gate.mjs --engine local --if-missing && tsx scripts/build-search-index.ts --if-configured",
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples"

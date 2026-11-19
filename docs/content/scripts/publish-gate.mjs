@@ -2,9 +2,10 @@
 /**
  * The publish gate: which docs pages are live, for which framework.
  *
- *   node scripts/publish-gate.mjs               check the snippets, write generated/live-pages.json
- *   node scripts/publish-gate.mjs --if-missing  the same, only when there's no live-pages.json yet
- *   node scripts/publish-gate.mjs --strict      the same, and fail as CI does (`strictProblems`)
+ *   node scripts/publish-gate.mjs                 check the snippets, write generated/live-pages.json
+ *   node scripts/publish-gate.mjs --engine cloud  the same, for one site's pages only (a site's build)
+ *   node scripts/publish-gate.mjs --if-missing    the same, only when the file has no part for it yet
+ *   node scripts/publish-gate.mjs --strict        the same, and fail as CI does (`strictProblems`)
  *
  * A headless page is live for a framework when its snippets compile for it (`snippets.mjs`) and
  * it names nothing pending in `../reference.mjs`. A pending name holds back the pages whose
@@ -32,7 +33,7 @@ import { ENGINES } from '../engines.mjs';
 import { READMES } from '../readmes.mjs';
 import { REFERENCE } from '../reference.mjs';
 import { VIEWER_PENDING } from '../viewer-pending.mjs';
-import { FRAMEWORK_LABELS, FRAMEWORKS, VIEWER_INTEGRATIONS } from './compile.mjs';
+import { FRAMEWORK_LABELS, FRAMEWORKS, readJson, VIEWER_INTEGRATIONS } from './compile.mjs';
 import { checkSnippets, writeJson } from './snippets.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -157,12 +158,13 @@ function printLive(title, pages, frameworks) {
 }
 
 /**
- * Check the snippets, then write which page is live for which framework on each site: its
- * headless pages and its viewer pages, in one `pages` per site. Returns them per site, and the
+ * Check the snippets of the sites `engines` names (every site unless told), then write which page
+ * is live for which framework on each: its headless pages and its viewer pages, in one `pages` per
+ * site. Another site's part of the file stays as it was. Returns them per site checked, and the
  * snippet status they come from.
  */
-export async function writePublishStatus() {
-  const snippets = await checkSnippets();
+export async function writePublishStatus({ engines } = {}) {
+  const snippets = await checkSnippets({ engines });
   const viewerPages = Object.assign(
     {},
     ...Object.values(snippets.sites).map((site) => site.viewer.pages),
@@ -177,12 +179,15 @@ export async function writePublishStatus() {
     };
   }
   writeJson(livePagesFile, {
-    sites: Object.fromEntries(
-      Object.entries(sites).map(([engine, { headless, viewer }]) => [
-        engine,
-        { pages: { ...headless, ...viewer } },
-      ]),
-    ),
+    sites: {
+      ...readJson(livePagesFile, {}).sites,
+      ...Object.fromEntries(
+        Object.entries(sites).map(([engine, { headless, viewer }]) => [
+          engine,
+          { pages: { ...headless, ...viewer } },
+        ]),
+      ),
+    },
   });
 
   for (const [engine, { headless, viewer }] of Object.entries(sites)) {
@@ -268,12 +273,19 @@ export function strictProblems(snippets, readmePages = readmeViewerPages()) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  if (process.argv.includes('--if-missing') && fs.existsSync(livePagesFile)) {
+  const engineIndex = process.argv.indexOf('--engine');
+  const engines = engineIndex === -1 ? Object.keys(ENGINES) : [process.argv[engineIndex + 1]];
+  if (engines.some((engine) => !ENGINES[engine])) {
+    throw new Error(`--engine must be one of: ${Object.keys(ENGINES).join(', ')}`);
+  }
+  const written = readJson(livePagesFile, {}).sites ?? {};
+  if (process.argv.includes('--if-missing') && engines.every((engine) => written[engine])) {
     console.log(
-      `${path.relative(process.cwd(), livePagesFile)} exists; not checking the snippets again.`,
+      `${path.relative(process.cwd(), livePagesFile)} has ${engines.join(' and ')}; ` +
+        'not checking the snippets again.',
     );
   } else {
-    const { snippets } = await writePublishStatus();
+    const { snippets } = await writePublishStatus({ engines });
     const problems = process.argv.includes('--strict') ? strictProblems(snippets) : [];
     for (const problem of problems) {
       console.error(process.env.GITHUB_ACTIONS ? `::error::${problem}` : `error: ${problem}`);

@@ -9,7 +9,7 @@
  * resolve to their source, so nothing needs building first. Every run also compiles a canary, a
  * file with known errors: a compiler that doesn't report them isn't checking, and fails the run.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -520,12 +520,42 @@ function unexportedDeclarations(ts, file) {
   });
 }
 
-const runTool = (entry, args, cwd) =>
-  spawnSync(process.execPath, [entry, ...args], {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
+/**
+ * Run a compiler in a child process. Its output goes to files beside `cwd`, so the child never
+ * waits for this process to read it while this process compiles another tree.
+ */
+function runTool(entry, args, cwd) {
+  const outputs = { stdout: `${cwd}.stdout`, stderr: `${cwd}.stderr` };
+  const stdout = fs.openSync(outputs.stdout, 'w');
+  const stderr = fs.openSync(outputs.stderr, 'w');
+  return new Promise((resolve) => {
+    let finished = false;
+    const finish = (status, error) => {
+      if (finished) return;
+      finished = true;
+      fs.closeSync(stdout);
+      fs.closeSync(stderr);
+      resolve({
+        status,
+        error,
+        stdout: fs.readFileSync(outputs.stdout, 'utf8'),
+        stderr: fs.readFileSync(outputs.stderr, 'utf8'),
+      });
+    };
+    const child = spawn(process.execPath, [entry, ...args], {
+      cwd,
+      stdio: ['ignore', stdout, stderr],
+    });
+    child.on('error', (error) => finish(null, error));
+    child.on('close', (status) => finish(status));
   });
+}
+
+/**
+ * The frameworks whose compiler runs in a child process (`vue-tsc`, `svelte-check`). `tsc` and
+ * `ngc` compile in this process, so only one of those runs at a time.
+ */
+export const CHILD_PROCESS_FRAMEWORKS = new Set(['vue', 'svelte']);
 
 /** The first line of a tool's output that says something, for a reason it failed. */
 const firstLine = (run) =>
@@ -538,7 +568,11 @@ const firstLine = (run) =>
 async function compileWithVueTsc(root) {
   const tool = findTool('vue-tsc', 'bin/vue-tsc.js');
   if (!tool) return { tool: null, reason: "vue-tsc isn't installed in website/" };
-  const run = runTool(tool.entry, ['--noEmit', '--pretty', 'false', '-p', 'tsconfig.json'], root);
+  const run = await runTool(
+    tool.entry,
+    ['--noEmit', '--pretty', 'false', '-p', 'tsconfig.json'],
+    root,
+  );
   // `file(line,column): error TS1234: message`, a message's later lines indented under it.
   const diagnostics = [];
   for (const line of `${run.stdout}${run.stderr}`.split('\n')) {
@@ -564,7 +598,7 @@ async function compileWithVueTsc(root) {
 async function compileWithSvelteCheck(root) {
   const tool = findTool('svelte-check', 'bin/svelte-check');
   if (!tool) return { tool: null, reason: "svelte-check isn't installed in website/" };
-  const run = runTool(
+  const run = await runTool(
     tool.entry,
     [
       '--workspace',
@@ -656,6 +690,11 @@ export async function compile(framework, root, checks = () => true) {
     ...result,
     diagnostics: result.diagnostics.filter(({ file }) => !file || !isCanary(root, file)),
   };
+}
+
+/** The JSON in `file`, or `fallback` when there's no such file. */
+export function readJson(file, fallback) {
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : fallback;
 }
 
 /** Write through a temporary file, so a build reading it never sees half of it. */
