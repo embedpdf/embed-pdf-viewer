@@ -1,7 +1,7 @@
 import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
-import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
+import ts from 'typescript';
 
 const SRC = 'src';
 const DIST = 'dist';
@@ -33,7 +33,32 @@ const nodeExternal = (id) =>
 const browserExternal = (id) =>
   id === '@embedpdf/engine-runtime-wasm32' || id.startsWith('@embedpdf/engine-runtime-wasm32/');
 
-const plugins = () => [typescript(), nodeResolve({ extensions: ['.js', '.ts'] })];
+const { options: compilerOptions } = ts.parseJsonConfigFileContent(
+  ts.readConfigFile('tsconfig.json', ts.sys.readFile).config,
+  ts.sys,
+  '.',
+);
+
+// Each file is transpiled on its own, as `verbatimModuleSyntax` allows, and the
+// build script type-checks the package once (`tsc --noEmit`). A TypeScript
+// watch program per output, as @rollup/plugin-typescript runs, takes minutes to
+// close here.
+const transpile = () => ({
+  name: 'transpile-typescript',
+  transform(code, id) {
+    if (!id.endsWith('.ts')) return null;
+    const { outputText, sourceMapText } = ts.transpileModule(code, {
+      fileName: id,
+      compilerOptions: { ...compilerOptions, declaration: false, sourceMap: true },
+    });
+    return {
+      code: outputText.replace(/\n\/\/# sourceMappingURL=\S+\s*$/, '\n'),
+      map: sourceMapText,
+    };
+  },
+});
+
+const plugins = () => [transpile(), nodeResolve({ extensions: ['.js', '.ts'] })];
 
 export default [
   {
