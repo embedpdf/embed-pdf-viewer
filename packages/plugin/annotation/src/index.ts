@@ -19,6 +19,9 @@ export {
   resolveClickPlacement,
   type Placement,
 } from '@embedpdf/core-annotation';
+// A form widget's Orientation, as the `box` and `rotation` an update takes:
+// `selection.update((annotation) => orientationPatch(annotation, 90))`.
+export { orientationPatch } from '@embedpdf/core-annotation';
 export { widgetAppearanceOf } from './authoring';
 export { DEFAULT_TOOLS } from './tools/definitions';
 export type {

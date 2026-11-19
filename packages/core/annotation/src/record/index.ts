@@ -20,7 +20,7 @@ import type { ModelAnnotation } from '../types';
 import { shapeOf } from './shape';
 
 export { groupOf, irtOf, kindOf, refOf } from './identity';
-export { shapeOf, withShape } from './shape';
+export { orientationPatch, shapeOf, withShape } from './shape';
 export { styleOf } from './style';
 export { textOf } from './text';
 export { withValues } from './values';

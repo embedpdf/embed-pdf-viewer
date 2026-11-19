@@ -1,3 +1,4 @@
+import { appearanceRaster, maxShiftedDifference, quarterTurned } from './appearanceRasters';
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { TWO_PAGES_PDF } from './runFormTransferConformance';
@@ -16,7 +17,8 @@ import { toPageRef } from '../identity/PageRef';
  * file holds counterclockwise), and `rect` where it stands on the page, the
  * box turned. On both engines: Acrobat's turned fields read so, a placement
  * turns a new field, an update turns, moves and resizes one, undo puts it
- * back, and a form bundle carries the turn.
+ * back, a form bundle carries the turn, and a mark in a signature field is
+ * fitted into the frame and turns with it.
  *
  * It runs on {@link TURNED_FIELDS_PDF}.
  */
@@ -27,6 +29,11 @@ export interface WidgetRotationConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open a fresh document of `bytes` with every scope. */
   open: (engine: Engine, bytes: Uint8Array) => Promise<DocumentHandle>;
+  /**
+   * Whether a signing completes on this engine with a placeholder CMS, so
+   * a signed field's mark can be turned. Default `true`.
+   */
+  completesSignings?: boolean;
 }
 
 const field = (name: string, rect: string, mk: string, page = 3) =>
@@ -61,6 +68,26 @@ export const TURNED_FIELDS_PDF = pdfOf([
 ]);
 
 const FIRST = toPageRef(3);
+
+const MARK_DRAWING = '1 0 0 rg 0 0 40 40 re f 0 0 1 rg 40 30 80 10 re f';
+
+/**
+ * A one-page PDF to draw into a signature field, 120 × 40: red over its left
+ * third, a blue bar along the rest of its top edge. Turned any way it looks
+ * like no other turn of it.
+ */
+const MARK_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 120 40] /Contents 4 0 R >>',
+  `<< /Length ${MARK_DRAWING.length} >>\nstream\n${MARK_DRAWING}\nendstream`,
+]);
+
+/** A DER `SEQUENCE`: what a completion takes as a CMS, without judging it. */
+const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
+
+/** The frame of a signature field as wide and as tall as the mark. */
+const MARK_FRAME: PageBox = { x: 150, y: 20, width: 120, height: 40 };
 
 /** `box` with its sides swapped about its middle: where it stands turned a quarter. */
 const swapped = (box: PageBox): PageBox => ({
@@ -120,6 +147,25 @@ export function runWidgetRotationConformance(
         () => null,
         (error: unknown) => error,
       );
+
+    /** A new signature field with the mark drawn into it; its widget's row. */
+    const markedField = async (
+      doc: DocumentHandle,
+      name: string,
+      placement: { box: PageBox; rotation?: 90 | 180 | 270 },
+    ): Promise<WidgetAnnotation> => {
+      const { field } = await doc.forms.create({
+        kind: 'signature',
+        name,
+        widgets: [{ page: FIRST, ...placement }],
+      });
+      await doc.forms.setSignatureAppearance(field.ref, { pdf: MARK_PDF });
+      return rowOf(doc, name);
+    };
+
+    /** The widget as the page shows it: the pixels of its appearance. */
+    const drawn = (doc: DocumentHandle, row: WidgetAnnotation) =>
+      appearanceRaster(doc.page(FIRST), row.ref, 'forms');
 
     test('/MK /R reads as the clockwise turn, with the box it turns; rect is where it stands', async () => {
       await withDoc(async (doc) => {
@@ -256,6 +302,80 @@ export function runWidgetRotationConformance(
         expectBox(back.rect, row.rect);
         await doc.apply({ undoOf: undo.meta.opId });
         expect((await rowOf(doc, 'r180')).rotation).toBe(90);
+      });
+    });
+
+    test('a mark drawn into a turned signature field is fitted into its frame and turned with it', async () => {
+      await withDoc(async (doc) => {
+        const upright = await drawn(doc, await markedField(doc, 'plain', { box: MARK_FRAME }));
+        const turned = await markedField(doc, 'turned', {
+          box: { ...MARK_FRAME, y: 120 },
+          rotation: 90,
+        });
+        expect(turned.hasMark).toBe(true);
+        expectBox(turned.rect, swapped(turned.box));
+        const raster = await drawn(doc, turned);
+        expect([raster.width, raster.height]).toEqual([upright.height, upright.width]);
+        expect(maxShiftedDifference(raster, quarterTurned(upright)) <= 3).toBe(true);
+      });
+    });
+
+    test('a turn turns the mark in a field, a new frame fits it again, and undo puts it back', async () => {
+      await withDoc(async (doc) => {
+        const row = await markedField(doc, 'marked', { box: MARK_FRAME });
+        const upright = await drawn(doc, row);
+
+        const turned = await doc.forms.updateWidget(row.ref, { rotation: 90 });
+        expect(turned.appearance.changed).toBe(true);
+        expect(turned.widget.hasMark).toBe(true);
+        expect(maxShiftedDifference(await drawn(doc, row), quarterTurned(upright)) <= 3).toBe(true);
+
+        // Acrobat's Orientation: the frame swaps its sides where the widget
+        // stands. The mark is fitted into it as into a new field's.
+        const oriented = await doc.forms.updateWidget(row.ref, {
+          rotation: null,
+          box: turned.widget.rect,
+        });
+        const fresh = await markedField(doc, 'fresh', {
+          box: { ...turned.widget.rect, x: 40 },
+        });
+        expect(maxShiftedDifference(await drawn(doc, row), await drawn(doc, fresh)) <= 3).toBe(
+          true,
+        );
+
+        await doc.apply({ undoOf: oriented.meta.opId });
+        await doc.apply({ undoOf: turned.meta.opId });
+        expect((await rowOf(doc, 'marked')).rotation).toBe(null);
+        expect(maxShiftedDifference(await drawn(doc, row), upright) <= 3).toBe(true);
+      });
+    });
+
+    test("a signed field's mark turns with it as well", async () => {
+      if (options.completesSignings === false) return;
+      await withDoc(async (doc) => {
+        // An engine that doesn't sign has no signed field to turn.
+        if (!doc.signatures) return;
+        const { field } = await doc.forms.create({
+          kind: 'signature',
+          name: 'signed',
+          widgets: [{ page: FIRST, box: MARK_FRAME }],
+        });
+        const prepared = await doc.signatures.prepare({
+          field: field.ref,
+          signer: { name: 'Signer' },
+          appearance: { pdf: MARK_PDF },
+        });
+        await doc.signatures.complete({
+          signingId: prepared.signingId,
+          cms: PLACEHOLDER_CMS,
+          expectedVersion: prepared.expectedVersion,
+        });
+        const row = await rowOf(doc, 'signed');
+        expect(row.hasMark).toBe(true);
+        const upright = await drawn(doc, row);
+
+        await doc.forms.updateWidget(row.ref, { rotation: 90 });
+        expect(maxShiftedDifference(await drawn(doc, row), quarterTurned(upright)) <= 3).toBe(true);
       });
     });
 

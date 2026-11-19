@@ -54,5 +54,6 @@ FormWidgetLook [InterfaceDeclaration] (from packages/plugin/form/src/model.ts): 
 WidgetActivationResult [TypeAliasDeclaration]: export type WidgetActivationResult = |{ status: 'form'; result: FormCommitResult} |{ status: 'dispatched'; result: ActionTriggerResult} ;
 WidgetAddress [TypeAliasDeclaration]: export type WidgetAddress = AnnotationRef | FormWidget;
 WidgetAnnotation [TypeAliasDeclaration] (from packages/engine/core/src/annotation/kinds/widget/index.ts): export type WidgetAnnotation<C extends Coordinates = PageCoordinates> = ReadOf< typeof WidgetDeclaration, C >;
-WidgetHit [InterfaceDeclaration] (from packages/plugin/form/src/model.ts): export interface WidgetHit{ readonly annotObjectNumber: number; readonly field: FormField; readonly box: Box; }
+WidgetHit [InterfaceDeclaration] (from packages/plugin/form/src/model.ts): export interface WidgetHit extends WidgetPlace{ readonly annotObjectNumber: number; readonly field: FormField; }
+WidgetPlace [InterfaceDeclaration] (from packages/plugin/form/src/model.ts): export interface WidgetPlace{ readonly box: Box; readonly rotation: 0 | 90 | 180 | 270; readonly rect: Box; }
 toFieldRef [FunctionDeclaration] (from packages/engine/core/src/identity/FormFieldRef.ts): export function toFieldRef(name: string): FormFieldRef{ return{ kind: 'fqn', name} ; }

@@ -354,7 +354,9 @@ export interface Behavior {
  * a tool, they are its kind's, with its defaults over the engine's. The
  * border's value is three keys (`borderStyle`, `dashArray`,
  * `cloudyIntensity`); a text's font, size, colour and alignment read as the
- * text shows (a free text's `fontColor` follows its `color` when it has none).
+ * text shows (a free text's `fontColor` follows its `color` when it has none);
+ * a selection of form widgets has `orientation`, their `rotation` as the
+ * choice's value (`'0'` upright), written with `orientationPatch`.
  */
 export interface AnnotationProperties {
   readonly properties: readonly AnnotationProperty[];
@@ -619,9 +621,13 @@ export interface AnnotationSelectionCapability {
   getProperties(): AnnotationProperties;
   /** Delete every selected annotation. */
   delete(options?: OperationOptions): Promise<BatchResult<AnnotationRef, AnnotationRef>>;
-  /** Turn the selection a quarter turn: `90` clockwise, `-90` the other way. */
+  /**
+   * Turn the selection a quarter turn: `90` clockwise, `-90` the other way.
+   * What turned stays on its page: where the turn would carry it past the
+   * page's edge, it moves the least that keeps it on the page.
+   */
   rotateBy(degrees: 90 | -90, options?: OperationOptions): Promise<void>;
-  /** Turn the selection upright again. */
+  /** Turn the selection upright again, kept on its page as `rotateBy()` keeps it. */
   resetRotation(options?: OperationOptions): Promise<void>;
   /** Make the selected annotations one group, saved the way Acrobat saves it. */
   group(options?: OperationOptions): Promise<void>;

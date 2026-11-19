@@ -242,6 +242,17 @@ export function transposedAboutCenter(rect: Rect): Rect {
   };
 }
 
+/**
+ * The upright rect a box stands in once turned `deg` about its middle: the
+ * box itself at 0 and 180, its sides swapped at 90 and 270 (exact, no
+ * rounding), and the box around its turned corners at any other angle.
+ */
+export function standingRect(box: Rect, deg: number): Rect {
+  const turn = normalizeDeg(deg);
+  if (turn % 90 !== 0) return rotatedAabb(box, turn);
+  return turn % 180 === 0 ? box : transposedAboutCenter(box);
+}
+
 const rotateAboutM = (pivot: Point, deg: number): Mat2D<'page', 'page'> =>
   rotateAbout(pivot as PointIn<'page'>, deg * DEG2RAD);
 

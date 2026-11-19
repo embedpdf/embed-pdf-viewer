@@ -48,10 +48,19 @@ export async function appearanceRasters(page: PageHandle): Promise<Map<string, R
   return rasters;
 }
 
-export async function appearanceRaster(page: PageHandle, ref: AnnotationRef): Promise<Raster> {
+/**
+ * One annotation's normal appearance at scale 1. A widget's is among the
+ * page's form (`from: 'forms'`), every other annotation's among its
+ * annotations.
+ */
+export async function appearanceRaster(
+  page: PageHandle,
+  ref: AnnotationRef,
+  from: 'annotations' | 'forms' = 'annotations',
+): Promise<Raster> {
   const key = annotationKey(ref);
   if (isLocalPage(page)) {
-    const { appearances } = await page.annotations.renderAppearancesRaw({
+    const { appearances } = await page[from].renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });
     const found = appearances.find((a) => annotationKey(a.ref) === key && a.mode === 'normal');
@@ -67,7 +76,7 @@ export async function appearanceRaster(page: PageHandle, ref: AnnotationRef): Pr
     }
     return { width: raster.width, height: raster.height, rgba };
   }
-  const { appearances } = await page.annotations.renderAppearances({
+  const { appearances } = await page[from].renderAppearances({
     format: 'png',
     viewport: { kind: 'scale', scale: 1 },
   });
@@ -76,6 +85,20 @@ export async function appearanceRaster(page: PageHandle, ref: AnnotationRef): Pr
     throw new Error(`no appearance image rendered for ${key}`);
   }
   return decodePng(found.image.source.bytes);
+}
+
+/** `raster` turned a quarter turn clockwise. */
+export function quarterTurned(raster: Raster): Raster {
+  const { width, height } = raster;
+  const rgba = new Uint8Array(raster.rgba.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const from = (y * width + x) * 4;
+      const to = (x * height + (height - 1 - y)) * 4;
+      rgba.set(raster.rgba.subarray(from, from + 4), to);
+    }
+  }
+  return { width: height, height: width, rgba };
 }
 
 export function maxAlpha(raster: Raster): number {

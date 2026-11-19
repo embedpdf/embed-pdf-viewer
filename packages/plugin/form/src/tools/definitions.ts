@@ -4,7 +4,8 @@
  * annotation tool/style registration (full viewer), active-tool → field
  * kind lookup, click placement, and default appearance. With the
  * annotation plugin each tool shows a ghost: the field a click places, drawn
- * with the tool's defaults where it will land.
+ * with the tool's defaults where it will land. Every tool places upright: on
+ * a page shown turned, its field reads as the author sees the page.
  *
  * "One tool system, two commit planes": the tools live in the annotation
  * registry when that plugin is present (defaults, style panel, click-create —
@@ -34,6 +35,14 @@ export interface FormToolDefinition {
     | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
+  /**
+   * Place the field as the author sees the page: on a page shown turned, it
+   * shows the click's size as seen and its contents are turned to read
+   * upright there (a quarter turn, `/MK /R`), as Acrobat places a field on a
+   * rotated page. With the annotation plugin, the tool registered there
+   * decides (an app may change it); this is its value without it.
+   */
+  upright: boolean;
   /** Seed drawing defaults, the widget's appearance fields: a placed field is
    *  visible (white box, gray border) and restylable per tool through the
    *  shared style panel. */
@@ -56,6 +65,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'text',
     visualKind: 'widget-text',
     clickCreate: { width: 160, height: 24 },
+    upright: true,
     defaults: { ...FIELD_CHROME, fontSize: 12 },
     cursor: 'crosshair',
   },
@@ -64,6 +74,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'checkbox',
     visualKind: 'widget-toggle',
     clickCreate: { width: 18, height: 18 },
+    upright: true,
     defaults: FIELD_CHROME,
     cursor: 'crosshair',
   },
@@ -73,6 +84,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     // Round, as the engine draws a radio button: its ghost and its placement too.
     visualKind: 'widget-radio',
     clickCreate: { width: 18, height: 18 },
+    upright: true,
     defaults: FIELD_CHROME,
     cursor: 'crosshair',
   },
@@ -81,6 +93,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'combobox',
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 24 },
+    upright: true,
     defaults: { ...FIELD_CHROME, fontSize: 12 },
     cursor: 'crosshair',
   },
@@ -89,6 +102,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'listbox',
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 72 },
+    upright: true,
     defaults: { ...FIELD_CHROME, fontSize: 12 },
     cursor: 'crosshair',
   },
@@ -98,6 +112,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'pushbutton',
     visualKind: 'widget-button',
     clickCreate: { width: 100, height: 28 },
+    upright: true,
     defaults: { ...FIELD_CHROME, interiorColor: '#e5e7eb', fontSize: 12 },
     cursor: 'crosshair',
   },
@@ -109,6 +124,7 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     fieldKind: 'signature',
     visualKind: 'widget-box',
     clickCreate: { width: 160, height: 48 },
+    upright: true,
     defaults: FIELD_CHROME,
     cursor: 'crosshair',
   },

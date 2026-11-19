@@ -16,10 +16,12 @@ import { useEffect, useRef, useState } from 'react';
 import { annotationKey } from '@embedpdf/react/annotation';
 import type { ReactNode } from 'react';
 import {
+  orientationPatch,
   useAnnotation,
   useAnnotationDefaults,
   useAnnotationProperties,
   useAnnotationState,
+  type Annotation,
   type AnnotationOption,
   type AnnotationPatch,
   type AnnotationProperty,
@@ -891,6 +893,32 @@ function FieldControl({
                 onClick={() => onChange({ subtype: option.value })}
               >
                 <Icon name={KIND_ICON[option.value] ?? 'palette'} size={18} />
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+      );
+    // The direction a form field's contents read in, the field staying where
+    // it stands: the plugin lists it for a selection of fields, never a tool.
+    case 'orientation':
+      return (
+        <Field label={label(spec)} mixed={mixed}>
+          <div className="flex gap-2">
+            {spec.options.map((option) => (
+              <Toggle
+                key={option.value}
+                title={label(option)}
+                active={!mixed && value === option.value}
+                onClick={() =>
+                  onChangeEach((current) =>
+                    orientationPatch(
+                      current as unknown as Annotation,
+                      Number(option.value) as 0 | 90 | 180 | 270,
+                    ),
+                  )
+                }
+              >
+                <span className="text-xs tabular-nums">{label(option)}</span>
               </Toggle>
             ))}
           </div>

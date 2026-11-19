@@ -35,6 +35,8 @@ export interface ForeignPlacement {
   readonly page: PageRef;
   readonly from: Point;
   readonly to: Point;
+  /** The page's display rotation at the press (an upright tool lays its drag out as seen). */
+  readonly displayRotation?: Rotation;
 }
 
 export interface AnnotationModel {

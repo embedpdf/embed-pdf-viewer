@@ -50,7 +50,7 @@ import { RawAnnotationReader } from './RawAnnotationReader';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
-import { assertMarkKeepsItsLook } from './internal/write/writeWidgetAnnotation';
+import { assertMarkKeepsItsLook, refitWidgetMark } from './internal/write/writeWidgetAnnotation';
 import {
   writeAnnotationRelationship,
   writeLinkedOpen,
@@ -321,19 +321,26 @@ export class AnnotationMutator {
       if (impact === 'inert' || impact === 'translation') {
         appearance = { action: 'preserved', changed: false };
       } else {
-        const ok =
-          currentDto.subtype === 'widget'
-            ? // Drawn as its field's family draws it: a signature field's and
-              // one in no field, their box. A mark in the widget stays: the
-              // file places it in the moved or resized box.
-              !currentDto.hasMark && fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
-            : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
+        let ok: boolean;
+        if (currentDto.subtype !== 'widget') {
+          ok = generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
+        } else if (currentDto.hasMark) {
+          // A mark in the widget stays, and is fitted into the box as it now
+          // stands and turns: a stamp's drawing is re-fitted the same way.
+          refitWidgetMark(fn, mem, annotPtr);
+          ok = false;
+        } else {
+          // Drawn as its field's family draws it: a signature field's and
+          // one in no field, their box.
+          ok = fn.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+        }
         appearance = ok
           ? { action: 'regenerated', changed: true }
-          : // Not drawn (a mark kept, a field type with no generator). The
-            // dictionary still changed when the patch was appearance-relevant,
-            // so `changed` stays true in that case — form-layer renderers may
-            // paint differently even though no /AP was written.
+          : // Not drawn (a mark kept and fitted again, a field type with no
+            // generator). The dictionary still changed when the patch was
+            // appearance-relevant, so `changed` stays true in that case —
+            // form-layer renderers may paint differently even though no /AP
+            // was drawn.
             { action: 'generation-unavailable', changed: impact === 'regenerate' };
       }
 

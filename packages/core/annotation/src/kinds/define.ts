@@ -40,11 +40,13 @@ export interface AnnotationOption {
  * writes `{ [property.key]: value }`, so each kind's list is its property
  * schema, kept in the library so every consumer gets it for free.
  *
- * `key` is the engine's field name, with three exceptions: the border's
+ * `key` is the engine's field name, with four exceptions: the border's
  * `borderStyle` reads and writes `borderStyle`, `dashArray` and
  * `cloudyIntensity` together; `bold`, `italic` and `underline` are the rich
- * body's formatting; and `link` is an attached link, not a field of the
- * annotation.
+ * body's formatting; `link` is an attached link, not a field of the
+ * annotation; and a form widget's `orientation` reads its `rotation` and
+ * writes it with the `box` that keeps the widget where it stands
+ * (`orientationPatch`).
  *
  * `label` is the English name and `labelKey` its translation key: a panel
  * shows `t(property.labelKey, { fallback: property.label })`, as a command's
@@ -86,6 +88,16 @@ export type AnnotationProperty =
    *  kind the annotation becomes (`subtype`, only over a selection: `selectionProperties`). */
   | {
       readonly key: 'lineEndings' | 'fontFamily' | 'textAlign' | 'blendMode' | 'icon' | 'subtype';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly labelKey: string;
+      readonly options: readonly AnnotationOption[];
+    }
+  /** The direction a form widget's contents read in, a quarter turn clockwise (`'0'`, `'90'`,
+   *  `'180'`, `'270'`), the widget staying where it stands. Only over a selection:
+   *  `selectionProperties`. Written with `orientationPatch`. */
+  | {
+      readonly key: 'orientation';
       readonly control: 'choice';
       readonly label: string;
       readonly labelKey: string;
@@ -138,6 +150,12 @@ export interface KindCaps {
   vertexEditable: boolean;
   /** Can be rotated (shapes, free text, lines/polys/ink). */
   rotatable: boolean;
+  /**
+   * Turns by quarter turns only (a form widget: its contents turn by `/MK /R`).
+   * The quarter-turn command and reset rotation act on it, alone or in a
+   * selection; it shows no rotation handle and joins no free turn.
+   */
+  quarterTurns: boolean;
   /** Can be moved as part of a multi-target (group) transform. */
   groupMovable: boolean;
   /** Can be uniformly scaled as part of a multi-target (group) transform — on
@@ -189,6 +207,7 @@ export const NO_CAPS: KindCaps = {
   resizable: false,
   vertexEditable: false,
   rotatable: false,
+  quarterTurns: false,
   groupMovable: false,
   groupResizable: false,
   groupRotatable: false,

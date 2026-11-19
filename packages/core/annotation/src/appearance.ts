@@ -46,7 +46,7 @@ import {
 
 import { anchoredBox, anchorModeOf, anchorOf } from './anchor';
 import { geomRotation } from './geometry';
-import { normalizeDeg } from './rect';
+import { normalizeDeg, standingRect } from './rect';
 import { annotationAfter, kindOf, shapeOf } from './record';
 import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 
@@ -151,9 +151,11 @@ function rasterInShape(record: ModelAnnotation, box: Rect): Rect {
  * turn to put back about its middle.
  *
  * - A stamp, link or form widget: where its shape is (`shapeNow`, the gesture
- *   in progress included), turned with it, lent or not: its raster is the
- *   drawing of its shape. A stamp's keeps its proportions in a resized box
- *   (`rasterInShape`).
+ *   in progress included), lent or not: its raster is the drawing of its
+ *   shape. A stamp's is drawn without its turn and turned with it, and keeps
+ *   its proportions in a resized box (`rasterInShape`). A widget's holds its
+ *   turn (the engine draws its contents turned, `/MK /R`), so it fills the
+ *   rect its box stands in, unturned.
  * - Every other kind: at the raster's box (`apBox`), carried along by a move
  *   in progress. A screen-anchored annotation's box rides the same
  *   similarity its shape projects through (`anchoredBox`), composed with any
@@ -167,6 +169,9 @@ export function rasterPlacement(
 ): { box?: Rect; rot?: number } {
   const record = model.byId[id];
   if (kindOf(record.annotation).caps.rasterOnly) {
+    if (shapeNow.kind === 'box' && record.annotation.subtype === 'widget') {
+      return { box: standingRect(shapeNow.box, shapeNow.rotation) };
+    }
     return {
       box: shapeNow.kind === 'box' ? rasterInShape(record, shapeNow.box) : record.apBox,
       rot: geomRotation(shapeNow) || undefined,

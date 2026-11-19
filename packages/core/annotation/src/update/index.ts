@@ -238,9 +238,9 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
     case 'setSnap':
       return [{ ...model, snap: { ...model.snap, ...message.patch } }, []];
     case 'rotateSelection':
-      return rotateSelection(model, message.degrees);
+      return rotateSelection(model, message.degrees, message.pageBoxes);
     case 'resetRotation':
-      return resetRotation(model);
+      return resetRotation(model, message.pageBoxes);
     case 'delete':
       return deleteSelection(model);
     case 'cancel':

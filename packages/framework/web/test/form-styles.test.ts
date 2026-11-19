@@ -39,6 +39,24 @@ describe('widgetBoxStyleOf', () => {
     });
   });
 
+  it('turns a turned widget’s box about its middle, and leaves an unturned one as it was', () => {
+    // The frame of a widget turned a quarter: its box before the turn, which stands 40 × 200.
+    expect(widgetBoxStyleOf({ look, rotation: 270 }, frame, colors)).toEqual({
+      position: 'absolute',
+      left: '10px',
+      top: '20px',
+      width: '200px',
+      height: '40px',
+      transform: 'rotate(270deg)',
+      pointerEvents: 'auto',
+      boxShadow: 'inset 0 0 0 1px B',
+    });
+    expect(widgetBoxStyleOf({ look, rotation: 0 }, frame, colors)).not.toHaveProperty('transform');
+    expect(widgetBoxStyleOf({ look, rotation: null }, frame, colors)).not.toHaveProperty(
+      'transform',
+    );
+  });
+
   it('draws no edge for a field with a border, or a control that draws its own', () => {
     expect(widgetBoxStyleOf({ look: { border: '#000' } }, frame, colors)).not.toHaveProperty(
       'boxShadow',

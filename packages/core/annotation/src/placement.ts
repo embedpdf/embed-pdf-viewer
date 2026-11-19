@@ -7,7 +7,8 @@
  * (`resolveClickPlacement`). `placedShape` answers the "what": the kind's
  * shape family lays its shape there. The commit, the drawing in progress and
  * the tool's ghost all make these two calls, so a ghost shows what a click
- * makes by construction. A form field takes the placed box as its bounds.
+ * makes by construction. A form field takes the placed box as its frame and
+ * the placement's turn as its own (`placedBoxFields`).
  */
 import type { Rotation } from '@embedpdf/core-geometry';
 import type { Annotation } from '@embedpdf/engine-core/runtime';
@@ -142,4 +143,19 @@ export function resolveClickPlacement(
  */
 export function placedShape(annotation: Annotation, placement: Placement): Shape | null {
   return kindOf(annotation).family.placed(placement, annotation);
+}
+
+/**
+ * The engine fields a placed box states for a kind whose contents read one
+ * way and so keep the placement's turn (a form widget, a stamp): its `box`,
+ * the box before its turn, and its `rotation`, `null` upright. What the box
+ * family writes for the shape it lays there (`placedShape`), for a sibling
+ * commit plane that creates no annotation: the form plugin's place handler
+ * sends these as its widget's placement.
+ */
+export function placedBoxFields(placement: Extract<Placement, { kind: 'box' }>): {
+  box: Rect;
+  rotation: number | null;
+} {
+  return { box: placement.rect, rotation: placement.rot || null };
 }

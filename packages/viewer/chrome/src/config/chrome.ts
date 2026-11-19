@@ -227,6 +227,9 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:save-file',
             'annotation:remove-link',
             'annotation:duplicate',
+            // One direction keeps the menu short; the other is a command too
+            // (`annotation:rotate-counterclockwise`), for an app's own menu.
+            'annotation:rotate-clockwise',
             'annotation:group',
             'annotation:ungroup',
           ],

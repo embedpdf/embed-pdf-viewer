@@ -14,15 +14,16 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { isDeletableByHand, isEditableByHand, isTransformableByHand } from '../editable';
-import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
+import { geomResetRotation, geomRotateAbout, geomRotation, geomTranslate } from '../geometry';
 import { groupUnionBounds } from '../hit';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
 import { kindOf, shapeOf, withShape, withValues, writableTarget } from '../record';
 import { restyleRuns, withoutStyle, type RichTextStyleDelta } from '../richtext';
 import { annotationTurnPivot } from '../selection';
-import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
+import type { Effect, FieldValues, Id, Model, ModelAnnotation, PageBoxes, Point } from '../types';
 import { withoutRecords } from './changes';
+import { clampMoveDelta } from './page-bound';
 
 type TextFormat = 'bold' | 'italic' | 'underline';
 
@@ -187,17 +188,59 @@ export function setFlags(
 }
 
 /**
+ * Does the kind of `record` take a turn of `deltaDeg`: any turn for a kind
+ * that rotates, a quarter turn for one that turns only so (a form widget).
+ */
+const takesTurn = (record: ModelAnnotation, deltaDeg: number): boolean => {
+  const { rotatable, quarterTurns } = kindOf(record.annotation).caps;
+  return rotatable || (quarterTurns && deltaDeg % 90 === 0);
+};
+
+/**
+ * `model` with the records of `ids` back on their pages. A turn about the
+ * middle can carry a record past its page's edge, where a move would never
+ * leave it, so the records a turn changed on a page move together, by the
+ * least that puts the frame around them inside the page's box: the clamp a
+ * move has ({@link clampMoveDelta}), so a frame larger than the page pins to
+ * its top left. A page with no box in `pageBoxes` keeps its records where the
+ * turn left them.
+ */
+function keptOnPages(model: Model, ids: readonly Id[], pageBoxes: PageBoxes | undefined): Model {
+  if (!pageBoxes) return model;
+  const idsByPage = new Map<number, Id[]>();
+  for (const id of ids) {
+    const page = model.byId[id].annotation.page.objectNumber;
+    idsByPage.set(page, [...(idsByPage.get(page) ?? []), id]);
+  }
+  let byId: Model['byId'] | null = null;
+  for (const [page, onPage] of idsByPage) {
+    const delta = clampMoveDelta(model, onPage, { x: 0, y: 0 }, pageBoxes[page]);
+    if (delta.x === 0 && delta.y === 0) continue;
+    byId ??= { ...model.byId };
+    for (const id of onPage) {
+      const record = byId[id];
+      byId[id] = withShape(record, geomTranslate(shapeOf(record.annotation), delta));
+    }
+  }
+  return byId ? { ...model, byId } : model;
+}
+
+/**
  * Rotate the current selection by `deltaDeg` (clockwise) — the toolbar
  * "rotate 90°" affordance. A single shape turns about its own centre; a
- * multi-target group about the union-box centre (gated by `groupRotatable` for
- * groups, `rotatable` for a single shape). Emits one patch per rotated member.
+ * multi-target group about the union-box centre. Each member turns when its
+ * kind takes the turn (`takesTurn`: `rotatable`, or `quarterTurns` for a
+ * quarter turn). With `pageBoxes`, what turned stays on its page
+ * ({@link keptOnPages}). Emits one patch per rotated member.
  */
-export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
+export function rotateSelection(
+  model: Model,
+  deltaDeg: number,
+  pageBoxes?: PageBoxes,
+): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
     const record = model.byId[id];
-    return (
-      record && isTransformableByHand(model, record) && kindOf(record.annotation).caps.rotatable
-    );
+    return record && isTransformableByHand(model, record) && takesTurn(record, deltaDeg);
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -224,31 +267,28 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
     const geometry = shapeOf(record.annotation);
     byId[id] = withShape(record, geomRotateAbout(geometry, pivot, deltaDeg));
   }
-  return [{ ...model, byId }, []];
+  return [keptOnPages({ ...model, byId }, ids, pageBoxes), []];
 }
 
 /** Reset rotation on the selection to the as-authored orientation. For a
  *  screen-anchored annotation that is its on-screen orientation, so reset is
  *  as meaningful as for anyone else. A kind that doesn't turn keeps its turn:
- *  a caret's follows its text, a callout's stands it upright. */
-export function resetRotation(model: Model): [Model, Effect[]] {
+ *  a caret's follows its text, a callout's stands it upright. With
+ *  `pageBoxes`, what turned stays on its page ({@link keptOnPages}). */
+export function resetRotation(model: Model, pageBoxes?: PageBoxes): [Model, Effect[]] {
   const byId = { ...model.byId };
-  let turned = false;
+  const turned: Id[] = [];
   for (const id of model.selected) {
     const record = byId[id];
-    if (
-      !record ||
-      !isTransformableByHand(model, record) ||
-      !kindOf(record.annotation).caps.rotatable
-    )
-      continue;
+    // Upright is a quarter turn away for a kind that turns only so.
+    if (!record || !isTransformableByHand(model, record) || !takesTurn(record, 0)) continue;
     const geometry = shapeOf(record.annotation);
     if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(record);
     byId[id] = withShape(record, geomResetRotation(geometry, pivot));
-    turned = true;
+    turned.push(id);
   }
-  return turned ? [{ ...model, byId }, []] : [model, []];
+  return turned.length ? [keptOnPages({ ...model, byId }, turned, pageBoxes), []] : [model, []];
 }
 
 export function deleteSelection(model: Model): [Model, Effect[]] {

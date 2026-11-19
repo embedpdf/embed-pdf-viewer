@@ -39,6 +39,12 @@ export type WidgetBoxStyle = {
   top: string;
   width: string;
   height: string;
+  /**
+   * A turned widget's quarter turn, about the box's middle: the box is the
+   * widget's frame, and turned it covers where the widget stands. Left out
+   * for a widget that isn't turned.
+   */
+  transform?: string;
   /** Always the widget's event surface: the control inside gates the edits. */
   pointerEvents: 'auto';
   /** The edge of a field without a border of its own, so people see where to fill in. */
@@ -46,12 +52,16 @@ export type WidgetBoxStyle = {
 };
 
 /**
- * The style of a widget's box at `frame` (the widget's box in the page
- * layer's pixels). `edge: false` leaves the edge out, for a control that draws
- * its own (a list box) or never has one (a button).
+ * The style of a widget's box at `frame`: the widget's frame (`box`, what its
+ * contents are laid out in) in the page layer's pixels. A turned widget's box
+ * turns with it, about its middle (`rotation`, a quarter turn clockwise), so
+ * whatever control sits in it reads the way the field does, and the turned
+ * box covers the rect the widget stands in. `edge: false` leaves the edge
+ * out, for a control that draws its own (a list box) or never has one (a
+ * button).
  */
 export function widgetBoxStyleOf(
-  widget: { look: Pick<FieldLook, 'border'> },
+  widget: { look: Pick<FieldLook, 'border'>; rotation?: number | null },
   frame: PixelRect,
   colors: FormColors,
   { edge = true }: { edge?: boolean } = {},
@@ -62,6 +72,7 @@ export function widgetBoxStyleOf(
     top: `${frame.top}px`,
     width: `${frame.width}px`,
     height: `${frame.height}px`,
+    ...(widget.rotation ? { transform: `rotate(${widget.rotation}deg)` } : {}),
     pointerEvents: 'auto',
     ...(edge && widget.look.border === null
       ? { boxShadow: `inset 0 0 0 1px ${colors.border}` }

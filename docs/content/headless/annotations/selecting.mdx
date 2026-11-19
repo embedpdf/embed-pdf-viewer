@@ -98,6 +98,11 @@ shows both:
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
 | `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
 
+A selection of [form fields](../forms/building#turn-a-field) also has `orientation`: a `'choice'`
+of the direction their contents read in, `'0'`, `'90'`, `'180'` or `'270'` clockwise, with each box
+staying where it stands. Write it with
+`annotation.selection.update((widget) => orientationPatch(widget, 90))`.
+
 Marks over text, and rectangles and ellipses, also have `subtype`: a `'choice'` of the kinds they
 can become, such as highlight, underline, squiggly and strikeout. Choosing one turns each selected
 annotation into that kind, as the same annotation. A strikeout that is part of a replacement has no
@@ -235,6 +240,13 @@ annotation.selection.rotateBy(90); // a quarter turn clockwise; -90 the other wa
 annotation.selection.resetRotation(); // upright again
 ```
 
+Both turn every selected annotation that can turn, a [form field](../forms/building#turn-a-field)
+in design mode among them: it turns by quarter turns only, so it has no rotation handle.
+
+What turns stays on its page. A turn is about the middle, so a wide box near the top of the page
+would stand past the edge once turned. It's moved the least that puts it back on the page, the way
+a drag keeps it there. Several annotations move together and keep their spacing.
+
 Grouping makes several annotations select and move as one. The group is saved in the PDF the way
 Acrobat saves it, so it stays a group there too:
 
@@ -357,7 +369,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `selection.delete()`                                       | Deletes every selected annotation                                                                                                |
 | `selection.duplicate({ offset? })`                         | Copies the selected annotations beside the originals and selects the copies, as one step to undo. Resolves `{ annotations, dropped }`. [Duplicate the selection](#duplicate-the-selection) |
 | `selection.canDuplicate()`                                 | Whether the selection can be copied: something is selected, the user may create, and nothing selected is locked                  |
-| `selection.rotateBy(degrees)`, `selection.resetRotation()` | Turns the selection a quarter turn (`90` clockwise, `-90` the other way), or back upright. [Turn and group](#turn-and-group)     |
+| `selection.rotateBy(degrees)`, `selection.resetRotation()` | Turns the selection a quarter turn (`90` clockwise, `-90` the other way), or back upright, and keeps it on its page. [Turn and group](#turn-and-group) |
 | `selection.group()`, `selection.ungroup()`                 | Makes the selected annotations one group, saved the way Acrobat saves it, or splits the selected group up again                  |
 | `selection.canGroup()`, `selection.canUngroup()`           | Whether the selection can be grouped, or is a group that can be split                                                            |
 | `selection.getAnchor()`                                    | Where a menu attaches: `{ page, bounds }` around the selection, or `null`. `<AnnotationMenu>` uses it. [Add a menu](#add-a-menu) |

@@ -7,6 +7,10 @@
  *
  * A widget ignores the `ReadOnly` flag here: a form designer must still move a
  * read-only field; the form-filling layer enforces it itself.
+ *
+ * A widget turns by quarter turns only (`quarterTurns`): its contents turn
+ * inside its box by `/MK /R`, which holds nothing else, so it has no
+ * rotation handle.
  */
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS, type AnnotationProperty, type KindCaps } from './define';
@@ -19,6 +23,7 @@ const WIDGET_CAPS: KindCaps = {
   selectable: true,
   movable: true,
   resizable: true,
+  quarterTurns: true,
   groupMovable: true,
   hasFill: true,
   opaqueBody: true,
@@ -134,6 +139,8 @@ export const widgetBox = defineKind({
 /**
  * A signature field's widget with a mark in it (`hasMark`: it's signed, or a
  * mark was drawn in): it shows the mark, not its box, so it has no style.
+ * The mark is a drawing fitted into the widget's box, and the engine fits it
+ * again when the box or its turn changes, so it turns as any widget does.
  */
 export const widgetMark = defineKind({
   name: 'widget-mark',

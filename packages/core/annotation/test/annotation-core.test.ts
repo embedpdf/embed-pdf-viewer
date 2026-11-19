@@ -2882,6 +2882,24 @@ describe('annotation-core — rotation', () => {
     expect(fx).toEqual([writes('s1', { subtype: 'square', rotation: null })]);
     expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBe(0);
   });
+
+  it('a quarter turn at the edge of the page keeps a shape on its page', () => {
+    // 200 wide and 40 tall against the top edge: turned about its middle it
+    // would reach 80 past the edge.
+    const base = modelWith([seededSquare('s1', { x: 100, y: 0, width: 200, height: 40 })]);
+    const page = { x: 0, y: 0, width: 600, height: 800 };
+    const turn = (pageBoxes?: Record<number, typeof page>) =>
+      step({ ...base, selected: ['s1'] }, { type: 'rotateSelection', degrees: 90, pageBoxes })[0];
+    /** Where the turned square stands: the upright box around it. */
+    const standing = (model: Model) => model.byId['s1'].annotation.rect;
+
+    expect(standing(turn()).y).toBeCloseTo(-80, 6);
+    const kept = turn({ [PON]: page });
+    expect(geomRotation(shapeOf(kept.byId['s1'].annotation))).toBe(90);
+    expect(standing(kept).y).toBeCloseTo(0, 6);
+    // Moved down only: its middle is still at x 200.
+    expect(standing(kept).x + standing(kept).width / 2).toBeCloseTo(200, 6);
+  });
 });
 
 describe('annotation-core — rotation-aware selection (grab + menu + group)', () => {
