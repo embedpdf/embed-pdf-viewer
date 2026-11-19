@@ -1,3 +1,4 @@
+import { sidebarPageMap } from '@embedpdf/docs-kit';
 import { getPageMap } from 'nextra/page-map';
 import type { ReactNode } from 'react';
 
@@ -12,7 +13,7 @@ import { Header } from '@/components/site/header';
  * so anything passed as its child lands inside the content column.
  */
 export default async function DocsLayout({ children }: { children: ReactNode }) {
-  const pageMap = await getPageMap();
+  const pageMap = sidebarPageMap(await getPageMap());
 
   return (
     <>
