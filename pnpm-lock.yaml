@@ -2012,7 +2012,47 @@ importers:
         version: 3.2.4(typescript@5.8.3)
 
   packages/framework/web:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../core/geometry
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../../plugin/annotation
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../../plugin/form
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../plugin/history
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../../plugin/interaction
+      '@embedpdf/plugin-link':
+        specifier: workspace:*
+        version: link:../../plugin/link
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../../plugin/render
+      '@embedpdf/plugin-search':
+        specifier: workspace:*
+        version: link:../../plugin/search
+      '@embedpdf/plugin-selection':
+        specifier: workspace:*
+        version: link:../../plugin/selection
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../../plugin/stage
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build

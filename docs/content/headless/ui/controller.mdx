@@ -1,0 +1,148 @@
+---
+title: A custom UI in minutes
+description: The page view and one viewer object with the common state and commands, so your own toolbar, find bar and outline take a few dozen lines.
+---
+
+# A custom UI in minutes
+
+Between the finished viewer and wiring every plugin by hand sits the controller:
+
+- **`<DocumentView>`** shows the document with every page layer a reader expects: the pictures,
+  text selection (and Ctrl+C), search matches, links, annotations and form fields.
+- **`useViewerController()`** is one object with everything a toolbar shows (`state`: page, page
+  count, zoom, rotation, outline rows, search, selection, undo/redo, unsaved changes) and the
+  common commands by name (`goToPage`, `zoomIn`, `setZoom('fit-width')`, `rotate`, `search`,
+  `nextHit`, `goToOutlineItem`, `undo`, `print`, `download`, …).
+
+Both are built on the plugins you install: every value is the plugin's own, and every command calls
+the plugin's own API. `viewer.get(SearchToken)` hands you a plugin's full API when you need more.
+`viewerPlugins()` is the list a reading viewer uses.
+
+<Fw only="react">
+```tsx
+import { saveFile, Viewer } from '@embedpdf/react/runtime';
+import { DocumentView, useViewerController, viewerPlugins } from '@embedpdf/react/controller';
+import { localEngine } from '@embedpdf/engine';
+import { useState } from 'react';
+
+const engine = localEngine();
+const plugins = viewerPlugins();
+
+function Toolbar() {
+  const viewer = useViewerController();
+  const { state } = viewer;
+  const [text, setText] = useState('');
+  const save = async () => saveFile(await viewer.download(), 'document.pdf');
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button disabled={!state.canGoPrevious} onClick={viewer.previousPage}>‹</button>
+      <span>{state.pageIndex + 1} / {state.pageCount}</span>
+      <button disabled={!state.canGoNext} onClick={viewer.nextPage}>›</button>
+      <button onClick={viewer.zoomOut}>−</button>
+      <span>{Math.round(state.zoom * 100)}%</span>
+      <button onClick={viewer.zoomIn}>+</button>
+      <button onClick={() => viewer.setZoom('fit-width')}>Fit</button>
+      <input value={text} onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && viewer.search(text)} />
+      <span>{state.search.activeHitIndex + 1} / {state.search.hitCount}</span>
+      <button onClick={viewer.nextHit}>Next</button>
+      <button disabled={!state.dirty} onClick={save}>Save</button>
+    </div>
+  );
+}
+
+function Outline() {
+  const viewer = useViewerController();
+  return (
+    <nav style={{ width: 240, overflow: 'auto' }}>
+      {viewer.state.outline.map(({ item, depth }) => (
+        <div key={JSON.stringify(item.ref)} style={{ paddingInlineStart: depth * 12 }}
+          onClick={() => viewer.goToOutlineItem(item.ref)}>{item.title}</div>
+      ))}
+    </nav>
+  );
+}
+
+export function App() {
+  return (
+    <Viewer engine={engine} plugins={plugins}
+      initialDocuments={[{ source: { kind: 'url', url: '/document.pdf' } }]}>
+      <Toolbar />
+      <div style={{ display: 'flex', height: 600 }}>
+        <Outline />
+        <DocumentView fallback={<p>Opening…</p>} />
+      </div>
+    </Viewer>
+  );
+}
+```
+</Fw>
+
+<Fw only="vue">
+```vue
+<!-- App.vue -->
+<script setup lang="ts">
+import { Viewer } from '@embedpdf/vue/runtime';
+import { DocumentView, viewerPlugins } from '@embedpdf/vue/controller';
+import { localEngine } from '@embedpdf/engine';
+import Toolbar from './Toolbar.vue';
+
+const engine = localEngine();
+const plugins = viewerPlugins();
+</script>
+
+<template>
+  <Viewer :engine :plugins :initial-documents="[{ source: { kind: 'url', url: '/document.pdf' } }]">
+    <Toolbar />
+    <div style="height: 600px"><DocumentView /></div>
+  </Viewer>
+</template>
+```
+
+```vue
+<!-- Toolbar.vue -->
+<script setup lang="ts">
+import { ref } from 'vue';
+import { saveFile } from '@embedpdf/vue/runtime';
+import { useViewerController } from '@embedpdf/vue/controller';
+
+const viewer = useViewerController();
+const { state } = viewer;
+const text = ref('');
+const save = async () => saveFile(await viewer.download(), 'document.pdf');
+</script>
+
+<template>
+  <div style="display: flex; gap: 8px">
+    <button :disabled="!state.canGoPrevious" @click="viewer.previousPage()">‹</button>
+    <span>{{ state.pageIndex + 1 }} / {{ state.pageCount }}</span>
+    <button :disabled="!state.canGoNext" @click="viewer.nextPage()">›</button>
+    <button @click="viewer.zoomOut()">−</button>
+    <span>{{ Math.round(state.zoom * 100) }}%</span>
+    <button @click="viewer.zoomIn()">+</button>
+    <input v-model="text" @keydown.enter="viewer.search(text)" />
+    <span>{{ state.search.activeHitIndex + 1 }} / {{ state.search.hitCount }}</span>
+    <button @click="viewer.nextHit()">Next</button>
+    <button :disabled="!state.dirty" @click="save">Save</button>
+  </div>
+  <nav>
+    <div v-for="row in state.outline" :key="JSON.stringify(row.item.ref)"
+      :style="{ paddingInlineStart: `${row.depth * 12}px` }"
+      @click="viewer.goToOutlineItem(row.item.ref)">{{ row.item.title }}</div>
+  </nav>
+</template>
+```
+</Fw>
+
+## Without a framework
+
+`createViewer()` from `@embedpdf/web/controller` makes and owns the kernel, so plain JavaScript (or
+a test) gets the same object: `const viewer = createViewer({ engine: localEngine(), src: '/document.pdf' })`,
+then `viewer.subscribe(render)`, `viewer.getState()`, the commands, and `viewer.destroy()`. To draw
+the pages in a page of your own, use a framework adapter's `<DocumentView>`.
+
+## Events
+
+`viewer.on(name, handler)` reports `pagechange`, `documentopen`, `documenterror`, `searchcomplete`
+and `download`, and returns its unsubscribe. Each plugin's own events stay on its API
+(`viewer.get(SearchToken)?.onActiveHitChanged`).

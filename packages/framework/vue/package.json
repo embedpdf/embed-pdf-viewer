@@ -24,6 +24,7 @@
     "./annotation": "./src/annotation.ts",
     "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
+    "./controller": "./src/controller.ts",
     "./form": "./src/form.ts",
     "./fonts": "./src/fonts.ts",
     "./i18n": "./src/i18n.ts",
@@ -76,6 +77,10 @@
       "./commands": {
         "import": "./dist/commands.js",
         "require": "./dist/commands.cjs"
+      },
+      "./controller": {
+        "import": "./dist/controller.js",
+        "require": "./dist/controller.cjs"
       },
       "./form": {
         "import": "./dist/form.js",
