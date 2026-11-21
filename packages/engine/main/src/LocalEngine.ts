@@ -254,6 +254,7 @@ export class LocalEngine implements LocalEngineContract {
         : ({ kind: 'artifact', bytes: artifactBytes } as const);
     const transfer = artifactBytes ? [baseBytes, artifactBytes] : [baseBytes];
     const signedDocumentPolicy = this.signedDocumentPolicy;
+    const baseSha256 = input.baseSha256;
 
     const submission = queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -268,6 +269,7 @@ export class LocalEngine implements LocalEngineContract {
             layer,
             password,
             signedDocumentPolicy,
+            ...(baseSha256 ? { baseSha256 } : {}),
             reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
           },
           transfer,

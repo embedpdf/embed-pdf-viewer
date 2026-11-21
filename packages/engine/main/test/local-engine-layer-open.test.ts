@@ -103,12 +103,13 @@ describe('LocalEngine layer open', () => {
     const transport = new RecordingTransport();
     const engine = LocalEngine.fromTransport({ transport });
     const baseBytes = new Uint8Array([9, 8, 7]);
-
+    const baseSha256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
     const handle = await engine.open({
       kind: 'layerBytes',
       id: 'doc-layer-a',
       baseKey: 'shared-base',
       baseBytes,
+      baseSha256,
     });
 
     expect(handle.id).toBe('doc-layer-a');
@@ -119,6 +120,7 @@ describe('LocalEngine layer open', () => {
       effect: 'open',
       docId: 'doc-layer-a',
       baseKey: 'shared-base',
+      baseSha256,
       layer: { kind: 'fresh' },
     });
     expect(pack.transfer).toHaveLength(1);
