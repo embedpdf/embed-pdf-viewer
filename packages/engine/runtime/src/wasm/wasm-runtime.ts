@@ -77,6 +77,23 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
     throw new Error('WASM runtime does not expose malloc/free');
   }
 
+  // The heap's buffer is replaced when memory grows: rebuild the view then.
+  // A replaced (non-shared) buffer is detached, so its length turns 0: that
+  // check is cheaper than reading the current buffer on every access.
+  let heapView: DataView | null = null;
+  let heapBuffer: ArrayBufferLike | null = null;
+  let shared = false;
+  const view = (): DataView => {
+    if (heapView && !shared && heapBuffer!.byteLength !== 0) return heapView;
+    const buffer = module.HEAPU8.buffer;
+    if (heapBuffer !== buffer) {
+      heapBuffer = buffer;
+      shared = typeof SharedArrayBuffer !== 'undefined' && buffer instanceof SharedArrayBuffer;
+      heapView = new DataView(buffer);
+    }
+    return heapView!;
+  };
+
   return {
     alloc(bytes) {
       return toPtr(malloc(bytes));
@@ -109,7 +126,23 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
       return ptr;
     },
     peek(ptr, kind, byteOffset = 0) {
-      const value = module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      const address = toNumber(ptr) + byteOffset;
+      // Plain numbers straight from the heap: the glue's getValue checks
+      // every access in a build with assertions, which costs more than the
+      // read in per-glyph loops. wasm memory is little-endian.
+      switch (kind) {
+        case 'i8':
+          return view().getInt8(address);
+        case 'i16':
+          return view().getInt16(address, true);
+        case 'i32':
+          return view().getInt32(address, true);
+        case 'f32':
+          return view().getFloat32(address, true);
+        case 'f64':
+          return view().getFloat64(address, true);
+      }
+      const value = module.getValue?.(address, wasmValueKind(kind)) ?? 0;
       // A pointer read from memory is a `Ptr`, as on the native runtime.
       return kind === 'ptr' ? toPtr(value) : value;
     },
@@ -252,6 +285,61 @@ function expandI64Args(signature: PdfFunctionSignature, args: unknown[]): unknow
   return expanded;
 }
 
+/** An export called without cwrap: `Ptr` arguments to addresses, the result as cwrap would give it. */
+function directCall(
+  fn: (...args: unknown[]) => unknown,
+  signature: PdfFunctionSignature,
+): (...args: unknown[]) => unknown {
+  const ptrArgs = signature.params.map((p) => p.ts === 'Ptr');
+  const anyPtrArg = ptrArgs.some(Boolean);
+  const result = signature.result;
+  const asBoolean = result?.wasm.cwrap === 'boolean';
+  const convert = !!result && (result.ts === 'Ptr' || result.ts === 'bigint');
+  const finish = (value: unknown): unknown => {
+    if (!result) return undefined;
+    if (asBoolean) return Boolean(value);
+    return convert ? toJsResult(result, value) : value;
+  };
+  // Per-glyph loops make millions of these calls: up to four arguments go
+  // without a rest array and spread.
+  const [p0, p1, p2, p3] = ptrArgs;
+  const big = (v: unknown): v is bigint => typeof v === 'bigint';
+  switch (anyPtrArg ? signature.params.length : -1) {
+    case 1:
+      return (a?: unknown) => finish(fn(p0 && big(a) ? Number(a) : a));
+    case 2:
+      return (a?: unknown, b?: unknown) =>
+        finish(fn(p0 && big(a) ? Number(a) : a, p1 && big(b) ? Number(b) : b));
+    case 3:
+      return (a?: unknown, b?: unknown, c?: unknown) =>
+        finish(
+          fn(
+            p0 && big(a) ? Number(a) : a,
+            p1 && big(b) ? Number(b) : b,
+            p2 && big(c) ? Number(c) : c,
+          ),
+        );
+    case 4:
+      return (a?: unknown, b?: unknown, c?: unknown, d?: unknown) =>
+        finish(
+          fn(
+            p0 && big(a) ? Number(a) : a,
+            p1 && big(b) ? Number(b) : b,
+            p2 && big(c) ? Number(c) : c,
+            p3 && big(d) ? Number(d) : d,
+          ),
+        );
+  }
+  return (...args: unknown[]) => {
+    if (anyPtrArg) {
+      for (let i = 0; i < args.length; i++) {
+        if (ptrArgs[i] && typeof args[i] === 'bigint') args[i] = Number(args[i]);
+      }
+    }
+    return finish(fn(...args));
+  };
+}
+
 function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
   const out: Record<string, (...args: unknown[]) => unknown> = {};
   // Read through the general signature type: the table's literal types,
@@ -269,7 +357,20 @@ function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
         );
       };
 
-    if (module.cwrap) {
+    // The raw wasm export when the glue exposes them: in a build with
+    // assertions, `_name` wraps every call in checks that cost more than a
+    // short native call.
+    const direct = module.wasmExports?.[name] ?? module[`_${name}`];
+    const numericOnly =
+      typeof direct === 'function' &&
+      signature.params.every((p) => p.wasm.cwrap !== 'string' && p.wasm.kind !== 'i64') &&
+      signature.result?.wasm.cwrap !== 'string';
+    if (numericOnly) {
+      // No string marshalling and no i64 pairs: call the export directly.
+      // cwrap → ccall costs more than many short native calls themselves
+      // (per-glyph text reads), and adds nothing here but a boolean result.
+      out[name] = directCall(direct, signature);
+    } else if (module.cwrap) {
       // `null` only appears for void return; params never carry it.
       // i64 params are legalized (see expandI64Args): two i32 slots each.
       const paramTypes = signature.params.flatMap((p) =>
