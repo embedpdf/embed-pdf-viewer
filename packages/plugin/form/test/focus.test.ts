@@ -122,7 +122,8 @@ const widgetRef = (objectNumber: number, page: typeof P1): AnnotationRef =>
 async function form({
   stage = true,
   tabs = 'rows' as 'rows' | 'structure',
-}: { stage?: boolean; tabs?: 'rows' | 'structure' } = {}) {
+  fields = snapshot.fields,
+}: { stage?: boolean; tabs?: 'rows' | 'structure'; fields?: FormField[] } = {}) {
   const time = manualClock();
   const reveal = vi.fn();
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
@@ -144,7 +145,7 @@ async function form({
       ...(stage ? [[StageToken, { reveal }] as const] : []),
     ],
     doc: {
-      forms: { list: vi.fn(async () => snapshot), create: vi.fn() },
+      forms: { list: vi.fn(async () => ({ ...snapshot, fields })), create: vi.fn() },
       apply,
       security: { allows: () => true, allowsField: () => true },
     } as never,
@@ -330,5 +331,30 @@ describe('the arrow keys in a radio group', () => {
     await vi.waitFor(() => expect(apply).toHaveBeenCalled());
     expect(JSON.stringify(apply.mock.calls[0])).toContain('"monthly"');
     expect(capability.moveInGroup(widgetRef(11, P1), false)).toBe(false);
+  });
+});
+
+describe('a radio button in the form layer', () => {
+  it('is named by its option, and comes in its group where the arrow keys bring it', async () => {
+    // The field lists yearly first; the page, and so Tab and the arrow keys, monthly first.
+    const plan = {
+      ...PLAN,
+      alternateName: 'Plan',
+      widgets: [...PLAN.widgets].reverse(),
+    } as FormField;
+    const { capability } = await form({
+      fields: snapshot.fields.map((field) => (field === PLAN ? plan : field)),
+    });
+    const buttons = capability
+      .listWidgets(P2)
+      .flatMap((item) =>
+        item.control === 'toggle' && item.kind === 'radio'
+          ? [{ label: item.label, inGroup: item.inGroup }]
+          : [],
+      );
+    expect(buttons).toEqual([
+      { label: 'Plan: yearly', inGroup: { position: 2, size: 2 } },
+      { label: 'Plan: monthly', inGroup: { position: 1, size: 2 } },
+    ]);
   });
 });

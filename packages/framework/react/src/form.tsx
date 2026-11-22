@@ -293,13 +293,18 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   );
 }
 
-/** A checkbox or a radio button: the picture is the control, a click writes the toggled value. */
+/**
+ * A checkbox or a radio button: the picture is the control, a click writes the toggled value. A
+ * radio button's label names its option, and it says where it comes in its group: its buttons
+ * are placed apart, so no group element can.
+ */
 function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
   // The value first, then the widget's action (Acrobat's order).
   const press = () => pressToggle(form, item, activate);
+  const inGroup = item.kind === 'radio' ? item.inGroup : null;
   return (
     <WidgetBox
       item={item}
@@ -308,6 +313,8 @@ function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
       role={item.kind === 'checkbox' ? 'checkbox' : 'radio'}
       aria-checked={item.checked}
       aria-label={item.label}
+      aria-posinset={inGroup?.position}
+      aria-setsize={inGroup?.size}
       tabIndex={item.disabled ? -1 : 0}
       onClick={press}
       onFocus={() => setFocused(true)}

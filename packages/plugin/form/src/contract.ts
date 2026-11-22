@@ -45,7 +45,7 @@ import type { FormWidgetItem } from './read/fill-items';
 export { FormToken } from './token';
 export { toFieldRef } from '@embedpdf/engine-core/runtime';
 export { FormTransfer } from '@embedpdf/engine-core/public';
-export type { FormWidgetItem, FormWidgetLook } from './read/fill-items';
+export type { FormWidgetItem, FormWidgetLook, GroupPosition } from './read/fill-items';
 export type { Box, WidgetHit, WidgetPlace } from './model';
 export type {
   FormBundle,

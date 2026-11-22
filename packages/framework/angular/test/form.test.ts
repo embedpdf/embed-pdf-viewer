@@ -257,6 +257,44 @@ describe('<epdf-form-layer> over a turned field', () => {
 });
 
 /**
+ * A radio group's buttons are placed apart on the page, with no group element around them: each
+ * button is named by its group's tooltip and its own option, and says where it comes in its group.
+ */
+describe('<epdf-form-layer> radio buttons', () => {
+  it(
+    'names each button by its option, and says where it comes in its group',
+    { timeout: 45_000 },
+    async () => {
+      const { fixture, form } = await openForm('hello_world.pdf', 'blank');
+      const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
+      await form.create({
+        kind: 'radio',
+        name: 'plan',
+        alternateName: 'Plan',
+        widgets: [
+          { page, rect: { x: 72, y: 100, width: 16, height: 16 }, exportValue: 'Monthly' },
+          { page, rect: { x: 200, y: 100, width: 16, height: 16 }, exportValue: 'Yearly' },
+        ],
+      });
+      await showPage(fixture, 'blank', page);
+
+      const radio = (name: string) =>
+        element(fixture).querySelector<HTMLElement>(`[role="radio"][aria-label="${name}"]`);
+      const monthly = await vi.waitFor(() => {
+        const found = radio('Plan: Monthly');
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      const yearly = radio('Plan: Yearly')!;
+      expect(monthly.getAttribute('aria-posinset')).toBe('1');
+      expect(monthly.getAttribute('aria-setsize')).toBe('2');
+      expect(yearly.getAttribute('aria-posinset')).toBe('2');
+      expect(yearly.getAttribute('aria-setsize')).toBe('2');
+    },
+  );
+});
+
+/**
  * With the render plugin, the layer paints each field as the engine draws it: one picture per
  * widget, the one of the state it shows. The engine encodes pictures with a 2D canvas, which
  * happy-dom doesn't have, so the render plugin's pictures are stand-ins here: a URL naming widget

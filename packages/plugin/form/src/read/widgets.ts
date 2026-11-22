@@ -23,7 +23,8 @@ export function createWidgetReads(
     rights,
     looks,
     pictures,
-  }: Pick<FormServices, 'fields' | 'rights' | 'looks' | 'pictures'>,
+    tabOrder,
+  }: Pick<FormServices, 'fields' | 'rights' | 'looks' | 'pictures' | 'tabOrder'>,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
@@ -53,9 +54,10 @@ export function createWidgetReads(
       widgetsOn(pageObjectNumber),
       rights.key(),
       ctx.settings().get().fillable,
+      tabOrder.rows(),
     ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
-      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand),
+      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand, tabOrder.groupPositionOf),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */
