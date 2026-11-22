@@ -1,11 +1,11 @@
 <!--
   A dropdown: an invisible native <select> over the field's picture. The
-  browser owns the dropdown, the engine the resting pixels. The select is made
-  again whenever the field's selection changes (its `key`), so it opens on the
-  field's value.
+  browser owns the dropdown, the engine the resting pixels. The select stays
+  one element through a change, so it keeps the focus; `value` puts it on the
+  field's selection.
 -->
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // Writes from the layer go through the host lens, like every control's.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
@@ -29,8 +29,6 @@ const { element: box, style: boxStyle } = useWidgetBox(
 );
 const focused = ref(false);
 
-const selectionKey = computed(() => props.item.selected.join('\0'));
-
 function onChange(event: Event): void {
   const value = (event.currentTarget as HTMLSelectElement).value;
   void form.setValue(props.item.fieldRef, { value: value || null });
@@ -40,7 +38,6 @@ function onChange(event: Event): void {
 <template>
   <div ref="box" :style="boxStyle" @click="activate">
     <select
-      :key="selectionKey"
       :value="item.selected[0] ?? ''"
       :aria-label="item.label"
       :disabled="item.disabled"
