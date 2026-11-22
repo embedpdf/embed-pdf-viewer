@@ -22,6 +22,7 @@ import { createWidgetLooks, type WidgetLooks } from './looks';
 import { createWidgetPictures, type WidgetPictures } from './pictures';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
+import { createTabOrder, type TabOrder } from './tab-order';
 
 export type { FormContext } from './context';
 
@@ -37,6 +38,8 @@ export interface FormServices {
   readonly events: FormEvents;
   /** Where the cursor is among the fields, and the controls it can go into. */
   readonly cursor: FormCursor;
+  /** The widgets in Tab's order, and each radio button's place among its group's. */
+  readonly tabOrder: TabOrder;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
   /** Whether the widgets are lent to the annotation plugin now (design mode). */
@@ -71,6 +74,7 @@ export function createServices(ctx: FormContext): FormServices {
     rights: createFillRights(ctx, fields),
     events,
     cursor: createCursor(ctx, fields, events),
+    tabOrder: createTabOrder(ctx, fields),
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
     design,

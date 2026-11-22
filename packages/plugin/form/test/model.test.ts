@@ -417,3 +417,73 @@ describe('signature widgets', () => {
     expect(widgetAt(index, boxes, { x: 500, y: 500 })).toBeNull();
   });
 });
+
+const radio = (over: Partial<Extract<FormField, { kind: 'radio' }>> = {}): FormField => ({
+  ref: { kind: 'objectNumber', objectNumber: 20 },
+  name: 'plan',
+  kind: 'radio',
+  origin: 'acroform',
+  readOnly: false,
+  required: false,
+  noExport: false,
+  alternateName: 'Plan',
+  mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
+  valueEntry: { kind: 'scalar', value: 'yearly' },
+  defaultValueEntry: { kind: 'none' },
+  value: 'yearly',
+  radiosInUnison: false,
+  noToggleToOff: false,
+  widgets: [
+    { ...formWidget(21, toPageRef(3)), onState: 'monthly', exportValue: 'monthly', checked: false },
+    { ...formWidget(22, toPageRef(3)), onState: '1', exportValue: 'Pay yearly', checked: true },
+  ],
+  ...over,
+});
+
+describe('radio buttons', () => {
+  const box = BOXES[4]!;
+
+  test("each button is named by its group's tooltip and its own option, and says where it comes", () => {
+    expect(projectWidget(radio(), 21, box, true, { position: 1, size: 2 })).toMatchObject({
+      control: 'toggle',
+      kind: 'radio',
+      label: 'Plan: monthly',
+      checked: false,
+      exportValue: 'monthly',
+      inGroup: { position: 1, size: 2 },
+    });
+    // The option is the button's export value: its /Opt entry over its on-state name.
+    expect(projectWidget(radio(), 22, box, true, { position: 2, size: 2 })).toMatchObject({
+      label: 'Plan: Pay yearly',
+      checked: true,
+      inGroup: { position: 2, size: 2 },
+    });
+  });
+
+  test("a group without a tooltip goes by the field's name; a checkbox keeps the field's label", () => {
+    expect(projectWidget(radio({ alternateName: null }), 21, box, true)).toMatchObject({
+      label: 'plan: monthly',
+      inGroup: null,
+    });
+    const checkbox = {
+      ...radio(),
+      kind: 'checkbox',
+      checked: true,
+      exportValue: 'Yes',
+      widgets: [
+        { ...formWidget(21, toPageRef(3)), onState: 'Yes', exportValue: 'Yes', checked: true },
+      ],
+    } as unknown as FormField;
+    expect(projectWidget(checkbox, 21, box, true)).toMatchObject({
+      kind: 'checkbox',
+      label: 'Plan',
+    });
+  });
+});

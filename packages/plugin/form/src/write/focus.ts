@@ -1,28 +1,20 @@
 /**
  * Moving the cursor between fields: `focus()`, `focusNext()` (what Tab does), the arrow keys in a
  * radio group, and the field the cursor is in. This area decides where the cursor goes: which
- * field, which of its boxes, in Tab's order (the engine's `tabOrderOf()`); the cursor service
+ * field, which of its boxes, in Tab's order (`services/tab-order.ts`); the cursor service
  * (`services/cursor.ts`) brings the box into view and hands it to its control.
  */
 import { memo } from '@embedpdf/core';
-import {
-  tabOrderOf,
-  type AnnotationRef,
-  type FormField,
-  type FormFieldRef,
-  type WidgetAnnotation,
+import type {
+  AnnotationRef,
+  FormField,
+  FormFieldRef,
+  WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormFocusNextOptions, FormFocusOptions } from '../contract';
 import type { FormHostCapability } from '../host-contract';
-import {
-  fieldByKey,
-  fieldByRef,
-  fieldForWidget,
-  fieldKeyOf,
-  shownOnScreen,
-  widgetRowOf,
-} from '../model';
+import { fieldByKey, fieldByRef, fieldForWidget, fieldKeyOf, widgetRowOf } from '../model';
 import { isEmpty, widgetObjectOf } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
 
@@ -41,14 +33,19 @@ const radioButtonOf = (field: FormField, widget: number) =>
 
 export function createFocus(
   ctx: FormContext,
-  { fields, rights, events, cursor }: Pick<FormServices, 'fields' | 'rights' | 'events' | 'cursor'>,
+  {
+    fields,
+    rights,
+    events,
+    cursor,
+    tabOrder,
+  }: Pick<FormServices, 'fields' | 'rights' | 'events' | 'cursor' | 'tabOrder'>,
   fill: Pick<FormCapability, 'setValue' | 'activateWidget'>,
 ) {
   /** Every box that shows, in Tab's order, and the ones Tab stops at. */
   const order = memo(
-    () => [fields.view(), ctx.document()?.pages, rights.key(), ctx.settings().get().fillable],
-    (index, pages) => {
-      const rows = tabOrderOf((index.snapshot?.widgets ?? []).filter(shownOnScreen), pages ?? []);
+    () => [fields.view(), tabOrder.rows(), rights.key(), ctx.settings().get().fillable],
+    (index, rows) => {
       const position = new Map<number, number>();
       const stops: Stop[] = [];
       const groups = new Set<string>();

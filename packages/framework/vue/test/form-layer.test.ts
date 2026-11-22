@@ -258,6 +258,65 @@ describe('<FormLayer> dropdown', () => {
 });
 
 /**
+ * A radio group's buttons are placed apart on the page, with no group element around them: each
+ * button is named by its group's tooltip and its own option, and says where it comes in its group.
+ */
+describe('<FormLayer> radio buttons', () => {
+  it(
+    'names each button by its option, and says where it comes in its group',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await realEngine();
+      const context = shallowRef<PageContextValue | null>(null);
+      const { kernel, wrapper } = await viewerWith(
+        [interactionPlugin(), formPlugin()],
+        () => [h(pageWith(context, () => h(FormLayer)))],
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await vi.waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const page = kernel.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          kind: 'radio',
+          name: 'plan',
+          alternateName: 'Plan',
+          widgets: [
+            { page, rect: { x: 72, y: 100, width: 16, height: 16 }, exportValue: 'Monthly' },
+            { page, rect: { x: 200, y: 100, width: 16, height: 16 }, exportValue: 'Yearly' },
+          ],
+        });
+        context.value = letterPage('blank', page);
+        await settle();
+
+        const radio = (name: string) =>
+          document.querySelector<HTMLElement>(`[role="radio"][aria-label="${name}"]`);
+        const monthly = await vi.waitFor(() => {
+          const found = radio('Plan: Monthly');
+          if (!found) throw new Error('no radio button yet');
+          return found;
+        });
+        const yearly = radio('Plan: Yearly')!;
+        expect(monthly.getAttribute('aria-posinset')).toBe('1');
+        expect(monthly.getAttribute('aria-setsize')).toBe('2');
+        expect(yearly.getAttribute('aria-posinset')).toBe('2');
+        expect(yearly.getAttribute('aria-setsize')).toBe('2');
+      } finally {
+        wrapper.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
  * A field turned a quarter (`/MK /R`): its control sits in the field's frame,
  * turned with it about its middle, so what's typed reads the way the field
  * does. An unturned field's control is placed as it always was.

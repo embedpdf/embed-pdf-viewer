@@ -1,7 +1,9 @@
 <!--
   A checkbox or a radio button: the field's picture is the control, so the box itself takes the
   role, the tab stop and the keys. A click, Space or Enter writes the toggled value, then runs
-  the widget's action (Acrobat's order: `@embedpdf/web`'s `pressToggle`).
+  the widget's action (Acrobat's order: `@embedpdf/web`'s `pressToggle`). A radio button's label
+  names its option, and it says where it comes in its group: its buttons are placed apart, so no
+  group element can.
 -->
 <script lang="ts">
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
@@ -22,6 +24,7 @@
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(() => item.annotationRef);
   let focused = $state(false);
+  const inGroup = $derived(item.kind === 'radio' ? item.inGroup : null);
 
   // The value first, then the widget's action.
   const press = () => pressToggle(form, item, activate);
@@ -39,6 +42,8 @@
   role={item.kind === 'checkbox' ? 'checkbox' : 'radio'}
   aria-checked={item.checked}
   aria-label={item.label}
+  aria-posinset={inGroup?.position}
+  aria-setsize={inGroup?.size}
   tabindex={item.disabled ? -1 : 0}
   onclick={press}
   onkeydown={onKeyDown}
