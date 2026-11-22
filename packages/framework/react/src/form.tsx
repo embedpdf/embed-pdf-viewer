@@ -332,9 +332,10 @@ function ComboControl({ item, page, colors }: ControlProps<'choice'>) {
   const [focused, setFocused] = useState(false);
   return (
     <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
+      {/* Controlled, never made again on a change: a new select would drop the focus to the page
+          while the old one never reports its blur. */}
       <select
-        key={item.selected.join('\0')}
-        defaultValue={item.selected[0] ?? ''}
+        value={item.selected[0] ?? ''}
         aria-label={item.label}
         disabled={item.disabled}
         onFocus={() => setFocused(true)}
