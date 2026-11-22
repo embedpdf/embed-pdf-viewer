@@ -78,6 +78,7 @@ const NOT_THE_VIEWERS = (tab: Page): Promise<string[]> =>
     const { viewer } = window.element;
     const stamp = viewer.get('stamp');
     interface Field {
+      kind: string;
       name: string;
       alternateName?: string | null;
       options?: readonly { label: string; value: string }[];
@@ -94,6 +95,12 @@ const NOT_THE_VIEWERS = (tab: Page): Promise<string[]> =>
         ...(field.options ?? []).flatMap((option) => [option.label, option.value]),
         // A radio button's or a checkbox's value, which the form designer lists.
         ...field.widgets.map((widget) => widget.exportValue ?? ''),
+        // A radio button's own name: the group's name and its value ("Plan: Monthly").
+        ...(field.kind === 'radio'
+          ? field.widgets.map(
+              (widget) => `${field.alternateName ?? field.name}: ${widget.exportValue ?? ''}`,
+            )
+          : []),
       ]),
       // The default handwriting fonts, by their names (`@embedpdf/default-signature-fonts`).
       'Allura',
