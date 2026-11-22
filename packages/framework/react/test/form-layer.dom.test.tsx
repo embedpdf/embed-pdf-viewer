@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { pageTransform } from '@embedpdf/core-geometry';
 import { annotationKey, type Kernel } from '@embedpdf/core';
@@ -374,6 +374,109 @@ describe('<FormLayer> over a turned field', () => {
           expect(form.getValue(toFieldRef('side'))).toEqual({ value: 'Up the page' }),
         );
         expect(form.listWidgets(page).find((each) => each.label === 'side')!.rotation).toBe(270);
+      } finally {
+        view.unmount();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
+ * A dropdown is one select for as long as its field shows: a choice keeps the
+ * focus where it is, and the focus ring leaves with the focus.
+ */
+describe('<FormLayer> dropdown', () => {
+  afterEach(cleanup);
+
+  it(
+    'keeps the focus through a choice, and drops its ring on blur',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const wasmBinary = new Uint8Array(await readFile(wasm));
+      const engine = await createLocalEngine({ runtime: { prefer: 'wasm', wasmBinary } });
+      const plugins = [interactionPlugin(), formPlugin()];
+
+      let kernel: Kernel | null = null;
+      let setPage!: (page: PageContextValue) => void;
+      function Grab() {
+        const current = useKernel();
+        useEffect(() => {
+          kernel = current;
+        }, [current]);
+        return null;
+      }
+      function Page() {
+        const [page, set] = useState<PageContextValue | null>(null);
+        setPage = set;
+        return page ? (
+          <PageProvider value={page}>
+            <FormLayer />
+          </PageProvider>
+        ) : null;
+      }
+
+      const view = render(
+        <Viewer
+          engine={engine}
+          plugins={plugins}
+          initialDocuments={[{ source: { kind: 'bytes', id: 'blank', bytes } }]}
+        >
+          <Grab />
+          <Page />
+        </Viewer>,
+      );
+
+      try {
+        await waitFor(() => expect(kernel?.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel!.capability(FormToken);
+        await form.refresh();
+        const page = kernel!.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          kind: 'combobox',
+          name: 'framework',
+          options: [
+            { label: 'React', value: 'React' },
+            { label: 'Vue', value: 'Vue' },
+          ],
+          widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+        setPage(
+          makePageContext(
+            'blank',
+            'test-view',
+            page,
+            0,
+            { top: 0, right: 0, bottom: 0, left: 0 },
+            pageTransform({ pageSize: { width: 612, height: 792 }, rotation: 0, scale: 1, dpr: 1 }),
+            () => new DOMRect(0, 0, 612, 792),
+          ),
+        );
+        const ring = () => document.querySelector('[data-embedpdf-form-focus-ring]');
+
+        const select = (await waitFor(() =>
+          screen.getByLabelText('framework'),
+        )) as HTMLSelectElement;
+        act(() => select.focus());
+        expect(ring()).not.toBeNull();
+
+        fireEvent.change(select, { target: { value: 'Vue' } });
+        await waitFor(() =>
+          expect(form.getValue(toFieldRef('framework'))).toEqual({ value: 'Vue' }),
+        );
+        await waitFor(() => expect(form.listWidgets(page)[0]).toMatchObject({ selected: ['Vue'] }));
+
+        // The same select, still focused, showing the choice.
+        expect(screen.getByLabelText('framework')).toBe(select);
+        expect(document.activeElement).toBe(select);
+        expect(select.value).toBe('Vue');
+        expect(ring()).not.toBeNull();
+
+        act(() => select.blur());
+        expect(ring()).toBeNull();
       } finally {
         view.unmount();
         await engine.destroy();

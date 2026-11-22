@@ -185,6 +185,79 @@ describe('<FormLayer> over fields made from code', () => {
 });
 
 /**
+ * A dropdown is one select for as long as its field shows: a choice keeps the
+ * focus where it is, and the focus ring leaves with the focus.
+ */
+describe('<FormLayer> dropdown', () => {
+  it(
+    'keeps the focus through a choice, and drops its ring on blur',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await realEngine();
+      const context = shallowRef<PageContextValue | null>(null);
+      const { kernel, wrapper } = await viewerWith(
+        [interactionPlugin(), formPlugin()],
+        () => [h(pageWith(context, () => h(FormLayer)))],
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await vi.waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const page = kernel.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          kind: 'combobox',
+          name: 'framework',
+          options: [
+            { label: 'React', value: 'React' },
+            { label: 'Vue', value: 'Vue' },
+          ],
+          widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+        context.value = letterPage('blank', page);
+        await settle();
+        const ring = () => document.querySelector('[data-embedpdf-form-focus-ring]');
+
+        const select = await vi.waitFor(() => {
+          const found = document.querySelector<HTMLSelectElement>('select[aria-label="framework"]');
+          if (!found) throw new Error('no dropdown yet');
+          return found;
+        });
+        select.focus();
+        await nextTick();
+        expect(ring()).not.toBeNull();
+
+        select.value = 'Vue';
+        select.dispatchEvent(new Event('change'));
+        await vi.waitFor(() =>
+          expect(form.getValue(toFieldRef('framework'))).toEqual({ value: 'Vue' }),
+        );
+        await settle();
+
+        // The same select, still focused, showing the choice.
+        expect(document.querySelector('select[aria-label="framework"]')).toBe(select);
+        expect(document.activeElement).toBe(select);
+        expect(select.value).toBe('Vue');
+        expect(ring()).not.toBeNull();
+
+        select.blur();
+        await nextTick();
+        expect(ring()).toBeNull();
+      } finally {
+        wrapper.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
  * A radio group's buttons are placed apart on the page, with no group element around them: each
  * button is named by its group's tooltip and its own option, and says where it comes in its group.
  */
