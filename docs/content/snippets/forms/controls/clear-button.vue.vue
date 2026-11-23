@@ -1,8 +1,12 @@
 <!-- TextBox.vue -->
 <script setup lang="ts">
-import type { FieldControlProps } from '@embedpdf/vue/form';
+import { useForm, type FieldControlProps } from '@embedpdf/vue/form';
 
-defineProps<FieldControlProps>();
+const props = defineProps<FieldControlProps>();
+const form = useForm();
+
+// Empty the box, then put the cursor back in it, ready for the new value.
+const clear = () => props.setValue({ value: '' }).then(() => form.focus(props.widget.fieldRef));
 </script>
 
 <template>
@@ -14,6 +18,6 @@ defineProps<FieldControlProps>();
     class="clear-button"
     :aria-label="`Clear ${widget.label}`"
     tabindex="-1"
-    @click="setValue({ value: '' })"
+    @click="clear"
   />
 </template>

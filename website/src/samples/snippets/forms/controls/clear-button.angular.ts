@@ -1,8 +1,10 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import {
   EpdfFieldControlTemplate,
+  EpdfForm,
   EpdfFormLayer,
+  type EpdfFieldControlTemplateContext,
   type FormWidgetItem,
 } from '@embedpdf/angular/form';
 
@@ -25,7 +27,7 @@ import {
             class="clear-button"
             [attr.aria-label]="'Clear ' + widget.label"
             tabindex="-1"
-            (click)="setValue({ value: '' })"
+            (click)="clear(widget, setValue)"
           ></button>
         }
       </ng-template>
@@ -33,6 +35,13 @@ import {
   `,
 })
 export class Fields {
+  private readonly form = inject(EpdfForm);
+
   protected readonly isTextBox = (widget: FormWidgetItem) =>
     widget.control === 'text' && !widget.multiline;
+
+  // Empty the box, then put the cursor back in it, ready for the new value.
+  protected clear(widget: FormWidgetItem, setValue: EpdfFieldControlTemplateContext['setValue']) {
+    void setValue({ value: '' }).then(() => this.form.focus(widget.fieldRef));
+  }
 }

@@ -57,7 +57,8 @@
 
 /* The switch. It is drawn in the field's frame, at the field's 100% size: the layer scales it
    with the page. A printed tick box is square and a switch is wide, so this one is as tall as its
-   frame and reaches past it to the left. */
+   frame and reaches past it to the left. Its corners are the printed box's own, 4px at that
+   size, and it has a hair of its own color around it, so it covers the box it stands on. */
 .switch {
   position: absolute;
   top: 0;
@@ -67,10 +68,14 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: var(--off);
+  border-radius: 4px;
+  --track: var(--off);
+  background: var(--track);
+  box-shadow: 0 0 0 0.5px var(--track);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .switch::after {
@@ -80,14 +85,14 @@
   left: 2px;
   height: calc(100% - 4px);
   aspect-ratio: 1;
-  border-radius: 50%;
+  border-radius: 2px;
   background: var(--knob);
   box-shadow: 0 1px 2px rgb(7 32 76 / 0.3);
   transition: left 0.15s ease;
 }
 
 .switch[aria-checked='true'] {
-  background: var(--on);
+  --track: var(--on);
 }
 
 /* The knob is as wide as the switch is tall, less its 2px margins: five ninths of the width. */
