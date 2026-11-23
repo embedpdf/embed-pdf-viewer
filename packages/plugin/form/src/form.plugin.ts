@@ -4,6 +4,7 @@ import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { FORM_DEFAULTS, type FormConfig } from './contract';
 import { createFormController } from './controller';
@@ -20,7 +21,8 @@ import { initialFormModel } from './model';
  * the annotation plugin present, the form lends it the widgets, which its
  * tools then select, move, restyle and delete. The render plugin draws the
  * widgets' pictures in both modes. With the fonts plugin, a text field in a
- * font of its own is edited in that font's program. `config` is the settings the app
+ * font of its own is edited in that font's program. With the Stage, `focus()` and
+ * `focusNext()` bring the box they go to into view. `config` is the settings the app
  * registers, over {@link FORM_DEFAULTS}.
  */
 export const formPlugin = (config?: FormConfig) =>
@@ -29,7 +31,7 @@ export const formPlugin = (config?: FormConfig) =>
     token: FormToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [AnnotationToken, ActionsToken, RenderToken, FontsToken],
+    optional: [AnnotationToken, ActionsToken, RenderToken, FontsToken, StageToken],
     state: initialFormModel,
     settings: { defaults: FORM_DEFAULTS, registered: config },
     create: createFormController,

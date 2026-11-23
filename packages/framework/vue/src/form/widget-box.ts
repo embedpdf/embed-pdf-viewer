@@ -4,16 +4,17 @@
  * border of its own gets, so people see where to fill in. A composable rather
  * than a component, so each control's template shows its whole box: the
  * toggle's box is its control (a role, a tab stop, keys), the others hold a
- * native control.
+ * native control, and a control of the app's draws inside one.
  */
-import { computed, ref, watch } from 'vue';
-import type { CSSProperties, Ref } from 'vue';
+import { computed, inject, provide, ref, watch } from 'vue';
+import type { CSSProperties, InjectionKey, Ref } from 'vue';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // The widget's PDF events go to the plugin's host lens.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import {
   bindFieldFocus,
   bindWidgetEvents,
+  claimClick,
   isolatePointerDown,
   rectInPixels,
   widgetBoxStyleOf,
@@ -21,6 +22,17 @@ import {
 import type { FormColors, PixelRect } from '@embedpdf/web';
 import { useCapability } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
+
+const EMBEDDED: InjectionKey<boolean> = Symbol('embedpdf:embedded-form-control');
+
+/**
+ * Mark what is drawn below as the layer's own control inside a control of the
+ * app's (`native`): the app's box is then the widget's event surface and the
+ * cursor's way in, and the layer's box only fills its place.
+ */
+export function provideEmbeddedControl(): void {
+  provide(EMBEDDED, true);
+}
 
 /** A control's box: bind `element` with `ref`, and `style` on the same element. */
 export interface WidgetBox {
@@ -37,7 +49,14 @@ export interface WidgetBox {
  * draw their own (a list box) or never have one (a button). The box is also
  * where the form's cursor reaches the control: `focus()` and Tab go through
  * the form, in the document's order (`bindFieldFocus`), unless the box has
- * nothing to focus (`focusable`).
+ * nothing to focus (`focusable`). `custom`: the box holds a control of the
+ * app's, so it draws no edge, and the cursor goes to the first element in it
+ * that Tab stops at.
+ *
+ * Inside a control of the app's ({@link provideEmbeddedControl}) the box only
+ * fills the place it is given: the app's box around it keeps the presses from
+ * the page, sends the widget's events and takes the cursor, and a click that
+ * passes through this one is left alone there (`claimClick`).
  *
  * The box keeps every press that starts in it from the page below: the Stage
  * listens natively on an ancestor, and a press reaching it would start the
@@ -57,17 +76,24 @@ export interface WidgetBox {
 export function useWidgetBox(
   item: () => FormWidgetItem,
   colors: () => FormColors,
-  options: { edge?: boolean; focusable?: () => boolean } = {},
+  options: { edge?: boolean; focusable?: () => boolean; custom?: boolean } = {},
 ): WidgetBox {
   const page = usePage();
   const form = useCapability(FormHostToken);
   const element = ref<HTMLDivElement | null>(null);
-  const edge = options.edge ?? true;
+  const custom = options.custom ?? false;
+  const edge = !custom && (options.edge ?? true);
+  const embedded = inject(EMBEDDED, false);
 
   watch(
     element,
     (box, _previous, onCleanup) => {
       if (!box) return;
+      if (embedded) {
+        box.addEventListener('click', claimClick);
+        onCleanup(() => box.removeEventListener('click', claimClick));
+        return;
+      }
       const release = isolatePointerDown(box);
       const unbind = bindWidgetEvents(box, (event) => {
         // Read at the event: a widget the engine has just placed gets its address later.
@@ -86,21 +112,31 @@ export function useWidgetBox(
     [
       element,
       () => item().annotationRef,
-      () => !item().disabled && (options.focusable?.() ?? true),
+      () => !embedded && !item().disabled && (options.focusable?.() ?? true),
       () => {
         const control = item();
         return control.control === 'toggle' && control.kind === 'radio';
       },
     ],
     ([box, widget, takesCursor, radio], _previous, onCleanup) => {
-      if (box && widget && takesCursor) onCleanup(bindFieldFocus(box, form, widget, { radio }));
+      if (box && widget && takesCursor) {
+        onCleanup(bindFieldFocus(box, form, widget, { radio, custom }));
+      }
     },
     { immediate: true, flush: 'post' },
   );
 
   const frame = computed(() => rectInPixels(item().box, page.value.transform));
   const style = computed(
-    (): CSSProperties => widgetBoxStyleOf(item(), frame.value, colors(), { edge }),
+    (): CSSProperties =>
+      embedded
+        ? widgetBoxStyleOf(
+            { look: item().look },
+            { left: 0, top: 0, width: frame.value.width, height: frame.value.height },
+            colors(),
+            { edge },
+          )
+        : widgetBoxStyleOf(item(), frame.value, colors(), { edge }),
   );
 
   return { element, frame, style };

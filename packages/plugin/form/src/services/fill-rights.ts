@@ -21,6 +21,8 @@ export interface FillRights {
   mayFill(field: Grouped): boolean;
   /** Whether the session may sign this signature field. */
   maySign(field: Grouped): boolean;
+  /** Whether the session may fill this field in, or sign it for a signature field: its permissions alone. */
+  mayFillOrSign(field: FormField): boolean;
   /**
    * Whether people fill this field in by hand: the `fillable` setting lets them, and the session
    * may fill it in (a signature field: sign it). A field it says no to has its boxes `disabled`.
@@ -41,9 +43,10 @@ const isFillableByHand = (fillable: FillableFields, kind: FormFieldKind): boolea
 export function createFillRights(ctx: FormContext, fields: Mirror<FieldIndex>): FillRights {
   const mayFill = (field: Grouped): boolean => ctx.allowsField('fill', field);
   const maySign = (field: Grouped): boolean => ctx.allowsField('sign', field);
+  const mayFillOrSign = (field: FormField): boolean =>
+    field.kind === 'signature' ? maySign(field) : mayFill(field);
   const mayFillByHand = (field: FormField): boolean =>
-    isFillableByHand(ctx.settings().get().fillable, field.kind) &&
-    (field.kind === 'signature' ? maySign(field) : mayFill(field));
+    isFillableByHand(ctx.settings().get().fillable, field.kind) && mayFillOrSign(field);
 
   /** The form's groups, `null` (no group) among them. */
   const groups = memo(
@@ -54,6 +57,7 @@ export function createFillRights(ctx: FormContext, fields: Mirror<FieldIndex>): 
   return {
     mayFill,
     maySign,
+    mayFillOrSign,
     mayFillByHand,
     takesInput: (field) => !field.readOnly && mayFillByHand(field),
     assertMayFill: (field, operation) => ctx.assertAllowedField('fill', field, operation),

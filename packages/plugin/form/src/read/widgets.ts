@@ -5,11 +5,21 @@
  * folded in, and the widget hit test.
  */
 import { memoByKey } from '@embedpdf/core';
-import type { PageRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef, PageRef, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 
+import type { FormWidgetAnchor } from '../contract';
 import type { FormHostCapability } from '../host-contract';
-import { pageWidgetsOf, widgetAt, type Box, type ShownWidget, type WidgetHit } from '../model';
+import {
+  pageWidgetsOf,
+  shownOnScreen,
+  widgetAt,
+  widgetRowOf,
+  type Box,
+  type ShownWidget,
+  type WidgetHit,
+} from '../model';
 import type { FormContext, FormServices } from '../services';
+import { widgetObjectOf } from './fields';
 import { fillItems, type FormWidgetItem } from './fill-items';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
@@ -23,7 +33,13 @@ export function createWidgetReads(
     rights,
     looks,
     pictures,
-  }: Pick<FormServices, 'fields' | 'rights' | 'looks' | 'pictures'>,
+    design,
+    siblings,
+    cursor,
+  }: Pick<
+    FormServices,
+    'fields' | 'rights' | 'looks' | 'pictures' | 'design' | 'siblings' | 'cursor'
+  >,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
@@ -55,13 +71,26 @@ export function createWidgetReads(
       ctx.settings().get().fillable,
     ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
-      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand),
+      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand, rights.mayFillOrSign),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */
   const getPageBox = (page: PageRef): Box | null => {
     const size = ctx.getPage(page)?.size;
     return size ? { x: 0, y: 0, width: size.width, height: size.height } : null;
+  };
+
+  // One anchor per widget row: a row stays the same object until its widget changes.
+  const anchors = new WeakMap<WidgetAnnotation, FormWidgetAnchor>();
+  const getWidgetAnchor = (widget: AnnotationRef): FormWidgetAnchor | null => {
+    const row = widgetRowOf(fields.view(), widgetObjectOf(widget));
+    if (!row) return null;
+    // Lent to the annotation plugin, a widget is where its drag has it.
+    if (design.lending()) return siblings.annotation()?.getAnnotationAnchor(row.ref) ?? null;
+    if (!shownOnScreen(row)) return null;
+    let anchor = anchors.get(row);
+    if (!anchor) anchors.set(row, (anchor = { page: row.page, bounds: row.rect }));
+    return anchor;
   };
 
   return {
@@ -83,6 +112,8 @@ export function createWidgetReads(
       ensureLoaded: loadWidgets,
       getWidgetAt,
       getPageBox,
+      getWidgetAnchor,
+      isWidgetFocused: (widget) => cursor.focused()?.widget === widgetObjectOf(widget),
     } satisfies Partial<FormHostCapability>,
   };
 }

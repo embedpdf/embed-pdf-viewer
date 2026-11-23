@@ -200,7 +200,7 @@ on [Building forms](forms/building#methods).
 | `getFieldForWidget(widget)` | The field a box belongs to, from the box's ref                                                                                                |
 | `getWidget(widget)`        | A box's row: its page, its place (`rect`), its look and its state, or `null` when no page shows it                                             |
 | `getWidgets(ref)`          | Every box a field shows in, as rows in the field's order: a radio group's buttons, or a field repeated on several pages                       |
-| `listWidgets(page)`        | Each field box on a page, with its place (`box`, `rotation` and `rect`), its control, its value and whether it can be filled. For drawing the fields yourself; see [Turned fields](#turned-fields). |
+| `listWidgets(page)`        | Each field box on a page, with its place (`box`, `rotation` and `rect`), its control, its value and whether it can be filled. For drawing the fields yourself; see [What a box tells you](forms/controls#what-a-box-tells-you) and [Turned fields](#turned-fields). |
 | `getWidgetAt(page, point)` | The field box under a point on a page, with its field and its place (`box`, `rotation` and `rect`), or `null`                                  |
 | `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
 | `setValues(entries)`       | Fills in several fields, each `{ ref, value }`, as one change with one recalculation; a field you may not fill in, or a value it can't take, fails on its own. Resolves `{ applied, skipped, failed }`. |

@@ -1,10 +1,16 @@
 /**
- * `<epdf-field-pictures>`: the page's fields as they look now, under the form layer's controls.
- * Each widget shows its picture, as the engine draws it (the form plugin's, every state loaded, so
- * a check box shows its new state at once), or the painter's drawing while its look is pending or
- * its picture is of an older version (`pictureOrPainting`): a value, a calculation, a restyle
- * shows at once. Either is drawn at the widget's box: a moved widget keeps its picture and takes
- * it along. Hidden widgets aren't drawn.
+ * The page's fields as they look now, under the form layer's controls. Each widget shows its
+ * picture, as the engine draws it (the form plugin's, every state loaded, so a check box shows
+ * its new state at once), or the painter's drawing while its look is pending or its picture is
+ * of an older version (`pictureOrPainting`): a value, a calculation, a restyle shows at once.
+ * Hidden widgets aren't drawn.
+ *
+ *   injectFieldLooks()        every widget's look on the page, for the layer
+ *   <epdf-field-pictures>     the looks it's given, each at its widget's box: a moved widget
+ *                             keeps its picture and takes it along
+ *
+ * The layer gives `<epdf-field-pictures>` the looks of the boxes it draws itself; a box a
+ * control of the app's draws gets its look inside that control (`custom-control.ts`).
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
@@ -14,9 +20,11 @@ import {
   DestroyRef,
   effect,
   inject,
+  input,
   PLATFORM_ID,
   signal,
   untracked,
+  type Signal,
 } from '@angular/core';
 import {
   CapabilityBinding,
@@ -42,8 +50,11 @@ import {
 
 const NO_WIDGETS: readonly ShownWidget[] = Object.freeze([]);
 
-/** A widget as the template draws it: its picture, or the painter's shapes in its box. */
-type ShownLook = { key: string; frame: PixelRect } & (
+/**
+ * A widget as a template draws it: its picture, or the painter's shapes in its box. `key` is
+ * the widget's (`annotationKey`), `frame` where it stands in the page layer's pixels.
+ */
+export type ShownLook = { key: string; frame: PixelRect } & (
   | { kind: 'picture'; url: string }
   | { kind: 'painting'; viewBox: string; shapes: SvgShape[] }
 );
@@ -54,7 +65,7 @@ type ShownLook = { key: string; frame: PixelRect } & (
   changeDetection: ChangeDetectionStrategy.OnPush,
   // A global `img { max-width: 100% }` reset would clamp a picture: the sizes are explicit.
   template: `
-    @for (look of looks(); track look.key) {
+    @for (look of shown(); track look.key) {
       @if (look.kind === 'picture') {
         <img
           alt=""
@@ -82,47 +93,58 @@ type ShownLook = { key: string; frame: PixelRect } & (
   `,
 })
 export class EpdfFieldPictures {
-  private readonly page = injectPage('<epdf-form-layer>');
-  private readonly host = injectKernelHost('<epdf-form-layer>');
-  private readonly render = new CapabilityBinding(
-    this.host,
+  /**
+   * The looks to draw, each at its widget's box. The layer hands over the signal, not its
+   * value, and this template reads it: a picture that arrives checks the pictures, not the
+   * layer's template and every control's box with it.
+   */
+  readonly looks = input.required<Signal<readonly ShownLook[]>>();
+
+  protected readonly shown = computed(() => this.looks()());
+}
+
+/**
+ * The look of every widget the page shows, in the order the page draws them: the same array
+ * while none of them changes. It loads the page's pictures again when one of its widgets is
+ * drawn again, and at appearance-scale crossings. Call it in the layer's injection context: the
+ * pictures are released with the layer.
+ */
+export function injectFieldLooks(): Signal<readonly ShownLook[]> {
+  const page = injectPage('<epdf-form-layer>');
+  const host = injectKernelHost('<epdf-form-layer>');
+  const render = new CapabilityBinding(
+    host,
     () => RenderToken,
-    () => this.page.documentId,
+    () => page.documentId,
   );
-  private readonly form = new CapabilityBinding(
-    this.host,
+  const form = new CapabilityBinding(
+    host,
     () => FormHostToken,
-    () => this.page.documentId,
+    () => page.documentId,
   );
 
   /** The widgets the page shows: the same array while none of them changes. */
-  private readonly widgets = this.form.select(
-    (form) => form.listShownWidgets(this.page.ref),
-    NO_WIDGETS,
-  );
+  const widgets = form.select((lens) => lens.listShownWidgets(page.ref), NO_WIDGETS);
   /** Loaded again when one of the page's widgets is drawn again, and at appearance-scale crossings. */
-  private readonly epoch = this.form.select((form) => form.getAppearanceEpoch(this.page.ref), '');
-  private readonly scale = this.render.select(
-    (render) => render.getAppearanceScale(this.page.transform().renderScale),
-    0,
-  );
+  const epoch = form.select((lens) => lens.getAppearanceEpoch(page.ref), '');
+  const scale = render.select((lens) => lens.getAppearanceScale(page.transform().renderScale), 0);
   /** The pictures' URLs, by widget and state; `null` until the page's first ones arrive. */
-  private readonly urls = signal<Record<string, AppearanceUrl> | null>(null);
+  const urls = signal<Record<string, AppearanceUrl> | null>(null);
   /** The pictures shown stay valid until the next ones are shown. */
-  private readonly shown = createShownUrls();
+  const shown = createShownUrls();
 
-  protected readonly looks = computed(() => {
-    const urls = this.urls();
-    const transform = this.page.transform();
-    const form = this.form.capability();
-    return this.widgets().flatMap((widget): ShownLook[] => {
+  const looks = computed(() => {
+    const loaded = urls();
+    const transform = page.transform();
+    const lens = form.capability();
+    return widgets().flatMap((widget): ShownLook[] => {
       const key = annotationKey(widget.ref);
       const look = pictureOrPainting({
         pending: widget.pending,
-        picture: urls && shownAppearance(urls, key, widget.appearanceState),
+        picture: loaded && shownAppearance(loaded, key, widget.appearanceState),
         version: widget.pictureVersion,
-        loaded: urls !== null,
-        paint: () => form?.getWidgetPainting(widget.ref) ?? null,
+        loaded: loaded !== null,
+        paint: () => lens?.getWidgetPainting(widget.ref) ?? null,
       });
       if (!look) return [];
       // Where the widget is now: a move keeps its picture, which comes along with it.
@@ -143,25 +165,24 @@ export class EpdfFieldPictures {
     });
   });
 
-  constructor() {
-    if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
-    inject(DestroyRef).onDestroy(() => this.shown.release());
-    effect((onCleanup) => {
-      const form = this.form.capability();
-      const scale = this.scale();
-      const ref = this.page.ref;
-      this.epoch();
-      if (!form || !scale) return;
-      onCleanup(
-        untracked(() =>
-          loadAppearanceUrls(
-            this.shown,
-            (signal) => form.renderAppearances(ref, scale, signal),
-            annotationKey,
-            (urls) => this.urls.set(urls),
-          ),
+  if (!isPlatformBrowser(inject(PLATFORM_ID))) return looks;
+  inject(DestroyRef).onDestroy(() => shown.release());
+  effect((onCleanup) => {
+    const lens = form.capability();
+    const at = scale();
+    const ref = page.ref;
+    epoch();
+    if (!lens || !at) return;
+    onCleanup(
+      untracked(() =>
+        loadAppearanceUrls(
+          shown,
+          (signal) => lens.renderAppearances(ref, at, signal),
+          annotationKey,
+          (loaded) => urls.set(loaded),
         ),
-      );
-    });
-  }
+      ),
+    );
+  });
+  return looks;
 }

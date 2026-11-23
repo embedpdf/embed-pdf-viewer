@@ -80,6 +80,8 @@ const origin = {
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
 /** A user who may fill in every field. */
 const ALWAYS = () => true;
+/** A user who may fill in none, or a setting that leaves every field out. */
+const NEVER = () => false;
 const LOOK: FormWidgetLook = {
   border: '#6b7280',
   borderWidth: 1,
@@ -92,6 +94,7 @@ const LOOK: FormWidgetLook = {
 };
 /** An unturned widget on its page: its frame is the rect it stands in. */
 const placed = (box: { x: number; y: number; width: number; height: number }) => ({
+  ref: { kind: 'objectNumber' as const, page: toPageRef(3), objectNumber: 4 },
   box,
   rotation: 0 as const,
   rect: box,
@@ -203,7 +206,7 @@ describe('field index', () => {
       { box: FRAME, rotation: 0, rect: FRAME },
     ]);
     // A fill item carries the same place: the control goes in the frame, turned.
-    const [item] = fillItems(index, 3, widgets, ALWAYS);
+    const [item] = fillItems(index, 3, widgets, ALWAYS, ALWAYS);
     expect(item).toMatchObject({ box: FRAME, rotation: 270, rect: STANDS });
     // A point is on a widget where it stands, not where its frame lies before the turn.
     expect(widgetAt(index, widgets, { x: 100, y: 30 })).toMatchObject({
@@ -339,8 +342,8 @@ describe('field index', () => {
 describe('fill projection', () => {
   test('joins the field plane with widget geometry', () => {
     const index = indexFields(snapshot([text()]));
-    expect(fillItems(index, 3, undefined, ALWAYS)).toEqual([]);
-    const items = fillItems(index, 3, BOXES, ALWAYS);
+    expect(fillItems(index, 3, undefined, ALWAYS, ALWAYS)).toEqual([]);
+    const items = fillItems(index, 3, BOXES, ALWAYS, ALWAYS);
     expect(items.length).toBe(1);
     const item = items[0]!;
     expect(item.control).toBe('text');
@@ -350,16 +353,38 @@ describe('fill projection', () => {
       expect(item.value).toBe('abc');
       expect(item.maxLength).toBe(5);
     }
-    expect(fillItems(index, 99, BOXES, ALWAYS)).toEqual([]);
+    expect(fillItems(index, 99, BOXES, ALWAYS, ALWAYS)).toEqual([]);
   });
 
   test('read-only fields, and fields the user may not fill in, project as disabled', () => {
     const readOnly = text({ readOnly: true });
-    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(true);
-    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, () => false)[0]!.disabled).toBe(
+    expect(
+      fillItems(indexFields(snapshot([readOnly])), 3, BOXES, ALWAYS, ALWAYS)[0]!.disabled,
+    ).toBe(true);
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, NEVER, NEVER)[0]!.disabled).toBe(
       true,
     );
-    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(false);
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, ALWAYS, ALWAYS)[0]!.disabled).toBe(
+      false,
+    );
+  });
+
+  test('whether a field is filled in by hand and whether the user may fill it in are two answers', () => {
+    const index = indexFields(snapshot([text()]));
+    // Left out by the `fillable` setting, with the permission to fill it in.
+    expect(fillItems(index, 3, BOXES, NEVER, ALWAYS)[0]).toMatchObject({
+      disabled: true,
+      canFill: true,
+    });
+    // Without the permission, it is neither.
+    expect(fillItems(index, 3, BOXES, NEVER, NEVER)[0]).toMatchObject({
+      disabled: true,
+      canFill: false,
+    });
+    expect(projectWidget(text(), 4, BOXES[4]!, false, true)).toMatchObject({
+      disabled: true,
+      canFill: true,
+    });
   });
 });
 
@@ -388,13 +413,13 @@ const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}
 
 describe('signature widgets', () => {
   test('an unsigned signature field projects a "signature" fill item', () => {
-    const item = projectWidget(signature(), 9, BOXES[4]!, true);
+    const item = projectWidget(signature(), 9, BOXES[4]!, true, true);
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
   test('a /V on the field marks the item signed', () => {
     const signed = signature({ valueEntry: { kind: 'unsupported' } });
-    expect(projectWidget(signed, 9, BOXES[4]!, true)).toMatchObject({
+    expect(projectWidget(signed, 9, BOXES[4]!, true, true)).toMatchObject({
       control: 'signature',
       signed: true,
     });

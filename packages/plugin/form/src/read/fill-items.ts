@@ -17,6 +17,7 @@ import type {
   FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 
+import { isEmpty } from './fields';
 import {
   fieldKeyOf,
   type FieldIndex,
@@ -37,6 +38,16 @@ interface FormWidgetItemBase extends WidgetPlace {
   annotObjectNumber: number;
   /** The widget's annotation address (null until the engine has placed it). */
   annotationRef: AnnotationRef | null;
+  /** The box's own address: what `getWidget()` takes, and what UI anchored to the box is given. */
+  ref: AnnotationRef;
+  /** The group the field is in, or `null`. */
+  groupId: string | null;
+  /** The session may fill the field in, or sign it for a signature field: its permissions alone. */
+  canFill: boolean;
+  /** The form asks for a value: the field's Required flag. */
+  required: boolean;
+  /** The field holds nothing yet, by the rule `validate()` checks a required field with. */
+  empty: boolean;
   /** How the widget looks in the PDF. */
   look: FormWidgetLook;
   /** A read-only field, no permission to fill, filling it turned off (`fillable`), or a write on its way: draw it, don't take input. */
@@ -82,15 +93,17 @@ export type FormWidgetItem = FormWidgetItemBase &
   );
 
 /**
- * Project one widget of a field into a fill control; `fillable`: the user may
- * fill the field in (a signature field: sign it). Null for kinds with no
- * fill control.
+ * Project one widget of a field into a fill control. `fillable`: people fill
+ * the field in by hand (a signature field: sign it), which the box is
+ * `disabled` without; `canFill`: the session's permission alone, which the
+ * `fillable` setting doesn't change. Null for kinds with no fill control.
  */
 export function projectWidget(
   field: FormField,
   annotObjectNumber: number,
   widget: PageWidget,
   fillable: boolean,
+  canFill: boolean,
 ): FormWidgetItem | null {
   const key = fieldKeyOf(field);
   const base: FormWidgetItemBase = {
@@ -99,6 +112,11 @@ export function projectWidget(
     annotObjectNumber,
     annotationRef:
       field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber)?.ref ?? null,
+    ref: widget.ref,
+    groupId: field.groupId,
+    canFill,
+    required: field.required,
+    empty: isEmpty(field),
     box: widget.box,
     rotation: widget.rotation,
     rect: widget.rect,
@@ -171,15 +189,17 @@ export function projectWidget(
 }
 
 /**
- * Project one page's widgets into fill controls, each disabled when the user
- * may not fill its field in, or sign it (`mayFill`). Widgets whose page has not loaded (or
- * that are direct objects with no join key) are skipped; the projection runs
- * again when the page's widgets land.
+ * Project one page's widgets into fill controls, each disabled when people
+ * don't fill its field in by hand (`mayFillByHand`), and each saying whether
+ * the session may fill it in, or sign it (`mayFill`, its permissions alone).
+ * Widgets whose page has not loaded (or that are direct objects with no join
+ * key) are skipped; the projection runs again when the page's widgets land.
  */
 export function fillItems(
   index: FieldIndex,
   pageObjectNumber: number,
   widgets: PageWidgets | undefined,
+  mayFillByHand: (field: FormField) => boolean,
   mayFill: (field: FormField) => boolean,
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
@@ -189,7 +209,13 @@ export function fillItems(
       if (widget.page?.objectNumber !== pageObjectNumber) continue;
       const placed = widgets[widget.objectNumber];
       if (!placed) continue;
-      const item = projectWidget(field, widget.objectNumber, placed, mayFill(field));
+      const item = projectWidget(
+        field,
+        widget.objectNumber,
+        placed,
+        mayFillByHand(field),
+        mayFill(field),
+      );
       if (item) items.push(item);
     }
   }
