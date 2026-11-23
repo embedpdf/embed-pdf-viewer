@@ -17,6 +17,13 @@ export type RichTextDecoration = 'underline' | 'line-through' | 'word';
 export type RichTextScript = 'normal' | 'sub' | 'super';
 export type RichTextAlign = TextAlignment | 'justify';
 export type RichTextDirection = 'ltr' | 'rtl';
+/**
+ * A free text's alignment as a write states it: `'auto'` follows the text's
+ * direction, decided by its first strong character (right-aligned
+ * right-to-left for Hebrew, Arabic and the other right-to-left scripts, else
+ * left-aligned left-to-right). A read never returns `'auto'`.
+ */
+export type FreeTextAlignInput = RichTextAlign | 'auto';
 
 export interface RichTextRunStyle {
   family: string;
@@ -108,6 +115,21 @@ export interface RichTextDocumentInput {
 export function richTextPlainText(doc: { paragraphs: readonly RichTextParagraph[] }): string {
   const paragraphs = doc.paragraphs.map((p) => p.runs.map((r) => r.text).join(''));
   return toLineBreaks(paragraphs.join('\n'), '\n');
+}
+
+const STRONG = /\p{L}/u;
+const RTL_SCRIPT =
+  /[\p{Script=Hebrew}\p{Script=Arabic}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Samaritan}\p{Script=Mandaic}\p{Script=Adlam}\p{Script=Hanifi_Rohingya}\p{Script=Mende_Kikakui}]/u;
+
+/**
+ * The direction of `text` as its first strong character decides it (the
+ * rule of HTML's `dir="auto"`); `null` when it has no letter.
+ */
+export function textDirectionOf(text: string): RichTextDirection | null {
+  for (const char of text) {
+    if (STRONG.test(char)) return RTL_SCRIPT.test(char) ? 'rtl' : 'ltr';
+  }
+  return null;
 }
 
 /** Plain text as rich paragraphs: one per line break, one run each, no

@@ -206,7 +206,8 @@ export function applyFreeTextPatch(
     writeRichText(fn, annotPtr, patch.richText, ctx, patch.fontFamily);
   }
 
-  if (patch.textAlign !== undefined) {
+  // The resolver makes `'auto'` concrete from the text; it never arrives here.
+  if (patch.textAlign !== undefined && patch.textAlign !== 'auto') {
     setTextAlignment(fn, annotPtr, textAlignmentToCode(patch.textAlign));
   }
   if (patch.intent !== undefined) {
