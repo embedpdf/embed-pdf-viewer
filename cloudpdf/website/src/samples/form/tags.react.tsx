@@ -21,15 +21,24 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin(
 
 const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
-/** A tag beside the first box of a field: pinned, so it stays on the field. */
+/**
+ * A tag beside the first box of a field: pinned, so it stays on the field. A pinned tag keeps
+ * its size at every zoom, so this one is small: it fits in the page's margin on a phone too.
+ */
 function Tag({ field }: { field: FormField }) {
   const form = useForm();
   const anchor = useFormWidgetAnchor(form.getWidgets(field.ref)[0]?.ref ?? null);
 
   return (
     <Anchored anchor={anchor} placement="left" gap={6} pinned>
-      <button type="button" className="tag" onClick={() => form.focus(field.ref)}>
-        Required
+      <button
+        type="button"
+        className="tag"
+        title="Required"
+        aria-label={`Required: ${field.alternateName ?? field.name}`}
+        onClick={() => form.focus(field.ref)}
+      >
+        !
       </button>
     </Anchored>
   );

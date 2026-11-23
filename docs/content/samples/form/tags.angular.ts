@@ -23,14 +23,23 @@ const forms = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-// A tag beside the first box of a field: pinned, so it stays on the field.
+// A tag beside the first box of a field: pinned, so it stays on the field. A pinned tag keeps
+// its size at every zoom, so this one is small: it fits in the page's margin on a phone too.
 @Component({
   selector: 'demo-tag',
   imports: [EpdfAnchored],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <epdf-anchored [anchor]="anchor()" placement="left" [gap]="6" pinned>
-      <button type="button" class="tag" (click)="form.focus(field().ref)">Required</button>
+      <button
+        type="button"
+        class="tag"
+        title="Required"
+        [attr.aria-label]="'Required: ' + (field().alternateName ?? field().name)"
+        (click)="form.focus(field().ref)"
+      >
+        !
+      </button>
     </epdf-anchored>
   `,
 })

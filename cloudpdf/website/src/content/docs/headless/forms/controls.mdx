@@ -49,13 +49,18 @@ snippet</Fw><Fw only="angular">Put them inside `<epdf-stage>`</Fw>, like a [menu
 
 <Example name="form/tags" />
 
-> **Try it:** fill in a field that has a tag: the tag goes. Scroll, zoom and turn the view, and
-> the tags stay on their fields, at the same size.
+> **Try it:** each required field that is still empty has an orange tag. Fill one in: its tag
+> goes. Scroll, zoom and turn the view, and the tags stay on their fields, at the same size.
 
 A field can show in several boxes, so an anchor is for one box: `form.getWidgets(field.ref)` lists
 a field's boxes, each with its `ref`. Anchored UI on a page that isn't on screen isn't drawn, so a
 form with hundreds of fields costs only the ones in view. See
 [Where it goes](../ui/anchored#where-it-goes) for `placement` and `gap`.
+
+A pinned tag keeps its size and its side at every zoom, and isn't moved to where there is room. The
+room beside a field shrinks with the page: next to a field at the edge of a page shown small, such
+as on a phone, there are a few dozen pixels. So keep a tag there small, as the example's is, or put
+it on a side of the field that has room.
 
 ## Draw a control your way
 

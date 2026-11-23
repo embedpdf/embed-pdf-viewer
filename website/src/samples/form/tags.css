@@ -55,21 +55,25 @@
   outline-offset: 2px;
 }
 
-/* The tag on a field that still has to be filled in */
+/* The tag on a field that still has to be filled in: a small round mark. It keeps its size
+   at every zoom, while the page's margin shrinks with the page, so it is no wider than the
+   margin of a page shown small. */
 .tag {
   display: block;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   font: inherit;
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
-  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
   color: var(--on-accent);
   background: var(--accent);
   border: 0;
-  border-radius: 999px;
-  padding: 5px 8px;
+  border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgb(7 32 76 / 0.18);
+  box-shadow: 0 2px 6px rgb(7 32 76 / 0.18);
   transition: background-color 0.15s ease;
 }
 
