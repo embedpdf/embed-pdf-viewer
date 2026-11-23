@@ -129,6 +129,18 @@ describe('createScrollbarPresses', () => {
     expect(dragging).toEqual([true]);
   });
 
+  it('keeps a press on the thumb or the track from the page below the bar', () => {
+    const presses = createScrollbarPresses(() => {});
+    const onThumb = press(110, {});
+    presses.pressThumb(onThumb, track());
+    expect(onThumb.stopPropagation).toHaveBeenCalled();
+    presses.release();
+    const onTrack = press(350);
+    presses.pressTrack(onTrack, track(), 'page');
+    expect(onTrack.stopPropagation).toHaveBeenCalled();
+    presses.release();
+  });
+
   it("leaves a press that reached the track from the thumb to the thumb's handler", () => {
     const presses = createScrollbarPresses(() => {});
     presses.pressTrack(press(350, {}), track(), 'jump');

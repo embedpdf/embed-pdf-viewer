@@ -164,6 +164,8 @@ export function createScrollbarPresses(onDragging: (dragging: boolean) => void):
     pressTrack(event, track, mode) {
       if (event.button !== 0 || event.target !== event.currentTarget) return;
       event.preventDefault();
+      // The Stage listens for presses on an ancestor of the bar: the bar's press is not a page's.
+      event.stopPropagation();
       capturePointer(event.currentTarget as Element, event.pointerId);
       const position = (lastPointer = positionOnTrack(event, track));
       const { layout, stage, vertical } = track;

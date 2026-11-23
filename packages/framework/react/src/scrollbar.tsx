@@ -28,7 +28,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import type { CapabilityToken } from '@embedpdf/core';
-import { createScrollbarPresses, paintDefault, scrollbarLayout } from '@embedpdf/web';
+import {
+  createScrollbarPresses,
+  isolatePointerDown,
+  paintDefault,
+  scrollbarLayout,
+} from '@embedpdf/web';
 import type { ScrollbarTrack } from '@embedpdf/web';
 import { useCapability, useDocumentScope, useKernelValue } from './runtime';
 import { useStageToken } from './stage-scope';
@@ -158,6 +163,24 @@ export function Scrollbar({
 
   useEffect(() => () => presses.release(), [presses]); // unmount: no orphaned repeat timers
 
+  // The Stage listens for presses natively on an ancestor of the bar, and React's own
+  // `onPointerDown` runs from the root, after the Stage has already seen the press and begun a
+  // pan with it. The bar takes its presses on a native listener on the track, which stops them
+  // there: the thumb's start a drag, the track's page or jump.
+  const press = useRef<(event: PointerEvent) => void>(() => {});
+  press.current = (event) => {
+    const onThumb = event.target instanceof Element && event.target !== trackRef.current;
+    if (onThumb) presses.pressThumb(event, track());
+    else presses.pressTrack(event, track(), trackPress);
+  };
+  useEffect(
+    () =>
+      trackRef.current
+        ? isolatePointerDown(trackRef.current, (event) => press.current(event))
+        : undefined,
+    [scrollable],
+  );
+
   if (!scrollable) return null;
 
   const trackDefaults: React.CSSProperties = vertical
@@ -204,7 +227,6 @@ export function Scrollbar({
       }}
       // Pointer capture retargets to the pressed element and bubbles here — one
       // move/up pair serves thumb drags, jump-drags, and paging alike.
-      onPointerDown={(event) => presses.pressTrack(event, track(), trackPress)}
       onPointerMove={(event) => presses.move(event, track())}
       onPointerUp={() => presses.release()}
       onPointerCancel={() => presses.release()}
@@ -220,7 +242,6 @@ export function Scrollbar({
           background: paintDefault('scrollbar-thumb'),
           ...thumbStyle,
         }}
-        onPointerDown={(event) => presses.pressThumb(event, track())}
       />
     </div>
   );

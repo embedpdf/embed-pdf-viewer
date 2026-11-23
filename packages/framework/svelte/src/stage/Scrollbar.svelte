@@ -17,6 +17,7 @@
 <script lang="ts">
   import {
     createScrollbarPresses,
+    isolatePointerDown,
     paintDefault,
     scrollbarLayout,
     type ScrollbarTrack,
@@ -95,6 +96,19 @@
   // No repeat timer outlives the bar.
   $effect(() => () => presses.release());
 
+  /**
+   * The Stage listens for presses natively on an ancestor of the bar, and Svelte delegates
+   * `onpointerdown` to the root, which runs after the Stage has already seen the press and begun
+   * a pan with it. The bar takes its presses on a native listener on the track, which stops them
+   * there: the thumb's start a drag, the track's page or jump.
+   */
+  const takePresses = (element: HTMLElement) =>
+    isolatePointerDown(element, (event) => {
+      const onThumb = event.target instanceof Element && event.target !== element;
+      if (onThumb) presses.pressThumb(event, pressedTrack());
+      else presses.pressTrack(event, pressedTrack(), trackPress);
+    });
+
   const trackDefaults = $derived(
     vertical
       ? 'position: absolute; top: 0; right: 0; bottom: 0; width: 12px;'
@@ -128,21 +142,19 @@
       : 0}; transition: opacity 200ms; pointer-events: {shown ? 'auto' : 'none'};{style
       ? ` ${style}`
       : ''}"
-    onpointerdown={(event) => presses.pressTrack(event, pressedTrack(), trackPress)}
+    {@attach takePresses}
     onpointermove={(event) => presses.move(event, pressedTrack())}
     onpointerup={() => presses.release()}
     onpointercancel={() => presses.release()}
     onpointerenter={() => (hovered = true)}
     onpointerleave={() => (hovered = false)}
   >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-embedpdf-scrollbar-thumb=""
       class={thumbClass}
       style="{thumbDefaults} border-radius: 6px; background: {paintDefault(
         'scrollbar-thumb',
       )};{thumbStyle ? ` ${thumbStyle}` : ''}"
-      onpointerdown={(event) => presses.pressThumb(event, pressedTrack())}
     ></div>
   </div>
 {/if}
