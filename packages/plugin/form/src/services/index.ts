@@ -18,6 +18,7 @@ import { createDesign, type FormDesign } from './design';
 import { createEvents, type FormEvents } from './events';
 import { createFillRights, type FillRights } from './fill-rights';
 import { createFormattedTexts, type FormattedTexts } from './formatted';
+import { createGroups, type FormGroups } from './groups';
 import { createWidgetLooks, type WidgetLooks } from './looks';
 import { createWidgetPictures, type WidgetPictures } from './pictures';
 import { createScriptingSeam, type FormScripting } from './scripting';
@@ -35,6 +36,8 @@ export interface FormServices {
   readonly predictor: FormPredictor;
   /** Who may fill in which field. */
   readonly rights: FillRights;
+  /** Who the form's groups are for people: each one's label and the color its fields show in. */
+  readonly groups: FormGroups;
   readonly events: FormEvents;
   /** Where the cursor is among the fields, and the controls it can go into. */
   readonly cursor: FormCursor;
@@ -72,6 +75,7 @@ export function createServices(ctx: FormContext): FormServices {
     fields,
     predictor,
     rights: createFillRights(ctx, fields),
+    groups: createGroups(ctx, fields, events),
     events,
     cursor: createCursor(ctx, fields, events),
     tabOrder: createTabOrder(ctx, fields),

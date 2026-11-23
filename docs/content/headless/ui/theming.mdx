@@ -188,6 +188,13 @@ whole, so a color you leave out follows the accent again.
 | `fields.border`     | The edge of a field that has no border of its own               | the viewer's `accent` at 55% | `--epdf-form-field-border`     |
 | `fields.background` | Inside a field that has no background of its own                | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own | `'#1f2a44'`                    | `--epdf-form-field-color`      |
+| `fields.tint`       | How strongly a field shows its group's color, from `0` to `1`   | `0.16`                       | `--epdf-form-field-tint`       |
+
+A group's color, given with `form.setGroups()`, stands for a person and not for a part of the
+viewer, so it has no variable of its own. It's a CSS color: to set it from your stylesheet, give
+it a variable of yours, `color: 'var(--signer-1)'`. With `fields.tint` at `0` no field shows its
+group at all; `--epdf-form-field-tint` changes how strongly the fill shows, and leaves the edge.
+See [Fields for several people](../forms#fields-for-several-people).
 
 **Parts you style yourself** have no settings, only CSS, for the look they have until you style them:
 

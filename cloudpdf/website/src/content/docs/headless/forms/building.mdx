@@ -68,6 +68,62 @@ A field just placed is selected at once, before the engine answers, and the tool
 `form-edit` rather than the default pointer, so design mode goes on. Without `canDesign()` nothing is
 lent: the fields stay fillable boxes the annotation tools leave alone.
 
+## Place fields for a signer
+
+When a form goes to several people, each field belongs to one of them: it's in their
+[group](/docs/engine/forms/groups). Tell the document
+[who its groups are](../forms#fields-for-several-people), then say who the next fields are for:
+
+```ts
+form.setDesignGroup('buyer'); // fields placed with a tool are Dana's
+```
+
+<Snippet name="forms/signing-flow/sender-toolbar" />
+
+While you design, every field shows in its group's color. A field placed with a tool goes into
+the group you set, which the form's state has as <Fw only={['react', 'vue', 'svelte']}>`designGroup`</Fw><Fw only="angular">`form.designGroup()`</Fw>. With `null`, where it starts, it names
+no group, and the field goes where a field made with `create()` goes when its draft names no
+`groupId`.
+
+Putting a field in a group other than your own takes the `fields:set-group` permission for that
+group, and `form.canSetGroup(groupId)` says whether the user has it. Turn off the signers a user
+can't place for: `setDesignGroup()` refuses a group they may not put a field in, as `create()`,
+`update()` and `moveToGroup()` do.
+
+<Engine local>
+
+<Example name="form/signers" />
+
+> **Try it:** click a printed box to place a field for Dana, pick Ada and place another: each
+> shows in its signer's color. Then open the form as Dana. Her field stands out and takes her
+> typing, and Ada's shows as the PDF has it.
+
+A signature field shows in its signer's color too, for the person who may sign it. Signing it
+takes the signature plugin, which this example leaves out: see
+["Sign here" in a form](signatures#sign-here-in-a-form).
+
+A document keeps the permissions it opened with, so the example saves the form and opens it again
+for each person, with theirs.
+
+</Engine>
+
+### Give fields to a signer
+
+A form made somewhere else, in Acrobat for example, arrives with its fields in no group. Move one
+like any setting:
+
+```ts
+await form.update(field.ref, { groupId: 'seller' });
+```
+
+Or move every selected field in one call, which is one step to undo:
+
+<Snippet name="forms/signing-flow/move-selected" />
+
+<Fw only={['react', 'vue', 'svelte']}>`selectedFields`</Fw><Fw only="angular">`form.selectedFields()`</Fw> in the form's state has every field with a selected box, and `form.listSelectedFields()`
+reads it once. `moveToGroup(fields, groupId)` leaves out the fields already in the group, shows
+the rest in their new color at once, and resolves `{ fields }` as they are now.
+
 ## Change a field's settings
 
 <Fw only={['react', 'vue', 'svelte']}>
@@ -95,12 +151,15 @@ lent: the fields stay fillable boxes the annotation tools leave alone.
 | `defaultValue`                               | What a reset puts back                                |
 | `options`                                    | For a dropdown or list: `{ label, value }` pairs      |
 | `maxLength`, `multiline`, `password`, `comb` | For a text box                                        |
+| `groupId`                                    | The group it's in: who fills it in. [Give fields to a signer](#give-fields-to-a-signer) |
 
 `getFieldSettings(ref)` describes a field's settings for a panel you draw without knowing the
 field's kind: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
 (`text`, `flag`, `number`, `choice`, `choices` or `options`), and a `label` in English with its
 translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choice`'s options are
-the field's own values, shown as they are.
+the field's own values, shown as they are. While the document has groups, `groupId` is one of the
+settings: a `choice` whose options are the ids of the groups the user may put the field in. Show
+each with its group's label, from the form's `groups`.
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel), or from code with
@@ -301,6 +360,9 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `reorderCalculations(fields, position)` | Moves fields in the order calculate scripts run in. Resolves `{ calculationOrder }`. [Scripts and calculations](#scripts-and-calculations)                                                            |
 | `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
+| `setDesignGroup(groupId)`               | Says who the next fields are for: a field placed with a tool goes into this group; `null` names none. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields for a signer](#place-fields-for-a-signer) |
+| `moveToGroup(fields, groupId)`          | Puts fields in a group, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
+| `canSetGroup(groupId)`                  | Whether the user may put a field in that group. [Place fields for a signer](#place-fields-for-a-signer)                                                                                             |
 | `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
 | `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
 
@@ -315,6 +377,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `onFieldCreated` | A field was added          | `field`, `origin` |
 | `onFieldUpdated` | A field's settings changed | `field`, `origin` |
 | `onFieldDeleted` | A field was removed        | `ref`, `origin`   |
+| `onDesignGroupChanged` | The group new fields are placed for changed | `groupId` |
 
 ## Permissions
 
@@ -323,6 +386,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `doc.forms.modify` | Adding, changing, removing and repairing fields                 | `form.canDesign()`             |
 | `doc.forms.import` | Importing fields and values with who created and filled them in | `form.canRestoreAttribution()` |
 | `doc.forms.script` | Writing scripts, submit buttons and links into fields and boxes | `form.canWriteScripts()`       |
+| `fields:set-group` | Putting a field in a group other than your own                  | `form.canSetGroup(groupId)`    |
 
 Hide the field tools when `canDesign()` is false, and the script, submit and link options of a
 field's or a box's actions when `canWriteScripts()` is false. Scripts already in the form run either way.

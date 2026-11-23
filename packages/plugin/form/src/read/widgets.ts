@@ -37,9 +37,18 @@ export function createWidgetReads(
     siblings,
     cursor,
     tabOrder,
+    groups,
   }: Pick<
     FormServices,
-    'fields' | 'rights' | 'looks' | 'pictures' | 'design' | 'siblings' | 'cursor' | 'tabOrder'
+    | 'fields'
+    | 'rights'
+    | 'looks'
+    | 'pictures'
+    | 'design'
+    | 'siblings'
+    | 'cursor'
+    | 'tabOrder'
+    | 'groups'
   >,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
@@ -71,6 +80,8 @@ export function createWidgetReads(
       rights.key(),
       ctx.settings().get().fillable,
       tabOrder.rows(),
+      groups.list(),
+      ctx.settings().get().fields.tint,
     ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
       fillItems(
@@ -80,6 +91,7 @@ export function createWidgetReads(
         rights.mayFillByHand,
         rights.mayFillOrSign,
         tabOrder.groupPositionOf,
+        groups.lookOf,
       ),
   );
 

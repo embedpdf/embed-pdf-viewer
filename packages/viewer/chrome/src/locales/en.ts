@@ -486,6 +486,7 @@ export const en: Locale = {
         required: 'Required',
         readOnly: 'Read-only',
         noExport: "Don't export",
+        group: 'Filled in by',
         defaultValue: 'Default value',
         maxLength: 'Maximum length',
         multiline: 'Several lines',

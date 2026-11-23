@@ -18,6 +18,7 @@ import { createActivation } from './write/activation';
 import { createFieldWrites } from './write/fields';
 import { createFill } from './write/fill';
 import { createFocus } from './write/focus';
+import { createGroupWrites } from './write/groups';
 import { createInterchange } from './write/interchange';
 import { createWidgetLender } from './write/lending';
 import { createResetWrites } from './write/reset';
@@ -39,6 +40,7 @@ export function createFormController(ctx: FormContext) {
   const typing = createTyping(ctx, services, values.setText);
   const resets = createResetWrites(ctx, services, fills);
   const design = createFieldWrites(ctx, services);
+  const groups = createGroupWrites(ctx, services);
   const interchange = createInterchange(ctx, services);
   const activation = createActivation(ctx, services, fills);
   const scripts = createScriptEffects(ctx, services, fills);
@@ -56,6 +58,7 @@ export function createFormController(ctx: FormContext) {
     typing.api,
     resets.api,
     design.api,
+    groups.api,
     interchange.api,
     activation.api,
     scripts.api,
@@ -75,6 +78,8 @@ export function createFormController(ctx: FormContext) {
       onFieldDeleted: events.fieldDeleted.on,
       onValidationRejected: events.validationRejected.on,
       onResynced: events.resynced.on,
+      onDesignGroupChanged: events.designGroupChanged.on,
+      onGroupsChanged: events.groupsChanged.on,
     },
   ]);
 

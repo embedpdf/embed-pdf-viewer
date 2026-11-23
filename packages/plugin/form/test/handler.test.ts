@@ -39,6 +39,8 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
   const form = {
     canDesign: () => true,
     getPageBox: () => PAGE,
+    // The palette places for the user's own group, unless a test says for whom.
+    getDesignGroup: () => null,
     list: () => [{ name: 'text_1' }],
     // The field shows once the engine answers, unless a test says it shows at once.
     get: () => null,
@@ -409,6 +411,19 @@ describe('form place handler', () => {
     expect(widgetOf(placed[0])).toMatchObject({ exportValue: 'Choice1' });
     expect(placed[1]).toMatchObject({ kind: 'combobox', name: 'combobox_1' });
     expect((placed[1] as { options: unknown[] }).options).toHaveLength(2);
+  });
+
+  it('places the field for the group the palette places for, and names none without one', async () => {
+    const own = makeForm();
+    const forBuyer = makeForm({ getDesignGroup: () => 'buyer' } as Partial<FormHostCapability>);
+    for (const { form } of [own, forBuyer]) {
+      const handler = createPlaceHandler(form, interactionFor('form-text'), null);
+      handler.onPointerDown(at('down', 100, 100));
+      handler.onPointerUp?.(at('up', 100, 100));
+    }
+    await flush();
+    expect(own.placed[0]).not.toHaveProperty('groupId');
+    expect(forBuyer.placed[0]).toMatchObject({ kind: 'text', name: 'text_2', groupId: 'buyer' });
   });
 
   it('a rejected create is contained (logged, no unhandled rejection)', async () => {

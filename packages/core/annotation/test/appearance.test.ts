@@ -194,6 +194,14 @@ describe('a lent form widget', () => {
     expect(item!.apBox).toEqual({ ...BOX, width: 130, height: 90 });
     expect(item!.lentScene).toBeUndefined();
   });
+
+  it('carries the accent its lender gives it to its render item, and none without one', () => {
+    const accent = { color: '#2563eb', strength: 0.16 };
+    const [tinted] = pageItems(modelWith([widget({ accent })]), PAGE);
+    expect(tinted!.accent).toBe(accent);
+    const [plain] = pageItems(modelWith([widget()]), PAGE);
+    expect(plain).not.toHaveProperty('accent');
+  });
 });
 
 describe('a new record', () => {

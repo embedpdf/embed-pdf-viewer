@@ -259,6 +259,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           pictureVersion: record.pictureVersion ?? 0,
           // A lent record's lender draws it where it is now, a gesture included.
           ...(record.painter ? { lentScene: once(record.painter, box) } : {}),
+          ...(record.accent ? { accent: record.accent } : {}),
           selected: model.selected.includes(id),
           ...(model.hovered === id ? { hovered: true } : {}),
           rot: geomRotation(geometry),

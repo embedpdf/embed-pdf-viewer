@@ -41,11 +41,13 @@ import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions
 
 import type { Box, WidgetHit } from './model';
 import type { FormWidgetItem } from './read/fill-items';
+import type { FormGroup } from './services/groups';
 
 export { FormToken } from './token';
 export { toFieldRef } from '@embedpdf/engine-core/runtime';
 export { FormTransfer } from '@embedpdf/engine-core/public';
 export type { FormWidgetItem, FormWidgetLook, GroupPosition } from './read/fill-items';
+export type { FormGroup } from './services/groups';
 export type { Box, WidgetHit, WidgetPlace } from './model';
 export type {
   FormBundle,
@@ -73,7 +75,8 @@ export type {
  * document while the app runs. The colors are what the viewer draws around
  * fields (a field's own colors are in the PDF); each can also come from CSS
  * (`--epdf-form-focus`, `--epdf-form-field-border`,
- * `--epdf-form-field-background`, `--epdf-form-field-color`), which wins.
+ * `--epdf-form-field-background`, `--epdf-form-field-color`,
+ * `--epdf-form-field-tint`), which wins.
  */
 export interface FormSettings {
   /**
@@ -93,6 +96,11 @@ export interface FormSettings {
     readonly background: string;
     /** The text of a field that has no color of its own. */
     readonly color: string;
+    /**
+     * How strongly a field shows its group's color ({@link FormCapability.listGroups}): from
+     * `0`, not at all, to `1`.
+     */
+    readonly tint: number;
   };
   /**
    * Which fields people may fill in by hand: `true`, every one; `false`,
@@ -104,6 +112,20 @@ export interface FormSettings {
   readonly fillable: FillableFields;
 }
 
+/** One of a document's groups, as the app names it with `setGroups()`. */
+export interface FormGroupInput {
+  /** The group: the id its fields carry, and the one the permissions name. */
+  readonly id: string;
+  /** Who the group is, for people: a legend shows it, and screen readers read it after a field's name. */
+  readonly label?: string;
+  /**
+   * The color its fields show in: a CSS color, so it can name a variable of
+   * the app's (`'var(--signer-1)'`). Left out, the group gets one of eight
+   * colors by its place in the list.
+   */
+  readonly color?: string;
+}
+
 /** Which fields people may fill in by hand: all, none, or those of these kinds. */
 export type FillableFields = boolean | readonly FormFieldKind[];
 
@@ -111,7 +133,7 @@ export type FillableFields = boolean | readonly FormFieldKind[];
 export const FORM_DEFAULTS: FormSettings = {
   validation: 'scripts',
   focus: { color: null },
-  fields: { border: null, background: 'rgb(255 255 255 / 0.92)', color: '#1f2a44' },
+  fields: { border: null, background: 'rgb(255 255 255 / 0.92)', color: '#1f2a44', tint: 0.16 },
   fillable: true,
 };
 
@@ -183,7 +205,9 @@ export type FormFieldFlagSetting =
  * (`null`). `choice`: one of `options`, or any text when `free`. `choices`:
  * any of `options`. `options`: the field's options, each a label and a value.
  * `options` of a `choice` or `choices` are the field's own values, the
- * document's words, shown as they are.
+ * document's words, shown as they are. The `groupId` setting's are the ids of
+ * the groups the user may put the field in: show each with its group's label
+ * (`listGroups()`). A field has it only while the document has groups.
  *
  * `label` is the English name and `labelKey` its translation key
  * (`form.settings.tooltip`): a panel shows `t(setting.labelKey, { fallback:
@@ -224,6 +248,14 @@ export type FormFieldSetting =
       readonly free: boolean;
     }
   | {
+      readonly key: 'groupId';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly labelKey: string;
+      readonly options: readonly string[];
+      readonly free: false;
+    }
+  | {
       readonly key: 'defaultValue';
       readonly control: 'choices';
       readonly label: string;
@@ -245,6 +277,11 @@ export type FormFieldSetting =
 export interface FormFieldSettings {
   readonly properties: readonly FormFieldSetting[];
   readonly values: Readonly<Record<string, unknown>>;
+}
+
+/** What `moveToGroup()` resolves: the fields as they are now, in the order given. */
+export interface FormGroupMoveResult {
+  readonly fields: readonly FormField[];
 }
 
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
@@ -393,6 +430,14 @@ export interface FormFocusChangedEvent {
   /** The box the cursor is in. */
   readonly widget: AnnotationRef | null;
 }
+/** The group that fields placed with a tool go in changed (`groupId` is `null` when it names none). */
+export interface FormDesignGroupChangedEvent {
+  readonly groupId: string | null;
+}
+/** `setGroups()` changed who the document's groups are: the groups as `listGroups()` gives them now. */
+export interface FormGroupsChangedEvent {
+  readonly groups: readonly FormGroup[];
+}
 /** The whole form was read. */
 export interface FormResyncedEvent {
   readonly snapshot: FormSnapshot;
@@ -450,8 +495,26 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * field, such as a radio group's buttons. `null` otherwise.
    */
   getSelectedField(): FormField | null;
+  /**
+   * Every field with a selected widget (in design mode), in the selection's order, each once.
+   * The same array while nothing changes.
+   */
+  listSelectedFields(): readonly FormField[];
   /** The field the cursor is in, or `null`. */
   getFocusedField(): FormField | null;
+  /**
+   * The document's groups: the ones `setGroups()` named, in that order, then
+   * the other groups the form's fields are in. Each has its label (`null`
+   * where the app gave none) and the color its fields show in: the app's,
+   * else one of eight by the group's place in this list. The same array
+   * while nothing changes.
+   */
+  listGroups(): readonly FormGroup[];
+  /**
+   * The group that fields placed with a tool go in (in design mode), or
+   * `null`, where it starts, when it names none.
+   */
+  getDesignGroup(): string | null;
   /**
    * A field's settings, described for a settings panel, which writes them
    * with `update()`; `null` for a field the form doesn't have. Every setting
@@ -599,6 +662,35 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     widgets: readonly AnnotationRef[],
     options?: FormDuplicateOptions & OperationOptions,
   ): Promise<FormDuplicateResult>;
+  /**
+   * Say who this document's groups are, for the people who look at it: the
+   * whole list, and an empty one clears it. A field's group is an id in the
+   * PDF; its name and its color are the app's, and never written there. The
+   * first entry of an id is the group. Fires `onGroupsChanged`; the same
+   * list again changes nothing.
+   */
+  setGroups(groups: readonly FormGroupInput[]): void;
+  /**
+   * Say who the next fields are for: a field placed with a tool goes into
+   * this group. With `null` it names none, and the field goes where one
+   * made without a `groupId` goes. Fires `onDesignGroupChanged`. Throws
+   * `permission-denied` for a group the user may not put a field in
+   * (`canSetGroup`).
+   */
+  setDesignGroup(groupId: string | null): void;
+  /**
+   * Put fields in a group, in one step to undo: each field not already in
+   * it gets it as its `groupId`. Fires `onFieldUpdated` for each, and
+   * resolves the fields as they are now, in the order given. Rejects
+   * `permission-denied` without `doc.forms.modify` or for a group the user
+   * may not put a field in (`canSetGroup`), `not-found` for a field the
+   * form doesn't have.
+   */
+  moveToGroup(
+    fields: readonly FormFieldRef[],
+    groupId: string,
+    options?: OperationOptions,
+  ): Promise<FormGroupMoveResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
   update(
     ref: FormFieldRef,
@@ -670,6 +762,12 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /** Whether adding, changing and removing fields is allowed: `doc.forms.modify`. */
   canDesign(): boolean;
   /**
+   * Whether the user may put a field in this group, with `create()`,
+   * `update()` or a tool: `doc.forms.modify`, and the group is the user's
+   * own or one a `fields:set-group` permission names.
+   */
+  canSetGroup(groupId: string): boolean;
+  /**
    * Whether an import may restore who created and filled in the fields it
    * brings, instead of naming the importing user: `doc.forms.import`.
    */
@@ -695,4 +793,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   readonly onResynced: EventHook<FormResyncedEvent>;
   /** The cursor moved into a field, to another one, or out of the fields. */
   readonly onFocusChanged: EventHook<FormFocusChangedEvent>;
+  /** The group that fields placed with a tool go in changed. */
+  readonly onDesignGroupChanged: EventHook<FormDesignGroupChangedEvent>;
+  /** `setGroups()` changed who the document's groups are. */
+  readonly onGroupsChanged: EventHook<FormGroupsChangedEvent>;
 }

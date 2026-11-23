@@ -81,6 +81,7 @@ import {
   pickRequestedFile,
   pictureOrPainting,
   rasterInFrame,
+  recordAccentStyleOf,
   rectInPixels,
   registerRendererBehaviors,
   sameAnnotationAnchor,
@@ -828,13 +829,22 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
           loaded: urls !== null,
           paint: () => (hasLiveDrawing(item) ? item : null),
         });
-        const native: React.ReactNode =
+        const drawn: React.ReactNode =
           shows?.kind === 'painting' ? (
             // shapes, cloudy, markup: all painted via scene()
             <Shape item={item} />
           ) : shows?.kind === 'picture' && item.raster ? (
             <BakedImage url={shows.picture.url} box={rasterInFrame(item.raster, item.frame)} />
           ) : null;
+        // A lent record's accent (a form field's group's color) fills its frame, above its drawing.
+        const native: React.ReactNode = item.accent ? (
+          <>
+            {drawn}
+            <div style={recordAccentStyleOf(item.accent)} />
+          </>
+        ) : (
+          drawn
+        );
         const framed = (
           content: React.ReactNode,
           options?: { interactive?: boolean; inert?: boolean },
