@@ -314,6 +314,15 @@ Tab and Shift+Tab move between fields in the document's order (see [Move between
 fields](#move-between-fields)), and the arrow keys between the buttons of a radio group. In a text
 box, Enter confirms and Escape puts back the value it had.
 
+### Screen readers
+
+Each control is named by the field's tooltip (its `alternateName`), or by its name when it has
+none. A radio button adds the option it stands for, its export value, the way screen readers read
+one in Acrobat: `Plan: monthly`. It also says where it comes in its group (`1 of 2`, in the order
+the arrow keys go round), since a group's buttons stand apart on the page. When you draw the fields
+yourself, each entry of `listWidgets(page)` carries the name as `label`, and a radio button its
+place as `inGroup`, `{ position, size }`, for `aria-posinset` and `aria-setsize`.
+
 ### Turned fields
 
 A field can be turned a quarter turn: so that it reads upright on a page that is shown turned, such

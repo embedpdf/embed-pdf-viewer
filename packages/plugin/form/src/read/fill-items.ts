@@ -9,6 +9,11 @@
  * its frame, its quarter turn and the rect it stands in (`WidgetPlace`): a
  * layer puts its control in the frame and turns it about its middle, so the
  * control reads the way the field does.
+ *
+ * A widget's `label` is its accessible name. A radio button's names its option too, the way
+ * screen readers read a PDF radio button: the group's tooltip, then the button's own choice
+ * (`Plan: monthly`). Its buttons are placed apart on the page, so no group element can hold them:
+ * each says where it comes in the group itself (`inGroup`).
  */
 import type {
   AnnotationRef,
@@ -29,6 +34,12 @@ import {
 } from '../model';
 
 export type { Box, FormWidgetLook, WidgetPlace } from '../model';
+
+/** Where a radio button comes among its group's buttons: `position` from 1, of `size`. */
+export interface GroupPosition {
+  readonly position: number;
+  readonly size: number;
+}
 
 interface FormWidgetItemBase extends WidgetPlace {
   key: FieldKey;
@@ -52,7 +63,10 @@ interface FormWidgetItemBase extends WidgetPlace {
   look: FormWidgetLook;
   /** A read-only field, no permission to fill, filling it turned off (`fillable`), or a write on its way: draw it, don't take input. */
   disabled: boolean;
-  /** Accessible name: the field's tooltip (`/TU`) when it has one, else its full name. */
+  /**
+   * Accessible name: the field's tooltip (`/TU`) when it has one, else its full name. A radio
+   * button adds the option it stands for, its export value: `Plan: monthly`.
+   */
   label: string;
 }
 
@@ -69,10 +83,22 @@ export type FormWidgetItem = FormWidgetItemBase &
       }
     | {
         control: 'toggle';
-        kind: 'checkbox' | 'radio';
+        kind: 'checkbox';
         checked: boolean;
         /** The export value that checks this widget. */
         exportValue: string;
+      }
+    | {
+        control: 'toggle';
+        kind: 'radio';
+        checked: boolean;
+        /** The export value that checks this widget: the option it stands for. */
+        exportValue: string;
+        /**
+         * Where the button comes among its group's buttons, in the order the arrow keys go round
+         * (Tab's): for `aria-posinset` and `aria-setsize`. Null while that order isn't known.
+         */
+        inGroup: GroupPosition | null;
       }
     | {
         control: 'choice';
@@ -92,11 +118,16 @@ export type FormWidgetItem = FormWidgetItemBase &
     | { control: 'signature'; signed: boolean }
   );
 
+/** A radio button's accessible name: its group's, then the option it stands for. */
+const radioLabel = (group: string, option: string): string =>
+  option === '' ? group : `${group}: ${option}`;
+
 /**
  * Project one widget of a field into a fill control. `fillable`: people fill
  * the field in by hand (a signature field: sign it), which the box is
  * `disabled` without; `canFill`: the session's permission alone, which the
- * `fillable` setting doesn't change. Null for kinds with no fill control.
+ * `fillable` setting doesn't change; `inGroup`: where a radio button comes
+ * among its group's. Null for kinds with no fill control.
  */
 export function projectWidget(
   field: FormField,
@@ -104,6 +135,7 @@ export function projectWidget(
   widget: PageWidget,
   fillable: boolean,
   canFill: boolean,
+  inGroup: GroupPosition | null = null,
 ): FormWidgetItem | null {
   const key = fieldKeyOf(field);
   const base: FormWidgetItemBase = {
@@ -151,12 +183,15 @@ export function projectWidget(
       const toggle = field.widgets.find(
         (candidate) => candidate.objectNumber === annotObjectNumber,
       );
+      const exportValue = toggle && 'exportValue' in toggle ? toggle.exportValue : '';
       return {
         ...base,
+        label: radioLabel(base.label, exportValue),
         control: 'toggle',
         kind: 'radio',
         checked: toggle && 'checked' in toggle ? toggle.checked : false,
-        exportValue: toggle && 'exportValue' in toggle ? toggle.exportValue : '',
+        exportValue,
+        inGroup,
       };
     }
     case 'combobox':
@@ -190,8 +225,9 @@ export function projectWidget(
 
 /**
  * Project one page's widgets into fill controls, each disabled when people
- * don't fill its field in by hand (`mayFillByHand`), and each saying whether
- * the session may fill it in, or sign it (`mayFill`, its permissions alone).
+ * don't fill its field in by hand (`mayFillByHand`), each saying whether the
+ * session may fill it in, or sign it (`mayFill`, its permissions alone), and
+ * each radio button with where it comes in its group (`groupPositionOf`).
  * Widgets whose page has not loaded (or that are direct objects with no join
  * key) are skipped; the projection runs again when the page's widgets land.
  */
@@ -201,6 +237,7 @@ export function fillItems(
   widgets: PageWidgets | undefined,
   mayFillByHand: (field: FormField) => boolean,
   mayFill: (field: FormField) => boolean,
+  groupPositionOf: (widget: number) => GroupPosition | null = () => null,
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
   const items: FormWidgetItem[] = [];
@@ -215,6 +252,7 @@ export function fillItems(
         placed,
         mayFillByHand(field),
         mayFill(field),
+        groupPositionOf(widget.objectNumber),
       );
       if (item) items.push(item);
     }

@@ -132,6 +132,60 @@ describe('<FormLayer> over a turned field', () => {
   );
 });
 
+/**
+ * A radio group's buttons are placed apart on the page, with no group element around them: each
+ * button is named by its group's tooltip and its own option, and says where it comes in its group.
+ */
+describe('<FormLayer> radio buttons', () => {
+  it(
+    'names each button by its option, and says where it comes in its group',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await wasmEngine();
+      const page = signal<PageContextValue | null>(null);
+      const { kernel, view } = await viewerWith(
+        [interactionPlugin(), formPlugin()],
+        FormHarness,
+        { page, stagePresses: [] },
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const ref = kernel.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          kind: 'radio',
+          name: 'plan',
+          alternateName: 'Plan',
+          widgets: [
+            { page: ref, rect: { x: 72, y: 100, width: 16, height: 16 }, exportValue: 'Monthly' },
+            { page: ref, rect: { x: 200, y: 100, width: 16, height: 16 }, exportValue: 'Yearly' },
+          ],
+        });
+        page.value = letterPage('blank', ref);
+        flushSync();
+
+        const monthly = await waitFor(() => view.getByRole('radio', { name: 'Plan: Monthly' }));
+        const yearly = view.getByRole('radio', { name: 'Plan: Yearly' });
+        expect(monthly.getAttribute('aria-posinset')).toBe('1');
+        expect(monthly.getAttribute('aria-setsize')).toBe('2');
+        expect(yearly.getAttribute('aria-posinset')).toBe('2');
+        expect(yearly.getAttribute('aria-setsize')).toBe('2');
+      } finally {
+        view.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
 describe('<FormLayer> over fields made from code', () => {
   it(
     'fills in a text box and a checkbox, and draws the edge of a field without a border',

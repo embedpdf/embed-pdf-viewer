@@ -365,7 +365,11 @@ const TextControl = React.memo(function TextControl({ item, page, colors }: Cont
   );
 });
 
-/** A checkbox or a radio button: the picture is the control, a click writes the toggled value. */
+/**
+ * A checkbox or a radio button: the picture is the control, a click writes the toggled value. A
+ * radio button's label names its option, and it says where it comes in its group: its buttons
+ * are placed apart, so no group element can.
+ */
 const ToggleControl = React.memo(function ToggleControl({
   item,
   page,
@@ -376,6 +380,7 @@ const ToggleControl = React.memo(function ToggleControl({
   const [focused, setFocused] = useState(false);
   // The value first, then the widget's action (Acrobat's order).
   const press = () => pressToggle(form, item, activate);
+  const inGroup = item.kind === 'radio' ? item.inGroup : null;
   return (
     <WidgetBox
       item={item}
@@ -384,6 +389,8 @@ const ToggleControl = React.memo(function ToggleControl({
       role={item.kind === 'checkbox' ? 'checkbox' : 'radio'}
       aria-checked={item.checked}
       aria-label={item.label}
+      aria-posinset={inGroup?.position}
+      aria-setsize={inGroup?.size}
       tabIndex={item.disabled ? -1 : 0}
       onClick={press}
       onFocus={() => setFocused(true)}
@@ -412,9 +419,10 @@ const ComboControl = React.memo(function ComboControl({
   const [focused, setFocused] = useState(false);
   return (
     <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
+      {/* Controlled, never made again on a change: a new select would drop the focus to the page
+          while the old one never reports its blur. */}
       <select
-        key={item.selected.join('\0')}
-        defaultValue={item.selected[0] ?? ''}
+        value={item.selected[0] ?? ''}
         aria-label={item.label}
         disabled={item.disabled}
         onFocus={() => setFocused(true)}

@@ -36,9 +36,10 @@ export function createWidgetReads(
     design,
     siblings,
     cursor,
+    tabOrder,
   }: Pick<
     FormServices,
-    'fields' | 'rights' | 'looks' | 'pictures' | 'design' | 'siblings' | 'cursor'
+    'fields' | 'rights' | 'looks' | 'pictures' | 'design' | 'siblings' | 'cursor' | 'tabOrder'
   >,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
@@ -69,9 +70,17 @@ export function createWidgetReads(
       widgetsOn(pageObjectNumber),
       rights.key(),
       ctx.settings().get().fillable,
+      tabOrder.rows(),
     ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
-      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand, rights.mayFillOrSign),
+      fillItems(
+        index,
+        pageObjectNumber,
+        widgets,
+        rights.mayFillByHand,
+        rights.mayFillOrSign,
+        tabOrder.groupPositionOf,
+      ),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */

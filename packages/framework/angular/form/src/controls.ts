@@ -171,7 +171,11 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
   }
 }
 
-/** A checkbox or a radio button: the picture is the control, a click writes the toggled value. */
+/**
+ * A checkbox or a radio button: the picture is the control, a click writes the toggled value. A
+ * radio button's label names its option, and it says where it comes in its group: its buttons
+ * are placed apart, so no group element can.
+ */
 @Component({
   selector: 'div[epdfFormToggle]',
   imports: [FormFocusRing],
@@ -180,6 +184,8 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
     '[attr.role]': "item().kind === 'checkbox' ? 'checkbox' : 'radio'",
     '[attr.aria-checked]': 'item().checked',
     '[attr.aria-label]': 'item().label',
+    '[attr.aria-posinset]': 'inGroup()?.position',
+    '[attr.aria-setsize]': 'inGroup()?.size',
     '[attr.tabindex]': 'item().disabled ? -1 : 0',
     '[style.cursor]': "item().disabled ? 'default' : 'pointer'",
     '[style.outline]': "'none'",
@@ -196,6 +202,10 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
 })
 export class FormToggleControl extends FormWidgetBox<WidgetOf<'toggle'>> {
   protected readonly focused = signal(false);
+  protected readonly inGroup = computed(() => {
+    const item = this.item();
+    return item.kind === 'radio' ? item.inGroup : null;
+  });
 
   /** The value first, then the widget's action (Acrobat's order), so its script reads the new state. */
   protected press(): void {
