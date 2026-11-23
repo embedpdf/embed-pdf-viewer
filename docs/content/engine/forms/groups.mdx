@@ -30,9 +30,13 @@ await doc.forms.create({
 await doc.forms.update(field.ref, { groupId: 'seller' });
 ```
 
-A field you create without a `groupId` goes in your own group (`identity.groupId`). Putting it in
-another group takes `fields:set-group` for that group, so a designer who prepares the contract
-gets one for each party:
+A field you create without a `groupId` is in no group, whatever your own group is
+(`identity.groupId`): a field is somebody's once you say whose. `groupId: null` in the draft
+means the same as leaving it out.
+
+Putting a field in your own group takes no permission of its own. Putting it in another group
+takes `fields:set-group` for that group, so a designer who prepares the contract gets one for
+each party:
 
 ```ts
 const designer = [
@@ -44,9 +48,18 @@ const designer = [
 ];
 ```
 
-A group can be changed, never removed. It's a setting of the field: it's saved in the PDF (in the
-field's `/EMBD_Metadata`), other PDF apps ignore it, and a form [export](/docs/engine/forms/import-export)
-carries it.
+`null` takes a field out of its group:
+
+```ts
+await doc.forms.update(field.ref, { groupId: null });
+```
+
+That takes `doc.forms.modify` and no `fields:set-group` permission: whoever designs the form may
+take a field out of any group, as they may delete it. A field in no group can only be filled in
+by a user who may fill in every field.
+
+The group is a setting of the field: it's saved in the PDF (in the field's `/EMBD_Metadata`),
+other PDF apps ignore it, and a form [export](/docs/engine/forms/import-export) carries it.
 
 ## Give each signer their group
 

@@ -246,7 +246,9 @@ export interface DocumentSecurityService {
    *     `fields:sign` scope for its group, or, without one, `doc.forms.fill`
    *     / `doc.sign` for every field;
    *   - `set-group` takes the destination group (`fields:set-group:` ladder;
-   *     the caller's own default group is always assignable).
+   *     the caller's own default group is always assignable). Taking a field
+   *     out of its group has no destination: it takes form design alone
+   *     (`allows('doc.forms.modify')`).
    *
    * A courtesy for UI gating, like {@link allowsAnnotation}: the engine
    * enforces every write with the same predicates.

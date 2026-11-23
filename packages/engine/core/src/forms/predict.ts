@@ -175,7 +175,10 @@ export interface FieldDraftContext {
   readonly objectNumber: number;
   /** Its widgets' refs, in `draft.widgets` order. */
   readonly widgets: readonly AnnotationRef[];
-  /** The group a draft without one goes in: the session's own (`identity.groupId`). */
+  /**
+   * @deprecated Not read: a field whose draft names no group is in none,
+   * whatever the session's own group is. Goes in 4.0.
+   */
   readonly groupId?: string | null;
   /** Who creates it, and when, as the engine stamps it. Left out, a read says `null`. */
   readonly createdBy?: string | null;
@@ -219,7 +222,7 @@ export function formFieldOfDraft(
     mappingName: draft.mappingName ?? null,
     valueEntry: { kind: 'none' } as FormValueEntry,
     defaultValueEntry: { kind: 'none' } as FormValueEntry,
-    groupId: draft.groupId ?? context.groupId ?? null,
+    groupId: draft.groupId ?? null,
     createdBy: context.createdBy ?? null,
     createdAt: context.createdAt ?? null,
     filledBy: null,

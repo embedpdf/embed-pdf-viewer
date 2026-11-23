@@ -13,7 +13,11 @@ import { toPageRef } from '../identity/PageRef';
  * contract, the same on every engine:
  *   - each signer fills in and signs only their own group's fields;
  *   - a field a script calculates moves with a fill of the signer's own;
- *   - a designer puts fields in their own group, or one they may set;
+ *   - a new field is in no group unless its draft names one: the designer's
+ *     own, or one they may set;
+ *   - `groupId: null` takes a field out of its group, with form design alone,
+ *     and an undo puts the group back;
+ *   - a copy, or an import that copies, leaves a field of no group in none;
  *   - a values import leaves out the fields the token may not fill;
  *   - signing a grouped signature field locks the rest of its group.
  *
@@ -59,7 +63,7 @@ export const FIELD_GROUP_TOKENS = {
   },
   /** The seller, as a grant would grant it: everything on the seller's fields. */
   seller: { scope: ['doc.open', 'doc.render', 'fields:*:group=seller'], identity: {} },
-  /** The designer: her fields go in legal; she may put fields in the buyer's group too. */
+  /** The designer: her own group is legal; she may put fields in the buyer's group too. */
   designer: {
     scope: ['doc.open', 'doc.render', 'doc.forms.modify', 'fields:set-group:group=buyer'],
     identity: { userId: 'lisa', groupId: 'legal' },
@@ -323,19 +327,59 @@ export function runFieldGroupsConformance(
       });
     });
 
-    test('a designer puts fields in her own group, or one she may set', async () => {
+    const widgetsAt = (x: number, y = 200) => [
+      { page: PAGE, rect: { x, y, width: 100, height: 20 } },
+    ];
+    const groupOf = async (doc: DocumentHandle, name: string) =>
+      (await doc.forms.get(field(name))).groupId;
+
+    test('a new field is in no group unless its draft names one', async () => {
+      await as('designer', async (doc) => {
+        // Her own group is legal, and a field she makes is nobody's until she says whose.
+        const unnamed = await doc.forms.create({
+          kind: 'text',
+          name: 'clause',
+          widgets: widgetsAt(20),
+        });
+        expect(unnamed.field.groupId).toBe(null);
+        expect(await groupOf(doc, 'clause')).toBe(null);
+        // `null` says the same as leaving the group out.
+        const none = await doc.forms.create({
+          kind: 'text',
+          name: 'note',
+          groupId: null,
+          widgets: widgetsAt(140),
+        });
+        expect(none.field.groupId).toBe(null);
+        expect(await groupOf(doc, 'note')).toBe(null);
+        // A create that is one op of a change follows the same rule.
+        const applied = await doc.apply({
+          ops: [
+            {
+              type: 'forms.create',
+              draft: { kind: 'text', name: 'annex', widgets: widgetsAt(260) },
+            },
+          ],
+        });
+        expect(applied.items.map((item) => item.type)).toEqual(['forms.create']);
+        expect(await groupOf(doc, 'annex')).toBe(null);
+      });
+    });
+
+    test('naming her own group takes no right; another takes fields:set-group for it', async () => {
       await as('designer', async (doc) => {
         const own = await doc.forms.create({
           kind: 'text',
           name: 'clause',
-          widgets: [{ page: PAGE, rect: { x: 20, y: 200, width: 100, height: 20 } }],
+          groupId: 'legal',
+          widgets: widgetsAt(20),
         });
         expect(own.field.groupId).toBe('legal');
         const buyers = await doc.forms.create({
           kind: 'text',
           name: 'buyer_address',
           groupId: 'buyer',
-          widgets: [{ page: PAGE, rect: { x: 140, y: 200, width: 100, height: 20 } }],
+          widgets: widgetsAt(140),
         });
         expect(buyers.field.groupId).toBe('buyer');
         const refused = await refusal(
@@ -343,7 +387,7 @@ export function runFieldGroupsConformance(
             kind: 'text',
             name: 'seller_address',
             groupId: 'seller',
-            widgets: [{ page: PAGE, rect: { x: 260, y: 200, width: 100, height: 20 } }],
+            widgets: widgetsAt(260),
           }),
         );
         expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
@@ -352,19 +396,167 @@ export function runFieldGroupsConformance(
         });
         const moved = await doc.forms.update(own.field.ref, { groupId: 'buyer' });
         expect(moved.field.groupId).toBe('buyer');
+        const back = await doc.forms.update(own.field.ref, { groupId: 'legal' });
+        expect(back.field.groupId).toBe('legal');
         expect(codeOf(await refusal(doc.forms.update(own.field.ref, { groupId: 'seller' })))).toBe(
           EngineErrorCode.Forbidden,
         );
         expect(doc.security.allowsField('set-group', { groupId: 'buyer' })).toBe(true);
+        expect(doc.security.allowsField('set-group', { groupId: 'legal' })).toBe(true);
         expect(doc.security.allowsField('set-group', { groupId: 'seller' })).toBe(false);
+      });
+    });
+
+    test('groupId: null takes a field out of its group, with form design alone', async () => {
+      await as('designer', async (doc) => {
+        // She may put fields in the buyer's group and her own, and has no right for the
+        // seller's: taking a field out of a group takes none.
+        const sellers = await doc.forms.update(field('seller_name'), { groupId: null });
+        expect(sellers.field.groupId).toBe(null);
+        expect(await groupOf(doc, 'seller_name')).toBe(null);
+        const buyers = await doc.forms.update(field('buyer_name'), { groupId: null });
+        expect(buyers.field.groupId).toBe(null);
+        // A field in no group stays in none.
+        const total = await doc.forms.update(field('total'), { groupId: null });
+        expect(total.field.groupId).toBe(null);
+        // Back in is an assignment again: only where she may put fields.
+        const refused = await refusal(
+          doc.forms.update(field('seller_name'), { groupId: 'seller' }),
+        );
+        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+        expect((refused as EngineError).details).toMatchObject({
+          required: 'fields:set-group:group=seller',
+        });
+        expect(
+          (await doc.forms.update(field('buyer_name'), { groupId: 'buyer' })).field.groupId,
+        ).toBe('buyer');
+      });
+    });
+
+    test('taking a field out of its group is refused without form design', async () => {
+      // The seller may put fields in the seller's group, and may not design the form.
+      await as('seller', async (doc) => {
+        expect(doc.security.allowsField('set-group', { groupId: 'seller' })).toBe(true);
+        const refused = await refusal(doc.forms.update(field('seller_name'), { groupId: null }));
+        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+        expect((refused as EngineError).details).toMatchObject({ required: 'doc.forms.modify' });
+        const applied = await refusal(
+          doc.apply({
+            ops: [{ type: 'forms.update', field: field('seller_name'), patch: { groupId: null } }],
+          }),
+        );
+        expect(codeOf(applied)).toBe(EngineErrorCode.Forbidden);
+      });
+      await as('buyer', async (doc) => {
+        const refused = await refusal(doc.forms.update(field('buyer_name'), { groupId: null }));
+        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+      });
+      await as('everything', async (doc) => {
+        expect(await groupOf(doc, 'seller_name')).toBe('seller');
+      });
+    });
+
+    test('an empty group id is refused, not read as no group', async () => {
+      await as('everything', async (doc) => {
+        const created = await refusal(
+          doc.forms.create({ kind: 'text', name: 'clause', groupId: '', widgets: widgetsAt(20) }),
+        );
+        expect(codeOf(created)).toBe(EngineErrorCode.InvalidArg);
+        const updated = await refusal(doc.forms.update(field('buyer_name'), { groupId: '' }));
+        expect(codeOf(updated)).toBe(EngineErrorCode.InvalidArg);
+        const tooLong = await refusal(
+          doc.forms.update(field('buyer_name'), { groupId: 'g'.repeat(257) }),
+        );
+        expect(codeOf(tooLong)).toBe(EngineErrorCode.InvalidArg);
+        expect(await groupOf(doc, 'buyer_name')).toBe('buyer');
+      });
+    });
+
+    test('undo puts a removed group back, and takes an assigned one away', async () => {
+      await as('designer', async (doc) => {
+        const update = (name: string, groupId: string | null) =>
+          doc.apply({ ops: [{ type: 'forms.update', field: field(name), patch: { groupId } }] });
+
+        // Out of a group she has no right to put fields in, and back by undo.
+        const removed = await update('seller_name', null);
+        expect(removed.meta.undoable).toBe(true);
+        expect(await groupOf(doc, 'seller_name')).toBe(null);
+        const undone = await doc.apply({ undoOf: removed.meta.opId });
+        expect(await groupOf(doc, 'seller_name')).toBe('seller');
+        // The undo's undo takes it out again.
+        await doc.apply({ undoOf: undone.meta.opId });
+        expect(await groupOf(doc, 'seller_name')).toBe(null);
+
+        // Into a group, and back to none by undo.
+        const assigned = await update('total', 'buyer');
+        expect(await groupOf(doc, 'total')).toBe('buyer');
+        const unassigned = await doc.apply({ undoOf: assigned.meta.opId });
+        expect(await groupOf(doc, 'total')).toBe(null);
+        await doc.apply({ undoOf: unassigned.meta.opId });
+        expect(await groupOf(doc, 'total')).toBe('buyer');
+      });
+    });
+
+    test('undo of a group change holds after someone else changed the field', async () => {
+      await as('designer', async (doc) => {
+        const update = (name: string, patch: { groupId?: string | null; required?: boolean }) =>
+          doc.apply({ ops: [{ type: 'forms.update', field: field(name), patch }] });
+
+        // A later change to the field leaves the undo each property to put back by value.
+        const removed = await update('buyer_name', { groupId: null });
+        await update('buyer_name', { required: true });
+        await doc.apply({ undoOf: removed.meta.opId });
+        const restored = await doc.forms.get(field('buyer_name'));
+        expect([restored.groupId, restored.required]).toEqual(['buyer', true]);
+
+        const assigned = await update('total', { groupId: 'buyer' });
+        await update('total', { required: true });
+        await doc.apply({ undoOf: assigned.meta.opId });
+        const unassigned = await doc.forms.get(field('total'));
+        expect([unassigned.groupId, unassigned.required]).toEqual([null, true]);
+      });
+    });
+
+    test('an update that expects no group applies only to a field in none', async () => {
+      await as('designer', async (doc) => {
+        const expectNone = (name: string) =>
+          doc.apply({
+            ops: [
+              {
+                type: 'forms.update',
+                field: field(name),
+                patch: { groupId: 'buyer' },
+                expect: { groupId: null },
+              },
+            ],
+          });
+        expect(codeOf(await refusal(expectNone('seller_name')))).toBe(
+          EngineErrorCode.ChangeConflict,
+        );
+        await expectNone('total');
+        expect(await groupOf(doc, 'total')).toBe('buyer');
+      });
+    });
+
+    test('a copy of a field in no group is in none; a copy keeps a group she may set', async () => {
+      await as('designer', async (doc) => {
+        const copied = await doc.forms.copy([field('total'), field('buyer_name')]);
+        expect(copied.fields.map((f) => f.groupId)).toEqual([null, 'buyer']);
+        const refused = await refusal(doc.forms.copy([field('seller_name')]));
+        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+        expect((refused as EngineError).details).toMatchObject({
+          required: 'fields:set-group:group=seller',
+        });
       });
     });
 
     test('a copied form keeps the groups the importer may set; a restore keeps every one', async () => {
       let buyers: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
+      let nobodys: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
       let everyone: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
       await as('everything', async (doc) => {
         buyers = await doc.forms.export({ fields: [field('buyer_name')] });
+        nobodys = await doc.forms.export({ fields: [field('total')] });
         everyone = await doc.forms.export();
       });
       const blank = await (async () => {
@@ -380,6 +572,9 @@ export function runFieldGroupsConformance(
         async (doc) => {
           const copied = await doc.forms.import(buyers!, { attribution: 'stamp' });
           expect(copied.fields.map((f) => [f.name, f.groupId])).toEqual([['buyer_name', 'buyer']]);
+          // A field of no group stays in none, whatever the importer's own group is.
+          const unassigned = await doc.forms.import(nobodys!, { attribution: 'stamp' });
+          expect(unassigned.fields.map((f) => [f.name, f.groupId])).toEqual([['total', null]]);
           const refused = await refusal(doc.forms.import(everyone!, { attribution: 'stamp' }));
           expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
         },

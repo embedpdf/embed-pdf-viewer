@@ -398,7 +398,8 @@ export class FormMutator {
     const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
     stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
-    if (draft.groupId !== undefined) {
+    // A draft that names no group (`null`, or nothing) leaves the field in none.
+    if (draft.groupId !== undefined && draft.groupId !== null) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
     }
     placements.forEach((placement, at) => {
