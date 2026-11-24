@@ -690,3 +690,339 @@ describe('a box that holds nothing to take the cursor', () => {
     expect(new Set(asked)).toEqual(new Set([100]));
   });
 });
+
+/** A radio group `name` whose buttons are `buttons`, in the order the field lists them. */
+const radio = (
+  field: number,
+  name: string,
+  buttons: readonly { widget: number; page: typeof P1; value: string; checked?: boolean }[],
+) => {
+  const value = buttons.find((button) => button.checked)?.value ?? 'Off';
+  return {
+    ...base,
+    ref: fieldRef(field),
+    name,
+    kind: 'radio',
+    value,
+    radiosInUnison: false,
+    noToggleToOff: false,
+    valueEntry: { kind: 'scalar', value },
+    defaultValueEntry: { kind: 'scalar', value: 'Off' },
+    widgets: buttons.map((button) => ({
+      ...formWidget(button.widget, button.page),
+      onState: button.value,
+      exportValue: button.value,
+      checked: button.checked ?? false,
+    })),
+  } as unknown as FormField;
+};
+
+/** Press Tab (or Shift+Tab) until it leaves the form, at most `most` times: the boxes it went to. */
+const presses = (
+  { capability, focused }: Awaited<ReturnType<typeof form>>,
+  options: { backward?: boolean; empty?: boolean; wrap?: boolean } = {},
+  most = 8,
+): number[] => {
+  const start = focused.length;
+  for (let press = 0; press < most; press++) if (!capability.focusNext(options)) break;
+  return focused.slice(start);
+};
+
+describe("a field between a radio group's buttons in Tab's order", () => {
+  // One page, in Tab's order: a text box, the group's first button, a text box, the group's
+  // checked button, a last text box. Every control is on screen.
+  const BEFORE = text(1, 'before', 11, P1, 'filled');
+  const BETWEEN = text(2, 'between', 14, P1);
+  const AFTER = text(3, 'after', 19, P1);
+  const CHOICE = radio(5, 'choice', [
+    { widget: 15, page: P1, value: 'first' },
+    { widget: 16, page: P1, value: 'second', checked: true },
+  ]);
+  const UNCHECKED = radio(5, 'choice', [
+    { widget: 15, page: P1, value: 'first' },
+    { widget: 16, page: P1, value: 'second' },
+  ]);
+  const widgets = [
+    row(11, P1, 100),
+    row(15, P1, 150),
+    row(14, P1, 200),
+    row(16, P1, 250),
+    row(19, P1, 300),
+  ];
+  const page = { fields: [BEFORE, CHOICE, BETWEEN, AFTER], widgets, shown: [11, 15, 14, 16, 19] };
+
+  it('is where Tab goes from the group, and is reached once', async () => {
+    const harness = await form(page);
+    harness.capability.focus(BEFORE.ref);
+    // The group is one stop, where its first button is; its checked button takes the cursor.
+    // From there Tab goes on to what comes after the group's stop: the field between.
+    expect(presses(harness)).toEqual([16, 14, 19]);
+    expect(harness.capability.focusNext()).toBe(false);
+  });
+
+  it('is passed once by Shift+Tab, which then leaves the group for the field before it', async () => {
+    const harness = await form(page);
+    harness.capability.focus(AFTER.ref);
+    expect(presses(harness, { backward: true })).toEqual([14, 16, 11]);
+    expect(harness.capability.focusNext({ backward: true })).toBe(false);
+  });
+
+  it('with nothing checked: Shift+Tab comes to the last button, and goes on before the group', async () => {
+    const harness = await form({ ...page, fields: [BEFORE, UNCHECKED, BETWEEN, AFTER] });
+    harness.capability.focus(AFTER.ref);
+    expect(presses(harness, { backward: true })).toEqual([14, 16, 11]);
+    // Forward the first button takes the cursor, which is where the stop is.
+    expect(presses(harness)).toEqual([15, 14, 19]);
+  });
+
+  it('counts for `empty` from a button of the group', async () => {
+    const harness = await form(page);
+    harness.capability.focus(CHOICE.ref);
+    expect(harness.focused).toEqual([16]);
+    // The group has a value, the field before it too: the empty fields are the two text boxes.
+    expect(presses(harness, { empty: true })).toEqual([14, 19]);
+    harness.capability.focus(CHOICE.ref);
+    expect(presses(harness, { empty: true, backward: true })).toEqual([]);
+  });
+
+  it('with `wrap`, each stop comes once in a round, either way', async () => {
+    // The group is the first stop: its first button, the text box, its checked button, a text box.
+    const harness = await form({
+      fields: [CHOICE, BETWEEN, AFTER],
+      widgets: widgets.slice(1),
+      shown: [15, 14, 16, 19],
+    });
+    harness.capability.focus(CHOICE.ref);
+    expect(presses(harness, { wrap: true }, 6)).toEqual([14, 19, 16, 14, 19, 16]);
+    expect(presses(harness, { wrap: true, backward: true }, 6)).toEqual([19, 14, 16, 19, 14, 16]);
+  });
+
+  it('is next from the group when the field is named, whichever button the field lists first', async () => {
+    // The field lists its checked button first; the page, and so Tab, the other one.
+    const listed = { ...CHOICE, widgets: [...CHOICE.widgets].reverse() } as FormField;
+    const { capability, focused } = await form({
+      ...page,
+      fields: [BEFORE, listed, BETWEEN, AFTER],
+    });
+    expect(capability.focusNext({ from: listed.ref })).toBe(true);
+    expect(capability.focusNext({ from: listed.ref, backward: true })).toBe(true);
+    expect(focused).toEqual([14, 11]);
+  });
+
+  it('is reached past a second group whose buttons lie among the first one’s', async () => {
+    // In Tab's order: A's first button, B's first, A's checked, B's checked.
+    const A = radio(5, 'a', [
+      { widget: 15, page: P1, value: 'first' },
+      { widget: 16, page: P1, value: 'second', checked: true },
+    ]);
+    const B = radio(6, 'b', [
+      { widget: 17, page: P1, value: 'first' },
+      { widget: 18, page: P1, value: 'second', checked: true },
+    ]);
+    const harness = await form({
+      fields: [BEFORE, A, B, AFTER],
+      widgets: [
+        row(11, P1, 100),
+        row(15, P1, 150),
+        row(17, P1, 200),
+        row(16, P1, 250),
+        row(18, P1, 300),
+        row(19, P1, 350),
+      ],
+      shown: [11, 15, 16, 17, 18, 19],
+    });
+    harness.capability.focus(BEFORE.ref);
+    expect(presses(harness)).toEqual([16, 18, 19]);
+    expect(presses(harness, { backward: true })).toEqual([18, 16, 11]);
+  });
+
+  it('on each page the group shows on: the group is one stop there, where its first button is', async () => {
+    // Page 1: a text box, a button, a text box, the checked button. Page 2: a button, a text
+    // box, a button, a last text box.
+    const SECOND = text(4, 'second', 24, P2);
+    const LAST = text(6, 'last', 29, P2);
+    const SPREAD = radio(5, 'spread', [
+      { widget: 15, page: P1, value: 'a' },
+      { widget: 16, page: P1, value: 'b', checked: true },
+      { widget: 21, page: P2, value: 'c' },
+      { widget: 22, page: P2, value: 'd' },
+    ]);
+    const harness = await form({
+      fields: [BEFORE, SPREAD, BETWEEN, SECOND, LAST],
+      widgets: [
+        row(11, P1, 100),
+        row(15, P1, 150),
+        row(14, P1, 200),
+        row(16, P1, 250),
+        row(21, P2, 100),
+        row(24, P2, 150),
+        row(22, P2, 200),
+        row(29, P2, 250),
+      ],
+      shown: [11, 15, 14, 16],
+    });
+    for (const box of [21, 24, 22, 29]) harness.show(box, P2);
+    harness.capability.focus(BEFORE.ref);
+    // Page 1's stop takes the cursor at the checked button; page 2 has none checked, so its first.
+    expect(presses(harness)).toEqual([16, 14, 21, 24, 29]);
+    // Backward page 2's stop takes it at its last button, and page 1's at the checked one.
+    expect(presses(harness, { backward: true })).toEqual([24, 22, 14, 16, 11]);
+  });
+
+  it("is never where the arrow keys go: they move between the group's buttons, as before", async () => {
+    const { capability, focused, apply } = await form(page);
+    expect(capability.moveInGroup(widgetRef(16, P1), false)).toBe(true);
+    expect(capability.moveInGroup(widgetRef(15, P1), false)).toBe(true);
+    expect(capability.moveInGroup(widgetRef(16, P1), true)).toBe(true);
+    expect(capability.moveInGroup(widgetRef(15, P1), true)).toBe(true);
+    expect(focused).toEqual([15, 16, 15, 16]);
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(4));
+    expect(capability.moveInGroup(widgetRef(14, P1), false)).toBe(false);
+  });
+
+  it('from a button that shows nowhere, Tab starts at the start of the form, as before', async () => {
+    // The group's first button has no size, so it has no place in Tab's order; the cursor was
+    // in it last.
+    const { capability, focused } = await form({
+      ...page,
+      widgets: widgets.map((box) =>
+        box === widgets[1]
+          ? ({ ...box, rect: { x: 0, y: 792, width: 0, height: 0 } } as WidgetAnnotation)
+          : box,
+      ),
+      shown: [11, 14, 16, 19],
+    });
+    capability.notifyWidgetEvent(CHOICE.ref, widgetRef(15, P1), 'focus');
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11]);
+  });
+
+  it('is where Tab goes after an arrow key moved the cursor to another button', async () => {
+    // A third button after the text box: first button, checked button, the text box, third.
+    const THREE = radio(5, 'choice', [
+      { widget: 15, page: P1, value: 'first' },
+      { widget: 16, page: P1, value: 'second', checked: true },
+      { widget: 17, page: P1, value: 'third' },
+    ]);
+    const harness = await form({
+      fields: [BEFORE, THREE, BETWEEN, AFTER],
+      widgets: [
+        row(11, P1, 100),
+        row(15, P1, 150),
+        row(16, P1, 200),
+        row(14, P1, 250),
+        row(17, P1, 300),
+        row(19, P1, 350),
+      ],
+      shown: [11, 15, 16, 14, 17, 19],
+    });
+    harness.capability.focus(THREE.ref);
+    expect(harness.capability.moveInGroup(widgetRef(16, P1), false)).toBe(true);
+    expect(harness.focused).toEqual([16, 17]);
+    expect(presses(harness)).toEqual([14, 19]);
+    harness.capability.focus(THREE.ref, { widget: widgetRef(17, P1) });
+    expect(presses(harness, { backward: true })).toEqual([11]);
+  });
+});
+
+describe("a radio group whose buttons come one after the other in Tab's order", () => {
+  // One page: a text box, the group's two buttons, a text box.
+  const BEFORE = text(1, 'before', 11, P1, 'filled');
+  const AFTER = text(3, 'after', 19, P1);
+  const buttons = (checked: 'first' | 'second' | null, page = P1) =>
+    radio(5, 'choice', [
+      { widget: 15, page, value: 'first', checked: checked === 'first' },
+      { widget: 16, page, value: 'second', checked: checked === 'second' },
+    ]);
+  const widgets = [row(11, P1, 100), row(15, P1, 150), row(16, P1, 200), row(19, P1, 250)];
+  const page = (checked: 'first' | 'second' | null) => ({
+    fields: [BEFORE, buttons(checked), AFTER],
+    widgets,
+    shown: [11, 15, 16, 19],
+  });
+
+  it('is one stop either way, at its checked button', async () => {
+    for (const [checked, box] of [
+      ['first', 15],
+      ['second', 16],
+    ] as const) {
+      const harness = await form(page(checked));
+      harness.capability.focus(BEFORE.ref);
+      expect(presses(harness)).toEqual([box, 19]);
+      expect(presses(harness, { backward: true })).toEqual([box, 11]);
+    }
+  });
+
+  it('with nothing checked, takes the cursor at its first button, or its last from after it', async () => {
+    const harness = await form(page(null));
+    harness.capability.focus(BEFORE.ref);
+    expect(presses(harness)).toEqual([15, 19]);
+    expect(presses(harness, { backward: true })).toEqual([16, 11]);
+  });
+
+  it('with `empty`, is a stop only while nothing is checked', async () => {
+    const empty = await form(page(null));
+    expect(presses(empty, { empty: true })).toEqual([15, 19]);
+    expect(presses(empty, { empty: true, backward: true })).toEqual([16]);
+    const chosen = await form(page('second'));
+    expect(presses(chosen, { empty: true })).toEqual([19]);
+    // From the group itself, which has a value: on to the next empty field.
+    chosen.capability.focus(buttons('second').ref);
+    expect(presses(chosen, { empty: true })).toEqual([19]);
+    chosen.capability.focus(buttons('second').ref);
+    expect(presses(chosen, { empty: true, backward: true })).toEqual([]);
+  });
+
+  it('with `wrap`, comes once in a round, either way', async () => {
+    const harness = await form(page('second'));
+    harness.capability.focus(BEFORE.ref);
+    expect(presses(harness, { wrap: true }, 6)).toEqual([16, 19, 11, 16, 19, 11]);
+    expect(presses(harness, { wrap: true, backward: true }, 6)).toEqual([19, 16, 11, 19, 16, 11]);
+  });
+
+  it('is one stop on each page it shows on', async () => {
+    const LAST = text(6, 'last', 29, P2);
+    const SPREAD = radio(5, 'spread', [
+      { widget: 15, page: P1, value: 'a' },
+      { widget: 16, page: P1, value: 'b', checked: true },
+      { widget: 21, page: P2, value: 'c' },
+      { widget: 22, page: P2, value: 'd' },
+    ]);
+    const harness = await form({
+      fields: [BEFORE, SPREAD, LAST],
+      widgets: [
+        row(11, P1, 100),
+        row(15, P1, 150),
+        row(16, P1, 200),
+        row(21, P2, 100),
+        row(22, P2, 150),
+        row(29, P2, 200),
+      ],
+      shown: [11, 15, 16],
+    });
+    for (const box of [21, 22, 29]) harness.show(box, P2);
+    harness.capability.focus(BEFORE.ref);
+    expect(presses(harness)).toEqual([16, 21, 29]);
+    expect(presses(harness, { backward: true })).toEqual([22, 16, 11]);
+  });
+
+  it('takes the arrow keys through its buttons on every page, going round', async () => {
+    const SPREAD = radio(5, 'spread', [
+      { widget: 15, page: P1, value: 'a' },
+      { widget: 16, page: P1, value: 'b', checked: true },
+      { widget: 21, page: P2, value: 'c' },
+    ]);
+    const { capability, focused, show, apply } = await form({
+      fields: [BEFORE, SPREAD],
+      widgets: [row(11, P1, 100), row(15, P1, 150), row(16, P1, 200), row(21, P2, 100)],
+      shown: [11, 15, 16],
+    });
+    show(21, P2);
+    expect(capability.moveInGroup(widgetRef(16, P1), false)).toBe(true);
+    expect(capability.moveInGroup(widgetRef(21, P2), false)).toBe(true);
+    expect(capability.moveInGroup(widgetRef(15, P1), true)).toBe(true);
+    expect(focused).toEqual([21, 15, 21]);
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(3));
+    expect(apply.mock.calls.map((call) => JSON.stringify(call)).join()).toMatch(/"c".*"a".*"c"/);
+  });
+});

@@ -7,6 +7,11 @@
  * A stop is a box of a field the user may fill in. The cursor passes over one whose control
  * takes no cursor (`cursor.goTo` declines it): a signature field with nothing to sign it. Stops
  * are tried in the order Tab comes to them, so a move asks only the ones it reaches.
+ *
+ * A radio group is one stop on each page it shows on, where its first button comes in Tab's
+ * order. The button that takes the cursor may come later in that order, with other fields
+ * before it. From any of its buttons the cursor goes on from the group's stop, so Tab takes
+ * what comes after the group and Shift+Tab what comes before it, each field once.
  */
 import { memo } from '@embedpdf/core';
 import type {
@@ -122,8 +127,8 @@ export function createFocus(
 
   /**
    * Move the cursor to the next stop after a box (`from`; `null`: from the start), as Tab does:
-   * the first one on the way that takes the cursor. `passed` are the stops this move already
-   * asked for and that came in holding nothing to focus.
+   * the first one on the way that takes the cursor. A radio button's place is its group's stop.
+   * `passed` are the stops this move already asked for and that came in holding nothing to focus.
    */
   const step = (
     from: number | null,
@@ -133,14 +138,21 @@ export function createFocus(
     const { backward, empty, wrap } = how;
     const index = fields.view();
     const { position, stops } = order();
-    const at = from === null ? null : (position.get(from) ?? null);
     const field = from === null ? null : fieldForWidget(index, from);
     const page = from === null ? null : widgetRowOf(index, from)?.page.objectNumber;
+    // A radio group is one stop: from one of its buttons, the group is where the cursor is.
+    const group =
+      field?.kind === 'radio'
+        ? stops.find((stop) => stop.field === field && stop.row.page.objectNumber === page)
+        : undefined;
+    // The cursor goes on from the box's place in Tab's order, and from a radio button from its
+    // group's stop: the button may come later, with other fields between.
+    const own = from === null ? undefined : position.get(from);
+    const at = own === undefined ? null : (group?.at ?? own);
     const candidates = stops.filter(
       (stop) =>
         (!empty || isEmpty(stop.field)) &&
-        // A radio group is one stop: from one of its buttons, the group is where the cursor is.
-        !(stop.field === field && field.kind === 'radio' && stop.row.page.objectNumber === page) &&
+        stop !== group &&
         !passed.has(widgetObjectOf(stop.row.ref)),
     );
     const isAhead = (stop: Stop) => (at === null ? true : backward ? stop.at < at : stop.at > at);
