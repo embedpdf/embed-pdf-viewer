@@ -27,12 +27,7 @@ import {
   input,
   signal,
 } from '@angular/core';
-import {
-  createScrollbarPresses,
-  paintDefault,
-  scrollbarLayout,
-  type ScrollbarTrack,
-} from '@embedpdf/web';
+import { attachScrollbar, paintDefault, scrollbarLayout, type ScrollbarState } from '@embedpdf/web';
 import { outsideStageError } from '@embedpdf/angular/runtime';
 import { EpdfStage } from './stage';
 
@@ -63,10 +58,6 @@ export type ScrollbarAxis = 'x' | 'y';
     '[style.opacity]': 'shown() ? 1 : 0',
     // A hidden bar must not take the clicks meant for the pages under it.
     '[style.pointer-events]': "shown() ? 'auto' : 'none'",
-    '(pointerdown)': 'onTrackDown($event)',
-    '(pointermove)': 'onMove($event)',
-    '(pointerup)': 'endDrag()',
-    '(pointercancel)': 'endDrag()',
     '(pointerenter)': 'hovered.set(true)',
     '(pointerleave)': 'hovered.set(false)',
   },
@@ -82,7 +73,6 @@ export type ScrollbarAxis = 'x' | 'y';
       [style.bottom.px]="vertical() ? null : 2"
       [style.width.px]="vertical() ? null : layout().thumbLength"
       [style.height.px]="vertical() ? layout().thumbLength : null"
-      (pointerdown)="onThumbDown($event)"
     ></div>
   `,
 })
@@ -139,9 +129,6 @@ export class EpdfScrollbar {
   protected readonly thumbColor = paintDefault('scrollbar-thumb');
   protected readonly round = Math.round;
 
-  /** Thumb drags, track paging and jumps: `@embedpdf/web`'s, shared by every framework. */
-  private readonly presses = createScrollbarPresses((dragging) => this.dragging.set(dragging));
-
   constructor() {
     const stage = inject(EpdfStage, { optional: true });
     if (!stage) throw outsideStageError('<epdf-scrollbar>');
@@ -169,37 +156,27 @@ export class EpdfScrollbar {
       onCleanup(() => observer.disconnect());
     });
 
-    inject(DestroyRef).onDestroy(() => this.endDrag());
+    // Thumb drags, track paging and jumps: `@embedpdf/web` binds the track with listeners of its
+    // own, shared by every framework, which keep the bar's presses from the Stage below it.
+    inject(DestroyRef).onDestroy(
+      attachScrollbar(this.element, {
+        bar: () => this.bar(),
+        onDragging: (dragging) => this.dragging.set(dragging),
+      }),
+    );
   }
 
-  /** The bar as it is now, for `@embedpdf/web`'s press handling. */
-  private track(): ScrollbarTrack {
+  /** The bar as it is now, which the listeners read at each event. */
+  private bar(): ScrollbarState {
     const vertical = this.vertical();
     return {
       stage: this.stage,
       vertical,
-      element: this.element,
       layout: this.layout(),
       // Fresh geometry for paging steps, from the metrics as they are now.
       liveLayout: () =>
         scrollbarLayout(this.stage.scrollMetrics(), vertical, this.trackPx(), this.minThumbSize()),
+      trackPress: this.trackPress(),
     };
-  }
-
-  protected onThumbDown(event: PointerEvent): void {
-    this.presses.pressThumb(event, this.track());
-  }
-
-  protected onTrackDown(event: PointerEvent): void {
-    this.presses.pressTrack(event, this.track(), this.trackPress());
-  }
-
-  /** Pointer capture sends the moves here, for thumb drags, jump drags and paging alike. */
-  protected onMove(event: PointerEvent): void {
-    this.presses.move(event, this.track());
-  }
-
-  protected endDrag(): void {
-    this.presses.release();
   }
 }

@@ -15,13 +15,7 @@
   Build anything else (a minimap, a progress ring) from `useScrollMetrics()` and `stage.scrollTo()`.
 -->
 <script lang="ts">
-  import {
-    createScrollbarPresses,
-    isolatePointerDown,
-    paintDefault,
-    scrollbarLayout,
-    type ScrollbarTrack,
-  } from '@embedpdf/web';
+  import { attachScrollbar, paintDefault, scrollbarLayout } from '@embedpdf/web';
   import { useCapability } from '../runtime/readers.svelte';
   import type { ScrollbarProps } from './props';
   import { asHost, scrollMetricsOf } from './readers.svelte';
@@ -81,32 +75,22 @@
     return () => observer.disconnect();
   });
 
-  // ── input: `@embedpdf/web`'s press handling (thumb drags, track paging and jumps), handed the
-  //    bar as it is now on every event. ──
-  const presses = createScrollbarPresses((value) => (dragging = value));
-  const pressedTrack = (): ScrollbarTrack => ({
-    stage,
-    vertical,
-    element: track!,
-    layout,
-    // Fresh geometry for paging steps, from the capability rather than the last drawn frame.
-    liveLayout: () => scrollbarLayout(stage.getScrollMetrics(), vertical, trackPx, minThumbSize),
-  });
-
-  // No repeat timer outlives the bar.
-  $effect(() => () => presses.release());
-
-  /**
-   * The Stage listens for presses natively on an ancestor of the bar, and Svelte delegates
-   * `onpointerdown` to the root, which runs after the Stage has already seen the press and begun
-   * a pan with it. The bar takes its presses on a native listener on the track, which stops them
-   * there: the thumb's start a drag, the track's page or jump.
-   */
-  const takePresses = (element: HTMLElement) =>
-    isolatePointerDown(element, (event) => {
-      const onThumb = event.target instanceof Element && event.target !== element;
-      if (onThumb) presses.pressThumb(event, pressedTrack());
-      else presses.pressTrack(event, pressedTrack(), trackPress);
+  // ── input: `@embedpdf/web` binds the track (thumb drags, track paging and jumps) with
+  //    listeners of its own, which read the bar as it is now on every event. Svelte would hand
+  //    `onpointerdown` to the root, after the Stage below the bar had already seen the press and
+  //    begun a pan with it. ──
+  const bindBar = (element: HTMLElement) =>
+    attachScrollbar(element, {
+      bar: () => ({
+        stage,
+        vertical,
+        layout,
+        // Fresh geometry for paging steps, from the capability rather than the last drawn frame.
+        liveLayout: () =>
+          scrollbarLayout(stage.getScrollMetrics(), vertical, trackPx, minThumbSize),
+        trackPress,
+      }),
+      onDragging: (value) => (dragging = value),
     });
 
   const trackDefaults = $derived(
@@ -142,10 +126,7 @@
       : 0}; transition: opacity 200ms; pointer-events: {shown ? 'auto' : 'none'};{style
       ? ` ${style}`
       : ''}"
-    {@attach takePresses}
-    onpointermove={(event) => presses.move(event, pressedTrack())}
-    onpointerup={() => presses.release()}
-    onpointercancel={() => presses.release()}
+    {@attach bindBar}
     onpointerenter={() => (hovered = true)}
     onpointerleave={() => (hovered = false)}
   >

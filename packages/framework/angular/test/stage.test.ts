@@ -295,6 +295,54 @@ describe('<epdf-scrollbar>', () => {
     expect(bar.querySelector('.thumb')).not.toBeNull();
   });
 
+  it('keeps a press on the bar from the page below it, and still drags and pages', async () => {
+    const fixture = await mount(
+      viewerHost({
+        imports: [EpdfStage, EpdfScrollbar],
+        config: { engine: fakeEngine(20).engine },
+        features,
+        template: `
+          <div class="below">
+            <epdf-stage>
+              <epdf-scrollbar axis="y" [autoHide]="false" class="bar" thumbClass="thumb" />
+            </epdf-stage>
+          </div>
+        `,
+      }),
+    );
+    const bar = fixture.nativeElement.querySelector('.bar') as HTMLElement;
+    await kernelOf(fixture).documents.open(bytesInput('a'));
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(bar.style.display).toBe('block');
+    });
+    const thumb = bar.querySelector('.thumb') as HTMLElement;
+    const pressesBelow: Event[] = [];
+    (fixture.nativeElement.querySelector('.below') as HTMLElement).addEventListener(
+      'pointerdown',
+      (event) => pressesBelow.push(event),
+    );
+    const pointer = (type: string, init: PointerEventInit = {}) =>
+      new PointerEvent(type, { bubbles: true, button: 0, ...init });
+
+    thumb.dispatchEvent(pointer('pointerdown'));
+    await settle(fixture);
+    expect(pressesBelow).toHaveLength(0);
+    expect(bar.hasAttribute('data-dragging')).toBe(true);
+    bar.dispatchEvent(pointer('pointerup'));
+    await settle(fixture);
+    expect(bar.hasAttribute('data-dragging')).toBe(false);
+
+    const stage = fixture.debugElement.query(By.directive(EpdfStage))
+      .componentInstance as EpdfStage;
+    expect(stage.scrollMetrics().scrollTop).toBe(0);
+    bar.dispatchEvent(pointer('pointerdown', { clientY: 500 }));
+    bar.dispatchEvent(pointer('pointerup'));
+    await settle(fixture);
+    expect(pressesBelow).toHaveLength(0);
+    expect(stage.scrollMetrics().scrollTop).toBeGreaterThan(0);
+  });
+
   it('outside a Stage is EPDF-104', async () => {
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(
