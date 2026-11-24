@@ -1,5 +1,6 @@
 import {
   opIdOf,
+  resolveSignatureAppearance,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -24,7 +25,7 @@ import {
   type FormFieldRef,
   type FormFieldUpdateResult,
   type SessionEventPublisher,
-  type SignatureAppearanceInput,
+  type SignatureAppearance,
   type FormFieldValue,
   type FormImportBody,
   type FormImportOptions,
@@ -78,6 +79,7 @@ import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
+import { assertServerTakesMark, markPart } from './signatureMark';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
 import { bundleImportForm, NO_BUNDLE_LIMITS, readBundleParts } from '../transport/bundleMultipart';
 import type { HttpClient } from '../transport/HttpClient';
@@ -380,7 +382,7 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
 
   setSignatureAppearance(
     ref: FormFieldRef,
-    appearance: SignatureAppearanceInput,
+    appearance: SignatureAppearance | null,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
@@ -388,24 +390,26 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
-        const bytes = new ArrayBuffer(appearance.pdf.byteLength);
-        new Uint8Array(bytes).set(appearance.pdf);
-        const form = buildRoleMutationForm(
-          {},
-          { appearance: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
+        const path = wirePaths.layerFormFieldSignatureAppearance(
+          this.docId,
+          this.layerName,
+          encodeFieldRefKey(ref),
         );
+        const parse = (raw: unknown) => FormFieldUpdateResultSchema.parse(raw);
+        const read = await resolveSignatureAppearance(appearance);
+        assertServerTakesMark(read, this.http.serverVersion);
+        const mark = markPart(read);
         const result = await write.send((sent) =>
-          this.http.postMultipartJson(
-            wirePaths.layerFormFieldSignatureAppearance(
-              this.docId,
-              this.layerName,
-              encodeFieldRefKey(ref),
-            ),
-            form,
-            (raw) => FormFieldUpdateResultSchema.parse(raw),
-            signal,
-            sent,
-          ),
+          mark
+            ? this.http.postMultipartJson(
+                path,
+                buildRoleMutationForm({}, { appearance: { bytes: mark } }),
+                parse,
+                signal,
+                sent,
+              )
+            : // No mark: no part travels, and the body says so.
+              this.http.postJson(path, { resources: { appearance: null } }, parse, signal, sent),
         );
         return this.absorbMutation(opId, result, 'forms.updated');
       });

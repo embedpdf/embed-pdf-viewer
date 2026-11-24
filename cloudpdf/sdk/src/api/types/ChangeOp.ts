@@ -217,7 +217,7 @@ export namespace ChangeOp {
 
     export namespace ChangeOpFormsSetSignatureAppearance {
         export interface Resources {
-            appearance: string;
+            appearance: string | null;
         }
     }
 

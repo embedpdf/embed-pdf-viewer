@@ -7,6 +7,8 @@ import {
   formResetFacts,
   formValuesImportFacts,
   opIdOf,
+  resolveSignatureAppearance,
+  signatureAppearanceBytes,
   wirePack,
   draftWritesScripts,
   writesScripts,
@@ -25,7 +27,7 @@ import {
   type FormFieldRef,
   type FormFieldUpdateResult,
   type SessionEventPublisher,
-  type SignatureAppearanceInput,
+  type SignatureAppearance,
   type FormWidgetLinkResult,
   type FormWidgetDeleteResult,
   type FormWidgetUpdateResult,
@@ -297,16 +299,21 @@ export class LocalDocumentFormsService implements Omit<DocumentFormsService, For
 
   setSignatureAppearance(
     ref: FormFieldRef,
-    appearance: SignatureAppearanceInput,
+    appearance: SignatureAppearance | null,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
     const write = this.beginFieldWrite('sign', options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
-    const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
+    // Queued now, so it keeps its place among this document's calls while
+    // its bytes are read.
     const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack(
+      line: { effect: 'write', docId },
+      buildPack: async (jobId: JobId) => {
+        // A copy the job owns: the transfer detaches it, and the caller's bytes are only read.
+        const mark = signatureAppearanceBytes(await resolveSignatureAppearance(appearance));
+        const bytes = mark && (mark.bytes.buffer as ArrayBuffer);
+        return wirePack(
           {
             kind: 'forms.setSignatureAppearance',
             effect: 'write',
@@ -314,11 +321,13 @@ export class LocalDocumentFormsService implements Omit<DocumentFormsService, For
             opId: write.opId,
             docId,
             ref,
-            pdf,
+            // In the spelling the caller chose: `{ pdf }` is read as a PDF only.
+            ...(mark?.declaredPdf ? { pdf: bytes! } : { appearance: bytes }),
             authority: this.guard.changeAuthority(),
           },
-          [pdf],
-        ),
+          bytes ? [bytes] : [],
+        );
+      },
     });
     return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.updated', ...payload.result });

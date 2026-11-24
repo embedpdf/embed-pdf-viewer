@@ -75,7 +75,8 @@ import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { OutlineItemRef } from '../identity/OutlineItemRef';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
-import type { SignatureAppearanceInput } from '../signature/types';
+import { resolveSignatureAppearance, signatureAppearanceBytes } from '../signature/appearance';
+import type { SignatureAppearance } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationCopyResult } from '../transfer/annotationCopy';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
@@ -251,9 +252,10 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly expect?: WidgetPatch<C>;
     }
   | {
+      /** A mark drawn into a signature field without signing; `null` takes it out. */
       readonly type: 'forms.setSignatureAppearance';
       readonly field: FormFieldRef;
-      readonly appearance: SignatureAppearanceInput;
+      readonly appearance: SignatureAppearance | null;
     }
   | {
       readonly type: 'metadata.update';
@@ -725,9 +727,10 @@ export async function resolveChangeResources(change: Change): Promise<{
         break;
       }
       case 'forms.setSignatureAppearance': {
-        const pdf = op.appearance.pdf.slice();
-        buffers.push(pdf.buffer);
-        ops.push({ ...op, appearance: { pdf } });
+        const appearance = await resolveSignatureAppearance(op.appearance);
+        const mark = signatureAppearanceBytes(appearance);
+        if (mark) buffers.push(mark.bytes.buffer as ArrayBuffer);
+        ops.push({ ...op, appearance });
         break;
       }
       case 'pages.insert': {

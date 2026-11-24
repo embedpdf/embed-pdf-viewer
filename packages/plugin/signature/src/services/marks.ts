@@ -1,4 +1,4 @@
-/** Marks → the one-page appearance bytes the engine draws into a field. */
+/** Marks → the bytes the engine draws into a field: a PNG, a JPEG or a one-page PDF, as they are. */
 import { PluginError } from '@embedpdf/core';
 import { resolveBinarySource, type BinarySource } from '@embedpdf/engine-core/runtime';
 

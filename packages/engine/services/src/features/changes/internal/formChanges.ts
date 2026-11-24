@@ -12,6 +12,7 @@ import {
   EngineErrorCode,
   draftWritesScripts,
   fieldScriptOf,
+  signatureAppearanceBytes,
   writesScripts,
   type ChangeItem,
   type FieldActionsPatch,
@@ -502,7 +503,11 @@ export function reorderWidgets(ctx: ChangeContext, op: Op<'forms.reorderWidgets'
   return reordered(ctx, plan, op.widgets);
 }
 
-/** `forms.setSignatureAppearance`; its reverse puts the widgets' appearances back. */
+/**
+ * `forms.setSignatureAppearance`: a mark drawn in, or taken out (`null`). Its
+ * reverse puts the widgets back as they were: the box for a mark drawn in,
+ * the mark for one taken out.
+ */
 export function setSignatureAppearance(
   ctx: ChangeContext,
   op: Op<'forms.setSignatureAppearance'>,
@@ -512,7 +517,7 @@ export function setSignatureAppearance(
   return recordRevert(ctx, before, 'forms.setSignatureAppearance', () =>
     new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setSignatureAppearance(
       op.field,
-      op.appearance.pdf,
+      signatureAppearanceBytes(op.appearance),
       ctx.signal,
     ),
   );

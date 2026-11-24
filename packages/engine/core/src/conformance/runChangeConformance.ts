@@ -1,5 +1,6 @@
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { BANDS_PNG } from './stampFixtures';
 import { toAttachmentRef } from '../dto/Attachment';
 import { OUTLINE_READ_LIMITS } from '../dto/DocumentOutline';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -82,6 +83,16 @@ const SIGNATURE_ARTWORK_PDF = pdfOf([
 
 const PAGE = toPageRef(3);
 const EMPTY_PAGE = toPageRef(4);
+
+/** A signature field named `signature`, with a box a mark is drawn into. */
+const SIGNATURE_FIELD: ChangeOp = {
+  type: 'forms.create',
+  draft: {
+    kind: 'signature',
+    name: 'signature',
+    widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
+  },
+};
 const at = (objectNumber: number, page = PAGE): AnnotationRef => ({
   kind: 'objectNumber',
   page,
@@ -174,6 +185,44 @@ interface RoundTrip {
   readonly setup?: (numbers: Numbers) => ChangeOp[];
   readonly ops: (numbers: Numbers) => ChangeOp[];
 }
+
+/**
+ * The round trips of an op that does two things, beside the one
+ * {@link ROUND_TRIPS} has for its type: each has an exact reverse too.
+ */
+const MORE_ROUND_TRIPS: readonly (RoundTrip & { type: ChangeOp['type']; does: string })[] = [
+  {
+    type: 'forms.setSignatureAppearance',
+    does: 'a PDF under `{ pdf }`',
+    setup: () => [SIGNATURE_FIELD],
+    ops: () => [
+      {
+        type: 'forms.setSignatureAppearance',
+        field: { kind: 'fqn', name: 'signature' },
+        appearance: { pdf: SIGNATURE_ARTWORK_PDF },
+      },
+    ],
+  },
+  {
+    type: 'forms.setSignatureAppearance',
+    does: 'no mark, which takes the mark out',
+    setup: () => [
+      SIGNATURE_FIELD,
+      {
+        type: 'forms.setSignatureAppearance',
+        field: { kind: 'fqn', name: 'signature' },
+        appearance: BANDS_PNG,
+      },
+    ],
+    ops: () => [
+      {
+        type: 'forms.setSignatureAppearance',
+        field: { kind: 'fqn', name: 'signature' },
+        appearance: null,
+      },
+    ],
+  },
+];
 
 /**
  * A round trip for every op type. Keyed by the type, so a new op without one
@@ -367,21 +416,12 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     ],
   },
   'forms.setSignatureAppearance': {
-    setup: () => [
-      {
-        type: 'forms.create',
-        draft: {
-          kind: 'signature',
-          name: 'signature',
-          widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
-        },
-      },
-    ],
+    setup: () => [SIGNATURE_FIELD],
     ops: () => [
       {
         type: 'forms.setSignatureAppearance',
         field: { kind: 'fqn', name: 'signature' },
-        appearance: { pdf: SIGNATURE_ARTWORK_PDF },
+        appearance: BANDS_PNG,
       },
     ],
   },
@@ -603,8 +643,18 @@ export function runChangeConformance(
       return item as Extract<ChangeItem, { type: T }>;
     };
 
-    for (const [type, trip] of Object.entries(ROUND_TRIPS) as [ChangeOp['type'], RoundTrip][]) {
-      test(`${type}: undo gives the state before, the undo's undo the state after`, async () => {
+    const roundTrips: [string, ChangeOp['type'], RoundTrip][] = [
+      ...(Object.entries(ROUND_TRIPS) as [ChangeOp['type'], RoundTrip][]).map(
+        ([type, trip]): [string, ChangeOp['type'], RoundTrip] => [type, type, trip],
+      ),
+      ...MORE_ROUND_TRIPS.map((trip): [string, ChangeOp['type'], RoundTrip] => [
+        `${trip.type}, ${trip.does}`,
+        trip.type,
+        trip,
+      ]),
+    ];
+    for (const [name, type, trip] of roundTrips) {
+      test(`${name}: undo gives the state before, the undo's undo the state after`, async () => {
         await withDocument(async (doc) => {
           const numbers = await take(doc, 4);
           if (trip.setup) await doc.apply({ ops: trip.setup(numbers) });

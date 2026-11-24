@@ -1,3 +1,4 @@
+import type { ResourceBytes } from '../annotation/resources';
 import type { DateInput, IsoDateTime } from '../dto/IsoDateTime';
 import type { FormFieldWidget } from '../forms/field';
 import type { FormFieldRef } from '../identity/FormFieldRef';
@@ -226,9 +227,24 @@ export interface DocumentVersionRef {
 // ---------------------------------------------------------------------------
 
 /**
+ * A signature's mark: what its field's widget shows. It is the bytes of a
+ * PNG, a JPEG or a one-page PDF, the formats an `appearance` resource takes
+ * (`ResourceBytes`), drawn at its own size and fitted whole into the box,
+ * upright in a turned field. Bytes of another format are refused with
+ * `InvalidArg` before anything is sent.
+ *
+ * `{ pdf }` ({@link SignatureAppearanceInput}) is a one-page PDF's bytes
+ * under a key. It takes a PDF only: an image under it is refused.
+ */
+export type SignatureAppearance = ResourceBytes | SignatureAppearanceInput;
+
+/**
  * Widget artwork for the signature, as a one-page PDF (the same path stamps
  * take: the page is drawn into the widget's appearance stream). A PDF with
  * more pages is refused with `InvalidArg`.
+ *
+ * One spelling of a {@link SignatureAppearance}, for a one-page PDF only.
+ * The bytes themselves are the other, which takes an image as well.
  */
 export interface SignatureAppearanceInput {
   /** A one-page PDF that carries the artwork. */
@@ -258,7 +274,8 @@ export interface SignaturePrepareInput {
   certify?: { permission: DocMdpPermission };
   /** FieldMDP for this signature plus a mirroring `/Lock` on the field. */
   lock?: FieldLockSpec;
-  appearance?: SignatureAppearanceInput;
+  /** The mark the field's widget shows once it is signed: a PNG, a JPEG or a one-page PDF. */
+  appearance?: SignatureAppearance;
 }
 
 export interface SignaturePrepared {

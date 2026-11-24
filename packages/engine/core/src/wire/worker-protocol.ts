@@ -863,7 +863,10 @@ export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
   authority: ChangeAuthority;
 }
 
-/** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
+/**
+ * Draw a mark into every widget of an unsigned signature field (the visual
+ * fill), or take it out again.
+ */
 export interface FormsSetSignatureAppearanceWorkerRequest extends WriteJobFields {
   kind: 'forms.setSignatureAppearance';
   effect: 'write';
@@ -871,7 +874,13 @@ export interface FormsSetSignatureAppearanceWorkerRequest extends WriteJobFields
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
-  pdf: ArrayBuffer;
+  /**
+   * A mark passed as its bytes (PNG, JPEG or a one-page PDF); `null` takes
+   * the field's mark out. A request carries this or `pdf`.
+   */
+  appearance?: ArrayBuffer | null;
+  /** A mark passed as `{ pdf }`: its bytes, read as a one-page PDF and nothing else. */
+  pdf?: ArrayBuffer;
   artifactPath?: string;
   /** Who draws the look and their grants: the field must be theirs to sign. */
   authority: ChangeAuthority;
