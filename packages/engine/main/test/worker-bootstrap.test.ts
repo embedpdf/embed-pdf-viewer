@@ -102,4 +102,25 @@ describe('engine worker boot — wasm source handling', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(createRuntimeMock.mock.calls[0][0]!.wasmBinary).toBe(bytes);
   });
+
+  test('a module the page compiled is only instantiated (Emscripten instantiateWasm)', async () => {
+    const { posted, init, settled } = makeScope();
+    // The smallest valid module: the header alone.
+    const module = new WebAssembly.Module(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
+    init({ kind: 'init', wasmUrl: 'https://app.example/assets/embedpdf.wasm', wasmModule: module });
+    await settled();
+
+    expect(posted[0]).toEqual({ kind: 'ready' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const options = createRuntimeMock.mock.calls[0][0]!;
+    expect(options.wasmUrl).toBe('https://app.example/assets/embedpdf.wasm');
+    const hook = (options.wasm as { instantiateWasm: Function }).instantiateWasm;
+    const received = await new Promise<[WebAssembly.Instance, WebAssembly.Module]>((resolve) => {
+      expect(
+        hook({}, (instance: WebAssembly.Instance, m: WebAssembly.Module) => resolve([instance, m])),
+      ).toEqual({});
+    });
+    expect(received[0]).toBeInstanceOf(WebAssembly.Instance);
+    expect(received[1]).toBe(module);
+  });
 });

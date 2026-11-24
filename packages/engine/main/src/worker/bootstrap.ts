@@ -33,6 +33,9 @@ export interface EngineWorkerInit {
   wasmUrl?: string;
   /** Pre-fetched `embedpdf.wasm` bytes (transferred) — wins over `wasmUrl`. */
   wasmBinary?: ArrayBuffer;
+  /** `embedpdf.wasm` already compiled by the main thread (from `wasmUrl`,
+   *  which stays set): the worker only instantiates it. */
+  wasmModule?: WebAssembly.Module;
 }
 
 /**
@@ -55,6 +58,11 @@ function boot(scope: DedicatedWorkerGlobalScope, init: EngineWorkerInit): void {
       prefer: 'wasm',
       wasmUrl: source.wasmUrl,
       wasmBinary: source.wasmBinary,
+      wasm: init.wasmModule
+        ? instantiateCompiled(init.wasmModule, (err) =>
+            scope.postMessage({ kind: 'init-error', error: describeBootError(err, init) }),
+          )
+        : undefined,
     });
     // The host hands us a `WirePack<WorkerResponse>` — payload plus the
     // transfer manifest the producing handler declared. We forward both
@@ -82,6 +90,25 @@ function boot(scope: DedicatedWorkerGlobalScope, init: EngineWorkerInit): void {
  */
 function resolveBootSource(init: EngineWorkerInit): { wasmUrl?: string; wasmBinary?: ArrayBuffer } {
   return { wasmUrl: init.wasmUrl, wasmBinary: init.wasmBinary };
+}
+
+/** Emscripten's `instantiateWasm` hook over a module the main thread compiled. */
+function instantiateCompiled(
+  module: WebAssembly.Module,
+  onError: (err: unknown) => void,
+): Record<string, unknown> {
+  return {
+    instantiateWasm(
+      imports: WebAssembly.Imports,
+      receiveInstance: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+    ) {
+      void WebAssembly.instantiate(module, imports).then(
+        (instance) => receiveInstance(instance, module),
+        onError,
+      );
+      return {};
+    },
+  };
 }
 
 function describeBootError(err: unknown, init: EngineWorkerInit): string {

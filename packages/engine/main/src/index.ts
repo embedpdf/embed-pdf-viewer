@@ -207,8 +207,15 @@ function workerBoot(
           : wasmOptions.wasmLoader
             ? await resolveWasmSourceAsync(wasmOptions)
             : resolveWasmSource(wasmOptions);
+      // Fetch and compile the wasm here while the worker script loads and
+      // evaluates, instead of after it (see compileWasmInParallel).
+      const compiled = compileWasmInParallel(wasm);
       const spawned = await createEngineWorker(delivery, configuredUrl);
-      postWorkerInit(spawned.worker, wasm);
+      if (compiled === null) {
+        postWorkerInit(spawned.worker, wasm);
+      } else {
+        void compiled.then((wasmModule) => postWorkerInit(spawned.worker, wasm, wasmModule));
+      }
       try {
         const transport = await BrowserWorkerTransport.spawn(spawned.worker);
         spawned.destroy();
@@ -242,9 +249,42 @@ function workerBoot(
   };
 }
 
-function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
+/**
+ * Start `WebAssembly.compileStreaming(fetch(wasmUrl))` on this thread, so the
+ * download and compile of `embedpdf.wasm` overlap the worker script's own
+ * download and evaluation (a multi-megabyte bundle) instead of following it.
+ * The compile runs on the browser's background threads; the compiled
+ * `WebAssembly.Module` is posted to the worker, which only instantiates it.
+ *
+ * Resolves to null wherever that is not possible (no streaming compile, a
+ * wrong MIME type, a page CSP without `wasm-unsafe-eval`, a failed fetch):
+ * the worker then fetches and compiles from the URL itself, as before.
+ */
+function compileWasmInParallel(
+  wasm: ResolvedWasmSource,
+): Promise<WebAssembly.Module | null> | null {
+  if (wasm.wasmBinary || !wasm.wasmUrl) return null;
+  if (typeof WebAssembly === 'undefined' || typeof WebAssembly.compileStreaming !== 'function') {
+    return null;
+  }
+  if (typeof fetch !== 'function') return null;
+  try {
+    return WebAssembly.compileStreaming(fetch(wasm.wasmUrl, { credentials: 'same-origin' })).catch(
+      () => null,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function postWorkerInit(
+  worker: Worker,
+  wasm: ResolvedWasmSource,
+  wasmModule?: WebAssembly.Module | null,
+): void {
   const init: EngineWorkerInit = { kind: 'init', wasmUrl: wasm.wasmUrl };
   if (wasm.wasmBinary) init.wasmBinary = wasm.wasmBinary;
+  else if (wasmModule) init.wasmModule = wasmModule;
   worker.postMessage(init, wasm.wasmBinary ? [wasm.wasmBinary] : []);
 }
 

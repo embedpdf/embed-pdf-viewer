@@ -40,7 +40,12 @@ const DEV_WASM = vi.hoisted(() => new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 
 class FakeWorker {
   static started: FakeWorker[] = [];
   static failToStart = false;
-  init: { kind: string; wasmUrl?: string; wasmBinary?: ArrayBuffer } | null = null;
+  init: {
+    kind: string;
+    wasmUrl?: string;
+    wasmBinary?: ArrayBuffer;
+    wasmModule?: WebAssembly.Module;
+  } | null = null;
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>();
 
   constructor(
@@ -61,6 +66,7 @@ class FakeWorker {
     kind: string;
     wasmUrl?: string;
     wasmBinary?: ArrayBuffer;
+    wasmModule?: WebAssembly.Module;
     jobId?: unknown;
   }): void {
     if (message.jobId !== undefined) {
@@ -100,6 +106,13 @@ beforeEach(() => {
   files.prebundled = false;
   vi.stubGlobal('Worker', FakeWorker);
   vi.stubGlobal('location', { origin: 'https://app.test', href: 'https://app.test/viewer' });
+  // No network here: the page-side wasm compile fails, so the worker gets the URL.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('offline');
+    }),
+  );
 });
 
 afterEach(() => {
@@ -205,6 +218,54 @@ describe("localEngine()'s worker", () => {
 
     expect(String(worker.url).startsWith('blob:')).toBe(true);
     expect(worker.init?.wasmUrl).toBe('https://app.test/embedpdf.wasm');
+    await engine.destroy();
+  });
+});
+
+describe('the wasm compile', () => {
+  it('runs on the page while the worker loads; the worker gets the compiled module', async () => {
+    const compiled = { compiled: true } as unknown as WebAssembly.Module;
+    const response = {} as Response;
+    const fetchMock = vi.fn(async () => response);
+    const compileStreaming = vi.fn(async () => compiled);
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('WebAssembly', { ...WebAssembly, compileStreaming });
+    const engine = localEngine();
+    const worker = await bootedWorker(engine);
+
+    expect(fetchMock).toHaveBeenCalledWith('https://app.test/assets/embedpdf-abc.wasm', {
+      credentials: 'same-origin',
+    });
+    expect(compileStreaming).toHaveBeenCalledTimes(1);
+    expect(worker.init?.wasmModule).toBe(compiled);
+    expect(worker.init?.wasmUrl).toBe('https://app.test/assets/embedpdf-abc.wasm');
+    await engine.destroy();
+  });
+
+  it('is left to the worker, from the URL, when the page cannot compile it', async () => {
+    vi.stubGlobal('WebAssembly', {
+      ...WebAssembly,
+      compileStreaming: vi.fn(async () => {
+        throw new TypeError("Incorrect response MIME type. Expected 'application/wasm'.");
+      }),
+    });
+    const engine = localEngine();
+    const worker = await bootedWorker(engine);
+
+    expect(worker.init?.wasmModule).toBeUndefined();
+    expect(worker.init?.wasmUrl).toBe('https://app.test/assets/embedpdf-abc.wasm');
+    await engine.destroy();
+  });
+
+  it('is not started for caller-supplied bytes', async () => {
+    const compileStreaming = vi.fn();
+    vi.stubGlobal('WebAssembly', { ...WebAssembly, compileStreaming });
+    const engine = localEngine({ wasmBinary: new Uint8Array(DEV_WASM) });
+    const worker = await bootedWorker(engine);
+
+    expect(compileStreaming).not.toHaveBeenCalled();
+    expect(worker.init?.wasmModule).toBeUndefined();
+    expect(worker.init?.wasmBinary).toBeInstanceOf(ArrayBuffer);
     await engine.destroy();
   });
 });
