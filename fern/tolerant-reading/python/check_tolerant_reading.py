@@ -42,5 +42,7 @@ if [text.kind, barcode.kind] != ["text", "unknown"]:
     sys.exit(f"read {[field.kind for field in form.fields]}")
 if text.value_entry.kind != "unsupported":
     sys.exit(f"read a value of an unknown kind as {text.value_entry.kind}")
+if text.format.kind != "other":
+    sys.exit(f"read a format of an unknown kind as {text.format.kind}")
 if barcode.raw_value != "":
     sys.exit(f"read an unknown field's missing rawValue as {barcode.raw_value!r}")

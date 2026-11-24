@@ -259,6 +259,17 @@ describe('AF date and time helpers', () => {
     expect(commitKeystroke(`AFTime_Keystroke(0);`, '23:59').event.rc).toBe(true);
   });
 
+  it('the scripts the engine writes for a format run as a pair', () => {
+    // What `format: { kind: 'date', pattern: 'dd/mm/yyyy' }` puts in a field.
+    expect(commitKeystroke(`AFDate_KeystrokeEx("dd/mm/yyyy");`, '5/3/26').event.rc).toBe(true);
+    expect(formatEvent(`AFDate_FormatEx("dd/mm/yyyy");`, '5/3/26').event.value).toBe('05/03/2026');
+    expect(commitKeystroke(`AFDate_KeystrokeEx("dd/mm/yyyy");`, 'soon').event.rc).toBe(false);
+    // And for a time: its keystroke script names a standard time pattern by number.
+    expect(commitKeystroke(`AFTime_Keystroke(1);`, '14:07').event.rc).toBe(true);
+    expect(formatEvent(`AFTime_FormatEx("h:MM tt");`, '14:07').event.value).toBe('2:07 pm');
+    expect(commitKeystroke(`AFTime_Keystroke(1);`, '25:99').event.rc).toBe(false);
+  });
+
   it('util.printd understands the new 12-hour tokens', () => {
     // nowMs is 09:30 UTC with a +180 minute offset → 12:30 local.
     const output = formatEvent(`event.value = util.printd('hh:MM tt', new Date());`, '');

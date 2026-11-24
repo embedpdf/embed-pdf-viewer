@@ -132,6 +132,13 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
       }),
     },
     { name: 'text in a comb', draft: text({ maxLength: 6, comb: true }) },
+    { name: 'text with a purpose', draft: text({ purpose: 'email' }) },
+    { name: 'text with no purpose by name', draft: text({ purpose: null }) },
+    {
+      name: 'text with a date format',
+      draft: text({ format: { kind: 'date', pattern: 'dd/mm/yyyy' }, purpose: 'date-signed' }),
+    },
+    { name: 'text with no format by name', draft: text({ format: null }) },
     {
       name: 'text, turned a quarter',
       draft: (page, name) => ({
@@ -179,6 +186,19 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
       draft: radio(['x', 'y'], { radiosInUnison: true, noToggleToOff: true }),
     },
     { name: 'combo box with a default', draft: combo({ defaultValue: 'b', edit: true }) },
+    {
+      name: 'combo box with a time format',
+      draft: combo({ edit: true, format: { kind: 'time', pattern: 'h:MM tt' } }),
+    },
+    {
+      name: 'signature field with a purpose',
+      draft: (page, name) => ({
+        kind: 'signature',
+        name,
+        purpose: 'signature',
+        widgets: [{ page, rect: box(72, 500, 160, 48) }],
+      }),
+    },
     {
       name: 'list box with a default out of order',
       draft: list({ multiSelect: true, defaultValue: ['c', 'a'] }),
@@ -389,6 +409,51 @@ const CASES: readonly PredictionCase[] = [
     op: { type: 'update', patch: { groupId: 'buyer' } },
   },
   {
+    name: 'update: a purpose',
+    draft: text(),
+    op: { type: 'update', patch: { purpose: 'organization-title' } },
+  },
+  {
+    name: 'update: another purpose',
+    draft: text({ purpose: 'name' }),
+    op: { type: 'update', patch: { purpose: 'email' } },
+  },
+  {
+    name: 'update: the purpose taken away',
+    draft: text({ purpose: 'name' }),
+    op: { type: 'update', patch: { purpose: null } },
+  },
+  {
+    name: 'update: a date format',
+    draft: text(),
+    op: { type: 'update', patch: { format: { kind: 'date', pattern: 'yyyy-mm-dd' } } },
+  },
+  {
+    name: 'update: a time format in place of a date format',
+    draft: text({ format: { kind: 'date', pattern: 'yyyy-mm-dd' } }),
+    op: { type: 'update', patch: { format: { kind: 'time', pattern: 'HH:MM' } } },
+  },
+  {
+    name: 'update: the format a field already has',
+    draft: text({ format: { kind: 'date', pattern: 'yyyy-mm-dd' } }),
+    op: { type: 'update', patch: { format: { kind: 'date', pattern: 'yyyy-mm-dd' } } },
+  },
+  {
+    name: 'update: the format removed',
+    draft: text({ format: { kind: 'date', pattern: 'yyyy-mm-dd' } }),
+    op: { type: 'update', patch: { format: null } },
+  },
+  {
+    name: 'update: no format, for a field without one',
+    draft: text(),
+    op: { type: 'update', patch: { format: null } },
+  },
+  {
+    name: "update: a dropdown's format",
+    draft: combo({ edit: true }),
+    op: { type: 'update', patch: { format: { kind: 'date', pattern: 'd-mmm-yy' } } },
+  },
+  {
     name: 'update: radios in unison',
     draft: radio(['x', 'y']),
     op: { type: 'update', patch: { radiosInUnison: true } },
@@ -524,6 +589,32 @@ const REFUSALS: readonly PredictionCase[] = [
     name: 'a signature field holds no value',
     draft: (page, name) => ({ kind: 'signature', name, widgets: [{ page, rect: box(72) }] }),
     op: value({ value: 'x' }),
+  },
+  {
+    name: 'a purpose with space around it',
+    draft: text(),
+    op: { type: 'update', patch: { purpose: ' email ' } },
+  },
+  {
+    name: 'a pattern with a letter group of its own',
+    draft: text(),
+    op: { type: 'update', patch: { format: { kind: 'date', pattern: 'dddd, mmmm d' } } },
+  },
+  {
+    name: 'a pattern that would end its script',
+    draft: text(),
+    op: { type: 'update', patch: { format: { kind: 'date', pattern: 'd");app.alert("m' } } },
+  },
+  {
+    name: 'a format beside a script for the same event',
+    draft: text(),
+    op: {
+      type: 'update',
+      patch: {
+        format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+        actions: { keystroke: { type: 'javascript', script: 'event.rc = true;' } },
+      },
+    },
   },
 ];
 

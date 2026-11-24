@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   FormFieldDTOSchema,
   FormFieldDraftSchema,
+  FormFieldFormatSchema,
   FormFieldPatchSchema,
   FormFieldValueSchema,
   FormSnapshotSchema,
@@ -18,6 +19,7 @@ const BASE = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -150,5 +152,122 @@ describe('form schemas', () => {
       expect(schema.safeParse({ ...draft, groupId: 'g'.repeat(257) }).success).toBe(false);
     }
     expect(FormFieldPatchSchema.parse({ groupId: null })).toEqual({ groupId: null });
+  });
+
+  test('a draft and a patch take a purpose, or null for none, and none with space around it', () => {
+    const draft = { kind: 'signature', name: 'sign' };
+    for (const schema of [FormFieldDraftSchema, FormFieldPatchSchema]) {
+      expect(schema.safeParse({ ...draft, purpose: 'signature' }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, purpose: 'p'.repeat(256) }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, purpose: null }).success).toBe(true);
+      for (const purpose of ['', ' name', 'name ', 'p'.repeat(257), 5]) {
+        expect(schema.safeParse({ ...draft, purpose }).success).toBe(false);
+      }
+    }
+    expect(FormFieldPatchSchema.parse({ purpose: null })).toEqual({ purpose: null });
+  });
+
+  test('a text field and a dropdown take a date or a time format, with a pattern that is one', () => {
+    const date = { kind: 'date', pattern: 'dd/mm/yyyy' };
+    for (const kind of ['text', 'combobox']) {
+      const draft = { kind, name: 'when' };
+      expect(FormFieldDraftSchema.safeParse({ ...draft, format: date }).success).toBe(true);
+      expect(FormFieldDraftSchema.safeParse({ ...draft, format: null }).success).toBe(true);
+      expect(
+        FormFieldDraftSchema.safeParse({ ...draft, format: { kind: 'time', pattern: 'HH:MM' } })
+          .success,
+      ).toBe(true);
+      for (const format of [
+        { kind: 'other' },
+        { kind: 'number', pattern: '0.00' },
+        { kind: 'date' },
+        { kind: 'date', pattern: '' },
+        { kind: 'date', pattern: 'dddd' },
+        { kind: 'date', pattern: 'd");x("' },
+        { kind: 'date', pattern: 'dd/'.repeat(21) + 'yy' },
+        { kind: 'date', pattern: 'dd/mm', script: 'x' },
+        // A pattern of the other kind.
+        { kind: 'date', pattern: 'HH:MM' },
+        { kind: 'time', pattern: 'dd/mm/yyyy' },
+        { kind: 'time', pattern: 'm/d/yy HH:MM' },
+        { kind: 'time', pattern: 'HH.MM' },
+        'dd/mm/yyyy',
+      ]) {
+        expect(FormFieldDraftSchema.safeParse({ ...draft, format }).success).toBe(false);
+        expect(FormFieldPatchSchema.safeParse({ format }).success).toBe(false);
+      }
+    }
+    // Another kind's draft has no format; a patch names no kind, so the engine refuses it there.
+    for (const kind of ['checkbox', 'radio', 'listbox', 'pushbutton', 'signature']) {
+      expect(FormFieldDraftSchema.safeParse({ kind, name: 'x', format: date }).success).toBe(false);
+    }
+    expect(FormFieldPatchSchema.parse({ format: null })).toEqual({ format: null });
+    expect(FormFieldPatchSchema.parse({ format: date })).toEqual({ format: date });
+  });
+
+  test('a response carries a format of a kind this client knows, or reads it as other', () => {
+    expect(FormFieldFormatSchema.parse({ kind: 'date', pattern: 'm/d' })).toEqual({
+      kind: 'date',
+      pattern: 'm/d',
+    });
+    expect(FormFieldFormatSchema.parse({ kind: 'other' })).toEqual({ kind: 'other' });
+    // A kind a later server adds, with whatever it carries.
+    expect(FormFieldFormatSchema.parse({ kind: 'number', decimals: 2 })).toEqual({ kind: 'other' });
+    // A kind this client knows still has to be whole.
+    expect(FormFieldFormatSchema.safeParse({ kind: 'date' }).success).toBe(false);
+  });
+
+  test('a field from a server older than purpose and format reads whole', () => {
+    const script = (source: string) => ({
+      root: { type: 'javascript', subtype: 'JavaScript', script: source, next: [] },
+      incomplete: false,
+      warnings: [],
+    });
+    const text = {
+      ...BASE,
+      ref: { kind: 'objectNumber', objectNumber: 4 },
+      name: 'when',
+      kind: 'text',
+      valueEntry: { kind: 'none' },
+      defaultValueEntry: { kind: 'none' },
+      value: '',
+      defaultValue: '',
+      maxLength: null,
+      multiline: false,
+      password: false,
+      comb: false,
+      widgets: [],
+    };
+    const { purpose: _purpose, ...older } = text;
+    // No purpose, since such a server reads none; the format its scripts give.
+    expect(FormFieldDTOSchema.parse(older)).toEqual({ ...text, purpose: null, format: null });
+    const dated = {
+      ...older,
+      actions: {
+        format: script('AFDate_FormatEx("dd/mm/yyyy");'),
+        keystroke: script('AFDate_KeystrokeEx("dd/mm/yyyy");'),
+      },
+    };
+    expect(FormFieldDTOSchema.parse(dated)).toMatchObject({
+      purpose: null,
+      format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+    });
+    expect(
+      FormFieldDTOSchema.parse({ ...older, actions: { format: script('event.value = 1;') } }),
+    ).toMatchObject({ format: { kind: 'other' } });
+    // What a server of this version sends is read as it is sent.
+    const sent = { ...dated, purpose: 'date-signed', format: null };
+    expect(FormFieldDTOSchema.parse(sent)).toMatchObject({ purpose: 'date-signed', format: null });
+    // A kind without a format gets none, and keeps its own members.
+    const { purpose: _radioPurpose, ...olderRadio } = RADIO;
+    const radio = FormFieldDTOSchema.parse(olderRadio);
+    expect(radio).toEqual(RADIO);
+    expect('format' in radio).toBe(false);
+    // A kind this client doesn't know reads as `unknown`, with no purpose either.
+    expect(FormFieldDTOSchema.parse({ ...older, kind: 'barcode' })).toMatchObject({
+      kind: 'unknown',
+      purpose: null,
+      rawValue: '',
+    });
   });
 });

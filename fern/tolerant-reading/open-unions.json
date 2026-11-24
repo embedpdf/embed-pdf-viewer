@@ -17,6 +17,13 @@
     "fixtureKind": "barcode"
   },
   {
+    "name": "FormFieldFormat",
+    "tag": "kind",
+    "catchAll": "other",
+    "fill": [],
+    "fixtureKind": "number"
+  },
+  {
     "name": "FormValueEntry",
     "tag": "kind",
     "catchAll": "unsupported",

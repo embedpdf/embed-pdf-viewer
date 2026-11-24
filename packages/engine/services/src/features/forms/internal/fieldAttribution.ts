@@ -1,4 +1,4 @@
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, isFieldPurpose } from '@embedpdf/engine-core/runtime';
 import type { AnnotationActor, IsoDateTime } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -7,13 +7,14 @@ import { formatPdfDate, pdfDateToIso } from '../../../shared/pdf-date';
 import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/writeEmbedMetadata';
 
 /**
- * Who made a field and who last filled it in, and the group it belongs to,
- * kept in the field's own `/EMBD_Metadata` the way an annotation keeps its
- * author and group:
+ * Who made a field and who last filled it in, the group it belongs to and
+ * what its value means, kept in the field's own `/EMBD_Metadata` the way an
+ * annotation keeps its author and group:
  *
  *   /EMBD_Metadata <<
  *     /SchemaVersion 1
  *     /GroupID      (buyer)                     % who fills it in
+ *     /Purpose      (email)                     % what its value means
  *     /CreatedBy    (u-17)                      % the creating session's user
  *     /CreatedAt    (D:20261008104200+00'00')
  *     /FilledBy     (u-42)                      % the user whose write set the value
@@ -25,7 +26,8 @@ import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/w
  * The engine stamps the attribution from the session's identity, never from
  * what a caller sends. An anonymous session names nobody: it stamps no
  * creation, and a fill clears the last filler, who no longer filled the
- * value. The group is what the caller sets, with the authority to set it.
+ * value. The group is what the caller sets, with the authority to set it,
+ * and so is the purpose, which the engine keeps and reads nothing into.
  */
 export interface FieldAttribution {
   readonly createdBy: string | null;
@@ -38,6 +40,7 @@ export interface FieldAttribution {
 
 const KEY_SCHEMA_VERSION = 'SchemaVersion';
 const KEY_GROUP_ID = 'GroupID';
+const KEY_PURPOSE = 'Purpose';
 const KEY_CREATED_BY = 'CreatedBy';
 const KEY_CREATED_AT = 'CreatedAt';
 const KEY_FILLED_BY = 'FilledBy';
@@ -107,6 +110,37 @@ export function writeFieldGroup(
   groupId: string | null,
 ): void {
   writeAttribution(runtime, docPtr, fieldObjectNumber, [[KEY_GROUP_ID, groupId]]);
+}
+
+/**
+ * The purpose of field `fieldIndex` of a loaded form model; `null` with
+ * none. An entry that is no purpose a write takes (another tool's, or one
+ * with space around it) reads as none, so every purpose read can be
+ * written back.
+ */
+export function readFieldPurpose(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): string | null {
+  const { fn, mem } = runtime;
+  if (!fn.EPDFForm_HasFieldEmbedMetadata(model, fieldIndex)) return null;
+  const purpose = readUtf16String(
+    mem,
+    (buf, cap) => fn.EPDFForm_GetFieldEmbedMetadataString(model, fieldIndex, KEY_PURPOSE, buf, cap),
+    null,
+  );
+  return isFieldPurpose(purpose) ? purpose : null;
+}
+
+/** Give a field the purpose `purpose`; `null` takes its purpose away. */
+export function writeFieldPurpose(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  fieldObjectNumber: number,
+  purpose: string | null,
+): void {
+  writeAttribution(runtime, docPtr, fieldObjectNumber, [[KEY_PURPOSE, purpose]]);
 }
 
 /** Stamp a new field with who created it, and when. An anonymous session stamps nothing. */

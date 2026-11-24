@@ -21696,6 +21696,10 @@
                 "type": "string",
                 "nullable": true
               },
+              "purpose": {
+                "type": "string",
+                "nullable": true
+              },
               "createdBy": {
                 "type": "string",
                 "nullable": true
@@ -21755,6 +21759,15 @@
               },
               "comb": {
                 "type": "boolean"
+              },
+              "format": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormFieldFormat"
+                  }
+                ],
+                "nullable": true,
+                "description": "The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with the pattern it is shown in, or `other` for a format script the engine does not recognise. A newer server can add kinds: read one your client doesn't know as `other`."
               }
             },
             "required": [
@@ -21769,6 +21782,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -21782,7 +21796,8 @@
               "maxLength",
               "multiline",
               "password",
-              "comb"
+              "comb",
+              "format"
             ],
             "additionalProperties": false
           },
@@ -21824,6 +21839,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -21905,6 +21923,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -21957,6 +21976,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
+              },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
               },
@@ -22007,6 +22029,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22060,6 +22083,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
+              },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
               },
@@ -22112,6 +22138,15 @@
                   "required": ["label", "value", "selected"],
                   "additionalProperties": false
                 }
+              },
+              "format": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormFieldFormat"
+                  }
+                ],
+                "nullable": true,
+                "description": "The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with the pattern it is shown in, or `other` for a format script the engine does not recognise. A newer server can add kinds: read one your client doesn't know as `other`."
               }
             },
             "required": [
@@ -22126,6 +22161,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22137,7 +22173,8 @@
               "value",
               "defaultValue",
               "edit",
-              "options"
+              "options",
+              "format"
             ],
             "additionalProperties": false
           },
@@ -22179,6 +22216,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -22243,6 +22283,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22298,6 +22339,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
+              },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
               },
@@ -22336,6 +22380,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22385,6 +22430,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -22424,6 +22472,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22473,6 +22522,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -22515,6 +22567,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "purpose",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -22529,6 +22582,86 @@
           }
         ],
         "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
+      },
+      "FormFieldFormat": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["date"]
+              },
+              "pattern": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "pattern"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["time"]
+              },
+              "pattern": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "pattern"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["other"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with the pattern it is shown in, or `other` for a format script the engine does not recognise. A newer server can add kinds: read one your client doesn't know as `other`."
+      },
+      "FormFieldFormatWritable": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["date"]
+              },
+              "pattern": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": ["kind", "pattern"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["time"]
+              },
+              "pattern": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": ["kind", "pattern"],
+            "additionalProperties": false
+          }
+        ]
       },
       "FormValueEntry": {
         "anyOf": [
@@ -22664,6 +22797,12 @@
                 "maxLength": 256,
                 "nullable": true
               },
+              "purpose": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "nullable": true
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -22693,6 +22832,14 @@
               },
               "comb": {
                 "type": "boolean"
+              },
+              "format": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormFieldFormatWritable"
+                  }
+                ],
+                "nullable": true
               }
             },
             "required": ["name", "kind"],
@@ -22721,6 +22868,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22759,6 +22909,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22804,6 +22957,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -22835,6 +22991,14 @@
               },
               "defaultValue": {
                 "type": "string"
+              },
+              "format": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormFieldFormatWritable"
+                  }
+                ],
+                "nullable": true
               }
             },
             "required": ["name", "kind"],
@@ -22863,6 +23027,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22917,6 +23084,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -22954,6 +23124,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "purpose": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22996,6 +23169,12 @@
             "nullable": true
           },
           "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "nullable": true
+          },
+          "purpose": {
             "type": "string",
             "minLength": 1,
             "maxLength": 256,
@@ -23064,6 +23243,14 @@
               "required": ["label", "value"],
               "additionalProperties": false
             }
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FormFieldFormatWritable"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false

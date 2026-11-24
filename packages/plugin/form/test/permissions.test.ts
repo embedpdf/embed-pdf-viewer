@@ -29,6 +29,7 @@ const field = (
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -44,6 +45,7 @@ const field = (
   multiline: false,
   password: false,
   comb: false,
+  format: null,
   ...over,
 });
 

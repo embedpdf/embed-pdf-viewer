@@ -21,6 +21,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         defaultValue?: string | undefined;
@@ -28,6 +29,7 @@ export namespace FormFieldDraft {
         multiline?: boolean | undefined;
         password?: boolean | undefined;
         comb?: boolean | undefined;
+        format?: (CloudPDF.FormFieldFormatWritable | null) | undefined;
     }
 
     export interface Checkbox {
@@ -39,6 +41,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
@@ -52,6 +55,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         radiosInUnison?: boolean | undefined;
@@ -67,11 +71,13 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         edit?: boolean | undefined;
         options?: FormFieldDraftCombobox.Options.Item[] | undefined;
         defaultValue?: string | undefined;
+        format?: (CloudPDF.FormFieldFormatWritable | null) | undefined;
     }
 
     export namespace FormFieldDraftCombobox {
@@ -94,6 +100,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         multiSelect?: boolean | undefined;
@@ -121,6 +128,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
@@ -134,6 +142,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }

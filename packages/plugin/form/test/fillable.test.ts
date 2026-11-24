@@ -32,6 +32,7 @@ const textField: FormField = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -47,6 +48,7 @@ const textField: FormField = {
   multiline: false,
   password: false,
   comb: false,
+  format: null,
 };
 
 const snapshot: FormSnapshot = {

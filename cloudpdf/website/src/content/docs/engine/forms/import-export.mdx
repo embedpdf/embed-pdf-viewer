@@ -85,7 +85,8 @@ writing leaves the document exactly as it was, with no new fields and no events.
 
 Each field is made as [`create()`](/docs/engine/forms/authoring) makes it, with every setting
 the bundle has: its widgets with their place, look, flags and actions, its options, its default,
-its scripts. Parent fields are made bare from the names, as a create makes them.
+its purpose, its format, its scripts. Parent fields are made bare from the names, as a create
+makes them.
 
 ### Pages
 
@@ -114,6 +115,11 @@ A field's scripts and its widgets' actions come along. A script, a submit or a l
 (JavaScript, submit-form or URI) needs `doc.forms.script`: without it, each one is left out and
 listed in `dropped`, and the field is imported without it. The actions that only change the view
 (go to a page, reset the form, show or hide) come along with `doc.forms.modify` alone.
+
+A [date or a time format](/docs/engine/forms/authoring#dates-and-times) comes along without
+`doc.forms.script` too. The engine then writes the field's format script and keystroke script
+again from the pattern, as `format` does, and lists neither in `dropped`. A keystroke script
+that isn't the format's own is still left out and listed.
 
 ### The calculation order
 

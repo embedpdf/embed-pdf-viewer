@@ -10,6 +10,7 @@
       "alternateName": null,
       "mappingName": null,
       "groupId": null,
+      "purpose": "email",
       "createdBy": null,
       "createdAt": null,
       "filledBy": null,
@@ -35,6 +36,10 @@
       "multiline": true,
       "password": false,
       "comb": false,
+      "format": {
+        "kind": "number",
+        "decimals": 2
+      },
       "widgets": [
         {
           "ref": {
@@ -61,6 +66,7 @@
       "alternateName": null,
       "mappingName": null,
       "groupId": null,
+      "purpose": null,
       "createdBy": null,
       "createdAt": "2026-11-04T10:00:00Z",
       "filledBy": null,

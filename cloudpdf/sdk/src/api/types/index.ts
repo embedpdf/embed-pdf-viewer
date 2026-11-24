@@ -115,6 +115,8 @@ export * from "./FontResolveRequest.js";
 export * from "./FontResolveRun.js";
 export * from "./FormField.js";
 export * from "./FormFieldDraft.js";
+export * from "./FormFieldFormat.js";
+export * from "./FormFieldFormatWritable.js";
 export * from "./FormFieldPatch.js";
 export * from "./FormFieldRef.js";
 export * from "./FormFieldValue.js";

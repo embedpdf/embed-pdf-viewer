@@ -77,6 +77,7 @@ import type { CloudManifest } from './CloudDocumentHandle';
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
+import { fieldFactsTheServerLacks } from './fieldFacts';
 import { planesInherited } from './planes';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
 import { bundleImportForm, NO_BUNDLE_LIMITS, readBundleParts } from '../transport/bundleMultipart';
@@ -328,6 +329,9 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.rejectIfClosed<FormFieldCreateResult>();
     if (rejected) return rejected;
+    // A purpose and a format are never sent to a server older than them.
+    const lacking = fieldFactsTheServerLacks(this.http.serverVersion, draft);
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
       const opId = opIdOf(options);
       const { objectNumber, widgetObjectNumbers } = options;
@@ -361,6 +365,8 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
     if (rejected) return rejected;
+    const lacking = fieldFactsTheServerLacks(this.http.serverVersion, patch);
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {

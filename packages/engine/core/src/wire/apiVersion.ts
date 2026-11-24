@@ -37,6 +37,15 @@ export const API_VERSION: string = apiVersionOf(version);
  */
 export const VALIDATION_INFO_SINCE = '3.3';
 
+/**
+ * The version a form field's `purpose` and `format` arrived in on the wire:
+ * in the draft of a create and the patch of an update, as a route's body and
+ * as a change op. A client sends neither to an older server, whose request
+ * schemas refuse a member they don't know. Reading needs no such check: an
+ * older server's field is read without them (`FormFieldDTOSchema`).
+ */
+export const FIELD_PURPOSE_AND_FORMAT_SINCE = '3.4';
+
 const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
   version.major < than.major || (version.major === than.major && version.minor < than.minor);
 

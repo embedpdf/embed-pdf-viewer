@@ -13,12 +13,12 @@ import type {
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formWidget, toPageRef, topRowOf } from '@embedpdf/engine-core/runtime';
+import { formatOfActions, formWidget, toPageRef, topRowOf } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
-import { readFieldAttribution, readFieldGroup } from './fieldAttribution';
+import { readFieldAttribution, readFieldGroup, readFieldPurpose } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldKind> = {
@@ -169,6 +169,7 @@ export function readFieldAt(
     defaultValueEntry,
     ...(actions ? { actions } : {}),
     groupId: readFieldGroup(runtime, model, fieldIndex),
+    purpose: readFieldPurpose(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
     widgets: [],
   };
@@ -187,6 +188,9 @@ export function readFieldAt(
         multiline: (rawFlags & FF_MULTILINE) !== 0,
         password: (rawFlags & FF_PASSWORD) !== 0,
         comb: (rawFlags & FF_COMB) !== 0,
+        // The format script decides, as in Acrobat; the field's name and a
+        // keystroke script on its own say nothing.
+        format: formatOfActions(actions),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }
@@ -219,6 +223,7 @@ export function readFieldAt(
         defaultValue: scalarDefault,
         edit: (rawFlags & FF_EDIT) !== 0,
         options: readOptions(runtime, model, fieldIndex),
+        format: formatOfActions(actions),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }

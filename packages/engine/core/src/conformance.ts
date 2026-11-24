@@ -235,6 +235,13 @@ export {
   type FieldGroupToken,
   type FieldGroupsConformanceOptions,
 } from './conformance/runFieldGroupsConformance';
+export {
+  FIELD_PURPOSE_FORMAT_PDF,
+  FIELD_PURPOSE_FORMAT_TOKENS,
+  runFieldPurposeFormatConformance,
+  type FieldPurposeFormatConformanceOptions,
+  type FieldPurposeFormatToken,
+} from './conformance/runFieldPurposeFormatConformance';
 export { runMixedScriptConformance } from './conformance/runMixedScriptConformance';
 export {
   runDocumentFontsConformance,

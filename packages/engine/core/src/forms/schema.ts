@@ -7,9 +7,23 @@ import { WidgetDTOSchema } from '../annotation/kinds/widget';
 import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
 import { PageBoxSchema, PdfRotationSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
+import { isDatePattern, isTimePattern } from './datePattern';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
+import {
+  formatOfActions,
+  takesFormat,
+  type FormFieldFormat,
+  type FormFieldFormatWritable,
+} from './format';
 import type { FormFieldPatch } from './patch';
-import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
+import type {
+  FormField,
+  FormFieldKind,
+  FormFieldOption,
+  FormFieldWidget,
+  ToggleFieldWidget,
+} from './field';
+import { FIELD_PURPOSE_MAX_LENGTH, isFieldPurpose } from './purpose';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
@@ -62,6 +76,79 @@ export const FormValueEntrySchema: z.ZodType<FormValueEntry> = withCatchAll(
     "doesn't know as `unsupported`.",
 );
 
+/**
+ * A text field's or a dropdown's format, as a response carries it. A kind
+ * this client doesn't know reads as `other`.
+ */
+export const FormFieldFormatSchema: z.ZodType<FormFieldFormat> = withCatchAll(
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('date'), pattern: z.string() }),
+    z.object({ kind: z.literal('time'), pattern: z.string() }),
+    z.object({ kind: z.literal('other') }),
+  ]),
+  'other',
+).describe(
+  "The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with " +
+    'the pattern it is shown in, or `other` for a format script the engine does not recognise. ' +
+    "A newer server can add kinds: read one your client doesn't know as `other`.",
+);
+
+/** A pattern a date format is written with: see `isDatePattern`. */
+const DatePatternSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine(isDatePattern, {
+    message:
+      'a date pattern is made of the groups yyyy yy mmmm mmm mm m dd d, at least one of them, ' +
+      'with spaces and / - . , between them, and at most one time such as HH:MM or h:MM:ss tt',
+  });
+
+/** A pattern a time format is written with: see `isTimePattern`. */
+const TimePatternSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine(isTimePattern, {
+    message:
+      'a time pattern is a time and nothing else: HH, H, hh or h, then :MM, then :ss when it ' +
+      'has seconds, then tt when it has one',
+  });
+
+/** The format a create or an update writes: a date or a time. `other` is read, never written. */
+export const FormFieldFormatWritableSchema: z.ZodType<FormFieldFormatWritable> =
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('date'), pattern: DatePatternSchema }).strict(),
+    z.object({ kind: z.literal('time'), pattern: TimePatternSchema }).strict(),
+  ]);
+
+/** A field's purpose as a create or an update names it: see `isFieldPurpose`. */
+const FieldPurposeSchema = z
+  .string()
+  .min(1)
+  .max(FIELD_PURPOSE_MAX_LENGTH)
+  .refine(isFieldPurpose, { message: 'a purpose has no space at its start or its end' });
+
+/**
+ * A field as a server older than `purpose` and `format` sends it, made
+ * whole: no purpose, since such a server reads none, and the format the
+ * field's own scripts give it, which is how a server of this version reads
+ * it too.
+ */
+function withFactsOlderServersLeaveOut(field: Record<string, unknown>): Record<string, unknown> {
+  const noPurpose = field.purpose === undefined;
+  const noFormat =
+    field.format === undefined &&
+    typeof field.kind === 'string' &&
+    takesFormat(field.kind as FormFieldKind);
+  if (!noPurpose && !noFormat) return field;
+  return {
+    ...field,
+    ...(noPurpose ? { purpose: null } : {}),
+    ...(noFormat ? { format: formatOfActions(field.actions as never) } : {}),
+  };
+}
+
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
   name: z.string(),
@@ -75,6 +162,7 @@ const FormFieldBaseShape = {
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
   groupId: z.string().nullable(),
+  purpose: z.string().nullable(),
   createdBy: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   filledBy: z.string().nullable(),
@@ -99,6 +187,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
       multiline: z.boolean(),
       password: z.boolean(),
       comb: z.boolean(),
+      format: FormFieldFormatSchema.nullable(),
     }),
     z.object({
       ...FormFieldBaseShape,
@@ -122,6 +211,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
       defaultValue: z.string(),
       edit: z.boolean(),
       options: z.array(FormFieldOptionSchema),
+      format: FormFieldFormatSchema.nullable(),
     }),
     z.object({
       ...FormFieldBaseShape,
@@ -148,6 +238,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
+  withFactsOlderServersLeaveOut,
 ).describe(
   'A form field, by its `family`. A newer server can add families: read one your client ' +
     "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +
@@ -210,6 +301,7 @@ const FormFieldDraftBaseShape = {
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
   groupId: z.string().min(1).max(256).nullable().optional(),
+  purpose: FieldPurposeSchema.nullable().optional(),
   actions: FieldActionsPatchSchema.optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
 };
@@ -225,6 +317,7 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
       multiline: z.boolean().optional(),
       password: z.boolean().optional(),
       comb: z.boolean().optional(),
+      format: FormFieldFormatWritableSchema.nullable().optional(),
     })
     .strict(),
   z.object({ ...FormFieldDraftBaseShape, kind: z.literal('checkbox') }).strict(),
@@ -243,6 +336,7 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
       edit: z.boolean().optional(),
       options: z.array(FormFieldOptionInputSchema).optional(),
       defaultValue: z.string().optional(),
+      format: FormFieldFormatWritableSchema.nullable().optional(),
     })
     .strict(),
   z
@@ -266,6 +360,7 @@ const FormFieldPatchBaseShape = {
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
   groupId: z.string().min(1).max(256).nullable().optional(),
+  purpose: FieldPurposeSchema.nullable().optional(),
   actions: FieldActionsPatchSchema.optional(),
 };
 
@@ -294,5 +389,7 @@ export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z
     edit: z.boolean().optional(),
     multiSelect: z.boolean().optional(),
     options: z.array(FormFieldOptionInputSchema).optional(),
+    // A text field's or a dropdown's.
+    format: FormFieldFormatWritableSchema.nullable().optional(),
   })
   .strict() as unknown as z.ZodType<FormFieldPatch>;

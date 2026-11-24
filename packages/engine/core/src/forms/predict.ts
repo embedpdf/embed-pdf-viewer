@@ -8,18 +8,29 @@
  * What these can't know is left as it was, and a read after the write tells:
  * dates and who filled a field in, the fonts a document's own default
  * appearance names, and a `/V` an ancestor field holds (a cleared value then
- * reads as an empty string, not as none).
+ * reads as an empty string, not as none). Scripts written through `actions`
+ * are left to that read too, with the format they give the field; a `format`
+ * write is worked out here, its two scripts included.
  */
 import type { FormFieldOptionInput, FormFieldDraft, WidgetPlacement } from './draft';
 import type { FormFieldDisplay } from './effects';
 import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
+import {
+  formatScripts,
+  formatsEqual,
+  formatWriteOf,
+  scriptTreeOf,
+  type FormFieldFormatWritable,
+} from './format';
 import type { FormFieldPatch } from './patch';
+import { checkedPurpose } from './purpose';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { standingRectOf } from './widgets';
 import { assertChoiceDefault, fieldValueWriteOf } from './write';
 import type { Annotation } from '../annotation/kinds';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
+import type { PdfFieldActions } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -223,6 +234,7 @@ export function formFieldOfDraft(
     valueEntry: { kind: 'none' } as FormValueEntry,
     defaultValueEntry: { kind: 'none' } as FormValueEntry,
     groupId: draft.groupId ?? null,
+    purpose: checkedPurpose(draft.purpose),
     createdBy: context.createdBy ?? null,
     createdAt: context.createdAt ?? null,
     filledBy: null,
@@ -230,12 +242,19 @@ export function formFieldOfDraft(
     filledAt: null,
     importedBy: null,
   };
+  // A format is its two scripts, which a read of the field gives back.
+  const format = formatWriteOf(draft, draft.kind) ?? null;
+  const formatted = {
+    format,
+    ...(format ? { actions: formatActions<never>(undefined, format) } : {}),
+  };
   let field: FormField;
   switch (draft.kind) {
     case 'text': {
       const defaultValue = draft.defaultValue ?? '';
       field = {
         ...base,
+        ...formatted,
         kind: 'text',
         defaultValueEntry: defaultEntryOfDraft(draft),
         value: '',
@@ -278,6 +297,7 @@ export function formFieldOfDraft(
     case 'combobox':
       field = {
         ...base,
+        ...formatted,
         kind: 'combobox',
         defaultValueEntry: defaultEntryOfDraft(draft),
         value: '',
@@ -330,6 +350,17 @@ export function formFieldAfter<C extends Coordinates>(
   if (patch.alternateName !== undefined) field.alternateName = patch.alternateName || null;
   if (patch.mappingName !== undefined) field.mappingName = patch.mappingName || null;
   if (patch.groupId !== undefined) field.groupId = patch.groupId;
+  if (patch.purpose !== undefined) field.purpose = checkedPurpose(patch.purpose);
+  if (field.kind === 'text' || field.kind === 'combobox') {
+    // The format the field already has is no change: its scripts stay as they are.
+    const format = formatWriteOf(patch, field.kind);
+    if (format !== undefined && !formatsEqual(format, field.format)) {
+      const actions = formatActions(field.actions, format);
+      field.format = format;
+      if (actions) field.actions = actions;
+      else delete field.actions;
+    }
+  }
   if (field.kind === 'text') {
     if ('maxLength' in patch && patch.maxLength !== undefined) field.maxLength = patch.maxLength;
     if ('defaultValue' in patch && patch.defaultValue !== undefined) {
@@ -373,6 +404,25 @@ const FLAGS = [
 ] as const;
 
 /* ── the rules underneath ───────────────────────────────────────────────── */
+
+/**
+ * A field's actions after a format write: the format's two scripts in place
+ * of the keystroke and format events, or both events gone for no format.
+ * `undefined` when no event is left, as a field without scripts reads.
+ */
+function formatActions<Destination>(
+  current: PdfFieldActions<Destination> | undefined,
+  format: FormFieldFormatWritable | null,
+): PdfFieldActions<Destination> | undefined {
+  const { keystroke: _keystroke, format: _format, ...kept } = current ?? {};
+  if (format === null) return Object.keys(kept).length > 0 ? kept : undefined;
+  const scripts = formatScripts(format);
+  return {
+    keystroke: scriptTreeOf(scripts.keystroke),
+    format: scriptTreeOf(scripts.format),
+    ...kept,
+  };
+}
 
 /** The first `limit` characters of `text` (characters, as the file counts them); all without a limit. */
 function firstCharacters(text: string, limit: number | null): string {

@@ -43,8 +43,9 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   annotations: 1,
   annotationsAll: 1,
   annotationsExport: 1,
-  form: 1,
-  formExport: 1,
+  // 2: a field's purpose and format (3.4).
+  form: 2,
+  formExport: 2,
   metadata: 1,
   outline: 1,
   attachments: 1,

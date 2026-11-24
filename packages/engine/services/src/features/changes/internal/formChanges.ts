@@ -21,7 +21,9 @@ import {
   type Coordinates,
   type FormImportOp,
   isSkippedItem,
+  isWritableFormat,
   type FormField,
+  type FormFieldFormat,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
@@ -1251,8 +1253,13 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
     mappingName: field.mappingName,
     // `null` for a field in no group: putting that back takes the field out of its group.
     groupId: field.groupId,
+    purpose: field.purpose,
     actions: scriptsOf(field),
   };
+  // A format a write can't make (`other`) is left out, as a script a write
+  // can't make is: putting the properties back never removes it.
+  const format = (value: FormFieldFormat | null) =>
+    value === null || isWritableFormat(value) ? { format: value } : {};
   const hasDefault = field.defaultValueEntry.kind !== 'none';
   const options = (list: readonly { label: string; value: string }[]) =>
     list.map(({ label, value }) => ({ label, value }));
@@ -1265,6 +1272,7 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
         multiline: field.multiline,
         password: field.password,
         comb: field.comb,
+        ...format(field.format),
       };
     case 'radio':
       return {
@@ -1278,6 +1286,7 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
         edit: field.edit,
         defaultValue: hasDefault ? field.defaultValue : null,
         options: options(field.options),
+        ...format(field.format),
       };
     case 'listbox':
       return {

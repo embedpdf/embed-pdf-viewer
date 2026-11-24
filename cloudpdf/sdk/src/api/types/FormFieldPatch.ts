@@ -10,6 +10,7 @@ export interface FormFieldPatch {
     alternateName?: (string | null) | undefined;
     mappingName?: (string | null) | undefined;
     groupId?: (string | null) | undefined;
+    purpose?: (string | null) | undefined;
     actions?: CloudPDF.FieldActionsPatch | undefined;
     kind?: FormFieldPatch.Kind | undefined;
     defaultValue?: (FormFieldPatch.DefaultValue | null) | undefined;
@@ -22,6 +23,7 @@ export interface FormFieldPatch {
     edit?: boolean | undefined;
     multiSelect?: boolean | undefined;
     options?: FormFieldPatch.Options.Item[] | undefined;
+    format?: (CloudPDF.FormFieldFormatWritable | null) | undefined;
 }
 
 export namespace FormFieldPatch {

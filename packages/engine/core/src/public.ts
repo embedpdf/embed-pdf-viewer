@@ -59,6 +59,14 @@ export { ANNOTATION_DEFAULTS, type AnnotationDefaults } from './annotation/defau
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 export { FormTransfer } from './transfer/FormTransfer';
+
+// Forms: the patterns a date or a time field's format is written with.
+export {
+  isDatePattern,
+  isTimePattern,
+  STANDARD_DATE_PATTERNS,
+  STANDARD_TIME_PATTERNS,
+} from './forms/datePattern';
 export {
   formatMeasurement,
   measureFromKnownLength,
@@ -215,6 +223,8 @@ export type {
   MeasureFromRatioOptions,
   FormFieldRef,
   FormField,
+  FormFieldFormat,
+  FormFieldFormatWritable,
   FormBundle,
   FormImportResult,
   FormValuesImportResult,
