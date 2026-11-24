@@ -476,6 +476,7 @@ export const ja: Locale = {
         required: '必須',
         readOnly: '読み取り専用',
         noExport: '書き出さない',
+        group: '記入者',
         defaultValue: 'デフォルト値',
         maxLength: '最大文字数',
         multiline: '複数行',

@@ -1,14 +1,18 @@
 <!--
   The layer's own drawing of one annotation, inside its frame: the engine's raster where the core
   places it (following a move as it happens), or the vector scene for everything drawn live (a
-  picture older than the annotation too). One rule picks (`pictureOrPainting`). A renderer gets it
-  as `native`.
+  picture older than the annotation too). One rule picks (`pictureOrPainting`). A lent record's
+  accent (a form field's group's color) fills the frame above it. A renderer gets it all as
+  `native`. The accent's block follows the drawing's with no blank between them: Svelte keeps a
+  blank between two blocks as a text node, in every frame.
 -->
 <script lang="ts">
   import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
   import {
+    cssText,
     pictureOrPainting,
     rasterInFrame,
+    recordAccentStyleOf,
     shownAppearance,
     type AppearanceUrl,
   } from '@embedpdf/web';
@@ -58,4 +62,4 @@
     style:transform={raster.transform}
     style:transform-origin="center"
   />
-{/if}
+{/if}{#if item.accent}<div style={cssText(recordAccentStyleOf(item.accent))}></div>{/if}

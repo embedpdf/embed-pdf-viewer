@@ -477,6 +477,7 @@ export const zhTW: Locale = {
         required: '必填',
         readOnly: '唯讀',
         noExport: '不匯出',
+        group: '填寫人',
         defaultValue: '預設值',
         maxLength: '長度上限',
         multiline: '多行',

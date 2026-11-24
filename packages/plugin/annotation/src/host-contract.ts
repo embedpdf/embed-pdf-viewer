@@ -10,6 +10,7 @@ import type {
   Effect,
   Id,
   Model,
+  RecordAccent,
   Rect,
   RenderItem,
   SceneNode,
@@ -145,6 +146,11 @@ export interface AnnotationLender {
    * draws live while a gesture reshapes it, as a square does.
    */
   painter(record: Annotation): ((box: Rect) => readonly SceneNode[]) | null;
+  /**
+   * The color a record shows in beside its own look, and how strong (a form field's group's);
+   * `null` for a record without one. Read again whenever {@link records} hands out a new object.
+   */
+  accentOf?(record: Annotation): RecordAccent | null;
   /** Its records' pictures on a page, at rest, in every state, each with its record's picture version. */
   renderAppearances(
     page: PageRef,

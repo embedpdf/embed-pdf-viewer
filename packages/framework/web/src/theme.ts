@@ -187,6 +187,7 @@ export const EPDF_VARIABLES = {
     default: 'rgb(255 255 255 / 0.92)',
   },
   'form-field-color': { setting: 'form.fields.color', default: '#1f2a44' },
+  'form-field-tint': { setting: 'form.fields.tint', default: '0.16' },
 
   // ── parts you style yourself: CSS only ──
   'scrollbar-thumb': { default: 'rgb(0 0 0 / 0.4)' },

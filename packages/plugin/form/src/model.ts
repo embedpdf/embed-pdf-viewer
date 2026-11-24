@@ -538,9 +538,46 @@ export interface FocusedWidget {
   readonly widget: number;
 }
 
-/** The plugin's session state: the box the cursor is in; a write in flight shows in the mirror's view. */
-export interface FormModel {
-  readonly focused: FocusedWidget | null;
+/** A group as the app named it for this document (`setGroups()`): what it gave, nothing worked out. */
+export interface NamedGroup {
+  readonly id: string;
+  readonly label: string | null;
+  readonly color: string | null;
 }
 
-export const initialFormModel = (): FormModel => ({ focused: null });
+const NO_NAMED_GROUPS: readonly NamedGroup[] = Object.freeze([]);
+
+/**
+ * The plugin's session state: the box the cursor is in, the group that fields placed with a
+ * tool go in, and who the app says this document's groups are. A write in flight shows in the
+ * mirror's view.
+ */
+export interface FormModel {
+  readonly focused: FocusedWidget | null;
+  /** The group a field placed with a tool goes in; `null` when it names none. */
+  readonly designGroup: string | null;
+  /** The groups the app named, in its order, each id once. */
+  readonly groups: readonly NamedGroup[];
+}
+
+export const initialFormModel = (): FormModel => ({
+  focused: null,
+  designGroup: null,
+  groups: NO_NAMED_GROUPS,
+});
+
+/** Name this document's groups: the whole list. The same list again changes nothing. */
+export function setGroups(state: FormModel, groups: readonly NamedGroup[]): FormModel {
+  const same =
+    groups.length === state.groups.length &&
+    groups.every((group, at) => {
+      const held = state.groups[at]!;
+      return group.id === held.id && group.label === held.label && group.color === held.color;
+    });
+  return same ? state : { ...state, groups };
+}
+
+/** Name the group that fields placed with a tool go in; the same group changes nothing. */
+export function setDesignGroup(state: FormModel, groupId: string | null): FormModel {
+  return state.designGroup === groupId ? state : { ...state, designGroup: groupId };
+}

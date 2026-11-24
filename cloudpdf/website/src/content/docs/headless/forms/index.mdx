@@ -151,6 +151,55 @@ The scripts read the form as the user sees it, values still on their way include
 read from the engine for them. Their engine starts when the first field of a form with scripts takes
 focus, so the first value doesn't wait for it; a form without scripts never starts it.
 
+## Fields for several people
+
+When a form goes to several people, each fills in their own fields: a field can be in a
+[group](/docs/engine/forms/groups), and a user's permissions name the groups they fill in. The form
+layer shows whose field is whose, each group in a color of its own, with nothing to set up.
+
+The PDF holds only each field's group id. Who a group is belongs to your app, and it changes from
+one document to the next, so you tell each open document:
+
+```ts
+form.setGroups([
+  { id: 'buyer', label: 'Dana Smith', color: '#2563eb' },
+  { id: 'seller', label: 'Lanternfield' }, // a color is picked for it
+]);
+```
+
+Call it where the document shows, so every document you open gets its own list:
+
+<Snippet name="forms/signing-flow/name-groups" />
+
+- **The fields a user may fill in show in their group's color:** a light fill and an edge. Other
+  people's fields show as the PDF has them, and take no input. So does a field that takes no value
+  any more: a read-only one, or a signature field that's signed. In
+  [design mode](forms/building#place-fields-for-a-signer) every field shows its group's color.
+- **`label` is who the group is, for people.** Screen readers read it after the field's name,
+  "Signature, Dana Smith", on the user's own fields and on other people's.
+- **`color` is a CSS color,** so it can name a variable of yours: `color: 'var(--signer-1)'`.
+  Without one, a group gets one of eight colors by its place in the list, so the first eight
+  never share one.
+- **`setGroups()` takes the whole list,** and an empty one clears it. Call it again when your
+  list changes; the same list again changes nothing. Naming a group needs no permission, so a
+  signer's page names them too.
+- **Each open document has its own list.** The same id can be one person in this document and
+  another in the next.
+- **A group you don't name shows too,** in one of the eight colors and with no name. A field in no
+  group shows as the PDF has it.
+
+For a legend of your own, <Fw only={['react', 'vue', 'svelte']}>`groups`</Fw><Fw only="angular">`form.groups()`</Fw> in the form's [state](#state) has every group you named, in your order, then
+every other group the form's fields are in, each as `{ id, label, color }`. A group you didn't
+name has `null` for its label. `form.listGroups()` reads the same list once.
+
+Two pages show a group in the same color when they name the same groups in the same order, so
+give the sender's page and each signer's the same list. For a color that never depends on the
+order, give each group its own.
+
+Names and colors stay in your app, never in the PDF. How strongly the fill shows is
+`fields.tint`, and `0` turns the colors off; see [Settings](#settings).
+[Place fields for a signer](forms/building#place-fields-for-a-signer) has a live example.
+
 ## Reset the form
 
 ```ts
@@ -202,6 +251,8 @@ on [Building forms](forms/building#methods).
 | `getFieldForWidget(widget)` | The field a box belongs to, from the box's ref                                                                                                |
 | `getWidget(widget)`        | A box's row: its page, its place (`rect`), its look and its state, or `null` when no page shows it                                             |
 | `getWidgets(ref)`          | Every box a field shows in, as rows in the field's order: a radio group's buttons, or a field repeated on several pages                       |
+| `listGroups()`             | Every group `setGroups()` named, then every other group the form's fields are in, as `{ id, label, color }`. [Fields for several people](#fields-for-several-people) |
+| `setGroups(groups)`        | Says who this document's groups are, `{ id, label, color }` each: the whole list, and `[]` clears it. Fires <Fw only={['react', 'vue', 'svelte']}>`onGroupsChanged`</Fw><Fw only="angular">`groupsChanged$`</Fw>. [Fields for several people](#fields-for-several-people) |
 | `listWidgets(page)`        | Each field box on a page, with its place (`box`, `rotation` and `rect`), its control, its value and whether it can be filled. For drawing the fields yourself; see [What a box tells you](forms/controls#what-a-box-tells-you) and [Turned fields](#turned-fields). |
 | `getWidgetAt(page, point)` | The field box under a point on a page, with its field and its place (`box`, `rotation` and `rect`), or `null`                                  |
 | `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
@@ -234,6 +285,9 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
 | `selectedField` | In design mode, the field whose boxes are selected (one, or several of the same field), or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
 | `focusedField`  | The field the cursor is in, or `null`; see [Move between fields](#move-between-fields)            | `getFocusedField()`                                  |
+| `selectedFields` | In design mode, every field with a selected box; see [Building forms](forms/building#give-fields-to-a-signer) | `listSelectedFields()` |
+| `groups`        | Every group you named or the form's fields are in, as `{ id, label, color }`; see [Fields for several people](#fields-for-several-people) | `listGroups()` |
+| `designGroup`   | In design mode, the group that fields placed with a tool go in, or `null` for none; see [Building forms](forms/building#place-fields-for-a-signer) | `getDesignGroup()` |
 
 For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
 
@@ -251,6 +305,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
 | `fillable`          | Which fields people fill in by hand: `true`, `false`, or field kinds       | `true`                       | —                              |
+| `fields.tint`       | How strongly a field shows its [group's color](#fields-for-several-people), from `0`, not at all, to `1` | `0.16`                       | `--epdf-form-field-tint`       |
 
 Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too,
 and a form with scripts logs a hint once.
@@ -285,6 +340,7 @@ The colors are what the viewer draws around fields; a field's own colors are sav
 | `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
 | `onFocusChanged`       | The cursor moved into a field, to another one, or out of the fields       | `field`, `widget` |
 | `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
+| `onGroupsChanged`      | `setGroups()` changed who the document's groups are                       | `groups`          |
 | `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 Fields that are added, changed or removed have their own events; see
@@ -321,7 +377,9 @@ box, Enter confirms and Escape puts back the value it had.
 Each control is named by the field's tooltip (its `alternateName`), or by its name when it has
 none. A radio button adds the option it stands for, its export value, the way screen readers read
 one in Acrobat: `Plan: monthly`. It also says where it comes in its group (`1 of 2`, in the order
-the arrow keys go round), since a group's buttons stand apart on the page. When you draw the fields
+the arrow keys go round), since a group's buttons stand apart on the page. A field of a
+[group you named](#fields-for-several-people) says whose it is last: `Plan: monthly, Dana Smith`.
+When you draw the fields
 yourself, each entry of `listWidgets(page)` carries the name as `label`, and a radio button its
 place as `inGroup`, `{ position, size }`, for `aria-posinset` and `aria-setsize`.
 

@@ -475,6 +475,7 @@ export const ko: Locale = {
         required: '필수',
         readOnly: '읽기 전용',
         noExport: '내보내지 않음',
+        group: '작성자',
         defaultValue: '기본값',
         maxLength: '최대 길이',
         multiline: '여러 줄',

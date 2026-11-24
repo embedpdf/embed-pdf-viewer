@@ -1,12 +1,14 @@
 /**
  * A field's settings, described for a settings panel the way an annotation
  * kind describes its look: which settings the field's kind has, how each is
- * edited, and its value. `update()` writes them.
+ * edited, and its value. `update()` writes them. While the document has
+ * groups, a field's group is one of them: the choices are the groups the
+ * user may put a field in, and the one the field is in.
  */
 import { memoByKey } from '@embedpdf/core';
 import type { FormField, FormFieldRef } from '@embedpdf/engine-core/runtime';
 
-import type { FormCapability, FormFieldSetting, FormFieldSettings } from '../contract';
+import type { FormCapability, FormFieldSetting, FormFieldSettings, FormGroup } from '../contract';
 import { canonicalKey, fieldByKey } from '../model';
 import type { FormServices } from '../services';
 
@@ -107,6 +109,30 @@ function familySettings(field: FormField): readonly FormFieldSetting[] {
   }
 }
 
+/**
+ * Who fills the field in, among the document's groups: the ones the user may put a field in,
+ * and the field's own. Nothing while the document has no groups.
+ */
+function groupSetting(
+  field: FormField,
+  groups: readonly FormGroup[],
+  maySet: (groupId: string) => boolean,
+): readonly FormFieldSetting[] {
+  if (groups.length === 0) return [];
+  return [
+    {
+      key: 'groupId',
+      control: 'choice',
+      label: 'Filled in by',
+      labelKey: 'form.settings.group',
+      options: groups
+        .filter((group) => group.id === field.groupId || maySet(group.id))
+        .map((group) => group.id),
+      free: false,
+    },
+  ];
+}
+
 /** Each setting's value, as the field holds it. */
 function valuesOf(
   field: FormField,
@@ -122,12 +148,16 @@ function valuesOf(
   return values;
 }
 
-export function createFieldSettings({ fields }: Pick<FormServices, 'fields'>) {
+export function createFieldSettings({ fields, groups }: Pick<FormServices, 'fields' | 'groups'>) {
   const settingsByKey = memoByKey(
-    (key: string) => [fieldByKey(fields.view(), key)],
-    (_key, field): FormFieldSettings | null => {
+    (key: string) => [fieldByKey(fields.view(), key), groups.list()] as const,
+    (_key, field, listed): FormFieldSettings | null => {
       if (!field) return null;
-      const properties = [...COMMON, ...familySettings(field)];
+      const properties = [
+        ...COMMON,
+        ...groupSetting(field, listed, groups.maySet),
+        ...familySettings(field),
+      ];
       return { properties, values: valuesOf(field, properties) };
     },
     { maxEntries: 256 },

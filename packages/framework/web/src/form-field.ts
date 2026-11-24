@@ -47,6 +47,68 @@ export function formColorsOf(settings: FormColorSettings, accent: string): FormC
   };
 }
 
+/**
+ * What a field shows its group in: the group's color, any CSS color (a
+ * `var()` of the app's included), and how strongly it shows, from 0 to 1. The
+ * structural twin of the form plugin's `accent` on a box and the annotation
+ * plugin's on a lent record.
+ */
+export interface FieldAccent {
+  readonly color: string;
+  readonly strength: number;
+}
+
+/** A group's color as a field shows it: what fills its box, and its edge. */
+export type FieldTint = {
+  /** The color mixed with transparent, as strong as the tint says. */
+  fill: string;
+  /** The color itself. */
+  edge: string;
+};
+
+/**
+ * A group's color as a field shows it: a fill of the accent's color, as
+ * strong as it says, and an edge of the color itself.
+ * `--epdf-form-field-tint` wins over the strength of the fill. No field has
+ * an accent while the form's `fields.tint` setting is 0, which is what turns
+ * the colors off.
+ */
+export function fieldTintOf(accent: FieldAccent): FieldTint {
+  const strength = paint('form-field-tint', accent.strength);
+  return {
+    fill: `color-mix(in srgb, ${accent.color} calc(${strength} * 100%), transparent)`,
+    edge: accent.color,
+  };
+}
+
+/**
+ * The style of a lent record's accent (the annotation plugin's
+ * `RenderItem.accent`: a form field's group's color in design mode), filling
+ * the record's frame above its own drawing: the same fill and edge a field
+ * shows while it's filled in.
+ */
+export type RecordAccentStyle = {
+  position: 'absolute';
+  inset: '0';
+  boxSizing: 'border-box';
+  background: string;
+  boxShadow: string;
+  pointerEvents: 'none';
+};
+
+/** {@link RecordAccentStyle} for an accent. */
+export function recordAccentStyleOf(accent: FieldAccent): RecordAccentStyle {
+  const tint = fieldTintOf(accent);
+  return {
+    position: 'absolute',
+    inset: '0',
+    boxSizing: 'border-box',
+    background: tint.fill,
+    boxShadow: `inset 0 0 0 1px ${tint.edge}`,
+    pointerEvents: 'none',
+  };
+}
+
 /** How a widget looks in the PDF: the structural twin of the form plugin's `FormWidgetLook`. */
 export interface FieldLook {
   readonly border: string | null;
@@ -151,14 +213,19 @@ export type ListBoxStyle = FieldTextStyle &
 /**
  * A list box's style: the field's own look, the settings where it has none (12 pt for a fitted
  * size), in `font`, the widget's font as the form plugin gives it (`null` while it has none).
+ * A field with an `accent` (its group's color, and how strongly it shows) shows it over its
+ * background and as its border.
  */
 export function listBoxStyleOf(
-  field: { box: { width: number }; look: FieldLook },
+  field: { box: { width: number }; look: FieldLook; accent?: FieldAccent | null },
   frame: PixelRect,
   colors: FormColors,
   font: CssFont | null = null,
 ): ListBoxStyle {
   const scale = scaleOf(field, frame);
+  const background = field.look.background ?? colors.background;
+  // The list draws its own background and border, so its group's color goes into both.
+  const tint = field.accent ? fieldTintOf(field.accent) : null;
   return {
     ...(font
       ? { fontFamily: font.fontFamily, fontWeight: font.fontWeight, fontStyle: font.fontStyle }
@@ -166,10 +233,10 @@ export function listBoxStyleOf(
     fontSize: `${(field.look.fontSize || 12) * scale}px`,
     textAlign: field.look.textAlign,
     color: field.look.color ?? colors.text,
-    background: field.look.background ?? colors.background,
+    background: tint ? `linear-gradient(${tint.fill}, ${tint.fill}), ${background}` : background,
     borderWidth: `${Math.max(1, field.look.borderWidth * scale)}px`,
     borderStyle: field.look.borderStyle === 'dashed' ? 'dashed' : 'solid',
-    borderColor: field.look.border ?? colors.border,
+    borderColor: tint ? tint.edge : (field.look.border ?? colors.border),
   };
 }
 

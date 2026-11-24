@@ -150,9 +150,10 @@ a page, and a control gets its box as `widget`:
 | `control`     | Which control it is: `'text'`, `'toggle'`, `'choice'`, `'button'` or `'signature'`                 |
 | `fieldRef`    | The field it belongs to: what `setValue()` and `get()` take                                         |
 | `ref`         | The box's own ref: what `useFormWidgetAnchor()` and `getWidget()` take                              |
-| `label`       | Its name for screen readers: the field's tooltip, else its name                                    |
+| `label`       | Its name for screen readers: the field's tooltip, else its name, then whose field it is when its [group](../forms#fields-for-several-people) has a label |
 | `groupId`     | The [group](/docs/engine/forms/groups) the field is in, or `null`                                  |
 | `canFill`     | Whether this user may fill it in, or sign it for a signature field: their permissions alone        |
+| `accent`      | What the layer shows it in, `{ color, strength }`, or `null`: its [group's](../forms#fields-for-several-people) color and the `fields.tint` setting, while this user may fill it in and it still takes a value |
 | `disabled`    | Draw it, take no input: a read-only field, one this user may not fill in, one [`fillable`](../forms#settings) leaves out, or a value on its way |
 | `required`    | The form asks for a value                                                                          |
 | `empty`       | It holds nothing yet: no text, nothing ticked or picked, no signature. What [`validate()`](../forms#check-required-fields) counts as missing |
@@ -168,6 +169,14 @@ its `exportValue`, a dropdown or list its `options` and `selected`, a signature 
 Controls fill forms in. They show while the active tool fills forms, as the layer's own do. In
 [design mode](building#design-mode) fields are boxes people select and move, drawn by the
 annotation layer, and your controls stand down with the layer's own.
+
+### A group's color
+
+A field in a [group](../forms#fields-for-several-people) shows in its group's color while its
+user may fill it in. That color is part of the layer's own control, so a control that keeps
+`native` shows it, and one that draws the box alone doesn't. `widget.accent` is what the layer
+would show, `{ color, strength }`, or `null`, for a look of your own. A lent field has the same
+`accent` on the annotation layer in design mode.
 
 ### Signature fields
 

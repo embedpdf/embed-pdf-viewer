@@ -30,6 +30,7 @@ import type {
   FormDuplicateOptions,
   FormDuplicateResult,
   FormFieldResult,
+  FormGroupMoveResult,
 } from '../contract';
 import { fieldByRef, fieldKeyOf, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
@@ -86,7 +87,7 @@ type ItemOf<T extends ChangeItem['type']> = Extract<ChangeItem, { type: T }>;
 
 export function createFieldWrites(
   ctx: FormContext,
-  { fields, enqueue }: Pick<FormServices, 'fields' | 'enqueue'>,
+  { fields, enqueue, groups }: Pick<FormServices, 'fields' | 'enqueue' | 'groups'>,
 ) {
   const numbers = createObjectNumbers(ctx);
 
@@ -127,6 +128,8 @@ export function createFieldWrites(
 
   const create: FormCapability['create'] = async (draft, options) => {
     allow('form.create', draftWritesScripts(draft));
+    // No group (`null`, or none named) takes form design alone, checked above.
+    if (typeof draft.groupId === 'string') groups.assertMaySet(draft.groupId, 'form.create');
     // The field, then each widget, in the draft's order.
     const count = 1 + (draft.widgets?.length ?? 0);
     const [objectNumber, ...widgetObjectNumbers] =
@@ -276,6 +279,42 @@ export function createFieldWrites(
     return duplicateResultOf(items, copy.copies, copy.dropped);
   };
 
+  const moveToGroup: FormCapability['moveToGroup'] = async (refs, groupId, options) => {
+    allow('form.moveToGroup');
+    // Out of every group (`null`) takes form design alone, checked above.
+    if (groupId !== null) groups.assertMaySet(groupId, 'form.moveToGroup');
+    const index = fields.view();
+    const moved = refs.map((ref) => {
+      const field = fieldByRef(index, ref);
+      if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
+      return field;
+    });
+    // A field already in the group has nothing to change; a field named twice moves once.
+    const moving = new Map<string, FormField>();
+    for (const field of moved) if (field.groupId !== groupId) moving.set(fieldKeyOf(field), field);
+    if (moving.size === 0) return { fields: moved } satisfies FormGroupMoveResult;
+    // One change, so one step to undo.
+    const change = stageAll(
+      'update',
+      [...moving.values()].map(
+        (field): ChangeOp => ({ type: 'forms.update', field: field.ref, patch: { groupId } }),
+      ),
+    );
+    let items: readonly ChangeItem[];
+    try {
+      items = (await ctx.cancellable(options?.signal, change.result)).items;
+    } catch (error) {
+      throw toPluginError('form', error);
+    }
+    const answered = new Map<string, FormField>();
+    for (const item of items) {
+      if (item.type === 'forms.update') answered.set(fieldKeyOf(item.field), item.field);
+    }
+    return {
+      fields: moved.map((field) => answered.get(fieldKeyOf(field)) ?? field),
+    } satisfies FormGroupMoveResult;
+  };
+
   return {
     copyOps,
     api: {
@@ -283,8 +322,17 @@ export function createFieldWrites(
       addWidget,
       duplicate,
       duplicateWidgets,
+      moveToGroup,
       update: async (ref, patch, options) => {
         allow('form.update', writesScripts(patch.actions));
+        // A field's own group, given back unchanged, is no change, and taking it out of its
+        // group (`null`) takes form design alone, checked above.
+        if (
+          typeof patch.groupId === 'string' &&
+          patch.groupId !== fieldByRef(fields.view(), ref)?.groupId
+        ) {
+          groups.assertMaySet(patch.groupId, 'form.update');
+        }
         const change = stage('update', { type: 'forms.update', field: ref, patch });
         return { field: (await answer<'forms.update'>(change, options)).field };
       },

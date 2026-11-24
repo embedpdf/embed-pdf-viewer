@@ -30,6 +30,8 @@ import {
 import type { FormContext, FormServices } from '../services';
 
 const NO_FIELDS: readonly FormField[] = Object.freeze([]);
+const NO_SELECTED_FIELDS: readonly FormField[] = Object.freeze([]);
+
 const NOTHING_SELECTED: readonly { readonly subtype: string; readonly ref: WidgetAddress }[] =
   Object.freeze([]);
 
@@ -215,6 +217,20 @@ export function createFieldReads(
     },
   );
 
+  /** Every field with a selected widget, in the selection's order, each once. */
+  const listSelectedFields = memo(
+    () => [fields.view(), siblings.annotation()?.selection.getSelected() ?? NOTHING_SELECTED],
+    (index, selected): readonly FormField[] => {
+      const found = new Map<string, FormField>();
+      for (const annotation of selected) {
+        if (!annotation.subtype.startsWith('widget')) continue;
+        const field = fieldForWidget(index, widgetObjectOf(annotation.ref));
+        if (field && !found.has(fieldKeyOf(field))) found.set(fieldKeyOf(field), field);
+      }
+      return found.size === 0 ? NO_SELECTED_FIELDS : Object.freeze([...found.values()]);
+    },
+  );
+
   return {
     api: {
       getSnapshot: () => fields.view().snapshot,
@@ -228,6 +244,7 @@ export function createFieldReads(
       list,
       getValue: (ref) => valueByKey(canonicalKey(fields.view(), ref)),
       getSelectedField,
+      listSelectedFields,
       validate,
       exportValues,
     } satisfies Partial<FormCapability>,

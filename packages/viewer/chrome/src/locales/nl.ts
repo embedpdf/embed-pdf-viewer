@@ -477,6 +477,7 @@ export const nl: Locale = {
         required: 'Vereist',
         readOnly: 'Alleen-lezen',
         noExport: 'Niet exporteren',
+        group: 'In te vullen door',
         defaultValue: 'Standaardwaarde',
         maxLength: 'Maximale lengte',
         multiline: 'Meerdere regels',

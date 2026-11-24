@@ -477,6 +477,7 @@ export const de: Locale = {
         required: 'Erforderlich',
         readOnly: 'Schreibgeschützt',
         noExport: 'Nicht exportieren',
+        group: 'Auszufüllen von',
         defaultValue: 'Standardwert',
         maxLength: 'Maximale Länge',
         multiline: 'Mehrzeilig',

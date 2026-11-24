@@ -112,4 +112,5 @@ export const DEMO_DOCUMENTS = {
   invoice: { cloudSource: cloudSource('invoice'), ...viewerForms('invoice') },
   registration: { cloudSource: cloudSource('registration'), ...viewerForms('registration') },
   agreement: { cloudSource: cloudSource('agreement'), ...viewerForms('agreement') },
+  loan: { cloudSource: cloudSource('loan'), ...viewerForms('loan') },
 };
