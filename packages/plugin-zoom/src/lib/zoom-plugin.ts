@@ -530,12 +530,16 @@ export class ZoomPlugin extends BasePlugin<
     const docState = this.getDocumentState(documentId);
     if (!docState) return;
 
+    const { zoomLevel } = docState;
+    // Numeric defaults must also go through handleRequest: it releases the
+    // viewport zoom gate. Skipping numbers left pages unmounted (!isGated).
     if (
-      docState.zoomLevel === ZoomMode.Automatic ||
-      docState.zoomLevel === ZoomMode.FitPage ||
-      docState.zoomLevel === ZoomMode.FitWidth
+      typeof zoomLevel === 'number' ||
+      zoomLevel === ZoomMode.Automatic ||
+      zoomLevel === ZoomMode.FitPage ||
+      zoomLevel === ZoomMode.FitWidth
     ) {
-      this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
+      this.handleRequest({ level: zoomLevel, focus }, documentId);
     }
   }
 
