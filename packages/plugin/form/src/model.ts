@@ -401,8 +401,9 @@ export const placeOf = (row: WidgetAnnotation): WidgetPlace => ({
   rect: row.rect,
 });
 
-/** One widget on its page: where it is and its look. */
+/** One widget on its page: its address, where it is and its look. */
 export interface PageWidget extends WidgetPlace {
+  readonly ref: AnnotationRef;
   readonly look: FormWidgetLook;
 }
 
@@ -430,6 +431,7 @@ export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): Page
     if (row.page.objectNumber !== pageObjectNumber || row.ref.kind !== 'objectNumber') continue;
     if (!shownOnScreen(row)) continue;
     widgets[row.ref.objectNumber] = {
+      ref: row.ref,
       ...placeOf(row),
       look: {
         border: row.color ?? null,

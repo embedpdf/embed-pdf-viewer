@@ -1,17 +1,21 @@
 /**
  * The form plugin's readers: `useForm()` (the API), the state and the settings, `useFormEvent()`,
- * `useFormValue()` (one field's value), and the colors `<FormLayer>` draws fields with.
+ * `useFormValue()` (one field's value), `useFormWidgetAnchor()` (where UI attaches to one box),
+ * and the colors `<FormLayer>` draws fields with.
  */
-import type { EventHook } from '@embedpdf/core';
+import type { AnnotationRef, EventHook } from '@embedpdf/core';
 import { FormToken, formState } from '@embedpdf/plugin-form';
-import type { FormCapability, FormFieldRef, FormFieldValue } from '@embedpdf/plugin-form';
-import { formColorsOf, type FormColors } from '@embedpdf/web';
+import type {
+  FormCapability,
+  FormFieldRef,
+  FormFieldValue,
+  FormWidgetAnchor,
+} from '@embedpdf/plugin-form';
+// Where a box stands, as it is moved in design mode, is a host read.
+import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import { formColorsOf, samePageBounds, type FormColors } from '@embedpdf/web';
 import { useViewerSettings } from '../runtime/documents.svelte';
-import {
-  useCapability,
-  useCapabilityEvent,
-  useOptionalSelector,
-} from '../runtime/readers.svelte';
+import { useCapability, useCapabilityEvent, useOptionalSelector } from '../runtime/readers.svelte';
 import { settingsReader, stateReader } from '../runtime/state.svelte';
 import {
   currentOf,
@@ -63,6 +67,27 @@ export function useFormValue(ref: MaybeGetter<FormFieldRef>): CurrentValue<FormF
   // The plugin keeps one value object per field until the field changes, so a reference
   // comparison is enough.
   return useOptionalSelector(FormToken, (form) => form.getValue(valueOf(ref)), null);
+}
+
+/**
+ * An anchor for `<Anchored>` that keeps a tag or a card attached to one box of a form field (a
+ * widget's `ref`), as `{ current }`: its page and where the box stands, following the box as it
+ * is moved in design mode. Pass a function (`() => widget.ref`) for a box that changes. `null`
+ * for `null`, a box that isn't here, and without a document. It changes when the box moves, not
+ * while people scroll or zoom.
+ */
+export function useFormWidgetAnchor(
+  widget: MaybeGetter<AnnotationRef | null>,
+): CurrentValue<FormWidgetAnchor | null> {
+  return useOptionalSelector(
+    FormHostToken,
+    (form) => {
+      const target = valueOf(widget);
+      return target ? form.getWidgetAnchor(target) : null;
+    },
+    null,
+    samePageBounds,
+  );
 }
 
 /**

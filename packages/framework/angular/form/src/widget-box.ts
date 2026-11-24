@@ -16,6 +16,10 @@
  * Each control (`controls.ts`) is a component whose host element is its box: it extends this
  * class and adds its own control inside. The listeners, the box's style and the colors are
  * `@embedpdf/web`'s, the same for every framework.
+ *
+ * Inside a control of the app's ({@link EPDF_FORM_EMBEDDED}) a box only fills the place it is
+ * given: the app's box around it (`custom-control.ts`) is the widget's event surface and the
+ * cursor's way in, and a click this box dealt with is left alone there.
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
@@ -25,6 +29,7 @@ import {
   effect,
   ElementRef,
   inject,
+  InjectionToken,
   input,
   PLATFORM_ID,
   type Signal,
@@ -35,12 +40,21 @@ import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host'
 import {
   bindFieldFocus,
   bindWidgetEvents,
+  claimClick,
   isolatePointerDown,
   rectInPixels,
   widgetBoxStyleOf,
   type FormColors,
   type WidgetEventKind,
 } from '@embedpdf/web';
+
+/**
+ * True for the layer's own control drawn inside a control of the app's (its `native`), false
+ * everywhere else. The element the layer's control is drawn in provides it.
+ */
+export const EPDF_FORM_EMBEDDED = new InjectionToken<boolean>('EPDF_FORM_EMBEDDED', {
+  factory: () => false,
+});
 
 /** One kind of field widget, as the form layer draws it: `WidgetOf<'text'>`. */
 export type WidgetOf<Control extends FormWidgetItem['control']> = Extract<
@@ -59,15 +73,25 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
 
   protected readonly page = injectPage('<epdf-form-layer>');
   protected readonly element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  /** The form plugin's host side, for the page's own document: writes, drafts, activation. */
-  protected readonly form = new CapabilityBinding(
+  /** The form plugin's host side, for the page's own document. */
+  protected readonly formBinding = new CapabilityBinding(
     injectKernelHost('<epdf-form-layer>'),
     () => FormHostToken,
     () => this.page.documentId,
-  ).capability;
+  );
+  /** The same, as the capability or `null`: writes, drafts, activation. */
+  protected readonly form = this.formBinding.capability;
+  /** Whether this is the layer's control inside a control of the app's: it only fills its place. */
+  protected readonly embedded = inject(EPDF_FORM_EMBEDDED);
 
   /** Whether a field without a border of its own gets an edge. A list and a button draw their own. */
   protected readonly drawsEdge: boolean = true;
+
+  /**
+   * Whether the box holds a control of the app's: the cursor goes to the first element in it
+   * that Tab stops at.
+   */
+  protected readonly custom: boolean = false;
 
   /** Whether the box has a control the cursor can go into. */
   protected readonly focusable: Signal<boolean> = computed(() => true);
@@ -75,13 +99,31 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
   /** The box in the page layer's pixels: moves with the camera. */
   protected readonly frame = computed(() => rectInPixels(this.item().box, this.page.transform()));
 
-  /** The box's place over the widget, and its edge. */
-  protected readonly boxStyle = computed(() =>
-    widgetBoxStyleOf(this.item(), this.frame(), this.colors(), { edge: this.drawsEdge }),
-  );
+  /**
+   * The box's place over the widget, and its edge. Inside a control of the app's it fills the
+   * place it's given, at the widget's size on screen, unturned: the app's box holds the turn.
+   */
+  protected readonly boxStyle = computed(() => {
+    const frame = this.frame();
+    return this.embedded
+      ? widgetBoxStyleOf(
+          { look: this.item().look },
+          { left: 0, top: 0, width: frame.width, height: frame.height },
+          this.colors(),
+          { edge: this.drawsEdge },
+        )
+      : widgetBoxStyleOf(this.item(), frame, this.colors(), { edge: this.drawsEdge });
+  });
 
   constructor() {
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+    if (this.embedded) {
+      // The app's box around it sends the widget's events, keeps the press from the Stage and
+      // takes the cursor. A click here is this control's: the app's box leaves it alone.
+      this.element.addEventListener('click', claimClick);
+      inject(DestroyRef).onDestroy(() => this.element.removeEventListener('click', claimClick));
+      return;
+    }
     // Native listeners on the box: the PDF events of the widget, and the press kept from the
     // Stage. `bindWidgetEvents` sends the press as "mouse down" itself; the press only stops
     // here, so both run.
@@ -98,7 +140,7 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
       const widget = item.annotationRef;
       if (!form || !widget || item.disabled || !this.focusable()) return;
       const radio = item.control === 'toggle' && item.kind === 'radio';
-      onCleanup(bindFieldFocus(this.element, form, widget, { radio }));
+      onCleanup(bindFieldFocus(this.element, form, widget, { radio, custom: this.custom }));
     });
   }
 

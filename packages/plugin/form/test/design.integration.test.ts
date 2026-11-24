@@ -566,6 +566,48 @@ describe('design through lending', () => {
     }
   });
 
+  it("a box's anchor follows the box while it is dragged, and stays where the drag left it", async () => {
+    const booted = await boot();
+    try {
+      const { annotation, form, page } = booted;
+      const widget = booted.widgetOf(NAME);
+      // Filling: the anchor is where the form has the box, the same object while it stays.
+      const filling = form.getWidgetAnchor(widget)!;
+      expect(filling.page).toEqual(page);
+      expect(filling.bounds).toEqual(form.getWidget(widget)!.rect);
+      expect(form.getWidgetAnchor(widget)).toBe(filling);
+
+      booted.design();
+      const resting = form.getWidgetAnchor(widget)!;
+      expect(resting.bounds).toEqual(filling.bounds);
+      annotation.selection.select([widget]);
+      const from = {
+        x: resting.bounds.x + resting.bounds.width / 2,
+        y: resting.bounds.y + resting.bounds.height / 2,
+      };
+      // At 400% the handles are small beside the box, so the press takes the box, not a handle.
+      annotation.editPointer('down', page, from, false, 4);
+      annotation.editPointer('move', page, { x: from.x + 15, y: from.y + 5 }, false, 4);
+      annotation.editPointer('move', page, { x: from.x + 30, y: from.y + 10 }, false, 4);
+      // Mid-drag, before anything is written: the anchor is where the drag has the box.
+      const dragging = form.getWidgetAnchor(widget)!;
+      expect(dragging.bounds.x).toBeCloseTo(resting.bounds.x + 30);
+      expect(dragging.bounds.y).toBeCloseTo(resting.bounds.y + 10);
+      expect(form.getWidget(widget)!.rect).toEqual(resting.bounds);
+      annotation.editPointer('up', page, { x: from.x + 30, y: from.y + 10 }, false, 4);
+      await settled(booted);
+
+      booted.interaction.activateDefaultTool();
+      const moved = form.getWidgetAnchor(widget)!;
+      expect(moved.bounds.x).toBeCloseTo(resting.bounds.x + 30);
+      expect(moved.bounds.y).toBeCloseTo(resting.bounds.y + 10);
+      // A box that isn't there has none.
+      expect(form.getWidgetAnchor({ kind: 'objectNumber', page, objectNumber: 99999 })).toBeNull();
+    } finally {
+      await booted.destroy();
+    }
+  });
+
   it("a commenter can't select a field", async () => {
     const booted = await boot([
       'doc.open',

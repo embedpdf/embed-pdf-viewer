@@ -25,7 +25,12 @@ import type { FormCommitSinkResult } from '@embedpdf/plugin-actions/contract/hos
 import type { FontCss } from '@embedpdf/plugin-fonts/contract';
 import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
-import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
+import type {
+  FormCapability,
+  FormCommitResult,
+  FormSetValueResult,
+  FormWidgetAnchor,
+} from './contract';
 import type { Box, ShownWidget } from './model';
 import type { WidgetPainting } from './services/looks';
 import { FormToken as PublicFormToken } from './token';
@@ -103,6 +108,14 @@ export interface FormHostCapability extends FormCapability {
   getWidgetFontCss(widget: AnnotationRef): FontCss | null;
   /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
   getPageBox(page: PageRef): Box | null;
+  /**
+   * Where UI attaches to one box of a field: its page and where the box stands, following the box
+   * as it is moved in design mode. The same object until the box moves; `null` for a box that
+   * isn't there, or that shows nowhere.
+   */
+  getWidgetAnchor(widget: AnnotationRef): FormWidgetAnchor | null;
+  /** Whether the cursor is in this box. */
+  isWidgetFocused(widget: AnnotationRef): boolean;
   /**
    * Lend the plugin a box's control while it's on screen, so `focus()` and `focusNext()` can put
    * the cursor in it; a box `focus()` asked for before its page came in takes the cursor now.

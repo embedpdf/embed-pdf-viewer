@@ -57,6 +57,42 @@ describe('bindFieldFocus', () => {
     expect(press(field, 'Tab', { ctrlKey: true }).defaultPrevented).toBe(false);
   });
 
+  it("in a control of an app's own, the cursor goes into the first element Tab stops at", () => {
+    document.body.innerHTML = `
+      <div id="box">
+        <span>Label</span>
+        <button id="skipped" tabindex="-1"></button>
+        <button id="off" disabled></button>
+        <input type="hidden" />
+        <div id="switch" role="switch" tabindex="0"></div>
+        <input id="later" />
+      </div>`;
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'agree', { custom: true });
+    targets.get('agree')!.focus({ select: true });
+    expect(document.activeElement).toBe(document.getElementById('switch'));
+  });
+
+  it("a control of an app's own with a text box in it has its text selected when asked", () => {
+    document.body.innerHTML =
+      '<div id="box"><div><input id="field" value="Ada" /></div><button tabindex="-1"></button></div>';
+    const field = document.getElementById('field') as HTMLInputElement;
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'name', { custom: true });
+    targets.get('name')!.focus({ select: true });
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 3]);
+  });
+
+  it("a control of an app's own sends Tab through the form from any element inside it", () => {
+    document.body.innerHTML =
+      '<div id="box"><div id="switch" role="switch" tabindex="0"></div></div>';
+    const { form } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'agree', { custom: true });
+    expect(press(document.getElementById('switch')!, 'Tab').defaultPrevented).toBe(true);
+    expect(form.focusNext).toHaveBeenCalledWith({ backward: false });
+  });
+
   it("moves a radio button's arrow keys within its group, and leaves other controls' alone", () => {
     document.body.innerHTML =
       '<div id="radio" tabindex="0"></div><div id="box"><select id="list"></select></div>';
