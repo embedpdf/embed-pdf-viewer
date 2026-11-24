@@ -21,6 +21,7 @@ const base = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -43,6 +44,7 @@ const name: FormField = {
   multiline: false,
   password: false,
   comb: false,
+  format: null,
 };
 
 const toggle = (objectNumber: number, onState: string) => ({

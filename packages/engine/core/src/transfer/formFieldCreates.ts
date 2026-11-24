@@ -26,6 +26,14 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormField } from '../forms/field';
+import {
+  formatOfActions,
+  isKeystrokeOfFormat,
+  isWritableFormat,
+  takesFormat,
+  type FormFieldFormatWritable,
+} from '../forms/format';
+import { isFieldPurpose } from '../forms/purpose';
 import { annotationKey } from '../identity/annotationKey';
 import type { PageRef } from '../identity/PageRef';
 
@@ -34,13 +42,30 @@ export function holdsValue(field: FormField): boolean {
   return field.valueEntry.kind === 'scalar' || field.valueEntry.kind === 'array';
 }
 
-/** A field's scripts as a create writes them; each left out is reported. */
+/**
+ * The date or time format a field's scripts give it, which a create writes
+ * again from its pattern; `null` for a field without one. Read from the
+ * scripts themselves, so a row an older version exported has it too.
+ */
+function writableFormatOf(field: FormField): FormFieldFormatWritable | null {
+  if (!takesFormat(field.kind)) return null;
+  const format = formatOfActions(field.actions);
+  return isWritableFormat(format) ? format : null;
+}
+
+/**
+ * A field's scripts as a create writes them; each left out is reported.
+ * Without the right to write scripts (`mayScript`), a date or a time format
+ * still comes along, as the create's `format`: its format script, and a
+ * keystroke script that is the format's own, are then no loss to report.
+ */
 export function fieldActionsOf(
   field: FormField,
   mayScript: boolean,
   dropped: FormImportDrop[],
 ): FieldActionsPatch {
   const actions: FieldActionsPatch = {};
+  const format = mayScript ? null : writableFormatOf(field);
   for (const [event, tree] of Object.entries(field.actions ?? {}) as [
     FieldScriptEvent,
     NonNullable<FormField['actions']>[FieldScriptEvent],
@@ -49,9 +74,10 @@ export function fieldActionsOf(
     const script = fieldScriptOf(tree);
     const member = `actions.${event}`;
     if (!script) dropped.push({ ref: field.ref, field: member, reason: 'unsupported-action' });
-    else if (!mayScript)
-      dropped.push({ ref: field.ref, field: member, reason: 'script-not-allowed' });
-    else actions[event] = script;
+    else if (mayScript) actions[event] = script;
+    else if (format && event === 'format') continue;
+    else if (format && event === 'keystroke' && isKeystrokeOfFormat(format, tree)) continue;
+    else dropped.push({ ref: field.ref, field: member, reason: 'script-not-allowed' });
   }
   return actions;
 }
@@ -112,9 +138,12 @@ export function widgetFlagsOf(row: WidgetAnnotation): WidgetFlags {
 
 /**
  * The create a field read becomes, under `name`: its own settings, the
- * `actions` and `widgets` given. Not checked against the create schema:
- * `where` names the field in the refusal of a kind the engine doesn't model,
- * which no create makes.
+ * `actions` and `widgets` given. A date or a time format goes in as `format`
+ * when its format script isn't among `actions` (it was left out for want of
+ * the right to write scripts); with the script there, the copy has the
+ * format through it, as its original does. Not checked against the create
+ * schema: `where` names the field in the refusal of a kind the engine
+ * doesn't model, which no create makes.
  */
 export function fieldDraftOf(
   field: FormField,
@@ -132,9 +161,14 @@ export function fieldDraftOf(
     ...(field.mappingName !== null ? { mappingName: field.mappingName } : {}),
     // The group the field was in; its writer decides whether it keeps it.
     ...(field.groupId !== null ? { groupId: field.groupId } : {}),
+    ...(isFieldPurpose(field.purpose) ? { purpose: field.purpose } : {}),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     widgets,
   };
+  // A format script is carried or left out with the keystroke script, so a
+  // create never gets `format` beside a script for one of its two events.
+  const written = actions.format === undefined ? writableFormatOf(field) : null;
+  const format = written ? { format: written } : {};
   const hasDefault = field.defaultValueEntry.kind !== 'none';
   const options = (list: readonly { label: string; value: string }[]) =>
     list.map(({ label, value }) => ({ label, value }));
@@ -142,6 +176,7 @@ export function fieldDraftOf(
     case 'text':
       return {
         ...base,
+        ...format,
         kind: 'text',
         ...(hasDefault ? { defaultValue: field.defaultValue } : {}),
         ...(field.maxLength !== null ? { maxLength: field.maxLength } : {}),
@@ -159,6 +194,7 @@ export function fieldDraftOf(
     case 'combobox':
       return {
         ...base,
+        ...format,
         kind: 'combobox',
         edit: field.edit,
         options: options(field.options),

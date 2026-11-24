@@ -56,20 +56,27 @@ export function readsUnknownAs<T extends [string, ...string[]]>(
  * `asCatchAll` adds what that kind has beyond the object's own fields. A kind
  * the client knows is read as that kind, so a malformed one still fails: the
  * catch-all is for kinds a newer server adds, not for broken data.
+ *
+ * `withLeftOut` gives an object the fields a server older than them leaves
+ * out, before it is read. The schema keeps those fields required, so the
+ * contract says a server of this version always sends them, and a client
+ * still reads an older server's answer.
  */
 export function withCatchAll<T>(
   union: z.ZodType<T>,
   unknownAs: string,
   asCatchAll: (value: Record<string, unknown>) => Record<string, unknown> = (value) => value,
+  withLeftOut: (value: Record<string, unknown>) => Record<string, unknown> = (value) => value,
 ): z.ZodType<T> {
   const { discriminator, optionsMap } = (
     union as unknown as z.ZodDiscriminatedUnion<string, z.ZodDiscriminatedUnionOption<string>[]>
   )._def;
   const reading = z.preprocess((value) => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
-    const kind = (value as Record<string, unknown>)[discriminator];
-    if (typeof kind !== 'string' || optionsMap.has(kind)) return value;
-    return asCatchAll({ ...value, [discriminator]: unknownAs });
+    const whole = withLeftOut(value as Record<string, unknown>);
+    const kind = whole[discriminator];
+    if (typeof kind !== 'string' || optionsMap.has(kind)) return whole;
+    return asCatchAll({ ...whole, [discriminator]: unknownAs });
   }, union) as z.ZodType<T>;
   mark(reading, { unknownAs });
   return reading;

@@ -1,21 +1,9 @@
 export { javaScriptProgramFromActionTree, javaScriptSourcesFromActionTree } from './actions';
-export {
-  cssToScriptColor,
-  isScriptColorArray,
-  scriptColorToCss,
-  scriptColorToRgb,
-} from './color';
-export {
-  createScriptHost,
-  resolveScriptIdentity,
-  seedFrom,
-} from './host';
-export type {
-  ScriptHost,
-  ScriptHostOptions,
-  ScriptTransaction,
-  ScriptWorldInput,
-} from './host';
+export { cssToScriptColor, isScriptColorArray, scriptColorToCss, scriptColorToRgb } from './color';
+export { createScriptHost, resolveScriptIdentity, seedFrom } from './host';
+export type { ScriptHost, ScriptHostOptions, ScriptTransaction, ScriptWorldInput } from './host';
+export { formatDate, parseDate } from './dates';
+export type { DateParts, DatePartsInput } from './dates';
 export { scriptFieldsFromSnapshot } from './input';
 export { installAcroJs, PRELUDE_SOURCE } from './prelude';
 export type {

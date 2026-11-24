@@ -26,6 +26,7 @@ describe("FormsClient", () => {
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
                     groupId: "groupId",
+                    purpose: "purpose",
                     createdBy: "createdBy",
                     createdAt: "2024-01-15T09:30:00Z",
                     filledBy: "filledBy",
@@ -39,6 +40,7 @@ describe("FormsClient", () => {
                     multiline: true,
                     password: true,
                     comb: true,
+                    format: { kind: "date", pattern: "pattern" },
                 },
             ],
             widgets: [
@@ -301,6 +303,7 @@ describe("FormsClient", () => {
                     calculate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 groupId: "groupId",
+                purpose: "purpose",
                 createdBy: "createdBy",
                 createdAt: "2024-01-15T09:30:00Z",
                 filledBy: "filledBy",
@@ -314,6 +317,7 @@ describe("FormsClient", () => {
                 multiline: true,
                 password: true,
                 comb: true,
+                format: { kind: "date", pattern: "pattern" },
             },
             widgets: [
                 {
@@ -499,6 +503,7 @@ describe("FormsClient", () => {
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
                     groupId: "groupId",
+                    purpose: "purpose",
                     createdBy: "createdBy",
                     createdAt: "2024-01-15T09:30:00Z",
                     filledBy: "filledBy",
@@ -512,6 +517,7 @@ describe("FormsClient", () => {
                     multiline: true,
                     password: true,
                     comb: true,
+                    format: { kind: "date", pattern: "pattern" },
                 },
             ],
             widgets: [
@@ -689,6 +695,7 @@ describe("FormsClient", () => {
                     calculate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 groupId: "groupId",
+                purpose: "purpose",
                 createdBy: "createdBy",
                 createdAt: "2024-01-15T09:30:00Z",
                 filledBy: "filledBy",
@@ -702,6 +709,7 @@ describe("FormsClient", () => {
                 multiline: true,
                 password: true,
                 comb: true,
+                format: { kind: "date", pattern: "pattern" },
             },
             meta: {
                 affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],

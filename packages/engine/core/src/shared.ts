@@ -412,7 +412,11 @@ export type {
   FormBundleWidget,
   WireFormBundle,
 } from './transfer/FormBundle';
-export { assertFormBundle, assertFormBundleManifest } from './transfer/FormBundle';
+export {
+  assertFormBundle,
+  assertFormBundleManifest,
+  completeFormBundle,
+} from './transfer/FormBundle';
 export { FormTransfer } from './transfer/FormTransfer';
 export type { FormExportRows, FormExportSelection } from './transfer/formExport';
 export { fieldMatches, formExportRowsOf } from './transfer/formExport';
@@ -733,6 +737,23 @@ export type {
 } from './forms/submission';
 export type { FormFieldDisplay, FormEffect } from './forms/effects';
 export { formEffectOps } from './forms/effects';
+export {
+  isDatePattern,
+  isTimePattern,
+  STANDARD_DATE_PATTERNS,
+  STANDARD_TIME_PATTERNS,
+} from './forms/datePattern';
+export {
+  formatOfActions,
+  formatsEqual,
+  formatWriteOf,
+  isWritableFormat,
+  scriptsOfFormat,
+  takesFormat,
+  type FormFieldFormat,
+  type FormFieldFormatWritable,
+} from './forms/format';
+export { checkedPurpose, isFieldPurpose } from './forms/purpose';
 export type {
   BaseVersionInfo,
   DigestAlgorithm,

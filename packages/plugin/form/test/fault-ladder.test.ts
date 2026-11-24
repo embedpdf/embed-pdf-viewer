@@ -51,6 +51,7 @@ const text = (
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -65,6 +66,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
+  format: null,
   widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });

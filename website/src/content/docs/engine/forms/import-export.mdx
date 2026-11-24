@@ -62,6 +62,11 @@ const again = await FormTransfer.parse(text);
 `parse()` checks the [limits](#limits) first, then the format, the version and the shape. Anything
 else is refused with `InvalidArg`.
 
+A file kept from an earlier version reads as today's bundle. A field written before fields had a
+[`purpose`](/docs/engine/forms/authoring#purpose) and a
+[`format`](/docs/engine/forms/authoring#dates-and-times) gets both: `purpose: null`, and the
+format its scripts give.
+
 ## Copy the design
 
 ```ts
@@ -85,7 +90,8 @@ writing leaves the document exactly as it was, with no new fields and no events.
 
 Each field is made as [`create()`](/docs/engine/forms/authoring) makes it, with every setting
 the bundle has: its widgets with their place, look, flags and actions, its options, its default,
-its scripts. Parent fields are made bare from the names, as a create makes them.
+its purpose, its format, its scripts. Parent fields are made bare from the names, as a create
+makes them.
 
 ### Pages
 
@@ -114,6 +120,11 @@ A field's scripts and its widgets' actions come along. A script, a submit or a l
 (JavaScript, submit-form or URI) needs `doc.forms.script`: without it, each one is left out and
 listed in `dropped`, and the field is imported without it. The actions that only change the view
 (go to a page, reset the form, show or hide) come along with `doc.forms.modify` alone.
+
+A [date or a time format](/docs/engine/forms/authoring#dates-and-times) comes along without
+`doc.forms.script` too. The engine then writes the field's format script and keystroke script
+again from the pattern, as `format` does, and lists neither in `dropped`. A keystroke script
+that isn't the format's own is still left out and listed.
 
 ### The calculation order
 
@@ -209,6 +220,24 @@ An import is one request. Its `opId`, made for you when you don't pass one, make
 second request with the same `opId` returns what the first one did and writes nothing.
 
 An export is cached until the document's form or pages change, so exporting again is cheap.
+
+A server older than version 3.4 keeps no [purpose](/docs/engine/forms/authoring#purpose). An
+import of a bundle in which a field has one fails with `NotImplemented` before the bundle is sent,
+and `details.needs` and `details.serverVersion` say which side to update. To import without the
+purposes, clear them first:
+
+```ts
+const plain = {
+  ...bundle,
+  fields: bundle.fields.map((row) => ({
+    ...row,
+    data: { ...row.data, purpose: null },
+  })),
+};
+await doc.forms.import(plain);
+```
+
+A date or a time format needs no such step: an older server reads it from the field's scripts.
 
 </Engine>
 

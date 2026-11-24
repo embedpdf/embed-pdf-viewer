@@ -65,6 +65,8 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import {
   FormFieldDraftSchema,
   FormFieldDTOSchema,
+  FormFieldFormatSchema,
+  FormFieldFormatWritableSchema,
   FormFieldPatchSchema,
   FormFieldWidgetSchema,
   FormValueEntrySchema,
@@ -1289,6 +1291,8 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
 export const FormWireComponents = {
   FormFieldRef: FormFieldRefSchema,
   FormField: FormFieldDTOSchema,
+  FormFieldFormat: FormFieldFormatSchema,
+  FormFieldFormatWritable: FormFieldFormatWritableSchema,
   FormValueEntry: FormValueEntrySchema,
   FormFieldValue: FormFieldValueSchema,
   FormWidget: FormWidgetSchema,

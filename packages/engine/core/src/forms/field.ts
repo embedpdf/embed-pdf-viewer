@@ -2,6 +2,7 @@ import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
+import type { FormFieldFormat } from './format';
 import type { FormValueEntry } from './value-entry';
 
 /**
@@ -110,6 +111,12 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
    */
   groupId: string | null;
   /**
+   * What the field's value means: `email`, `date-signed`, or a name an app
+   * made up. The engine keeps it and reads nothing into it. `null` for a
+   * field with none.
+   */
+  purpose: string | null;
+  /**
    * The user who created the field, as the creating session's identity
    * named them; `null` for a field another tool made, or an anonymous
    * session.
@@ -146,6 +153,12 @@ export interface TextField<C extends Coordinates = PageCoordinates> extends Form
   password: boolean;
   /** Fixed character cells; meaningful with `maxLength`. */
   comb: boolean;
+  /**
+   * The shape the value has: a date or a time with its pattern, `other` for
+   * a format script the engine doesn't know, `null` without one. Read from
+   * the field's format script, as Acrobat decides it.
+   */
+  format: FormFieldFormat | null;
 }
 
 /** A checkbox. Write with `{ checked }`, or `{ value }` naming a widget's export value. */
@@ -179,6 +192,8 @@ export interface ComboBoxField<C extends Coordinates = PageCoordinates> extends 
   /** Free text is allowed in addition to the options. */
   edit: boolean;
   options: FormFieldOption[];
+  /** The shape the value has, as a text field's; `null` without a format script. */
+  format: FormFieldFormat | null;
 }
 
 /** A list box. Write with `{ selectedValues }`. */

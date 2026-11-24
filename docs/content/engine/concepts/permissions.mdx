@@ -356,8 +356,9 @@ and buttons that submit the form or open a link. A script runs for everyone who 
 afterwards. In your viewer it can change what they type or hide fields; opened in another PDF app,
 a script or a submit button can send their answers anywhere. So a user who may design fields
 (`doc.forms.modify`) doesn't get it with that. Buttons that only go to a page, reset the form, or
-show and hide fields need `doc.forms.modify` alone. An import without it leaves the scripts, submits
-and links out and copies the rest.
+show and hide fields need `doc.forms.modify` alone, and so does a field's date or time `format`:
+the engine writes its two scripts itself, from a pattern it checked. An import without it leaves
+the scripts, submits and links out and copies the rest.
 
 It doesn't make a script's result trustworthy: a client can skip scripts and send any value. A
 server that must trust a calculated value calculates it itself.

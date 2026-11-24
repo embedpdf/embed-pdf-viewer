@@ -208,6 +208,8 @@ export {
   FormFieldOptionInputSchema,
   FormFieldDraftSchema,
   FormFieldPatchSchema,
+  FormFieldFormatSchema,
+  FormFieldFormatWritableSchema,
   FormValueEntrySchema,
 } from './forms/schema';
 export {
@@ -482,6 +484,7 @@ export {
 } from './wire/cachedReads';
 export {
   API_VERSION,
+  FIELD_PURPOSE_AND_FORMAT_SINCE,
   MARK_IMAGE_OR_NONE_SINCE,
   VALIDATION_INFO_SINCE,
   apiVersionOf,

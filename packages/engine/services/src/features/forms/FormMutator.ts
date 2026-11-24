@@ -19,17 +19,21 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
+  checkedPurpose,
   defaultEntryOfDraft,
   EngineError,
   EngineErrorCode,
   fieldAfterReset,
   fieldAfterValue,
   fitWidgetToFamily,
+  formatsEqual,
+  formatWriteOf,
   formFieldAfter,
   formWidget,
   isAtDefault,
   placedWidgetOf,
   reorderedList,
+  scriptsOfFormat,
   valueEntriesEqual,
   type FormValueEntry,
   type ToggleFieldWidget,
@@ -63,6 +67,7 @@ import {
   stampFieldCreation,
   stampFieldFill,
   writeFieldGroup,
+  writeFieldPurpose,
 } from './internal/fieldAttribution';
 import { writeFieldScripts } from './internal/fieldScripts';
 import { writeFieldEntry, writeSelectedIndices } from './internal/fieldValues';
@@ -371,8 +376,11 @@ export class FormMutator {
     );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.kind, placement));
-    // The default is checked against the draft before anything is written.
+    // The default is checked against the draft before anything is written,
+    // and so are the purpose and the format.
     defaultEntryOfDraft(draft);
+    const purpose = checkedPurpose(draft.purpose);
+    const format = formatWriteOf(draft, draft.kind) ?? null;
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!Number.isInteger(draft.maxLength) || draft.maxLength <= 0) {
         throw new EngineError(
@@ -398,11 +406,22 @@ export class FormMutator {
     // back the field, its widgets and any parent's /Kids together.
     const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
+    // A format is the field's format and keystroke scripts, composed from its pattern.
+    if (format) {
+      writeFieldScripts(
+        this.runtime,
+        docPtr,
+        fieldObjectNumber,
+        undefined,
+        scriptsOfFormat(format),
+      );
+    }
     stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
     // A draft that names no group (`null`, or nothing) leaves the field in none.
     if (draft.groupId !== undefined && draft.groupId !== null) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
     }
+    if (purpose !== null) writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
         this.runtime,
@@ -597,6 +616,8 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.kind);
+    const purpose = patch.purpose === undefined ? undefined : checkedPurpose(patch.purpose);
+    const format = formatWriteOf(patch, before.kind);
     // Checked against the field as the patch leaves it, before anything is written.
     if ('defaultValue' in patch && patch.defaultValue !== undefined) {
       formFieldAfter({ field: before, widgets: [] }, patch);
@@ -645,6 +666,21 @@ export class FormMutator {
     }
     if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
+    }
+    if (purpose !== undefined && purpose !== before.purpose) {
+      writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
+    }
+    // A format replaces the field's format and keystroke scripts, and `null`
+    // removes both. The format the field already has is no change, so its
+    // scripts stay as they are, an older wording of the same format too.
+    if (format !== undefined && !formatsEqual(format, 'format' in before ? before.format : null)) {
+      writeFieldScripts(
+        this.runtime,
+        docPtr,
+        fieldObjectNumber,
+        before.actions,
+        scriptsOfFormat(format),
+      );
     }
     // New options and a new default, and the selection that goes with them,
     // as engine-core's rules (`formFieldAfter`) work them out.
@@ -1090,14 +1126,15 @@ const PATCH_BASE_MEMBERS = [
   'alternateName',
   'mappingName',
   'groupId',
+  'purpose',
   'actions',
 ];
 
 /** The members each kind's patch adds; a kind not listed takes the base only. */
 const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldKind, readonly string[]>> = {
-  text: ['defaultValue', 'maxLength', 'multiline', 'password', 'comb'],
+  text: ['defaultValue', 'maxLength', 'multiline', 'password', 'comb', 'format'],
   radio: ['radiosInUnison', 'noToggleToOff'],
-  combobox: ['edit', 'defaultValue', 'options'],
+  combobox: ['edit', 'defaultValue', 'options', 'format'],
   listbox: ['multiSelect', 'options', 'defaultValue'],
 };
 

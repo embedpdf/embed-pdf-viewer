@@ -43,6 +43,7 @@ const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormFie
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -58,6 +59,7 @@ const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormFie
   multiline: false,
   password: false,
   comb: false,
+  format: null,
   ...over,
 });
 
@@ -399,6 +401,7 @@ const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}
   alternateName: 'Sign here',
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -454,6 +457,7 @@ const radio = (over: Partial<Extract<FormField, { kind: 'radio' }>> = {}): FormF
   alternateName: 'Plan',
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,

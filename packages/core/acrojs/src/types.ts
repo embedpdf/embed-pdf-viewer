@@ -6,6 +6,8 @@ import type {
   FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 
+import type { DateParts } from './dates';
+
 /** JSON-safe value vocabulary exposed through Acrobat's `event` and `Field`. */
 export type ScriptValue = string | number | boolean | null | string[];
 
@@ -352,6 +354,17 @@ export const SCRIPT_EVENT_MATRIX = Object.freeze({
 
 /** Functions installed into the isolated VM global by `PRELUDE_SOURCE`. */
 export interface AcroJsVmGlobal {
+  /**
+   * The date `text` says under `pattern`, as the date keystroke functions
+   * read it, or `null` when they refuse it. It reads nothing but its
+   * arguments: `today` gives the year and the month the text leaves out. No
+   * run is needed, and a script cannot replace it.
+   */
+  __acrojsParseDate(
+    text: string,
+    pattern: string,
+    today: Pick<DateParts, 'year' | 'month' | 'day'>,
+  ): DateParts | null;
   __acrojsBoot(
     sources: string[],
     input: ScriptInput,

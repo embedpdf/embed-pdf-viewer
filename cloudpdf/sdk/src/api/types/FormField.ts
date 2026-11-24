@@ -30,6 +30,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -43,6 +44,8 @@ export namespace FormField {
         multiline: boolean;
         password: boolean;
         comb: boolean;
+        /** The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with the pattern it is shown in, or `other` for a format script the engine does not recognise. A newer server can add kinds: read one your client doesn't know as `other`. */
+        format: CloudPDF.FormFieldFormat | null;
     }
 
     export namespace FormFieldText {
@@ -67,6 +70,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -112,6 +116,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -158,6 +163,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -169,6 +175,8 @@ export namespace FormField {
         defaultValue: string;
         edit: boolean;
         options: FormFieldCombobox.Options.Item[];
+        /** The shape a text field's or a dropdown's value has, by its `kind`: a date or a time with the pattern it is shown in, or `other` for a format script the engine does not recognise. A newer server can add kinds: read one your client doesn't know as `other`. */
+        format: CloudPDF.FormFieldFormat | null;
     }
 
     export namespace FormFieldCombobox {
@@ -202,6 +210,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -247,6 +256,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -278,6 +288,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -309,6 +320,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
+        purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;

@@ -40,6 +40,7 @@ Every field has these:
 | `noExport`      | `true` when the field is left out when the form is submitted.                                                                       |
 | `alternateName` | The tooltip PDF apps show, also read by screen readers, or `null`.                                                                  |
 | `groupId`       | The group the field belongs to: who fills it in, such as `'buyer'`, or `null`. See [Signers and groups](/docs/engine/forms/groups). |
+| `purpose`       | What the value means, such as `'email'`, or `null`. See [Purpose](/docs/engine/forms/authoring#purpose).                            |
 | `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                                                       |
 
 A document without a form returns an empty `fields`. The list's `formKind` says what the document
@@ -62,16 +63,20 @@ if (field.kind === 'listbox') console.log(field.selectedValues); // string[]
 
 | Family       | Its value                                                          | Also                                                                                             |
 | :----------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| `text`       | `value`, a string                                                  | `defaultValue`, `maxLength` (`null`: no limit), `multiline`, `password`, `comb`                  |
+| `text`       | `value`, a string                                                  | `defaultValue`, `maxLength` (`null`: no limit), `multiline`, `password`, `comb`, `format`        |
 | `checkbox`   | `checked`                                                          | `exportValue`: what the form data holds while it's checked                                       |
 | `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                                                |
-| `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                                            |
+| `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`, `format`                                  |
 | `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values), `topIndex` (the option in its top row) |
 | `pushbutton` | none: a button only runs an action                                 | Each widget's `caption`, on its row in `widgets`                                                 |
 | `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                                  |
 
 Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the
 user sees; `value` is what the form stores, and what you pass when you fill the field in.
+
+A text field's or a dropdown's `format` is the shape its value has: a date
+(`{ kind: 'date', pattern: 'dd/mm/yyyy' }`), a time, another format (`{ kind: 'other' }`), or
+`null` for none. See [Dates and times](/docs/engine/forms/authoring#dates-and-times).
 
 ### Who created and filled it in
 
@@ -274,6 +279,10 @@ those scripts while a user types.
 A field's scripts are in `field.actions` (`keystroke`, `format`, `validate` and `calculate`), and
 the list's `calculationOrder` holds the fields whose totals are calculated, in order. To write them,
 see [Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
+
+A date or a time format is read for you: `field.format` gives its pattern, and `formatDate()` and
+`parseDate()` write and read a date by it without running a script. See
+[Dates and times](/docs/engine/forms/authoring#dates-and-times).
 
 The viewer's form plugin runs these scripts and writes their results as one
 [change](/docs/engine/documents/changes): `forms.setValue`, `forms.reset`, `forms.setDisplay`

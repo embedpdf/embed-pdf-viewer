@@ -10,6 +10,7 @@ import {
   formResetFacts,
   formValuesImportFacts,
   assertFormBundle,
+  completeFormBundle,
   assertFormBundleManifest,
   type BundleLimits,
   type DocumentEventInit,
@@ -78,6 +79,7 @@ import type { CloudManifest } from './CloudDocumentHandle';
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
+import { bundlePurposeTheServerLacks, fieldFactsTheServerLacks } from './fieldFacts';
 import { planesInherited } from './planes';
 import { assertServerTakesMark, markPart } from './signatureMark';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
@@ -240,7 +242,8 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
       const { body, resources } = await readBundleParts('form', form);
       const bundle = { ...(body as Omit<FormBundle, 'resources'>), resources };
       await assertFormBundle(bundle, NO_BUNDLE_LIMITS);
-      return bundle;
+      // An older server's fields come without a purpose and a format.
+      return completeFormBundle(bundle);
     });
   }
 
@@ -256,8 +259,13 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
     return AbortablePromise.run<FormImportResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
+        // Checked first: what the server lacks is asked of a bundle that is one.
+        const manifest = await this.checkedManifest(bundle);
+        // A server older than purposes would drop one without saying so.
+        const lacking = bundlePurposeTheServerLacks(this.http.serverVersion, manifest);
+        if (lacking) throw lacking;
         const body: FormImportBody = {
-          bundle: await this.checkedManifest(bundle),
+          bundle: manifest,
           options: {
             ...(options.pages !== undefined ? { pages: options.pages } : {}),
             ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
@@ -330,6 +338,9 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.rejectIfClosed<FormFieldCreateResult>();
     if (rejected) return rejected;
+    // A purpose and a format are never sent to a server older than them.
+    const lacking = fieldFactsTheServerLacks(this.http.serverVersion, draft);
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
       const opId = opIdOf(options);
       const { objectNumber, widgetObjectNumbers } = options;
@@ -363,6 +374,8 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
     if (rejected) return rejected;
+    const lacking = fieldFactsTheServerLacks(this.http.serverVersion, patch);
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {

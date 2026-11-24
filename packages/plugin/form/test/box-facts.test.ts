@@ -29,6 +29,7 @@ const base = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  purpose: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -51,6 +52,7 @@ const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormFie
   multiline: false,
   password: false,
   comb: false,
+  format: null,
   ...over,
 });
 
