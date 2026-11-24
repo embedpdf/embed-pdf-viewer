@@ -54,8 +54,12 @@ export interface FormFocusTarget {
    * its field. A target without it takes the cursor.
    */
   takesCursor?(): boolean;
-  /** Take the cursor; `select` selects a text box's text, so typing replaces it. */
-  focus(options: { readonly select: boolean }): void;
+  /**
+   * Take the cursor; `select` selects a text box's text, so typing replaces it. `false` when
+   * nothing took it after all: the cursor then passes over the box, as over one that says it
+   * takes none. A target that answers nothing took it.
+   */
+  focus(options: { readonly select: boolean }): boolean | void;
 }
 
 /**

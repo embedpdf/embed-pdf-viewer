@@ -5,9 +5,10 @@ import { bindFieldFocus, type FieldFocusForm } from '../src/field-focus';
 
 afterEach(() => {
   document.body.innerHTML = '';
+  document.head.innerHTML = '';
 });
 
-type Target = { takesCursor(): boolean; focus(options: { readonly select: boolean }): void };
+type Target = { takesCursor(): boolean; focus(options: { readonly select: boolean }): boolean };
 
 /** A form that remembers the targets it was lent and answers Tab with `next`. */
 function fakeForm(next = true) {
@@ -126,6 +127,88 @@ describe('bindFieldFocus', () => {
     expect(targets.get('sign')!.takesCursor()).toBe(true);
     targets.get('sign')!.focus({ select: false });
     expect(document.activeElement).toBe(sign);
+  });
+
+  it("a control of an app's own whose only element can't take focus takes no cursor", () => {
+    document.head.innerHTML =
+      '<style>.gone { display: none; } .unseen { visibility: hidden; }</style>';
+    document.body.innerHTML = `
+      <input id="before" />
+      <div data-case="hidden"><button hidden></button></div>
+      <div data-case="in a hidden part"><div hidden><button></button></div></div>
+      <div data-case="in an inert part"><div inert><button></button></div></div>
+      <div data-case="disabled"><button disabled></button></div>
+      <div data-case="display: none"><button class="gone"></button></div>
+      <div data-case="in a part with display: none"><div class="gone"><button></button></div></div>
+      <div data-case="visibility: hidden"><button class="unseen"></button></div>`;
+    const before = document.getElementById('before')!;
+    const { form, targets } = fakeForm();
+    for (const box of document.querySelectorAll<HTMLElement>('[data-case]')) {
+      const name = box.dataset.case!;
+      bindFieldFocus(box, form, name, { custom: true });
+      before.focus();
+      expect(targets.get(name)!.takesCursor(), name).toBe(false);
+      expect(targets.get(name)!.focus({ select: false }), name).toBe(false);
+      expect(document.activeElement, name).toBe(before);
+    }
+  });
+
+  it("in a control of an app's own, the cursor goes past what can't take focus to what can", () => {
+    document.head.innerHTML = '<style>.gone { display: none; }</style>';
+    document.body.innerHTML = `
+      <div id="box">
+        <button hidden></button>
+        <button class="gone"></button>
+        <div inert><input /></div>
+        <input id="field" value="Ada" />
+      </div>`;
+    const field = document.getElementById('field') as HTMLInputElement;
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'name', { custom: true });
+    expect(targets.get('name')!.takesCursor()).toBe(true);
+    expect(targets.get('name')!.focus({ select: true })).toBe(true);
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 3]);
+  });
+
+  it("a control of an app's own answers whether the cursor went in", () => {
+    document.body.innerHTML = `
+      <input id="before" />
+      <div id="box"><button id="first"></button><button id="second"></button></div>`;
+    const before = document.getElementById('before')!;
+    const first = document.getElementById('first')!;
+    const second = document.getElementById('second')!;
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'sign', { custom: true });
+
+    // The browser ignores `focus()` on what it won't focus, for a reason the markup doesn't
+    // show: the cursor is where it was, and the next element is asked.
+    vi.spyOn(first, 'focus').mockImplementation(() => {});
+    before.focus();
+    expect(targets.get('sign')!.focus({ select: false })).toBe(true);
+    expect(document.activeElement).toBe(second);
+
+    // Nothing in the box takes it: the target says so.
+    vi.spyOn(second, 'focus').mockImplementation(() => {});
+    before.focus();
+    expect(targets.get('sign')!.focus({ select: false })).toBe(false);
+    expect(document.activeElement).toBe(before);
+
+    // A control that hands the cursor on, to a picker it opens elsewhere, took it.
+    const picker = document.createElement('input');
+    document.body.append(picker);
+    vi.spyOn(first, 'focus').mockImplementation(() => picker.focus());
+    before.focus();
+    expect(targets.get('sign')!.focus({ select: false })).toBe(true);
+    expect(document.activeElement).toBe(picker);
+  });
+
+  it("the layer's own control always answers that the cursor went in", () => {
+    document.body.innerHTML = '<div id="box"><input id="field" /></div>';
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('box')!, form, 'name');
+    expect(targets.get('name')!.focus({ select: false })).toBe(true);
+    expect(document.activeElement).toBe(document.getElementById('field'));
   });
 
   it("a control of an app's own with a text box in it has its text selected when asked", () => {

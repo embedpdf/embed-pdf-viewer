@@ -9,8 +9,9 @@
  *
  * Not every box has a control: a signature field with nothing to sign it is only its picture.
  * Its target says it takes no cursor (`takesCursor`), and the cursor passes over a box on screen
- * that says so. A box that isn't on screen can't say: it is asked for like any other, and when
- * it comes in holding nothing, the cursor goes on from it (`onward`).
+ * that says so, and over one that said yes and then took none (`focus` answers `false`). A box
+ * that isn't on screen can't say: it is asked for like any other, and when it comes in holding
+ * nothing, the cursor goes on from it (`onward`).
  *
  * The box the cursor is in follows the controls' focus and blur (`notifyWidgetEvent`). A blur
  * counts only when no focus follows in the same turn, so moving between fields is one change.
@@ -50,6 +51,19 @@ interface Pending {
 /** Whether a control takes the cursor: every one that doesn't say it takes none. */
 const takes = (target: FormFocusTarget): boolean => target.takesCursor?.() ?? true;
 
+/** Put the cursor in a control. `false` when it takes none: it says so, or nothing in it took it. */
+const enter = (target: FormFocusTarget, select: boolean): boolean =>
+  takes(target) && target.focus({ select }) !== false;
+
+/** What became of a move to a box. */
+export type CursorMove =
+  /** The cursor is in the box, or goes in when its control arrives. */
+  | 'taken'
+  /** Its control takes no cursor: the move passes over the box. */
+  | 'declined'
+  /** It isn't on screen, and no Stage can bring it in. */
+  | 'unreachable';
+
 export interface FormCursor {
   /** The box the cursor is in: its field and its annotation object number. */
   focused(): FocusedWidget | null;
@@ -58,17 +72,12 @@ export interface FormCursor {
   /** A control's focus or blur, as the form layer reports it. */
   note(event: 'focus' | 'blur', field: FormFieldRef, widget: AnnotationRef): void;
   /**
-   * Whether the cursor can go into a box: `false` for one on screen whose control says it takes
-   * no cursor. A box that isn't on screen may yet take it.
-   */
-  mayTake(row: WidgetAnnotation): boolean;
-  /**
    * Bring a box into view and put the cursor in it: now if its control is there, else when it
-   * comes. `false` when its control takes no cursor (the view stays where it is), or when it
-   * isn't there and no Stage can bring it in. `onward` runs if the box comes in holding nothing
-   * to focus: where the cursor goes instead.
+   * comes. A box on screen whose control says it takes no cursor is declined before the view
+   * moves. `onward` runs if the box comes in holding nothing to focus: where the cursor goes
+   * instead.
    */
-  goTo(row: WidgetAnnotation, select: boolean, onward?: () => void): boolean;
+  goTo(row: WidgetAnnotation, select: boolean, onward?: () => void): CursorMove;
   /** A box's control, lent while it's on screen. Returns the call that takes it back. */
   attach(widget: AnnotationRef, target: FormFocusTarget): () => void;
 }
@@ -99,16 +108,11 @@ export function createCursor(
   };
 
   /**
-   * The box asked for has come in. Its control takes the cursor. One that holds nothing to
-   * focus is given the turn to draw what does (a control of an app's own may render after its
-   * box), and if it still holds nothing then, the cursor goes on.
+   * A box asked for came in holding nothing to focus. It is given the turn to draw what does (a
+   * control of an app's own may render after its box), and if nothing in it takes the cursor
+   * then, the cursor goes on.
    */
-  const arrive = (waiting: Pending, target: FormFocusTarget) => {
-    if (takes(target)) {
-      clearPending();
-      target.focus({ select: waiting.select });
-      return;
-    }
+  const settleLater = (waiting: Pending) => {
     waiting.settle ??= ctx.clock.after(0, () => {
       waiting.settle = null;
       if (pending !== waiting) return;
@@ -116,9 +120,14 @@ export function createCursor(
       // Gone again within the turn: it's still awaited.
       if (!now) return;
       clearPending();
-      if (takes(now)) now.focus({ select: waiting.select });
-      else waiting.onward?.();
+      if (!enter(now, waiting.select)) waiting.onward?.();
     });
+  };
+
+  /** The box asked for has come in: its control takes the cursor, or gets its turn to. */
+  const arrive = (waiting: Pending, target: FormFocusTarget) => {
+    if (!enter(target, waiting.select)) settleLater(waiting);
+    else if (pending === waiting) clearPending();
   };
 
   return {
@@ -142,22 +151,20 @@ export function createCursor(
         });
       }
     },
-    mayTake(row) {
-      const target = targets.get(widgetObjectOf(row.ref));
-      return !target || takes(target);
-    },
     goTo(row, select, onward) {
       const widget = widgetObjectOf(row.ref);
-      const target = targets.get(widget);
-      if (target && !takes(target)) return false;
+      const shown = targets.get(widget);
+      // On screen, and it says it holds nothing to focus: the view stays where it is.
+      if (shown && !takes(shown)) return 'declined';
       const stage = ctx.tryGet(StageToken);
       stage?.reveal(row.page, { rect: row.rect });
       clearPending();
-      if (target) {
-        target.focus({ select });
-        return true;
-      }
-      if (!stage) return false;
+      // Read again: a host may draw the box, and lend its control, as the view moves.
+      const target = targets.get(widget);
+      if (target && enter(target, select)) return 'taken';
+      // It was on screen, said it takes the cursor, and nothing in it did.
+      if (target && target === shown) return 'declined';
+      if (!stage) return 'unreachable';
       const waiting: Pending = {
         widget,
         select,
@@ -168,7 +175,9 @@ export function createCursor(
         settle: null,
       };
       pending = waiting;
-      return true;
+      // Lent as the view moved, with nothing to focus yet: it gets its turn, as one that comes later.
+      if (target) settleLater(waiting);
+      return 'taken';
     },
     attach(widgetRef, target) {
       const widget = widgetObjectOf(widgetRef);

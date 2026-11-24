@@ -29,7 +29,7 @@ FormFilter [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): e
 FormFocusChangedEvent [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): export interface FormFocusChangedEvent{ readonly field: FormField | null; readonly widget: AnnotationRef | null; }
 FormFocusNextOptions [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): export interface FormFocusNextOptions{ from?: FormFieldRef; backward?: boolean; empty?: boolean; wrap?: boolean; }
 FormFocusOptions [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): export interface FormFocusOptions{ widget?: WidgetAddress; select?: boolean; }
-FormFocusTarget [InterfaceDeclaration]: export interface FormFocusTarget{ takesCursor?(): boolean; focus(options:{ readonly select: boolean} ): void; }
+FormFocusTarget [InterfaceDeclaration]: export interface FormFocusTarget{ takesCursor?(): boolean; focus(options:{ readonly select: boolean} ): boolean | void; }
 FormGroup [InterfaceDeclaration] (from packages/plugin/form/src/services/groups.ts): export interface FormGroup{ readonly id: string; readonly label: string | null; readonly color: string; }
 FormGroupInput [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): export interface FormGroupInput{ readonly id: string; readonly label?: string; readonly color?: string; }
 FormGroupMoveResult [InterfaceDeclaration] (from packages/plugin/form/src/contract.ts): export interface FormGroupMoveResult{ readonly fields: readonly FormField[]; }

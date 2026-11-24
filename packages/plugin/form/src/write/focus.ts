@@ -4,8 +4,9 @@
  * field, which of its boxes, in Tab's order (`services/tab-order.ts`); the cursor service
  * (`services/cursor.ts`) brings the box into view and hands it to its control.
  *
- * A stop is a box of a field the user may fill in. The cursor passes over one whose control is
- * on screen and takes no cursor (`cursor.mayTake`): a signature field with nothing to sign it.
+ * A stop is a box of a field the user may fill in. The cursor passes over one whose control
+ * takes no cursor (`cursor.goTo` declines it): a signature field with nothing to sign it. Stops
+ * are tried in the order Tab comes to them, so a move asks only the ones it reaches.
  */
 import { memo } from '@embedpdf/core';
 import type {
@@ -34,6 +35,8 @@ interface Step {
   readonly empty: boolean;
   readonly wrap: boolean;
 }
+
+const NO_STOPS: ReadonlySet<number> = new Set();
 
 /** A radio button as its field lists it: whether it's the checked one, and the value it picks. */
 const radioButtonOf = (field: FormField, widget: number) =>
@@ -97,30 +100,37 @@ export function createFocus(
     return checked ?? (backward ? (buttons.at(-1) ?? stop.row) : stop.row);
   };
 
-  /** Whether the cursor can go into a stop: not one on screen whose control takes no cursor. */
-  const takesCursor = (stop: Stop, backward: boolean): boolean =>
-    cursor.mayTake(boxAt(stop, backward));
-
   const focus = (ref: FormFieldRef, options: FormFocusOptions = {}): boolean => {
     const index = fields.view();
     const field = fieldByRef(index, ref);
     if (!field || !rights.takesInput(field)) return false;
-    let row: WidgetAnnotation | undefined;
+    const select = options.select ?? false;
     if (options.widget) {
       const widget = widgetObjectOf(options.widget);
       if (fieldForWidget(index, widget) !== field) return false;
-      row = order().rows.find((candidate) => widgetObjectOf(candidate.ref) === widget);
-    } else {
-      const stop = order().stops.find(
-        (candidate) => candidate.field === field && takesCursor(candidate, false),
-      );
-      row = stop && boxAt(stop, false);
+      const row = order().rows.find((candidate) => widgetObjectOf(candidate.ref) === widget);
+      return row ? cursor.goTo(row, select) === 'taken' : false;
     }
-    return row ? cursor.goTo(row, options.select ?? false) : false;
+    // The field's first stop that takes the cursor.
+    for (const stop of order().stops) {
+      if (stop.field !== field) continue;
+      const move = cursor.goTo(boxAt(stop, false), select);
+      if (move !== 'declined') return move === 'taken';
+    }
+    return false;
   };
 
-  /** Move the cursor to the next stop after a box (`from`; `null`: from the start), as Tab does. */
-  const step = (from: number | null, { backward, empty, wrap }: Step): boolean => {
+  /**
+   * Move the cursor to the next stop after a box (`from`; `null`: from the start), as Tab does:
+   * the first one on the way that takes the cursor. `passed` are the stops this move already
+   * asked for and that came in holding nothing to focus.
+   */
+  const step = (
+    from: number | null,
+    how: Step,
+    passed: ReadonlySet<number> = NO_STOPS,
+  ): boolean => {
+    const { backward, empty, wrap } = how;
     const index = fields.view();
     const { position, stops } = order();
     const at = from === null ? null : (position.get(from) ?? null);
@@ -131,21 +141,24 @@ export function createFocus(
         (!empty || isEmpty(stop.field)) &&
         // A radio group is one stop: from one of its buttons, the group is where the cursor is.
         !(stop.field === field && field.kind === 'radio' && stop.row.page.objectNumber === page) &&
-        takesCursor(stop, backward),
+        !passed.has(widgetObjectOf(stop.row.ref)),
     );
-    const ahead = candidates.filter((stop) =>
-      at === null ? true : backward ? stop.at < at : stop.at > at,
-    );
-    const next =
-      (backward ? ahead.at(-1) : ahead[0]) ??
-      (wrap ? (backward ? candidates.at(-1) : candidates[0]) : undefined);
-    if (!next) return false;
-    const box = boxAt(next, backward);
-    // A box that isn't on screen may come in holding nothing to focus. The cursor then goes on
-    // from it the same way, and never starts over, so it can't go round a form of such boxes.
-    const onward = () => void step(widgetObjectOf(box.ref), { backward, empty, wrap: false });
-    // Tab selects a text box's text, so typing replaces it.
-    return cursor.goTo(box, true, onward);
+    const isAhead = (stop: Stop) => (at === null ? true : backward ? stop.at < at : stop.at > at);
+    const ahead = candidates.filter(isAhead);
+    const round = wrap ? candidates.filter((stop) => !isAhead(stop)) : [];
+    // The way Tab comes to them: what lies ahead, then, with `wrap`, round from the other end.
+    const way = backward ? [...ahead.reverse(), ...round.reverse()] : [...ahead, ...round];
+    for (const stop of way) {
+      const here = widgetObjectOf(stop.row.ref);
+      // A box that isn't on screen may come in holding nothing to focus. The cursor then goes on
+      // from this stop the same way. A stop is asked for once in a move, so a move can't go
+      // round a form of such boxes.
+      const onward = () => void step(here, how, new Set([...passed, here]));
+      // Tab selects a text box's text, so typing replaces it.
+      const move = cursor.goTo(boxAt(stop, backward), true, onward);
+      if (move !== 'declined') return move === 'taken';
+    }
+    return false;
   };
 
   const focusNext = (options: FormFocusNextOptions = {}): boolean => {
@@ -171,7 +184,7 @@ export function createFocus(
     const here = buttons.findIndex((row) => widgetObjectOf(row.ref) === widget);
     if (here < 0 || buttons.length < 2) return false;
     const next = buttons[(here + (backward ? buttons.length - 1 : 1)) % buttons.length]!;
-    if (!cursor.goTo(next, false)) return false;
+    if (cursor.goTo(next, false) !== 'taken') return false;
     // As a click on it: the value first, then its action (Acrobat's order).
     const button = radioButtonOf(field, widgetObjectOf(next.ref));
     if (button) {

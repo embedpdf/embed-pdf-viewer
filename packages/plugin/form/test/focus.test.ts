@@ -309,6 +309,22 @@ describe('focusNext()', () => {
     expect(focused).toEqual([11, 16]);
   });
 
+  it('with `wrap`, takes what lies on its way before it goes round', async () => {
+    const { capability, focused, show } = await form();
+    show(14, P2);
+    show(16, P2);
+    // From email, the second stop: back to name, and only from name round to the last.
+    capability.focus(EMAIL.ref);
+    expect(capability.focusNext({ backward: true, wrap: true })).toBe(true);
+    expect(capability.focusNext({ backward: true, wrap: true })).toBe(true);
+    expect(focused).toEqual([12, 11, 16]);
+    // Forward the same: from city on to the group, and only from the group round to name.
+    capability.focus(CITY.ref);
+    expect(capability.focusNext({ wrap: true })).toBe(true);
+    expect(capability.focusNext({ wrap: true })).toBe(true);
+    expect(focused).toEqual([12, 11, 16, 14, 16, 11]);
+  });
+
   it('goes on from the field the cursor was in last, as a Next button outside the form does', async () => {
     const { capability, focused } = await form();
     capability.focus(NAME.ref);
@@ -531,19 +547,129 @@ describe('a box that holds nothing to take the cursor', () => {
     expect(capability.focus(LATER_SIGN.ref)).toBe(false);
   });
 
-  it('the cursor going on past it never starts over: with none after it, it stays', async () => {
+  it('the cursor going on past it keeps `wrap`, and comes round to the first stop', async () => {
     const { capability, focused, showEmpty, time } = await form({
-      ...pages,
-      fields: [FIRST, LATER_SIGN],
-      widgets: [row(11, P1, 100), row(18, P2, 100)],
+      fields: [FIRST, SECOND, LATER_SIGN],
+      widgets: [row(11, P1, 100), row(12, P1, 200), row(18, P2, 100)],
+      shown: [11, 12],
     });
-    capability.focus(FIRST.ref);
+    capability.focus(SECOND.ref);
     expect(capability.focusNext({ wrap: true })).toBe(true);
     showEmpty(18, P2);
     time.advance(0);
-    expect(focused).toEqual([11]);
-    // Asked again, the field is known to take no cursor: the form's only stop is the first.
+    expect(focused).toEqual([12, 11]);
+    // Without `wrap` it stops at the end, as Tab does.
+    capability.focus(SECOND.ref);
+    showEmpty(18, P2)();
+    expect(capability.focusNext()).toBe(true);
+    showEmpty(18, P2);
+    time.advance(0);
+    expect(focused).toEqual([12, 11, 12]);
+  });
+
+  it('the cursor going on past it never goes round a form of such boxes', async () => {
+    // Two signature fields nothing can sign, on two pages, and no other field.
+    const HERE = signature(1, 'here', 18, P1);
+    const THERE = signature(2, 'there', 19, P2);
+    const { capability, reveal, focused, showEmpty, time } = await form({
+      fields: [HERE, THERE],
+      widgets: [row(18, P1, 100), row(19, P2, 100)],
+      shown: [],
+    });
     expect(capability.focusNext({ wrap: true })).toBe(true);
-    expect(focused).toEqual([11, 11]);
+    const leave = showEmpty(18, P1);
+    time.advance(0);
+    // On to the second, whose page comes in as the first one's goes.
+    expect(reveal).toHaveBeenLastCalledWith(P2, expect.anything());
+    leave();
+    showEmpty(19, P2);
+    time.advance(0);
+    time.advance(0);
+    // Each was asked for once: the first isn't asked again, though nothing says now that it can't.
+    expect(reveal).toHaveBeenCalledTimes(2);
+    expect(focused).toEqual([]);
+  });
+
+  it('the cursor goes on from where the stop is, not from the box it chose', async () => {
+    // Page 2 in Tab's order: a group's first button, a text box, the group's checked button.
+    const { capability, focused, show, showEmpty, time } = await form({
+      fields: [NAME, CITY, PLAN],
+      widgets: [row(11, P1, 100), row(15, P2, 100), row(14, P2, 200), row(16, P2, 300)],
+      shown: [11],
+    });
+    capability.focus(NAME.ref);
+    // The group is the next stop, and its checked button, the last box, is asked for.
+    expect(capability.focusNext()).toBe(true);
+    show(14, P2);
+    showEmpty(15, P2);
+    showEmpty(16, P2);
+    time.advance(0);
+    expect(focused).toEqual([11, 14]);
+  });
+
+  it('a control lent while the Stage brings its box in takes the cursor', async () => {
+    const { capability, reveal, focused, show } = await form();
+    // A host that draws the page as the view moves.
+    reveal.mockImplementationOnce(() => void show(14, P2));
+    expect(capability.focus(CITY.ref)).toBe(true);
+    expect(focused).toEqual([14]);
+    expect(capability.getFocusedField()?.name).toBe('city');
+  });
+
+  it('a box lent while the Stage brings it in, with nothing to focus: the cursor goes on', async () => {
+    const { capability, reveal, focused, show, showEmpty, time } = await form(pages);
+    show(14, P2);
+    capability.focus(FIRST.ref);
+    reveal.mockImplementationOnce(() => void showEmpty(18, P2));
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11]);
+    time.advance(0);
+    expect(focused).toEqual([11, 14]);
+  });
+
+  it('a control that says it takes the cursor and then takes none is passed over', async () => {
+    const { capability, focused } = await form(page);
+    // Nothing in the box took the cursor when asked: its target answers `false`.
+    const asked = vi.fn(() => false);
+    capability.attachFocusTarget(widgetRef(18, P1), { focus: asked });
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext()).toBe(true);
+    expect(asked).toHaveBeenCalledTimes(1);
+    expect(focused).toEqual([11, 12]);
+    expect(capability.focus(SIGN.ref)).toBe(false);
+  });
+
+  it('asks only the stops it comes to', async () => {
+    // A text box, then forty radio groups: Tab from the text box needs the first group alone.
+    const fields: FormField[] = [FIRST];
+    const widgets = [row(11, P1, 1)];
+    for (let group = 0; group < 40; group++) {
+      const button = 100 + group * 2;
+      fields.push({
+        ...PLAN,
+        ref: fieldRef(500 + group),
+        name: `plan${group}`,
+        widgets: [
+          { ...formWidget(button, P1), onState: 'a', exportValue: 'a', checked: true },
+          { ...formWidget(button + 1, P1), onState: 'b', exportValue: 'b', checked: false },
+        ],
+      } as unknown as FormField);
+      widgets.push(row(button, P1, 10 + group * 2), row(button + 1, P1, 11 + group * 2));
+    }
+    const { capability } = await form({ fields, widgets, shown: [11] });
+    const asked: number[] = [];
+    for (let group = 0; group < 40; group++) {
+      const button = 100 + group * 2;
+      capability.attachFocusTarget(widgetRef(button, P1), {
+        takesCursor: () => {
+          asked.push(button);
+          return true;
+        },
+        focus: () => {},
+      });
+    }
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext()).toBe(true);
+    expect(new Set(asked)).toEqual(new Set([100]));
   });
 });
