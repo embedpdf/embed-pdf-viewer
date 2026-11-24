@@ -35,7 +35,8 @@ export function fieldFactsTheServerLacks(
 
 /**
  * The refusal of an import whose bundle holds a field with a purpose when
- * the server is older than purposes, or `null` when it can go out. Such a
+ * the server is older than purposes, or `null` when it can go out. `bundle`
+ * is one already checked: its rows are read as they stand. Such a
  * server takes the bundle, makes the field without its purpose and lists
  * nothing as left out, so the purpose would be lost unseen. A format needs
  * no such check: an older server reads it from the field's scripts, and

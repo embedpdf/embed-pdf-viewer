@@ -254,6 +254,38 @@ describe("a field's purpose and format on the wire", () => {
     }
   });
 
+  test('an import checks its bundle before it asks what the server has', async () => {
+    // Against a server of this version and against an older one: a bundle
+    // that is none is refused as it always was, through the promise.
+    for (const version of [undefined, '3.2']) {
+      const { fetchFn, sent } = recordingFetch(version);
+      const doc = await open(fetchFn);
+      try {
+        const exported = await doc.forms.export({ fields: [named('plain_one')] });
+        const broken: unknown[] = [
+          { ...exported, fields: [{ data: null }] },
+          { ...exported, fields: [null] },
+          { ...exported, fields: undefined },
+          { ...exported, fields: [{ data: { purpose: 'email' } }] },
+        ];
+        for (const bundle of broken) {
+          let attempt: Promise<unknown> | undefined;
+          expect(() => {
+            attempt = doc.forms.import(bundle as never);
+          }).not.toThrow();
+          const refusal = await attempt!.then(
+            () => null,
+            (error: unknown) => error,
+          );
+          expect(EngineError.is(refusal) && refusal.code).toBe(EngineErrorCode.InvalidArg);
+        }
+        expect(sent).toEqual([]);
+      } finally {
+        await doc.close();
+      }
+    }
+  });
+
   test("an older server's fields read whole: no purpose, and the format their scripts give", async () => {
     const { fetchFn } = recordingFetch('3.2');
     const doc = await open(fetchFn);

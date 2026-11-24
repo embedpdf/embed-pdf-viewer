@@ -256,14 +256,16 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   import(bundle: FormBundle, options: FormImportOptions = {}): AbortablePromise<FormImportResult> {
     const rejected = this.rejectIfClosed<FormImportResult>();
     if (rejected) return rejected;
-    // A server older than purposes would drop one without saying so.
-    const lacking = bundlePurposeTheServerLacks(this.http.serverVersion, bundle);
-    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormImportResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
+        // Checked first: what the server lacks is asked of a bundle that is one.
+        const manifest = await this.checkedManifest(bundle);
+        // A server older than purposes would drop one without saying so.
+        const lacking = bundlePurposeTheServerLacks(this.http.serverVersion, manifest);
+        if (lacking) throw lacking;
         const body: FormImportBody = {
-          bundle: await this.checkedManifest(bundle),
+          bundle: manifest,
           options: {
             ...(options.pages !== undefined ? { pages: options.pages } : {}),
             ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
