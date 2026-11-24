@@ -421,6 +421,28 @@ describe('canSetGroup()', () => {
     ).rejects.toMatchObject({ code: 'permission-denied' });
   });
 
+  it('taking a field out of its group, or making one in none, takes form design alone', async () => {
+    const { form, apply } = await boot([text(1, { groupId: 'buyer' })], { setGroup: [] });
+    // The stand-in engine answers with nothing, so only the sending is read here.
+    void form.update({ kind: 'objectNumber', objectNumber: 1 }, { groupId: null }).catch(() => {});
+    expect(form.get({ kind: 'objectNumber', objectNumber: 1 })!.groupId).toBeNull();
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    // A new field in no group is not refused for a group right either.
+    const made = await Promise.race([
+      form.create({ kind: 'text', name: 'nobodys', groupId: null, widgets: [] }).then(
+        () => 'sent',
+        (error: { code?: string }) => error.code ?? 'failed',
+      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('on its way'), 50)),
+    ]);
+    expect(made).not.toBe('permission-denied');
+    // Without form design, neither.
+    const filler = await loaded([text(1, { groupId: 'buyer' })], { design: false });
+    await expect(
+      filler.update({ kind: 'objectNumber', objectNumber: 1 }, { groupId: null }),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+
   it('naming a group takes no right: a signer’s page names them too', async () => {
     const signer = await loaded([text(1, { groupId: 'buyer' })], {
       fill: ['buyer'],
@@ -448,6 +470,22 @@ describe('moveToGroup()', () => {
     expect(ops).toEqual([
       { type: 'forms.update', field: ref(1), patch: { groupId: 'buyer' } },
       { type: 'forms.update', field: ref(3), patch: { groupId: 'buyer' } },
+    ]);
+  });
+
+  it('takes fields out of their group with `null`, with form design alone', async () => {
+    const { form, apply } = await boot(
+      [text(1, { groupId: 'buyer' }), text(2), text(3, { groupId: 'seller' })],
+      { setGroup: [] },
+    );
+    void form.moveToGroup([ref(1), ref(2), ref(3)], null).catch(() => undefined);
+    // At once, and the groups nobody is in any more leave the list.
+    expect(form.list().map((field) => field.groupId)).toEqual([null, null, null]);
+    expect(form.listGroups()).toEqual([]);
+    const { ops } = (apply.mock.calls[0] as unknown as [{ ops: unknown[] }])[0];
+    expect(ops).toEqual([
+      { type: 'forms.update', field: ref(1), patch: { groupId: null } },
+      { type: 'forms.update', field: ref(3), patch: { groupId: null } },
     ]);
   });
 

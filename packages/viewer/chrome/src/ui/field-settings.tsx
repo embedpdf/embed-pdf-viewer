@@ -133,10 +133,7 @@ function SettingControl({
             value={typeof value === 'string' ? value : ''}
             onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
           >
-            {/* A field's group can be changed, not taken away: "none" shows only while it has none. */}
-            {spec.key === 'groupId' && typeof value === 'string' ? null : (
-              <option value="">{t('demo.fieldNone')}</option>
-            )}
+            <option value="">{t('demo.fieldNone')}</option>
             {spec.options.map((option) => (
               <option key={option} value={option}>
                 {optionLabel(option)}

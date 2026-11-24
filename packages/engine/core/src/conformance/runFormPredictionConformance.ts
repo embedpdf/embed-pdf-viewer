@@ -114,6 +114,7 @@ const list =
 const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => FormFieldDraft }[] =
   [
     { name: 'text, as little as it takes', draft: text() },
+    { name: 'text, in no group by name', draft: text({ groupId: null }) },
     {
       name: 'text, every setting',
       draft: text({
@@ -378,6 +379,16 @@ const CASES: readonly PredictionCase[] = [
     op: { type: 'update', patch: { groupId: 'seller' } },
   },
   {
+    name: 'update: out of its group',
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { groupId: null } },
+  },
+  {
+    name: 'update: into a group from none',
+    draft: text(),
+    op: { type: 'update', patch: { groupId: 'buyer' } },
+  },
+  {
     name: 'update: radios in unison',
     draft: radio(['x', 'y']),
     op: { type: 'update', patch: { radiosInUnison: true } },
@@ -607,7 +618,6 @@ export function runFormPredictionConformance(
           objectNumber: created.ref.kind === 'objectNumber' ? created.ref.objectNumber : 0,
           widgets: actual.widgets.map((row) => row.ref as AnnotationRef),
           widgetNames: actual.widgets.map((row) => row.nm ?? ''),
-          groupId: actual.field.groupId,
           createdBy: actual.field.createdBy,
           createdAt: actual.field.createdAt,
         });

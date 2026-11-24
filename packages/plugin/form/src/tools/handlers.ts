@@ -61,7 +61,7 @@ export function placedOnPage(
 /**
  * The field a palette tool places: one widget at `widget`, named like
  * `text_1`, in `groupId` when the palette places for a group (the form's
- * design group); without one the engine puts it in the session's own. A
+ * design group); without one it is in no group. A
  * radio button stands for `'Choice1'` and a dropdown or a list starts with
  * two options, as in Acrobat; rename and change them in a settings panel.
  */

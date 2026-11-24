@@ -2,8 +2,7 @@
  * The form's groups, as the app sets them: who this document's groups are (`setGroups()`), and
  * who new fields are placed for (the design group). Both are session state a toolbar sets and
  * reads; neither is written into the PDF. A field placed with a tool goes into the design group
- * (tools/handlers.ts); `null`, where it starts, names none, so the field goes where one made
- * without a `groupId` goes.
+ * (tools/handlers.ts); `null`, where it starts, names none, so the field is in no group.
  */
 import type { FormCapability, FormGroupInput } from '../contract';
 import { setDesignGroup, setGroups, type NamedGroup } from '../model';

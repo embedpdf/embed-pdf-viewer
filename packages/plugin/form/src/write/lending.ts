@@ -26,6 +26,7 @@ import type { AnnotationLender } from '@embedpdf/plugin-annotation/contract/host
 import type { DuplicatePlacement } from './duplicate';
 import { fieldForWidget, fieldKeyOf, hasArea } from '../model';
 import type { FormContext, FormServices } from '../services';
+import { undoLookOf } from '../sync/predict';
 
 const objectNumberOf = (ref: AnnotationRef): number =>
   ref.kind === 'objectNumber' ? ref.objectNumber : -1;
@@ -34,12 +35,11 @@ export function createWidgetLender(
   ctx: FormContext,
   {
     fields,
-    predictor,
     design,
     pictures,
     looks,
     groups,
-  }: Pick<FormServices, 'fields' | 'predictor' | 'design' | 'pictures' | 'looks' | 'groups'>,
+  }: Pick<FormServices, 'fields' | 'design' | 'pictures' | 'looks' | 'groups'>,
   /** The ops that copy widgets by the designer's rule (write/fields.ts). */
   copyOps: (
     widgets: readonly AnnotationRef[],
@@ -116,7 +116,7 @@ export function createWidgetLender(
       }
       return [...ops, ...deleteOps(deleted)];
     },
-    undoOf: (ops) => predictor.undoLook(fields.view(), ops),
+    undoOf: (ops) => undoLookOf(fields.view(), ops),
     reorderOps: (page: PageRef, refs, position) => [
       { type: 'forms.reorderWidgets', page, widgets: [...refs], position },
     ],

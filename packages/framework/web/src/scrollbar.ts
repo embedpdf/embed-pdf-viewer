@@ -1,5 +1,6 @@
 /**
- * A Stage scrollbar's geometry and its press handling, shared by every framework's `Scrollbar`.
+ * A Stage scrollbar's geometry, its press handling and the listeners that carry it, shared by
+ * every framework's `Scrollbar`.
  *
  * The Stage gives its scroll position as a scrolling element has it (`scrollTop`,
  * `scrollHeight`, `clientHeight` and their horizontal twins, in screen pixels). From that and the
@@ -11,6 +12,8 @@
  *
  * The adapters keep their reactive glue: the track's size, auto-hide, hover and the markup.
  */
+
+import { isolatePointerDown } from './event-isolation';
 
 /** The scroll position a Stage reports (`ScrollMetrics` from the stage plugin satisfies it). */
 export interface ScrollbarMetrics {
@@ -80,9 +83,9 @@ export interface ScrollbarTrack {
 }
 
 /**
- * The pointer event a press handler reads: a DOM `PointerEvent`, or a framework's own event
- * with the same members (React's), so `stopPropagation` and `currentTarget` mean what the
- * framework's handlers mean.
+ * What a press handler reads from a pointer event; a DOM `PointerEvent` satisfies it. A handler
+ * stops the press it takes, which keeps it from the Stage only when the handler runs on a native
+ * listener on the bar itself, as `attachScrollbar` calls it.
  */
 export interface ScrollbarPointerEvent {
   readonly button: number;
@@ -95,7 +98,10 @@ export interface ScrollbarPointerEvent {
   stopPropagation(): void;
 }
 
-/** A scrollbar's presses: wire the thumb's and the track's pointer events to these. */
+/**
+ * A scrollbar's presses, for a bar that wires its own listeners to them. `attachScrollbar` wires
+ * them for you.
+ */
 export interface ScrollbarPresses {
   /** A press on the thumb starts a drag. */
   pressThumb(event: ScrollbarPointerEvent, track: ScrollbarTrack): void;
@@ -164,6 +170,8 @@ export function createScrollbarPresses(onDragging: (dragging: boolean) => void):
     pressTrack(event, track, mode) {
       if (event.button !== 0 || event.target !== event.currentTarget) return;
       event.preventDefault();
+      // The Stage listens for presses on an ancestor of the bar: the bar's press is not a page's.
+      event.stopPropagation();
       capturePointer(event.currentTarget as Element, event.pointerId);
       const position = (lastPointer = positionOnTrack(event, track));
       const { layout, stage, vertical } = track;
@@ -222,5 +230,54 @@ export function createScrollbarPresses(onDragging: (dragging: boolean) => void):
       stopPaging();
       onDragging(false);
     },
+  };
+}
+
+/** The bar as it is now: what its listeners read at each event. */
+export interface ScrollbarState extends Omit<ScrollbarTrack, 'element'> {
+  /**
+   * What a press on the track does: `'page'` steps toward the pointer and repeats while held,
+   * `'jump'` puts the thumb under the pointer and goes on as a drag.
+   */
+  readonly trackPress: 'page' | 'jump';
+}
+
+export interface AttachScrollbarOptions {
+  /** The bar as it is now. Read at every event, so it is never an earlier render's. */
+  bar(): ScrollbarState;
+  /** A drag started or ended, for the bar's `data-dragging` and to keep it shown. */
+  onDragging(dragging: boolean): void;
+}
+
+/**
+ * Bind a scrollbar's track element, with the thumb inside it: its presses, the moves that follow
+ * them (pointer capture sends those to the bar) and their release. A press on the track itself
+ * pages or jumps; a press anywhere else in it is on the thumb, and starts a drag.
+ *
+ * The Stage listens for presses on an ancestor of the bar, so the bar takes its own on a native
+ * listener, which runs before the Stage's and stops them there. A framework's own handler may run
+ * too late: React and Svelte dispatch from their root, after the Stage has begun a pan with the
+ * press. Returns the detach, which also ends a press under way.
+ */
+export function attachScrollbar(element: HTMLElement, options: AttachScrollbarOptions): () => void {
+  const presses = createScrollbarPresses(options.onDragging);
+  const track = (): ScrollbarTrack => ({ ...options.bar(), element });
+
+  const detachPress = isolatePointerDown(element, (event) => {
+    if (event.target === element) presses.pressTrack(event, track(), options.bar().trackPress);
+    else presses.pressThumb(event, track());
+  });
+  const onMove = (event: PointerEvent) => presses.move(event, track());
+  const onRelease = () => presses.release();
+  element.addEventListener('pointermove', onMove);
+  element.addEventListener('pointerup', onRelease);
+  element.addEventListener('pointercancel', onRelease);
+
+  return () => {
+    detachPress();
+    element.removeEventListener('pointermove', onMove);
+    element.removeEventListener('pointerup', onRelease);
+    element.removeEventListener('pointercancel', onRelease);
+    presses.release();
   };
 }

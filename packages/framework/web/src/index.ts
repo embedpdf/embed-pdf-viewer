@@ -351,13 +351,15 @@ export type {
 } from './page-surface';
 export { attachPagePointer, createClickCounter } from './page-pointer';
 export type { PagePointerHub, PagePointerPage, PagePointerSample } from './page-pointer';
-export { createScrollbarPresses, scrollbarLayout } from './scrollbar';
+export { attachScrollbar, createScrollbarPresses, scrollbarLayout } from './scrollbar';
 export type {
+  AttachScrollbarOptions,
   ScrollbarLayout,
   ScrollbarMetrics,
   ScrollbarPointerEvent,
   ScrollbarPresses,
   ScrollbarStage,
+  ScrollbarState,
   ScrollbarTrack,
 } from './scrollbar';
 export {

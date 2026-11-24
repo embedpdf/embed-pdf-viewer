@@ -207,7 +207,8 @@ export type FormFieldFlagSetting =
  * `options` of a `choice` or `choices` are the field's own values, the
  * document's words, shown as they are. The `groupId` setting's are the ids of
  * the groups the user may put the field in: show each with its group's label
- * (`listGroups()`). A field has it only while the document has groups.
+ * (`listGroups()`), and none of them (`null`) takes the field out of its
+ * group. A field has it only while the document has groups.
  *
  * `label` is the English name and `labelKey` its translation key
  * (`form.settings.tooltip`): a panel shows `t(setting.labelKey, { fallback:
@@ -672,23 +673,24 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   setGroups(groups: readonly FormGroupInput[]): void;
   /**
    * Say who the next fields are for: a field placed with a tool goes into
-   * this group. With `null` it names none, and the field goes where one
-   * made without a `groupId` goes. Fires `onDesignGroupChanged`. Throws
+   * this group. With `null` it names none, and the field is in no group.
+   * Fires `onDesignGroupChanged`. Throws
    * `permission-denied` for a group the user may not put a field in
    * (`canSetGroup`).
    */
   setDesignGroup(groupId: string | null): void;
   /**
-   * Put fields in a group, in one step to undo: each field not already in
-   * it gets it as its `groupId`. Fires `onFieldUpdated` for each, and
-   * resolves the fields as they are now, in the order given. Rejects
-   * `permission-denied` without `doc.forms.modify` or for a group the user
-   * may not put a field in (`canSetGroup`), `not-found` for a field the
-   * form doesn't have.
+   * Put fields in a group, or with `null` take them out of theirs, in one
+   * step to undo: each field not already there gets it as its `groupId`.
+   * Fires `onFieldUpdated` for each, and resolves the fields as they are
+   * now, in the order given. Rejects `permission-denied` without
+   * `doc.forms.modify` or for a group the user may not put a field in
+   * (`canSetGroup`; taking a field out of its group needs no more than
+   * `doc.forms.modify`), `not-found` for a field the form doesn't have.
    */
   moveToGroup(
     fields: readonly FormFieldRef[],
-    groupId: string,
+    groupId: string | null,
     options?: OperationOptions,
   ): Promise<FormGroupMoveResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */

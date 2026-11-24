@@ -39,10 +39,10 @@ export interface FormCopyRequest {
   /** Whether scripts, submits and links are kept (`doc.forms.script`); without it they're left out. */
   readonly mayScript: boolean;
   /**
-   * The group a copy goes in, given the one its source is in (if any):
-   * checked by the caller, which refuses one it may not set.
+   * The group a copy goes in, given the one its source is in (`null` for
+   * none): checked by the caller, which refuses one it may not set.
    */
-  readonly groupOf: (groupId: string | undefined) => string | undefined;
+  readonly groupOf: (groupId: string | null) => string | null;
   /** What the copy may carry: `fields` names as many fields as a bundle holds items. */
   readonly limits: BundleLimits;
 }

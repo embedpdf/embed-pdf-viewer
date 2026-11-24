@@ -20,7 +20,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         defaultValue?: string | undefined;
@@ -38,7 +38,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
@@ -51,7 +51,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         radiosInUnison?: boolean | undefined;
@@ -66,7 +66,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         edit?: boolean | undefined;
@@ -93,7 +93,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         multiSelect?: boolean | undefined;
@@ -120,7 +120,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
@@ -133,7 +133,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
-        groupId?: string | undefined;
+        groupId?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }

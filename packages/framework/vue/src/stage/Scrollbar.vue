@@ -17,10 +17,9 @@
   `var(--epdf-scrollbar-thumb, …)` pill.
 -->
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { CSSProperties, StyleValue } from 'vue';
-import { createScrollbarPresses, paintDefault, scrollbarLayout } from '@embedpdf/web';
-import type { ScrollbarTrack } from '@embedpdf/web';
+import { attachScrollbar, paintDefault, scrollbarLayout } from '@embedpdf/web';
 import { useCapabilityRef } from '../runtime/capabilities';
 import { asHost, useScrollMetricsValue } from './composables';
 import { useStageToken } from './scope';
@@ -103,26 +102,35 @@ watch(
   { immediate: true, flush: 'post' },
 );
 
-// ── interactions: `@embedpdf/web`'s press handling (thumb drags, track paging
-//    and jumps), handed the bar as it is now on every event. ──────────────────
-const presses = createScrollbarPresses((value) => (dragging.value = value));
-const pressedTrack = (): ScrollbarTrack => ({
-  stage: stage.value,
-  vertical: vertical.value,
-  element: track.value!,
-  layout: layout.value,
-  // Fresh geometry for paging steps: read from the capability, never a stale render.
-  liveLayout: () =>
-    scrollbarLayout(
-      stage.value.getScrollMetrics(),
-      vertical.value,
-      trackPx.value,
-      props.minThumbSize,
-    ),
-});
-
-// No repeat timer outlives the bar.
-onUnmounted(() => presses.release());
+// ── interactions: `@embedpdf/web` binds the track (thumb drags, track paging
+//    and jumps) with listeners of its own, which read the bar as it is now on
+//    every event and keep its presses from the Stage below it. ───────────────
+watch(
+  track,
+  (element, _previous, onCleanup) => {
+    if (!element) return;
+    onCleanup(
+      attachScrollbar(element, {
+        bar: () => ({
+          stage: stage.value,
+          vertical: vertical.value,
+          layout: layout.value,
+          // Fresh geometry for paging steps: read from the capability, never a stale render.
+          liveLayout: () =>
+            scrollbarLayout(
+              stage.value.getScrollMetrics(),
+              vertical.value,
+              trackPx.value,
+              props.minThumbSize,
+            ),
+          trackPress: props.trackPress,
+        }),
+        onDragging: (value) => (dragging.value = value),
+      }),
+    );
+  },
+  { flush: 'post' },
+);
 
 const trackStyle = computed(
   (): CSSProperties => ({
@@ -175,10 +183,6 @@ const thumbDefaults = computed((): CSSProperties => {
     :data-state="shown ? 'visible' : 'hidden'"
     :data-dragging="dragging ? '' : undefined"
     :style="trackStyle"
-    @pointerdown="presses.pressTrack($event, pressedTrack(), trackPress)"
-    @pointermove="presses.move($event, pressedTrack())"
-    @pointerup="presses.release()"
-    @pointercancel="presses.release()"
     @pointerenter="hovered = true"
     @pointerleave="hovered = false"
   >
@@ -186,7 +190,6 @@ const thumbDefaults = computed((): CSSProperties => {
       data-embedpdf-scrollbar-thumb=""
       :class="thumbClass"
       :style="[thumbDefaults, thumbStyle]"
-      @pointerdown="presses.pressThumb($event, pressedTrack())"
     />
   </div>
 </template>

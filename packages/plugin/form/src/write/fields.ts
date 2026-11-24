@@ -35,6 +35,7 @@ import type {
 import { fieldByRef, fieldKeyOf, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { createObjectNumbers } from '../services/object-numbers';
+import { undoLookOf } from '../sync/predict';
 import { widgetDuplicateOf, type DuplicatePlacement } from './duplicate';
 import { isMerged, nextChoiceOf } from './new-widget';
 import { nextInLine } from './next-in-line';
@@ -86,12 +87,7 @@ type ItemOf<T extends ChangeItem['type']> = Extract<ChangeItem, { type: T }>;
 
 export function createFieldWrites(
   ctx: FormContext,
-  {
-    fields,
-    predictor,
-    enqueue,
-    groups,
-  }: Pick<FormServices, 'fields' | 'predictor' | 'enqueue' | 'groups'>,
+  { fields, enqueue, groups }: Pick<FormServices, 'fields' | 'enqueue' | 'groups'>,
 ) {
   const numbers = createObjectNumbers(ctx);
 
@@ -106,7 +102,7 @@ export function createFieldWrites(
     ctx.changes.stage({
       label: { key: `form.${verb}` } satisfies ChangeLabel,
       ops: [op],
-      undo: predictor.undoLook(fields.view(), [op]),
+      undo: undoLookOf(fields.view(), [op]),
     });
 
   /** Stage the ops of one design verb as one change, one step of the history. */
@@ -114,7 +110,7 @@ export function createFieldWrites(
     ctx.changes.stage({
       label: { key: `form.${verb}` } satisfies ChangeLabel,
       ops: [...ops],
-      undo: predictor.undoLook(fields.view(), ops),
+      undo: undoLookOf(fields.view(), ops),
     });
 
   /** The engine's answer to a staged design change: its one item. */
@@ -132,7 +128,8 @@ export function createFieldWrites(
 
   const create: FormCapability['create'] = async (draft, options) => {
     allow('form.create', draftWritesScripts(draft));
-    if (draft.groupId !== undefined) groups.assertMaySet(draft.groupId, 'form.create');
+    // No group (`null`, or none named) takes form design alone, checked above.
+    if (typeof draft.groupId === 'string') groups.assertMaySet(draft.groupId, 'form.create');
     // The field, then each widget, in the draft's order.
     const count = 1 + (draft.widgets?.length ?? 0);
     const [objectNumber, ...widgetObjectNumbers] =
@@ -284,7 +281,8 @@ export function createFieldWrites(
 
   const moveToGroup: FormCapability['moveToGroup'] = async (refs, groupId, options) => {
     allow('form.moveToGroup');
-    groups.assertMaySet(groupId, 'form.moveToGroup');
+    // Out of every group (`null`) takes form design alone, checked above.
+    if (groupId !== null) groups.assertMaySet(groupId, 'form.moveToGroup');
     const index = fields.view();
     const moved = refs.map((ref) => {
       const field = fieldByRef(index, ref);
@@ -327,9 +325,10 @@ export function createFieldWrites(
       moveToGroup,
       update: async (ref, patch, options) => {
         allow('form.update', writesScripts(patch.actions));
-        // A field's own group, given back unchanged, is no change.
+        // A field's own group, given back unchanged, is no change, and taking it out of its
+        // group (`null`) takes form design alone, checked above.
         if (
-          patch.groupId !== undefined &&
+          typeof patch.groupId === 'string' &&
           patch.groupId !== fieldByRef(fields.view(), ref)?.groupId
         ) {
           groups.assertMaySet(patch.groupId, 'form.update');

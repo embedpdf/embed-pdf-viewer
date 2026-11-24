@@ -260,6 +260,29 @@ describe('fields for several people, on a real engine', () => {
       expect(history.canUndo()).toBe(false);
       expect(sender.accentOf(form.get(first.ref)!)).toBeNull();
 
+      // Out of every group again, by a sender whose rights name two groups only: it takes
+      // form design alone, and it is one step too.
+      await form.moveToGroup([first.ref, second.ref], 'seller');
+      history.clear();
+      const freed = await form.moveToGroup([first.ref, second.ref, third.ref], null);
+      expect(freed.fields.map((field) => field.groupId)).toEqual([null, null, null]);
+      expect(await sender.truth()).toMatchObject({
+        [first.name]: null,
+        [second.name]: null,
+        [third.name]: null,
+      });
+      expect(form.listGroups().map((group) => group.id)).toEqual(['buyer', 'seller']);
+      history.undo();
+      await vi.waitFor(async () =>
+        expect(await sender.truth()).toMatchObject({
+          [first.name]: 'seller',
+          [second.name]: 'seller',
+          [third.name]: 'seller',
+        }),
+      );
+      await vi.waitFor(() => expect(form.get(first.ref)!.groupId).toBe('seller'));
+      await form.moveToGroup([first.ref, second.ref], null);
+
       // A group the sender may not place for is refused, and nothing moves.
       await expect(form.moveToGroup([first.ref], 'witness')).rejects.toMatchObject({
         code: 'permission-denied',

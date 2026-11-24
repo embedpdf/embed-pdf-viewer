@@ -139,7 +139,7 @@ the theme variables come from `@embedpdf/web`, shared by all four. So does what
 every page surface computes: the page context (`makePageContext`), the
 surface's boxes (`pageSurfaceLayout`), the projectors, the page's pointer
 listener (`attachPagePointer`) and the scrollbar (`scrollbarLayout`,
-`createScrollbarPresses`).
+`attachScrollbar`).
 
 When logic every adapter needs is missing there, write the small piece you need
 next to your feature and say it is a candidate to move, rather than editing a

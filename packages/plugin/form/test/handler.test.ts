@@ -39,7 +39,7 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
   const form = {
     canDesign: () => true,
     getPageBox: () => PAGE,
-    // The palette places for the user's own group, unless a test says for whom.
+    // The palette places for no group, unless a test says for whom.
     getDesignGroup: () => null,
     list: () => [{ name: 'text_1' }],
     // The field shows once the engine answers, unless a test says it shows at once.
