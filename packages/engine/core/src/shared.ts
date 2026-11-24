@@ -763,6 +763,7 @@ export type {
   PdfRevision,
   SignatureCancelResult,
   SignatureSignerInput,
+  SignatureAppearance,
   SignatureAppearanceInput,
   SignatureCompleteInput,
   SignatureCompleteResult,
@@ -781,6 +782,8 @@ export type {
   ValidationInfoCounts,
   ValidationInfoKind,
 } from './signature/types';
+export { resolveSignatureAppearance, signatureAppearanceBytes } from './signature/appearance';
+export type { SignatureAppearanceBytes } from './signature/appearance';
 export {
   VALIDATION_INFO_KINDS,
   VALIDATION_INFO_LIMITS,

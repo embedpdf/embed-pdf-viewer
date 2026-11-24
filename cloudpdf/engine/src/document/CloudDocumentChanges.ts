@@ -28,6 +28,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 
 import { buildMutationForm } from './buildMutationForm';
+import { assertServerTakesMark, markPart } from './signatureMark';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { ChangeSender, CloudWrites, SentChange } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
@@ -94,10 +95,14 @@ export class CloudDocumentChanges {
     return AbortablePromise.run<ChangeResult>(async (signal) => {
       // In line now, so it keeps its place among this document's writes while
       // its bytes are read.
-      const answer = await this.writes.change(signal, sentChangeOf(opId, change), {
-        named: objectNumbersNamedBy(change),
-        alone: carriesBytes(change),
-      });
+      const answer = await this.writes.change(
+        signal,
+        sentChangeOf(opId, change, this.serverVersion()),
+        {
+          named: objectNumbersNamedBy(change),
+          alone: carriesBytes(change),
+        },
+      );
       if (answer.status === 'refused') throw deserializeError(answer.error);
       this.absorb(opId, change, answer.result);
       return answer.result;
@@ -155,10 +160,14 @@ export function changeSender(http: HttpClient, docId: string, layerName: string)
 
 /**
  * A change ready to send: its bytes read, and checked against what a request
- * may hold, so a malformed change is refused alone rather than refusing the
- * request it would share.
+ * may hold and what the server takes, so a malformed change is refused alone
+ * rather than refusing the request it would share.
  */
-async function sentChangeOf(opId: string, change: Change): Promise<SentChange> {
+async function sentChangeOf(
+  opId: string,
+  change: Change,
+  serverVersion: string | null,
+): Promise<SentChange> {
   if (!isUndoChange(change) && change.ops.length > CHANGE_REQUEST_LIMITS.ops) {
     throw new EngineError(
       EngineErrorCode.PayloadTooLarge,
@@ -167,6 +176,14 @@ async function sentChangeOf(opId: string, change: Change): Promise<SentChange> {
     );
   }
   const sent: SentChange = { opId, change: (await resolveChangeResources(change)).change };
+  // A mark the server can't take as it is meant is refused here, alone.
+  if (!isUndoChange(sent.change)) {
+    for (const op of sent.change.ops) {
+      if (op.type === 'forms.setSignatureAppearance') {
+        assertServerTakesMark(op.appearance, serverVersion);
+      }
+    }
+  }
   // Checked as the server reads it: the JSON, after serialization.
   const { body } = changeRequestOf([sent]);
   const checked = ChangeRequestSchema.safeParse(JSON.parse(JSON.stringify(body)));
@@ -205,10 +222,9 @@ function changeRequestOf(changes: readonly SentChange[]): {
       }
       case 'forms.setSignatureAppearance': {
         const { appearance, ...rest } = op;
-        return {
-          ...rest,
-          resources: { appearance: part(appearance.pdf.slice().buffer as ArrayBuffer) },
-        };
+        // `null`, no mark, travels as it is: no part.
+        const mark = markPart(appearance);
+        return { ...rest, resources: { appearance: mark && part(mark) } };
       }
       case 'pages.insert': {
         const { source, ...rest } = op;
@@ -257,7 +273,7 @@ function carriesBytes(change: Change): boolean {
   if (isUndoChange(change)) return false;
   return change.ops.some(
     (op) =>
-      op.type === 'forms.setSignatureAppearance' ||
+      (op.type === 'forms.setSignatureAppearance' && op.appearance !== null) ||
       op.type === 'pages.insert' ||
       op.type === 'attachments.create' ||
       ((op.type === 'annotations.create' || op.type === 'annotations.update') &&

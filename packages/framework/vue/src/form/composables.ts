@@ -1,6 +1,7 @@
 /**
  * The form composables for app code: `useForm()` (the API), `useFormEvent()`,
- * the state and the settings as refs, and `useFormValue()` for one field. And
+ * the state and the settings as refs, `useFormValue()` for one field, and
+ * `useFormWidgetAnchor()` for UI attached to one box of a field. And
  * what the controls of `<FormLayer>` share: the colors the viewer draws fields
  * with, and a widget's click running its action.
  */
@@ -9,10 +10,15 @@ import type { MaybeRefOrGetter, Ref } from 'vue';
 import type { EventHook } from '@embedpdf/core';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken, formState } from '@embedpdf/plugin-form';
-import type { FormCapability, FormFieldRef, FormFieldValue } from '@embedpdf/plugin-form';
+import type {
+  FormCapability,
+  FormFieldRef,
+  FormFieldValue,
+  FormWidgetAnchor,
+} from '@embedpdf/plugin-form';
 // Activating a widget from the layer is a host call.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { formColorsOf } from '@embedpdf/web';
+import { formColorsOf, samePageBounds } from '@embedpdf/web';
 import type { FormColors } from '@embedpdf/web';
 import { useCapability, useCapabilityEvent, useOptionalSelector } from '../runtime/capabilities';
 import { useViewerSettings } from '../runtime/documents';
@@ -62,6 +68,28 @@ export function useFormValue(
   field: MaybeRefOrGetter<FormFieldRef>,
 ): Readonly<Ref<FormFieldValue | null>> {
   return useOptionalSelector(FormToken, (form) => form.getValue(toValue(field)), null);
+}
+
+/**
+ * An anchor for `<Anchored>` that keeps a tag or a card attached to one box
+ * of a form field (a widget's `ref`), as a ref: its page and where the box
+ * stands, following the box as it is moved in design mode. `null` for `null`,
+ * or a box that isn't here. It changes when the box moves, not while people
+ * scroll or zoom. A getter follows a box that changes
+ * (`() => focus.value?.widget ?? null`).
+ */
+export function useFormWidgetAnchor(
+  widget: MaybeRefOrGetter<AnnotationRef | null>,
+): Readonly<Ref<FormWidgetAnchor | null>> {
+  return useOptionalSelector(
+    FormHostToken,
+    (form) => {
+      const target = toValue(widget);
+      return target ? form.getWidgetAnchor(target) : null;
+    },
+    null,
+    samePageBounds,
+  );
 }
 
 // ── what the controls of <FormLayer> share ───────────────────────────────────

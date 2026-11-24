@@ -595,7 +595,8 @@ A signature field's widget draws its box: its background and border, in the styl
 mark is in it, because the field is signed or a mark was drawn in with
 [`setSignatureAppearance()`](/docs/engine/forms/signatures), the widget reads `hasMark: true` and
 shows that mark instead. Its style no longer applies, so changing it fails with `InvalidArg`;
-moving or resizing the widget keeps the mark.
+moving or resizing the widget keeps the mark. A mark that was drawn in can be taken out again,
+and the widget then draws its box as before.
 
 ### Turned widgets
 

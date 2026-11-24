@@ -847,7 +847,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         protection,
       );
       const ref = fieldRefFromParams(req);
-      // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
+      // The mark is a PNG, a JPEG or a page of a PDF (sniffed, never declared),
+      // riding the multipart envelope; `null` in its place takes the mark out.
       const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
       const parsed = parseOrInvalidArg(
         SignatureAppearanceBodySchema as unknown as SchemaLike<
@@ -856,10 +857,11 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         envelope.body,
         'request body',
       );
-      const resource = resourcesByRole(envelope, parsed.resources).appearance!;
-      if (resource.mimeType !== 'application/pdf') {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
-      }
+      const { appearance: key } = parsed.resources;
+      const resource = resourcesByRole(
+        envelope,
+        key === null ? {} : { appearance: key },
+      ).appearance;
       setNoStore(reply);
       return layerService.setSignatureAppearance(
         ctx,
@@ -867,7 +869,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
           docId,
           layerName,
           ref,
-          pdf: new Uint8Array(resource.bytes),
+          appearance: resource ? new Uint8Array(resource.bytes) : null,
           authority: ctx.authority,
         },
         abortSignalOf(reply),

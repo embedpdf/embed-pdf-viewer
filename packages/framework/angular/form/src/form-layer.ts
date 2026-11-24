@@ -15,17 +15,22 @@
  * boxes you select and move. Each field becomes a real HTML control (`controls.ts`), placed and
  * styled like the field in the PDF, in the colors of the form settings, which the
  * `--epdf-form-*` CSS variables override.
+ *
+ * An `<ng-template [epdfFieldControl]>` inside the layer draws the boxes its function matches
+ * with a control of yours (`templates.ts`, `custom-control.ts`); it shows and stands down with
+ * the layer's own.
  */
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  contentChildren,
   effect,
   signal,
   untracked,
   type Signal,
 } from '@angular/core';
-import type { CapabilityToken } from '@embedpdf/core';
+import { annotationKey, type CapabilityToken } from '@embedpdf/core';
 import {
   CapabilityBinding,
   injectKernelHost,
@@ -40,7 +45,7 @@ import {
 } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { InteractionToken as InteractionHostToken } from '@embedpdf/plugin-interaction/contract/host';
-import { formColorsOf } from '@embedpdf/web';
+import { fieldControlFor, formColorsOf } from '@embedpdf/web';
 import {
   FormButtonControl,
   FormComboControl,
@@ -49,9 +54,22 @@ import {
   FormTextControl,
   FormToggleControl,
 } from './controls';
-import { EpdfFieldPictures } from './field-pictures';
+import { FormCustomControl } from './custom-control';
+import { EpdfFieldPictures, injectFieldLooks, type ShownLook } from './field-pictures';
+import { EpdfFieldControlTemplate } from './templates';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
+
+/** One box as the template draws it: with the layer's own control, or a control of the app's. */
+interface DrawnBox {
+  readonly item: FormWidgetItem;
+  /** The app's template that draws it, when one matches. */
+  readonly control: EpdfFieldControlTemplate | null;
+  /** The widget as it looks now, for that template's `native`. */
+  readonly look: ShownLook | null;
+}
+
+const NO_BOXES: readonly DrawnBox[] = Object.freeze([]);
 
 @Component({
   selector: 'epdf-form-layer',
@@ -63,33 +81,42 @@ const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
     FormListControl,
     FormButtonControl,
     FormSignatureControl,
+    FormCustomControl,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div style="position: absolute; inset: 0; pointer-events: none">
-      <epdf-field-pictures />
-      @if (active()) {
-        <!-- One control per widget: a field with several boxes has one per box. -->
-        @for (item of widgets(); track item.key + ':' + item.annotObjectNumber) {
-          @switch (item.control) {
+      <epdf-field-pictures [looks]="pictures" />
+      <!-- One control per widget: a field with several boxes has one per box. -->
+      @for (box of boxes(); track box.item.key + ':' + box.item.annotObjectNumber) {
+        @if (box.control; as control) {
+          <div
+            epdfFormCustom
+            [item]="box.item"
+            [colors]="colors()"
+            [control]="control"
+            [look]="box.look"
+          ></div>
+        } @else {
+          @switch (box.item.control) {
             @case ('text') {
-              <div epdfFormText [item]="item" [colors]="colors()"></div>
+              <div epdfFormText [item]="box.item" [colors]="colors()"></div>
             }
             @case ('toggle') {
-              <div epdfFormToggle [item]="item" [colors]="colors()"></div>
+              <div epdfFormToggle [item]="box.item" [colors]="colors()"></div>
             }
             @case ('choice') {
-              @if (item.kind === 'list') {
-                <div epdfFormList [item]="item" [colors]="colors()"></div>
+              @if (box.item.kind === 'list') {
+                <div epdfFormList [item]="box.item" [colors]="colors()"></div>
               } @else {
-                <div epdfFormCombo [item]="item" [colors]="colors()"></div>
+                <div epdfFormCombo [item]="box.item" [colors]="colors()"></div>
               }
             }
             @case ('button') {
-              <div epdfFormButton [item]="item" [colors]="colors()"></div>
+              <div epdfFormButton [item]="box.item" [colors]="colors()"></div>
             }
             @case ('signature') {
-              <div epdfFormSignature [item]="item" [colors]="colors()"></div>
+              <div epdfFormSignature [item]="box.item" [colors]="colors()"></div>
             }
           }
         }
@@ -133,6 +160,53 @@ export class EpdfFormLayer {
   protected readonly colors = computed(() => {
     const { focus, fields } = this.settings();
     return formColorsOf({ focus, fields }, this.host.viewerSettings().accent);
+  });
+
+  // ── your templates ───────────────────────────────────────────────────────────
+
+  private readonly templates = contentChildren(EpdfFieldControlTemplate, { descendants: true });
+
+  /** The controls of yours, in the order the templates are written: the first that matches wins. */
+  private readonly controls = computed(() =>
+    this.templates().flatMap((template) => {
+      const match = template.match();
+      return typeof match === 'function' ? [{ for: match, template }] : [];
+    }),
+  );
+
+  /** Every widget's look on the page: the layer draws the ones no control of yours does. */
+  private readonly looks = injectFieldLooks();
+
+  /**
+   * The boxes the layer draws controls for, while the active tool fills forms: each with the
+   * layer's own control, or with the first control of yours that matches it, which draws the
+   * field's picture too.
+   */
+  protected readonly boxes = computed((): readonly DrawnBox[] => {
+    if (!this.active()) return NO_BOXES;
+    const controls = this.controls();
+    const widgets = this.widgets();
+    if (controls.length === 0) {
+      return widgets.map((item) => ({ item, control: null, look: null }));
+    }
+    const looks = new Map(this.looks().map((look) => [look.key, look]));
+    return widgets.map((item) => {
+      const control = fieldControlFor(item, controls)?.template ?? null;
+      return {
+        item,
+        control,
+        look: control ? (looks.get(annotationKey(item.ref)) ?? null) : null,
+      };
+    });
+  });
+
+  /** The pictures the layer draws itself: every widget's but those a control of yours draws. */
+  protected readonly pictures = computed(() => {
+    const drawn = new Set(
+      this.boxes().flatMap((box) => (box.control ? [annotationKey(box.item.ref)] : [])),
+    );
+    const looks = this.looks();
+    return drawn.size === 0 ? looks : looks.filter((look) => !drawn.has(look.key));
   });
 
   constructor() {

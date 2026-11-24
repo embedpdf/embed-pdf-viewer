@@ -347,7 +347,7 @@ export async function registerSignatureRoutes(
     const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
     // Whether this field is the token's to sign (its group) is checked in the worker.
     const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
-    // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
+    // The mark is a PNG, a JPEG or a page of a PDF: the stamp rule (sniffed, never declared).
     const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
       SignaturePrepareBodySchema as unknown as SchemaLike<
@@ -368,12 +368,7 @@ export async function registerSignatureRoutes(
     const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
     const resource = resourcesByRole(envelope, named).appearance;
-    if (resource) {
-      if (resource.mimeType !== 'application/pdf') {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
-      }
-      input.appearance = { pdf: new Uint8Array(resource.bytes) };
-    }
+    if (resource) input.appearance = new Uint8Array(resource.bytes);
     setNoStore(reply);
     const prepared = await layerService.prepareSignature(
       ctx,

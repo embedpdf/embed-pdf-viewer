@@ -1,0 +1,185 @@
+---
+title: Your own form controls
+description: Attach your own UI to a form field, such as a tag on the fields still to fill in, and draw a field's control with your own component.
+---
+
+# Your own form controls
+
+The form layer draws each field as an HTML control: a text box, a checkbox, a list. You can put your
+own UI on a field, or draw its control yourself: a tag on the fields still to fill in, a hint next
+to a field, a switch instead of a checkbox.
+
+This changes the screen only. What people enter is still the field's value in the PDF, so other PDF
+apps, printing and downloads show the field as the PDF describes it.
+
+## Its control, or UI on it
+
+Ask whether it should zoom and turn with the PDF:
+
+| You want | Use | It |
+| :-- | :-- | :-- |
+| A hint, a menu or a picker next to a field | [Anchored UI](../ui/anchored#attach-to-a-form-field) | Floats over the pages, and moves to stay in view |
+| A tag that stays on a field: "Required", a signer's name, a ✓ | [Pinned anchored UI](#pin-a-tag-to-a-field) | Floats over the pages, upright and the same size at every zoom, exactly where you put it |
+| A different control: a switch for a checkbox, a button inside a text box | A [control](#draw-a-control-your-way) | Is part of the page: it zooms and turns with the field |
+
+It's the same choice as for [an annotation](../annotations/custom-rendering#its-look-or-ui-on-it).
+Most of what an app adds to a form is the first two, and they need nothing from the form layer.
+
+## Pin a tag to a field
+
+A tag on each field that still has to be filled in, a signer's name on each of their fields, a ✓ on
+a field that's done: UI that belongs to one field and stays on it. `useFormWidgetAnchor(widget)`
+gives you the anchor of one box of a field, and follows it when the field is moved. `pinned` keeps
+the tag exactly where you put it:
+
+<Snippet name="forms/controls/field-tag" />
+
+<Fw only={['vue', 'svelte', 'angular']}>
+
+Pass the box as a function, and the anchor follows `field` when it changes.
+
+</Fw>
+
+Draw one for each field that needs it: `form.validate().missing` lists the required fields this
+user still has to fill in. <Fw only="react">Mount them in the Stage's `overlay`</Fw><Fw only="vue">Mount
+them in the Stage's `#overlay` slot</Fw><Fw only="svelte">Mount them in the Stage's `overlay`
+snippet</Fw><Fw only="angular">Put them inside `<epdf-stage>`</Fw>, like a [menu](../ui/anchored).
+
+<Example name="form/tags" />
+
+> **Try it:** each required field that is still empty has an orange tag. Fill one in: its tag
+> goes. Scroll, zoom and turn the view, and the tags stay on their fields, at the same size.
+
+A field can show in several boxes, so an anchor is for one box: `form.getWidgets(field.ref)` lists
+a field's boxes, each with its `ref`. Anchored UI on a page that isn't on screen isn't drawn, so a
+form with hundreds of fields costs only the ones in view. See
+[Where it goes](../ui/anchored#where-it-goes) for `placement` and `gap`.
+
+A pinned tag keeps its size and its side at every zoom, and isn't moved to where there is room. The
+room beside a field shrinks with the page: next to a field at the edge of a page shown small, such
+as on a phone, there are a few dozen pixels. So keep a tag there small, as the example's is, or put
+it on a side of the field that has room.
+
+## Draw a control your way
+
+<Fw only={['react', 'vue', 'svelte']}>Give the layer a list of **controls**. Each one says which
+boxes it draws and with which component:</Fw><Fw only="angular">Put a **control** in the layer for
+each kind of box you draw: an `<ng-template epdfFieldControl>` that says which boxes it draws, and
+draws them:</Fw>
+
+<Snippet name="forms/controls/controls" />
+
+<Fw only={['react', 'vue', 'svelte']}>`for`</Fw><Fw only="angular">The function you give `epdfFieldControl`</Fw>
+gets the box, with [what it tells you](#what-a-box-tells-you), so you can pick by control, by the
+field's group or anything else. The first control that matches wins; a box no control matches is
+drawn as usual.
+
+<Fw only="react">
+
+Define the list once, outside your component or in `useMemo`, as you do for the
+[annotation layer's renderers](../annotations/custom-rendering#draw-an-annotation-your-way).
+
+</Fw>
+
+Your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws into a **frame**: a box the layer places, turns and scales exactly like
+the field. Fill it, with `width` and `height` at `100%`, and draw at the field's 100% size: the
+layer scales your drawing with the page. A field that is [turned](../forms#turned-fields) turns
+its frame, so your control reads the way the field reads with no code of yours.
+
+<Snippet name="forms/controls/switch" />
+
+<Fw only={['react', 'vue', 'svelte']}>Your component gets:</Fw><Fw only="angular">Your template gets these:
+the box is `let-widget`, and the rest are named, such as `let-frame="frame"`.</Fw>
+
+| Prop       | What it is                                                                                    |
+| :--------- | :-------------------------------------------------------------------------------------------- |
+| `widget`   | The box, as `listWidgets()` gives it: its field (`fieldRef`), its control, its value, and [what it tells you](#what-a-box-tells-you). |
+| `frame`    | The box you draw into: its `width` and `height` in pixels at the field's 100% size, its `rotation` on screen in degrees clockwise, and the `scale` the layer draws it at. |
+| `native`   | The layer's own control for the box with the field's picture, filling the frame. Render it to keep the control and add to it. |
+| `setValue` | Fills in the field: `setValue({ value })`, `({ checked })` or `({ selectedValues })`, with the same checks, scripts and undo step as [`form.setValue()`](../forms#fill-in-a-field). |
+| `focused`  | True while the cursor is in this box.                                                         |
+
+The frame is the same one an [annotation renderer](../annotations/custom-rendering#draw-an-annotation-your-way)
+gets. Your control is drawn in place of the field's picture, so a switch shows no check mark under
+it.
+
+<Example name="form/controls" />
+
+> **Try it:** flip a switch, and the checkbox it stands for is filled in. Press Tab to move through
+> the fields, the switches among them. Zoom and turn the view: the switches zoom and turn with the
+> page.
+
+A click on your control also runs the field's own action, when the PDF gives it one, after the
+value you wrote: as a click on the layer's control does.
+
+### Add to the layer's control
+
+`native` is what the layer would have drawn: the field's picture, and its control. Render it and
+put your own parts next to it, such as a button at the end of a text box that empties it:
+
+<Snippet name="forms/controls/clear-button" />
+
+<Example name="form/clear-button" />
+
+> **Try it:** press **Fill in**, or type in a text box and press Tab: a button at the end of the
+> box empties it, and leaves the cursor in the box. The box is still the layer's own: it shows
+> the field as the PDF draws it, you type in it, and Tab moves on to the next field, past the
+> button.
+
+What you draw in the frame zooms with the page. Open a menu or a picker from it as a card, with
+[anchored UI](../ui/anchored#attach-to-a-form-field) or your own popover.
+
+### The cursor and Tab
+
+[Tab, `focus()` and `focusNext()`](../forms#move-between-fields) put the cursor in the first
+element of your control that takes focus: an `<input>`, a `<button>`, or an element with
+`tabindex="0"`. Give it one, and the field takes part in the form's order like any other. While the
+cursor is anywhere inside your control, the field is the focused field.
+
+A box that is `disabled` takes no input: draw it, and leave out what people would click.
+
+## What a box tells you
+
+Each box says where it is, what it holds, and whose it is. `listWidgets(page)` gives the boxes of
+a page, and a control gets its box as `widget`:
+
+| Value         | What it is                                                                                         |
+| :------------ | :------------------------------------------------------------------------------------------------- |
+| `control`     | Which control it is: `'text'`, `'toggle'`, `'choice'`, `'button'` or `'signature'`                 |
+| `fieldRef`    | The field it belongs to: what `setValue()` and `get()` take                                         |
+| `ref`         | The box's own ref: what `useFormWidgetAnchor()` and `getWidget()` take                              |
+| `label`       | Its name for screen readers: the field's tooltip, else its name                                    |
+| `groupId`     | The [group](/docs/engine/forms/groups) the field is in, or `null`                                  |
+| `canFill`     | Whether this user may fill it in, or sign it for a signature field: their permissions alone        |
+| `disabled`    | Draw it, take no input: a read-only field, one this user may not fill in, one [`fillable`](../forms#settings) leaves out, or a value on its way |
+| `required`    | The form asks for a value                                                                          |
+| `empty`       | It holds nothing yet: no text, nothing ticked or picked, no signature. What [`validate()`](../forms#check-required-fields) counts as missing |
+| `box`, `rotation`, `rect` | Where it is; see [Turned fields](../forms#turned-fields)                               |
+
+Then each control has its value: a text box its `value`, a checkbox or radio button `checked` and
+its `exportValue`, a dropdown or list its `options` and `selected`, a signature box `signed`.
+
+## Good to know
+
+### Design mode
+
+Controls fill forms in. They show while the active tool fills forms, as the layer's own do. In
+[design mode](building#design-mode) fields are boxes people select and move, drawn by the
+annotation layer, and your controls stand down with the layer's own.
+
+### Signature fields
+
+An empty signature field's control is a button. A click makes the field the
+[target](signatures#sign-here-in-a-form), where the next mark goes. Your own control for it calls
+`signature.setTarget(widget.fieldRef)`, or opens your own signing UI.
+
+### Dropdown lists
+
+The list a dropdown opens is the browser's own, so it opens unturned and at the browser's size. For
+a list in your app's look, draw the dropdown as a control and open your list as anchored UI.
+
+### Drawing every field yourself
+
+A control replaces one box inside the form layer, which still places it, turns it, and moves the
+cursor between fields. To draw a form without the layer, `listWidgets(page)` gives you every box
+with these same values.

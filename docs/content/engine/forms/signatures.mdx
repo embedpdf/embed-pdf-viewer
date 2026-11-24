@@ -79,17 +79,27 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 | `field`             | The signature field to sign. It must not be signed yet.                           |                                               |
 | `kind`              | `'signature'`, or `'timestamp'` for a [document timestamp](#document-timestamps). | `'signature'`                                 |
 | `signer`            | `{ name, reason, location, contactInfo, signedAt }`, written into the signature.  | none; `signedAt` now                          |
-| `appearance`        | `{ pdf }`: a one-page PDF, drawn into the field's box.                            | none                                          |
+| `appearance`        | The mark the field's box shows: a PNG, a JPEG or a one-page PDF.                  | none                                          |
 | `certify`           | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.       | not certified                                 |
 | `lock`              | Fields this signature [locks](#lock-fields).                                      | none                                          |
 | `digest`            | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
 | `subFilter`         | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                               | `'ETSI.CAdES.detached'`                       |
 | `contentsSizeBytes` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`; `16384` with a `timestampAuthority`   |
 
+`appearance` is the mark the field shows once it is signed. Pass the picture's bytes, a
+`Uint8Array` or a `Blob`, in the formats a [stamp](/docs/engine/annotations/stamps) takes: a
+PNG, a JPEG or a one-page PDF.
+
+```ts
+await sign(doc, { field, key, appearance: png });
+```
+
+The mark is drawn at its own size and fitted whole into the field's box, upright when the field
+is turned. `{ pdf: bytes }` still works, for a one-page PDF only: an image under it is refused.
+
 The field needs a widget to carry an `appearance`; without one, the call fails with
-`SignatureRefused`. A PDF with more than one page fails with `InvalidArg`, as for a
-[stamp](/docs/engine/annotations/stamps); take the page you want out first with
-`doc.pages.extract()`.
+`SignatureRefused`. Bytes of another format fail with `InvalidArg`, and so does a PDF with more
+than one page; take the page you want out first with `doc.pages.extract()`.
 
 ## Timestamp a signature
 
@@ -667,15 +677,27 @@ To draw a mark into a field without signing it, for example a handwritten signat
 that has no key, use `setSignatureAppearance()`. The field stays unsigned:
 
 ```ts
-await doc.forms.setSignatureAppearance(field.ref, { pdf: artworkPdf });
+await doc.forms.setSignatureAppearance(field.ref, png);
 ```
 
-The mark takes the place of the field's box: from then on its widgets read `hasMark: true`, and
-their style can't change (see [Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
+The mark is a PNG, a JPEG or a one-page PDF, as [`appearance`](#options) is when you sign, and
+`{ pdf: bytes }` still works here too. It takes the place of the field's box: from then on its
+widgets read `hasMark: true`, and their style can't change (see
+[Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
+
+To take the mark out again, pass `null`:
+
+```ts
+await doc.forms.setSignatureAppearance(field.ref, null);
+```
+
+The field is empty again: its widgets read `hasMark: false` and show the field's box in its
+style, which can change again. Undo brings the mark back. A field that has no mark is left as
+it is.
 
 Once a field is signed, its look is part of what the signature seals, so
-`setSignatureAppearance()` fails with `ProtectedDocument`. To sign with artwork, pass `appearance` to
-`sign()` or `prepare()`.
+`setSignatureAppearance()` fails with `ProtectedDocument`, for a mark and for `null`. To sign
+with a mark, pass `appearance` to `sign()` or `prepare()`.
 
 <Engine cloud>
 
@@ -700,6 +722,11 @@ Once a field is signed, its look is part of what the signature seals, so
   the local engine, and the server stores what it is given after the same check. So
   `addValidationInfo()` from `@embedpdf/core-signature` works here as it is.
 - **A document timestamp needs no field** here either: the server makes it.
+- **An image as a mark, and taking a mark out, need a server of version 3.4.** An older one is
+  never sent them: `setSignatureAppearance()` with a PNG, a JPEG or `null`, and `sign()` or
+  `prepare()` with a PNG or a JPEG as `appearance`, fail with `NotImplemented`, and
+  `details.needs` and `details.serverVersion` say which side to update. A one-page PDF works
+  against it.
 - **These need a server of version 3.3.** An older one is never sent them:
   `getValidationInfo()`, `addValidationInfo()` and a document timestamp with no `field` fail
   with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to

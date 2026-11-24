@@ -9,7 +9,11 @@ import {
   type PageRenderFamilySpec,
   type PageRenderPin,
 } from './renderFamilies';
-import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
+import {
+  AppearanceResourceKeysSchema,
+  FieldAppearanceResourceKeysSchema,
+  ImageResourceKeysSchema,
+} from './resourceKeys';
 import type { AnnotationList } from '../annotation/AnnotationList';
 import type {
   Font,
@@ -2313,9 +2317,12 @@ const SignatureSignerInputSchema = z.object({
   signedAt: IsoDateTimeSchema.optional(),
 });
 
-/** The `body` part of a visual signature fill: which part holds the one-page PDF. */
+/**
+ * The `body` part of a visual signature fill: which part holds the mark (a
+ * PNG, a JPEG or a one-page PDF), or `null` to take the field's mark out.
+ */
 export const SignatureAppearanceBodySchema = z.object({
-  resources: AppearanceResourceKeysSchema,
+  resources: FieldAppearanceResourceKeysSchema,
 });
 export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 

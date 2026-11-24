@@ -1,11 +1,11 @@
 <!--
   A page with a `<FormLayer>` once the test hands it a page context (`page.value`), inside an
   element that records every press reaching it with a native listener, as the Stage listens.
-  `probes` (see `Probes.svelte`) read beside the page.
+  `controls` are the layer's; `probes` (see `Probes.svelte`) read beside the page.
 -->
 <script lang="ts">
   import type { ComponentProps } from 'svelte';
-  import { FormLayer } from '../../src/form';
+  import { FormLayer, type FieldControl } from '../../src/form';
   import type { PageContextValue } from '../../src/runtime';
   import LayerPage from './LayerPage.svelte';
   import Probes from './Probes.svelte';
@@ -14,10 +14,12 @@
     page,
     stagePresses = [],
     probes = [],
+    controls,
   }: {
     page: { value: PageContextValue | null };
     stagePresses?: Event[];
     probes?: ComponentProps<typeof Probes>['probes'];
+    controls?: readonly FieldControl[];
   } = $props();
 
   function stageBelow(element: HTMLElement) {
@@ -31,7 +33,7 @@
 <div {@attach stageBelow}>
   {#if page.value}
     {#key page.value}
-      <LayerPage page={page.value} layer={FormLayer} />
+      <LayerPage page={page.value} layer={FormLayer} layerProps={{ controls }} />
     {/key}
   {/if}
 </div>

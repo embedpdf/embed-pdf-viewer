@@ -47,6 +47,17 @@ Pass the ref as a function, and the anchor and the thread follow the `note` inpu
 
 </Fw>
 
+## Attach to a form field
+
+`useFormWidgetAnchor(widget)` gives you the anchor of one box of a form field, and follows it while
+the field is moved in design mode. A tag beside the next field to fill in stays put, so it's
+`pinned`:
+
+<Snippet name="ui/next-field" />
+
+[Your own form controls](../forms/controls) has a tag on every field that still has to be filled
+in, and a control of your own inside a field.
+
 ## Where it goes
 
 | Prop        | What it is                                                           | Default  |

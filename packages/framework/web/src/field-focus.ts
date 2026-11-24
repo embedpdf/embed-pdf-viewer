@@ -1,7 +1,8 @@
 /**
  * A field box and the form's cursor. While the box is on screen it lends the form plugin a focus
  * target (`attachFocusTarget`), so `focus()` and `focusNext()` put the cursor in its control: the
- * box itself when it takes focus (a checkbox or radio button), else the form control inside it. It
+ * box itself when it takes focus (a checkbox or radio button), else the form control inside it;
+ * in a control of an app's own, the first element that Tab stops at. It
  * focuses without the browser scrolling, since the Stage brings the box into view. Tab and
  * Shift+Tab, which bubble up to the box, go the form's way, in the document's order and across
  * pages that aren't on screen; past the last field the browser's Tab goes on, out of the form. In
@@ -22,6 +23,11 @@ export interface FieldFocusForm<Widget> {
 export interface FieldFocusOptions {
   /** The control is a radio button: the arrow keys move within its group. */
   readonly radio?: boolean;
+  /**
+   * The box holds a control of an app's own: the cursor goes into the first element inside it
+   * that Tab stops at (an input, a button, an element with `tabindex="0"`), wherever it is.
+   */
+  readonly custom?: boolean;
 }
 
 /** Whether an element has text that `select()` selects. */
@@ -37,6 +43,22 @@ const controlIn = (box: HTMLElement): HTMLElement =>
     ? box
     : (box.querySelector<HTMLElement>('input, textarea, select, button') ?? box);
 
+/** What can take focus without a `tabindex` of its own. */
+const FOCUSABLE = 'input, textarea, select, button, a[href], [tabindex], [contenteditable]';
+
+/** Whether Tab stops at an element: its `tabindex` when it has one, else what the browser gives it. */
+const takesTab = (element: HTMLElement): boolean => {
+  if (element.hasAttribute('disabled')) return false;
+  if (element.tagName === 'INPUT' && element.getAttribute('type') === 'hidden') return false;
+  if (element.getAttribute('contenteditable') === 'false') return false;
+  const tabIndex = element.getAttribute('tabindex');
+  return tabIndex === null || Number(tabIndex) >= 0;
+};
+
+/** The first element in a control of an app's own that Tab stops at, else the box. */
+const firstTabStopIn = (box: HTMLElement): HTMLElement =>
+  Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE)).find(takesTab) ?? box;
+
 /** Bind a field box to the form's cursor. Returns the unbind. */
 export function bindFieldFocus<Widget>(
   box: HTMLElement,
@@ -46,7 +68,7 @@ export function bindFieldFocus<Widget>(
 ): () => void {
   const detach = form.attachFocusTarget(widget, {
     focus: ({ select }) => {
-      const control = controlIn(box);
+      const control = options.custom ? firstTabStopIn(box) : controlIn(box);
       control.focus({ preventScroll: true });
       if (select && hasSelectableText(control)) control.select();
     },

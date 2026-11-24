@@ -346,13 +346,15 @@ export type {
 } from './page-surface';
 export { attachPagePointer, createClickCounter } from './page-pointer';
 export type { PagePointerHub, PagePointerPage, PagePointerSample } from './page-pointer';
-export { createScrollbarPresses, scrollbarLayout } from './scrollbar';
+export { attachScrollbar, createScrollbarPresses, scrollbarLayout } from './scrollbar';
 export type {
+  AttachScrollbarOptions,
   ScrollbarLayout,
   ScrollbarMetrics,
   ScrollbarPointerEvent,
   ScrollbarPresses,
   ScrollbarStage,
+  ScrollbarState,
   ScrollbarTrack,
 } from './scrollbar';
 export {
@@ -389,6 +391,22 @@ export { attachFocusTrap, moveFocusInto } from './focus-trap';
 export type { FocusTrapOptions } from './focus-trap';
 export { bindFieldFocus } from './field-focus';
 export type { FieldFocusForm, FieldFocusOptions } from './field-focus';
+export {
+  claimClick,
+  createFieldControlPress,
+  fieldControlFor,
+  fieldControlPlaceOf,
+  isClickClaimed,
+  runsActionOnClick,
+} from './form-controls';
+export type {
+  FieldControlEntry,
+  FieldControlFrame,
+  FieldControlFrameStyle,
+  FieldControlPlace,
+  FieldControlPress,
+  FieldPictureStyle,
+} from './form-controls';
 export { createSurfaceFocusFollower } from './surface-focus';
 export type { SurfaceFocusFollower, SurfaceFocusOptions } from './surface-focus';
 export { standardCommandsBrowser } from './standard-commands-platform';
