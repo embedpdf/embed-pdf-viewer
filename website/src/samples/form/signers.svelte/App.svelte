@@ -5,7 +5,6 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { FormLayer, formPlugin } from '@embedpdf/svelte/form';
-  import { stampPlugin } from '@embedpdf/svelte/stamp';
   import { signaturePlugin } from '@embedpdf/svelte/signature';
   import { localEngine } from '@embedpdf/engine';
   import HandOver from './HandOver.svelte';
@@ -16,14 +15,12 @@
   import '../signers.css';
 
   const engine = localEngine();
-  const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
     annotationPlugin(),
     formPlugin(),
-    stampPlugin({ assetEngine }),
     // An empty signature field becomes a button. With no key, a mark is drawn into the field.
     signaturePlugin(),
   ];

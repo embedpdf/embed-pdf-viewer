@@ -5,10 +5,8 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { FormLayer, formPlugin } from '@embedpdf/svelte/form';
-  import { stampPlugin } from '@embedpdf/svelte/stamp';
   import { signaturePlugin } from '@embedpdf/svelte/signature';
   import { cloudEngine } from '@cloudpdf/engine';
-import { localEngine } from '@embedpdf/engine';
   import HandOver from './HandOver.svelte';
   import SignCard from './SignCard.svelte';
   import { people, type Person } from './people';
@@ -17,14 +15,12 @@ import { localEngine } from '@embedpdf/engine';
   import '../signers.css';
 
   const engine = cloudEngine();
-  const assetEngine = localEngine();
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
     annotationPlugin(),
     formPlugin(),
-    stampPlugin({ assetEngine }),
     // An empty signature field becomes a button. With no key, a mark is drawn into the field.
     signaturePlugin(),
   ];

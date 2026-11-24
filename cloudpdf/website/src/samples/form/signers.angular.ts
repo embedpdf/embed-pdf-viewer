@@ -23,13 +23,10 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
-import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
 import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { cloudEngine } from '@cloudpdf/engine';
-import { localEngine } from '@embedpdf/engine';
 
 const engine = cloudEngine();
-const assetEngine = localEngine();
 
 const loan: OpenInput = { kind: 'grant', grant: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
@@ -186,7 +183,6 @@ type Point = { x: number; y: number };
 })
 export class SignCard {
   private readonly form = inject(EpdfForm);
-  private readonly stamp = inject(EpdfStamp);
   protected readonly signature = inject(EpdfSignature);
   protected readonly anchor = this.form.widgetAnchorOf(() => {
     const target = this.signature.target();
@@ -196,14 +192,14 @@ export class SignCard {
 
   private readonly card = viewChild<ElementRef<HTMLDivElement>>('card');
   private readonly pad = viewChild<ElementRef<HTMLCanvasElement>>('pad');
-  private strokes: Point[][] = [];
+  private last: Point | null = null;
 
   constructor() {
     // Each field starts with an empty pad, and the card takes the cursor, so Escape closes it.
     effect(() => {
       const target = this.signature.target();
       const pad = this.pad()?.nativeElement;
-      this.strokes = [];
+      this.last = null;
       this.drawn.set(false);
       pad?.getContext('2d')?.clearRect(0, 0, pad.width, pad.height);
       if (target) this.card()?.nativeElement.focus();
@@ -218,17 +214,16 @@ export class SignCard {
   protected start(event: PointerEvent) {
     const canvas = event.currentTarget as HTMLCanvasElement;
     canvas.setPointerCapture(event.pointerId);
-    this.strokes.push([this.pointOf(event, canvas)]);
+    this.last = this.pointOf(event, canvas);
   }
 
   protected draw(event: PointerEvent) {
     const canvas = event.currentTarget as HTMLCanvasElement;
-    const stroke = this.strokes.at(-1);
+    const from = this.last;
     const ink = canvas.getContext('2d');
-    if (!stroke || !ink || !canvas.hasPointerCapture(event.pointerId)) return;
-    const from = stroke.at(-1)!;
+    if (!from || !ink || !canvas.hasPointerCapture(event.pointerId)) return;
     const to = this.pointOf(event, canvas);
-    stroke.push(to);
+    this.last = to;
     ink.strokeStyle = INK;
     ink.lineWidth = 2;
     ink.lineCap = 'round';
@@ -246,26 +241,14 @@ export class SignCard {
     if (field) this.form.focus(field);
   }
 
-  // The drawing becomes a stamp among the signer's marks, and the stamp goes into the field.
-  protected async sign() {
+  // The drawing goes into the field as a picture.
+  protected sign() {
     const field = this.signature.target();
-    if (!field) return;
-    const library =
-      this.stamp.listLibraries().find((each) => each.name === 'Signatures') ??
-      (await this.stamp.createLibrary('Signatures', { kind: 'signatures' })).library;
-    // A new drawing takes the place of the one drawn before.
-    const before = this.stamp
-      .listAssets({ libraryId: library.id })
-      .find((each) => each.name === 'signature');
-    if (before) await this.stamp.deleteAsset(before.id);
-    const { asset } = await this.stamp.createAsset({
-      libraryId: library.id,
-      name: 'signature',
-      label: 'Signature',
-      mark: { kind: 'ink', strokes: this.strokes, color: INK, strokeWidth: 2 },
+    this.pad()?.nativeElement.toBlob(async (png) => {
+      if (!field || !png) return;
+      await this.signature.placeMark({ source: png }, { field });
+      this.form.focus(field);
     });
-    await this.signature.placeMark({ assetId: asset.id }, { field });
-    this.form.focus(field);
   }
 }
 
@@ -319,7 +302,6 @@ export class Toolbar {
       withInteraction(),
       withAnnotation(),
       withForm(),
-      withStamp({ assetEngine }),
       // An empty signature field becomes a button. With no key, a mark is drawn into the field.
       withSignature(),
     ),

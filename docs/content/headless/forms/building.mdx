@@ -98,13 +98,13 @@ design the form may leave a field in none, or take it out of its group.
 > box takes her typing, and Ada's show as the PDF has them. Click Dana's signature field, or Tab
 > to it and press Space, draw a signature in the card and press Sign.
 
-The signers can sign because the example also has the stamp plugin and the
-[signature plugin](signatures): an empty signature field is a button, and pressing it makes the
-field the [target](signatures#sign-here-in-a-form). The example's card opens next to the target,
-turns the drawing into one of the person's marks, and places it in the field with
-`signature.placeMark()`. With no signing key, the mark is drawn into the field and nothing is
-sealed; [The key](signatures#the-key) has what a real signature takes. Escape or Cancel closes
-the card and puts the cursor back on the field.
+The signers can sign because the example also has the [signature plugin](signatures): an empty
+signature field is a button, and pressing it makes the field the
+[target](signatures#sign-here-in-a-form). The example's card opens next to the target and places
+the drawing in the field as a PNG, with `signature.placeMark({ source: png }, { field })`. With
+no signing key, the mark is drawn into the field and nothing is sealed;
+[The key](signatures#the-key) has what a real signature takes. Escape or Cancel closes the card
+and puts the cursor back on the field.
 
 A document keeps the permissions it opened with, so the example saves the form and opens it again
 for each person, with theirs.

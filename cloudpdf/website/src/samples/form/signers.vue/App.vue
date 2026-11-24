@@ -7,10 +7,8 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { FormLayer, formPlugin } from '@embedpdf/vue/form';
-import { stampPlugin } from '@embedpdf/vue/stamp';
 import { signaturePlugin } from '@embedpdf/vue/signature';
 import { cloudEngine } from '@cloudpdf/engine';
-import { localEngine } from '@embedpdf/engine';
 import { people, type Person } from './people';
 import HandOver from './HandOver.vue';
 import SignCard from './SignCard.vue';
@@ -19,14 +17,12 @@ import Toolbar from './Toolbar.vue';
 import '../signers.css';
 
 const engine = cloudEngine();
-const assetEngine = localEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine }),
   // An empty signature field becomes a button. With no key, a mark is drawn into the field.
   signaturePlugin(),
 ];

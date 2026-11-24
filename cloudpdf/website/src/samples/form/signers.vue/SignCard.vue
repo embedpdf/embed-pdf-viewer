@@ -4,14 +4,12 @@
 import { ref, watch } from 'vue';
 import { Anchored } from '@embedpdf/vue/anchored';
 import { useForm, useFormWidgetAnchor } from '@embedpdf/vue/form';
-import { useStamp } from '@embedpdf/vue/stamp';
 import { useSignature, useSignatureState } from '@embedpdf/vue/signature';
 
 const INK = '#1d2b53';
 type Point = { x: number; y: number };
 
 const form = useForm();
-const stamp = useStamp();
 const signature = useSignature();
 const { target } = useSignatureState();
 const anchor = useFormWidgetAnchor(() =>
@@ -20,13 +18,13 @@ const anchor = useFormWidgetAnchor(() =>
 const card = ref<HTMLDivElement | null>(null);
 const pad = ref<HTMLCanvasElement | null>(null);
 const drawn = ref(false);
-let strokes: Point[][] = [];
+let last: Point | null = null;
 
 // Each field starts with an empty pad, and the card takes the cursor, so Escape closes it.
 watch(
   [target, card],
   () => {
-    strokes = [];
+    last = null;
     drawn.value = false;
     pad.value?.getContext('2d')?.clearRect(0, 0, pad.value.width, pad.value.height);
     if (target.value) card.value?.focus();
@@ -42,17 +40,16 @@ const pointOf = (event: PointerEvent, canvas: HTMLCanvasElement): Point => {
 const start = (event: PointerEvent) => {
   const canvas = event.currentTarget as HTMLCanvasElement;
   canvas.setPointerCapture(event.pointerId);
-  strokes.push([pointOf(event, canvas)]);
+  last = pointOf(event, canvas);
 };
 
 const draw = (event: PointerEvent) => {
   const canvas = event.currentTarget as HTMLCanvasElement;
-  const stroke = strokes.at(-1);
+  const from = last;
   const ink = canvas.getContext('2d');
-  if (!stroke || !ink || !canvas.hasPointerCapture(event.pointerId)) return;
-  const from = stroke.at(-1)!;
+  if (!from || !ink || !canvas.hasPointerCapture(event.pointerId)) return;
   const to = pointOf(event, canvas);
-  stroke.push(to);
+  last = to;
   ink.strokeStyle = INK;
   ink.lineWidth = 2;
   ink.lineCap = 'round';
@@ -70,26 +67,14 @@ const close = () => {
   if (field) form.focus(field);
 };
 
-// The drawing becomes a stamp among the signer's marks, and the stamp goes into the field.
-const sign = async () => {
+// The drawing goes into the field as a picture.
+const sign = () => {
   const field = target.value;
-  if (!field) return;
-  const library =
-    stamp.listLibraries().find((each) => each.name === 'Signatures') ??
-    (await stamp.createLibrary('Signatures', { kind: 'signatures' })).library;
-  // A new drawing takes the place of the one drawn before.
-  const before = stamp
-    .listAssets({ libraryId: library.id })
-    .find((each) => each.name === 'signature');
-  if (before) await stamp.deleteAsset(before.id);
-  const { asset } = await stamp.createAsset({
-    libraryId: library.id,
-    name: 'signature',
-    label: 'Signature',
-    mark: { kind: 'ink', strokes, color: INK, strokeWidth: 2 },
+  pad.value?.toBlob(async (png) => {
+    if (!field || !png) return;
+    await signature.placeMark({ source: png }, { field });
+    form.focus(field);
   });
-  await signature.placeMark({ assetId: asset.id }, { field });
-  form.focus(field);
 };
 </script>
 

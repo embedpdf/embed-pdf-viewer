@@ -17,23 +17,18 @@ import {
   useFormState,
   useFormWidgetAnchor,
 } from '@embedpdf/react/form';
-import { stampPlugin, useStamp } from '@embedpdf/react/stamp';
 import { signaturePlugin, useSignature, useSignatureState } from '@embedpdf/react/signature';
 import { localEngine } from '@embedpdf/engine';
 
 import './signers.css';
 
 const engine = localEngine();
-// [!asset-engine]
-const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
-// [!/asset-engine]
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine }),
   // An empty signature field becomes a button. With no key, a mark is drawn into the field.
   signaturePlugin(),
 ];
@@ -169,18 +164,17 @@ type Point = { x: number; y: number };
  */
 function SignCard() {
   const form = useForm();
-  const stamp = useStamp();
   const signature = useSignature();
   const { target } = useSignatureState();
   const anchor = useFormWidgetAnchor(target ? (form.getWidgets(target)[0]?.ref ?? null) : null);
   const card = useRef<HTMLDivElement>(null);
   const pad = useRef<HTMLCanvasElement>(null);
-  const strokes = useRef<Point[][]>([]);
+  const last = useRef<Point | null>(null);
   const [drawn, setDrawn] = useState(false);
 
   // Each field starts with an empty pad, and the card takes the cursor, so Escape closes it.
   useEffect(() => {
-    strokes.current = [];
+    last.current = null;
     setDrawn(false);
     pad.current?.getContext('2d')?.clearRect(0, 0, pad.current.width, pad.current.height);
     if (target) card.current?.focus();
@@ -195,16 +189,15 @@ function SignCard() {
 
   const start = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    strokes.current.push([pointOf(event)]);
+    last.current = pointOf(event);
   };
 
   const draw = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const stroke = strokes.current.at(-1);
+    const from = last.current;
     const ink = event.currentTarget.getContext('2d');
-    if (!stroke || !ink || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const from = stroke.at(-1)!;
+    if (!from || !ink || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const to = pointOf(event);
-    stroke.push(to);
+    last.current = to;
     ink.strokeStyle = INK;
     ink.lineWidth = 2;
     ink.lineCap = 'round';
@@ -221,25 +214,13 @@ function SignCard() {
     form.focus(target);
   };
 
-  // The drawing becomes a stamp among the signer's marks, and the stamp goes into the field.
-  const sign = async () => {
-    const library =
-      stamp.listLibraries().find((each) => each.name === 'Signatures') ??
-      (await stamp.createLibrary('Signatures', { kind: 'signatures' })).library;
-    // A new drawing takes the place of the one drawn before.
-    const before = stamp
-      .listAssets({ libraryId: library.id })
-      .find((each) => each.name === 'signature');
-    if (before) await stamp.deleteAsset(before.id);
-    const { asset } = await stamp.createAsset({
-      libraryId: library.id,
-      name: 'signature',
-      label: 'Signature',
-      mark: { kind: 'ink', strokes: strokes.current, color: INK, strokeWidth: 2 },
+  // The drawing goes into the field as a picture.
+  const sign = () =>
+    pad.current?.toBlob(async (png) => {
+      if (!png) return;
+      await signature.placeMark({ source: png }, { field: target });
+      form.focus(target);
     });
-    await signature.placeMark({ assetId: asset.id }, { field: target });
-    form.focus(target);
-  };
 
   return (
     <Anchored anchor={anchor} placement="bottom-start" gap={8}>
@@ -265,7 +246,7 @@ function SignCard() {
           <button type="button" className="button" onClick={close}>
             Cancel
           </button>
-          <button type="button" className="button" disabled={!drawn} onClick={() => void sign()}>
+          <button type="button" className="button" disabled={!drawn} onClick={sign}>
             Sign
           </button>
         </div>
