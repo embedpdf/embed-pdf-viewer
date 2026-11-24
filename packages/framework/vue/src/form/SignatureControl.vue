@@ -32,7 +32,7 @@ const actionable = computed(
 const { element: box, style: boxStyle } = useWidgetBox(
   () => props.item,
   () => props.colors,
-  // Without the signature plugin the box has nothing to focus.
+  // Without the signature plugin the box has nothing to focus: the cursor passes over it.
   { focusable: () => actionable.value },
 );
 

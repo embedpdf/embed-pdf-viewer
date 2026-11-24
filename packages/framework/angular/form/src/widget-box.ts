@@ -11,7 +11,8 @@
  * - a field without a border of its own gets an edge in the form settings' color, so people
  *   see where to fill in (lists and buttons draw their own);
  * - the form's cursor reaches the control here: `focus()` and Tab go through the form, in the
- *   document's order (`bindFieldFocus`), unless the box has nothing to focus (`focusable`).
+ *   document's order (`bindFieldFocus`); a box with nothing to focus says so (`focusable`), and
+ *   the cursor passes over it.
  *
  * Each control (`controls.ts`) is a component whose host element is its box: it extends this
  * class and adds its own control inside. The listeners, the box's style and the colors are
@@ -138,9 +139,12 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
       const item = this.item();
       const form = this.form();
       const widget = item.annotationRef;
-      if (!form || !widget || item.disabled || !this.focusable()) return;
+      if (!form || !widget || item.disabled) return;
       const radio = item.control === 'toggle' && item.kind === 'radio';
-      onCleanup(bindFieldFocus(this.element, form, widget, { radio, custom: this.custom }));
+      const focusable = this.focusable();
+      onCleanup(
+        bindFieldFocus(this.element, form, widget, { radio, custom: this.custom, focusable }),
+      );
     });
   }
 

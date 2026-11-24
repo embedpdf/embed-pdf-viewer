@@ -23,11 +23,14 @@ import {
 import { interactionPlugin } from '../../src/interaction';
 import { renderPlugin } from '../../src/render';
 import { makePageContext, type CurrentValue, type PageContextValue } from '../../src/runtime';
+import { signaturePlugin } from '../../src/signature';
 import { formControlRecords, resetFormControlRecords } from '../fixtures/form-control-records';
 import FormHarness from '../fixtures/FormHarness.svelte';
 import FrameSwitchControl from '../fixtures/FrameSwitchControl.svelte';
 import NativeWithButton from '../fixtures/NativeWithButton.svelte';
+import NoteControl from '../fixtures/NoteControl.svelte';
 import { signal } from '../fixtures/signal.svelte';
+import SignButtonControl from '../fixtures/SignButtonControl.svelte';
 import SwitchControl from '../fixtures/SwitchControl.svelte';
 import { latest, viewerWith } from '../fixtures/viewer';
 
@@ -414,6 +417,153 @@ describe('<FormLayer controls>: a turned control', () => {
         await waitFor(() => expect(form.getValue(toFieldRef('side'))).toEqual({ checked: true }));
         await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
         await action.mock.results[0]!.value;
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+});
+
+describe('<FormLayer>: Tab and a box with nothing to take the cursor', () => {
+  type Mounted = Awaited<ReturnType<typeof mount>>;
+
+  /** A text box, a signature field and a second text box, added in that order: Tab's order. */
+  async function threeFields({ form, ref }: Mounted) {
+    await form.create({
+      kind: 'text',
+      name: 'first',
+      widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+    });
+    await form.create({
+      kind: 'signature',
+      name: 'sign',
+      widgets: [{ page: ref, rect: { x: 72, y: 140, width: 160, height: 40 } }],
+    });
+    await form.create({
+      kind: 'text',
+      name: 'second',
+      widgets: [{ page: ref, rect: { x: 72, y: 200, width: 160, height: 20 } }],
+    });
+  }
+
+  /** Press Tab in an element; whether the layer took the press from the browser. */
+  const tab = async (element: Element, shiftKey = false): Promise<boolean> =>
+    !(await fireEvent.keyDown(element, { key: 'Tab', shiftKey }));
+
+  it('passes over a signature field when nothing can sign it', { timeout: 45_000 }, async () => {
+    // No signature plugin: the signature field is only its picture.
+    const mounted = await mount();
+    const { form, view } = mounted;
+    try {
+      await threeFields(mounted);
+      mounted.show();
+      const first = await waitFor(() => view.getByLabelText('first'));
+      const second = view.getByLabelText('second');
+      expect(form.listWidgets(mounted.ref).map((item) => item.control)).toEqual([
+        'text',
+        'signature',
+        'text',
+      ]);
+      expect(document.querySelectorAll('input, button')).toHaveLength(2);
+
+      expect(form.focus(toFieldRef('first'))).toBe(true);
+      expect(document.activeElement).toBe(first);
+      // Tab goes to the second text box, over the signature field.
+      expect(await tab(first)).toBe(true);
+      expect(document.activeElement).toBe(second);
+      await waitFor(() => expect(form.getFocusedField()?.name).toBe('second'));
+      // Past the last field the browser's Tab goes on, out of the form.
+      expect(await tab(second)).toBe(false);
+      expect(document.activeElement).toBe(second);
+      // Shift+Tab comes back over it.
+      expect(await tab(second, true)).toBe(true);
+      expect(document.activeElement).toBe(first);
+
+      // Your code's moves pass over it too.
+      expect(form.focus(toFieldRef('sign'))).toBe(false);
+      expect(document.activeElement).toBe(first);
+      expect(form.focusNext()).toBe(true);
+      expect(document.activeElement).toBe(second);
+    } finally {
+      await mounted.close();
+    }
+  });
+
+  it(
+    'stops at a signature field with the signature plugin, whose "sign here" takes the cursor',
+    { timeout: 45_000 },
+    async () => {
+      const mounted = await mount({
+        plugins: [interactionPlugin(), formPlugin(), signaturePlugin()],
+      });
+      const { form, view } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => view.getByLabelText('first'));
+        const second = view.getByLabelText('second');
+        const sign = view.getByRole('button', { name: 'sign' });
+
+        expect(form.focus(toFieldRef('first'))).toBe(true);
+        expect(await tab(first)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        await waitFor(() => expect(form.getFocusedField()?.name).toBe('sign'));
+        expect(await tab(sign)).toBe(true);
+        expect(document.activeElement).toBe(second);
+        expect(await tab(second, true)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        expect(form.focus(toFieldRef('sign'))).toBe(true);
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+
+  it(
+    "stops at a signature field a control of the app's own draws with something to focus",
+    { timeout: 45_000 },
+    async () => {
+      const controls: FieldControl[] = [
+        { for: (widget) => widget.control === 'signature', component: SignButtonControl },
+      ];
+      const mounted = await mount({ controls });
+      const { form, view } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => view.getByLabelText('first'));
+        const sign = view.getByRole('button', { name: 'Sign sign' });
+
+        expect(form.focus(toFieldRef('first'))).toBe(true);
+        expect(await tab(first)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        expect(await tab(sign)).toBe(true);
+        expect(document.activeElement).toBe(view.getByLabelText('second'));
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+
+  it(
+    "passes over a control of the app's own that holds nothing to focus",
+    { timeout: 45_000 },
+    async () => {
+      const controls: FieldControl[] = [
+        { for: (widget) => widget.control === 'signature', component: NoteControl },
+      ];
+      const mounted = await mount({ controls });
+      const { form, view } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => view.getByLabelText('first'));
+        view.getByText('Signed on paper');
+
+        expect(form.focus(toFieldRef('first'))).toBe(true);
+        expect(await tab(first)).toBe(true);
+        expect(document.activeElement).toBe(view.getByLabelText('second'));
+        expect(form.focus(toFieldRef('sign'))).toBe(false);
       } finally {
         await mounted.close();
       }

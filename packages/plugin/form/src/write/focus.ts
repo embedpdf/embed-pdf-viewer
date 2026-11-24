@@ -3,6 +3,9 @@
  * radio group, and the field the cursor is in. This area decides where the cursor goes: which
  * field, which of its boxes, in Tab's order (`services/tab-order.ts`); the cursor service
  * (`services/cursor.ts`) brings the box into view and hands it to its control.
+ *
+ * A stop is a box of a field the user may fill in. The cursor passes over one whose control is
+ * on screen and takes no cursor (`cursor.mayTake`): a signature field with nothing to sign it.
  */
 import { memo } from '@embedpdf/core';
 import type {
@@ -23,6 +26,13 @@ interface Stop {
   readonly row: WidgetAnnotation;
   readonly field: FormField;
   readonly at: number;
+}
+
+/** How `focusNext()` moves, each of its options given. */
+interface Step {
+  readonly backward: boolean;
+  readonly empty: boolean;
+  readonly wrap: boolean;
 }
 
 /** A radio button as its field lists it: whether it's the checked one, and the value it picks. */
@@ -87,6 +97,10 @@ export function createFocus(
     return checked ?? (backward ? (buttons.at(-1) ?? stop.row) : stop.row);
   };
 
+  /** Whether the cursor can go into a stop: not one on screen whose control takes no cursor. */
+  const takesCursor = (stop: Stop, backward: boolean): boolean =>
+    cursor.mayTake(boxAt(stop, backward));
+
   const focus = (ref: FormFieldRef, options: FormFocusOptions = {}): boolean => {
     const index = fields.view();
     const field = fieldByRef(index, ref);
@@ -97,39 +111,56 @@ export function createFocus(
       if (fieldForWidget(index, widget) !== field) return false;
       row = order().rows.find((candidate) => widgetObjectOf(candidate.ref) === widget);
     } else {
-      const stop = order().stops.find((candidate) => candidate.field === field);
+      const stop = order().stops.find(
+        (candidate) => candidate.field === field && takesCursor(candidate, false),
+      );
       row = stop && boxAt(stop, false);
     }
     return row ? cursor.goTo(row, options.select ?? false) : false;
   };
 
-  const focusNext = (options: FormFocusNextOptions = {}): boolean => {
+  /** Move the cursor to the next stop after a box (`from`; `null`: from the start), as Tab does. */
+  const step = (from: number | null, { backward, empty, wrap }: Step): boolean => {
     const index = fields.view();
     const { position, stops } = order();
-    const backward = options.backward ?? false;
-    // Where it goes on from: the field's first box, the box the cursor is in, or the one it was in last.
-    const fromField = options.from ? fieldByRef(index, options.from) : null;
-    const from = options.from
-      ? (fromField?.widgets.map(({ objectNumber }) => objectNumber).find((w) => position.has(w)) ??
-        null)
-      : (cursor.focused()?.widget ?? cursor.last());
     const at = from === null ? null : (position.get(from) ?? null);
     const field = from === null ? null : fieldForWidget(index, from);
     const page = from === null ? null : widgetRowOf(index, from)?.page.objectNumber;
     const candidates = stops.filter(
       (stop) =>
-        (!options.empty || isEmpty(stop.field)) &&
+        (!empty || isEmpty(stop.field)) &&
         // A radio group is one stop: from one of its buttons, the group is where the cursor is.
-        !(stop.field === field && field.kind === 'radio' && stop.row.page.objectNumber === page),
+        !(stop.field === field && field.kind === 'radio' && stop.row.page.objectNumber === page) &&
+        takesCursor(stop, backward),
     );
     const ahead = candidates.filter((stop) =>
       at === null ? true : backward ? stop.at < at : stop.at > at,
     );
     const next =
       (backward ? ahead.at(-1) : ahead[0]) ??
-      (options.wrap ? (backward ? candidates.at(-1) : candidates[0]) : undefined);
+      (wrap ? (backward ? candidates.at(-1) : candidates[0]) : undefined);
+    if (!next) return false;
+    const box = boxAt(next, backward);
+    // A box that isn't on screen may come in holding nothing to focus. The cursor then goes on
+    // from it the same way, and never starts over, so it can't go round a form of such boxes.
+    const onward = () => void step(widgetObjectOf(box.ref), { backward, empty, wrap: false });
     // Tab selects a text box's text, so typing replaces it.
-    return next ? cursor.goTo(boxAt(next, backward), true) : false;
+    return cursor.goTo(box, true, onward);
+  };
+
+  const focusNext = (options: FormFocusNextOptions = {}): boolean => {
+    const { position } = order();
+    // Where it goes on from: the field's first box, the box the cursor is in, or the one it was in last.
+    const fromField = options.from ? fieldByRef(fields.view(), options.from) : null;
+    const from = options.from
+      ? (fromField?.widgets.map(({ objectNumber }) => objectNumber).find((w) => position.has(w)) ??
+        null)
+      : (cursor.focused()?.widget ?? cursor.last());
+    return step(from, {
+      backward: options.backward ?? false,
+      empty: options.empty ?? false,
+      wrap: options.wrap ?? false,
+    });
   };
 
   const moveInGroup = (ref: AnnotationRef, backward: boolean): boolean => {

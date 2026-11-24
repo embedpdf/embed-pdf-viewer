@@ -113,6 +113,11 @@ See [Keyboard order](/docs/engine/documents/pages#keyboard-order). Fields the us
 and a group of radio buttons is one stop, whose buttons the arrow keys move between. Tab on the last
 field, or Shift+Tab on the first, leaves the form, as it does on a web page.
 
+A signature field is a stop when something can sign it: the signature plugin makes it a button
+(see ["Sign here" in a form](forms/signatures#sign-here-in-a-form)), or a
+[control of your own](forms/controls) draws it. With neither, the field is only its picture, and
+the cursor passes over it.
+
 Your code moves the cursor too. `focus(ref)` brings a field into view, on whatever page it is, and
 puts the cursor in it; `focusNext()` goes on from the field the cursor is in, or was in last:
 
@@ -124,9 +129,10 @@ form.focusNext({ backward: true }); // the one before
 form.focusNext({ empty: true, wrap: true }); // the next empty field, starting over at the end
 ```
 
-Both return `false` when there is no such field, or none the user can fill in. A field takes the
-cursor as soon as it's on screen; on iPhone and iPad, the keyboard opens for a field that was already
-showing, and one that had to come into view opens it on a tap.
+Both return `false` when there is no such field, none the user can fill in, or none with anything
+to put the cursor in. A field takes the cursor as soon as it's on screen; on iPhone and iPad, the
+keyboard opens for a field that was already showing, and one that had to come into view opens it on
+a tap.
 
 <Fw only={['react', 'vue', 'svelte']}>`focusedField`</Fw><Fw only="angular">`form.focusedField()`</Fw> is the field the cursor is in, or `null`, and
 <Fw only={['react', 'vue', 'svelte']}>`onFocusChanged`</Fw><Fw only="angular">`focusChanged$`</Fw> tells you each time it moves, for a help text next to the

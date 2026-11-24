@@ -7,7 +7,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-type Target = { focus(options: { readonly select: boolean }): void };
+type Target = { takesCursor(): boolean; focus(options: { readonly select: boolean }): void };
 
 /** A form that remembers the targets it was lent and answers Tab with `next`. */
 function fakeForm(next = true) {
@@ -71,6 +71,61 @@ describe('bindFieldFocus', () => {
     bindFieldFocus(document.getElementById('box')!, form, 'agree', { custom: true });
     targets.get('agree')!.focus({ select: true });
     expect(document.activeElement).toBe(document.getElementById('switch'));
+  });
+
+  it('a box that holds a control says it takes the cursor', () => {
+    document.body.innerHTML =
+      '<div id="text"><input /></div><div id="check" tabindex="0"></div><div id="radio" tabindex="-1"></div>';
+    const { form, targets } = fakeForm();
+    bindFieldFocus(document.getElementById('text')!, form, 'text');
+    bindFieldFocus(document.getElementById('check')!, form, 'check');
+    // A box asked to take the cursor itself does, Tab stop or not, as a radio group's buttons are.
+    bindFieldFocus(document.getElementById('radio')!, form, 'radio', { radio: true });
+    expect(targets.get('text')!.takesCursor()).toBe(true);
+    expect(targets.get('check')!.takesCursor()).toBe(true);
+    expect(targets.get('radio')!.takesCursor()).toBe(true);
+  });
+
+  it('a box that is only a picture says it takes no cursor, and takes none', () => {
+    // A signature field with nothing to sign it: the layer draws no control in its box.
+    document.body.innerHTML = '<input id="before" /><div id="box"></div>';
+    const before = document.getElementById('before')!;
+    const box = document.getElementById('box')!;
+    const focus = vi.spyOn(box, 'focus');
+    const { form, targets } = fakeForm();
+    bindFieldFocus(box, form, 'sign', { focusable: false });
+    before.focus();
+    expect(targets.get('sign')!.takesCursor()).toBe(false);
+    targets.get('sign')!.focus({ select: true });
+    expect(focus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(before);
+  });
+
+  it("a control of an app's own with nothing Tab stops at takes no cursor, until it has one", () => {
+    document.body.innerHTML = `
+      <input id="before" />
+      <div id="box">
+        <span>Signed on paper</span>
+        <button tabindex="-1"></button>
+        <button disabled></button>
+      </div>`;
+    const before = document.getElementById('before')!;
+    const box = document.getElementById('box')!;
+    const focus = vi.spyOn(box, 'focus');
+    const { form, targets } = fakeForm();
+    bindFieldFocus(box, form, 'sign', { custom: true });
+    before.focus();
+    expect(targets.get('sign')!.takesCursor()).toBe(false);
+    targets.get('sign')!.focus({ select: false });
+    expect(focus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(before);
+
+    // The control draws a button later: the box answers from what it holds when asked.
+    const sign = document.createElement('button');
+    box.append(sign);
+    expect(targets.get('sign')!.takesCursor()).toBe(true);
+    targets.get('sign')!.focus({ select: false });
+    expect(document.activeElement).toBe(sign);
   });
 
   it("a control of an app's own with a text box in it has its text selected when asked", () => {

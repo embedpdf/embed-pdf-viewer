@@ -83,6 +83,18 @@ const PLAN = {
   ],
 } as unknown as FormField;
 
+/** An unsigned signature field `name` with one box, object number `widget`, on `page`. */
+const signature = (field: number, name: string, widget: number, page: typeof P1) =>
+  ({
+    ...base,
+    ref: fieldRef(field),
+    name,
+    kind: 'signature',
+    valueEntry: { kind: 'none' },
+    defaultValueEntry: { kind: 'none' },
+    widgets: [formWidget(widget, page)],
+  }) as unknown as FormField;
+
 /** A box's row: on `page`, at `y` (page space, y down). */
 const row = (
   objectNumber: number,
@@ -123,7 +135,16 @@ async function form({
   stage = true,
   tabs = 'rows' as 'rows' | 'structure',
   fields = snapshot.fields,
-}: { stage?: boolean; tabs?: 'rows' | 'structure'; fields?: FormField[] } = {}) {
+  widgets = snapshot.widgets,
+  shown = [11, 12, 13],
+}: {
+  stage?: boolean;
+  tabs?: 'rows' | 'structure';
+  fields?: FormField[];
+  widgets?: WidgetAnnotation[];
+  /** Page 1's boxes whose controls are on screen from the start. */
+  shown?: number[];
+} = {}) {
   const time = manualClock();
   const reveal = vi.fn();
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
@@ -145,7 +166,7 @@ async function form({
       ...(stage ? [[StageToken, { reveal }] as const] : []),
     ],
     doc: {
-      forms: { list: vi.fn(async () => ({ ...snapshot, fields })), create: vi.fn() },
+      forms: { list: vi.fn(async () => ({ ...snapshot, widgets, fields })), create: vi.fn() },
       apply,
       security: { allows: () => true, allowsField: () => true },
     } as never,
@@ -169,10 +190,17 @@ async function form({
     };
     return capability.attachFocusTarget(widgetRef(objectNumber, page), target);
   };
-  show(11, P1);
-  show(12, P1);
-  show(13, P1);
-  return { capability, reveal, focused, selected, show, time, apply };
+  /**
+   * A box on screen that holds nothing to focus, as the form layer shows a signature field
+   * nothing can sign: asked to take the cursor, nothing happens. `takes` answers for it later.
+   */
+  const showEmpty = (objectNumber: number, page: typeof P1, takes: () => boolean = () => false) =>
+    capability.attachFocusTarget(widgetRef(objectNumber, page), {
+      takesCursor: takes,
+      focus: () => {},
+    });
+  for (const objectNumber of shown) show(objectNumber, P1);
+  return { capability, reveal, focused, selected, show, showEmpty, time, apply };
 }
 
 describe('focus()', () => {
@@ -356,5 +384,166 @@ describe('a radio button in the form layer', () => {
       { label: 'Plan: yearly', inGroup: { position: 2, size: 2 } },
       { label: 'Plan: monthly', inGroup: { position: 1, size: 2 } },
     ]);
+  });
+});
+
+describe('a box that holds nothing to take the cursor', () => {
+  // One page: a text box, a signature field, a second text box, in that order.
+  const FIRST = text(1, 'first', 11, P1);
+  const SIGN = signature(2, 'sign', 18, P1);
+  const SECOND = text(3, 'second', 12, P1);
+  const page = {
+    fields: [FIRST, SIGN, SECOND],
+    widgets: [row(11, P1, 100), row(18, P1, 150), row(12, P1, 200)],
+    shown: [11, 12],
+  };
+  // The same, with the signature field and the second text box on page 2, which isn't on screen.
+  const LATER_SIGN = signature(2, 'sign', 18, P2);
+  const LATER_SECOND = text(3, 'second', 14, P2);
+  const pages = {
+    fields: [FIRST, LATER_SIGN, LATER_SECOND],
+    widgets: [row(11, P1, 100), row(18, P2, 100), row(14, P2, 200)],
+    shown: [11],
+  };
+
+  it('is passed over by Tab and Shift+Tab: a signature field nothing can sign', async () => {
+    const { capability, reveal, focused, showEmpty } = await form(page);
+    showEmpty(18, P1);
+    capability.focus(FIRST.ref);
+    reveal.mockClear();
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11, 12]);
+    expect(capability.getFocusedField()?.name).toBe('second');
+    // The view went to the second text box, never to the signature field.
+    expect(reveal.mock.calls).toEqual([[P1, { rect: { x: 50, y: 200, width: 200, height: 20 } }]]);
+    // Past the last field Tab leaves the form; Shift+Tab goes back over the signature field.
+    expect(capability.focusNext()).toBe(false);
+    expect(capability.focusNext({ backward: true })).toBe(true);
+    expect(focused).toEqual([11, 12, 11]);
+  });
+
+  it('refuses `focus()`, and leaves the view where it is', async () => {
+    const { capability, reveal, focused, showEmpty } = await form(page);
+    showEmpty(18, P1);
+    expect(capability.focus(SIGN.ref)).toBe(false);
+    expect(capability.focus(SIGN.ref, { widget: widgetRef(18, P1) })).toBe(false);
+    expect(reveal).not.toHaveBeenCalled();
+    expect(focused).toEqual([]);
+  });
+
+  it('is not what `focusNext()` starts at, or wraps round to', async () => {
+    const { capability, focused, showEmpty } = await form({
+      ...page,
+      fields: [SIGN, FIRST, SECOND],
+      widgets: [row(18, P1, 50), row(11, P1, 100), row(12, P1, 200)],
+    });
+    showEmpty(18, P1);
+    expect(capability.focusNext()).toBe(true);
+    expect(capability.focusNext()).toBe(true);
+    expect(capability.focusNext({ wrap: true })).toBe(true);
+    expect(focused).toEqual([11, 12, 11]);
+    expect(capability.focusNext({ empty: true, from: SECOND.ref, wrap: true })).toBe(true);
+    expect(focused).toEqual([11, 12, 11, 11]);
+  });
+
+  it('is a stop again once it holds something that takes the cursor', async () => {
+    const { capability, focused, show, showEmpty } = await form(page);
+    const takeBack = showEmpty(18, P1);
+    capability.focus(FIRST.ref);
+    takeBack();
+    // With the signature plugin, the layer's "sign here" button takes the cursor.
+    show(18, P1);
+    expect(capability.focusNext()).toBe(true);
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11, 18, 12]);
+    expect(capability.focus(SIGN.ref)).toBe(true);
+    expect(capability.getFocusedField()?.name).toBe('sign');
+  });
+
+  it('answers when it is asked, so a control drawn later counts', async () => {
+    const { capability, focused, showEmpty } = await form(page);
+    let drawn = false;
+    showEmpty(18, P1, () => drawn);
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11, 12]);
+    drawn = true;
+    // The box says yes now: Shift+Tab stops at it. (The stand-in's `focus` moves nothing.)
+    expect(capability.focusNext({ backward: true })).toBe(true);
+    expect(focused).toEqual([11, 12]);
+  });
+
+  it('a box that is merely off screen is still reached, once its control arrives', async () => {
+    const { capability, reveal, focused, show } = await form(pages);
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext()).toBe(true);
+    expect(reveal).toHaveBeenLastCalledWith(P2, {
+      rect: { x: 50, y: 100, width: 200, height: 20 },
+    });
+    expect(focused).toEqual([11]);
+    show(18, P2);
+    expect(focused).toEqual([11, 18]);
+    expect(capability.getFocusedField()?.name).toBe('sign');
+  });
+
+  it('a box asked for that comes in with nothing to focus: the cursor goes on past it', async () => {
+    const { capability, reveal, focused, show, showEmpty, time } = await form(pages);
+    capability.focus(FIRST.ref);
+    // Nothing says yet that the signature field can't take the cursor: the view goes to it.
+    expect(capability.focusNext()).toBe(true);
+    expect(reveal).toHaveBeenLastCalledWith(P2, {
+      rect: { x: 50, y: 100, width: 200, height: 20 },
+    });
+    show(14, P2);
+    showEmpty(18, P2);
+    expect(focused).toEqual([11]);
+    // Once the turn is over and the box still holds nothing, Tab's next stop takes the cursor.
+    time.advance(0);
+    expect(focused).toEqual([11, 14]);
+    expect(reveal).toHaveBeenLastCalledWith(P2, {
+      rect: { x: 50, y: 200, width: 200, height: 20 },
+    });
+    expect(capability.getFocusedField()?.name).toBe('second');
+  });
+
+  it('a box asked for whose control is drawn within the turn takes the cursor', async () => {
+    const { capability, focused, show, showEmpty, time } = await form(pages);
+    capability.focus(FIRST.ref);
+    capability.focusNext();
+    show(14, P2);
+    const takeBack = showEmpty(18, P2);
+    takeBack();
+    show(18, P2);
+    expect(focused).toEqual([11, 18]);
+    time.advance(0);
+    expect(focused).toEqual([11, 18]);
+  });
+
+  it('a box `focus()` asked for that comes in with nothing to focus: the cursor stays', async () => {
+    const { capability, focused, show, showEmpty, time } = await form(pages);
+    capability.focus(FIRST.ref);
+    expect(capability.focus(LATER_SIGN.ref)).toBe(true);
+    show(14, P2);
+    showEmpty(18, P2);
+    time.advance(0);
+    expect(focused).toEqual([11]);
+    // It is on screen now, and says no.
+    expect(capability.focus(LATER_SIGN.ref)).toBe(false);
+  });
+
+  it('the cursor going on past it never starts over: with none after it, it stays', async () => {
+    const { capability, focused, showEmpty, time } = await form({
+      ...pages,
+      fields: [FIRST, LATER_SIGN],
+      widgets: [row(11, P1, 100), row(18, P2, 100)],
+    });
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext({ wrap: true })).toBe(true);
+    showEmpty(18, P2);
+    time.advance(0);
+    expect(focused).toEqual([11]);
+    // Asked again, the field is known to take no cursor: the form's only stop is the first.
+    expect(capability.focusNext({ wrap: true })).toBe(true);
+    expect(focused).toEqual([11, 11]);
   });
 });
