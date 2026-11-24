@@ -253,21 +253,33 @@ describe('design through lending', () => {
     }
   });
 
-  it('a placed field shows in the session’s own group at once', async () => {
+  it('a placed field shows in the group its draft names at once, and in none without one', async () => {
     const booted = await boot(undefined, CHANGE_FIXTURE_PDF, { userId: 'lisa', groupId: 'legal' });
     try {
       const { form, page } = booted;
       booted.design();
       // The first create fills the session's pool of object numbers.
       await form.create({ kind: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
-      const created = form.create({
+      const unnamed = form.create({
         kind: 'text',
         name: 'clause',
         widgets: [{ page, rect: box(200, 60) }],
       });
-      // Before the engine answers: the group the engine puts it in, not none.
-      expect(form.get({ kind: 'fqn', name: 'clause' })?.groupId).toBe('legal');
-      expect((await created).field.groupId).toBe('legal');
+      // Before the engine answers, and after: nobody's, though the session's own group is legal.
+      expect(form.get({ kind: 'fqn', name: 'clause' })?.groupId).toBeNull();
+      expect((await unnamed).field.groupId).toBeNull();
+      const named = form.create({
+        kind: 'text',
+        name: 'annex',
+        groupId: 'legal',
+        widgets: [{ page, rect: box(200, 110) }],
+      });
+      expect(form.get({ kind: 'fqn', name: 'annex' })?.groupId).toBe('legal');
+      expect((await named).field.groupId).toBe('legal');
+      // Taken out of its group, it shows in none at once, and the engine agrees.
+      const removed = form.update({ kind: 'fqn', name: 'annex' }, { groupId: null });
+      expect(form.get({ kind: 'fqn', name: 'annex' })?.groupId).toBeNull();
+      expect((await removed).field.groupId).toBeNull();
     } finally {
       await booted.destroy();
     }

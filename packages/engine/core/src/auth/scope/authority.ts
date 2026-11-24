@@ -294,9 +294,12 @@ export function allowsSomeFieldWrite(
 
 /**
  * Check that the caller may put a form field in `groupId`: their own
- * default group always, another with `fields:set-group` for it.
+ * default group always, another with `fields:set-group` for it. `null` is no
+ * group, which takes no right of its own: whoever may design the form may
+ * leave a field in none, or take it out of its group.
  */
-export function authorizeFieldGroup(authority: ChangeAuthority, groupId: string): void {
+export function authorizeFieldGroup(authority: ChangeAuthority, groupId: string | null): void {
+  if (groupId === null) return;
   const { identity, grants } = authority;
   if (grants && !checkSetGroup('fields', groupId, identity.groupId, grants.scope)) {
     throw new PermissionDenied(`fields:set-group:group=${groupId}`, 'target');

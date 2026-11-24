@@ -176,6 +176,13 @@ describe('openapi document', () => {
     // One nullable schema reused is nullable everywhere it's used.
     const xyz = schemas.PageDestination.anyOf[0].properties;
     expect(nullable(resolved(xyz.y))).toBe(true);
+    // An optional nullable every kind of a model shares is nullable in each kind.
+    const drafts = schemas.FormFieldDraft.anyOf as Record<string, any>[];
+    expect(drafts.map((draft) => nullable(resolved(draft.properties.groupId)))).toEqual(
+      drafts.map(() => true),
+    );
+    expect(drafts).toHaveLength(7);
+    expect(nullable(resolved(schemas.FormFieldPatch.properties.groupId))).toBe(true);
   });
 
   test('the SDKs send EmbedPDF-Version: the major and minor of the release', () => {

@@ -189,15 +189,10 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
     ctx.runtime,
     ctx.session,
     ctx.fonts,
-  ).createField(
-    { ...op.draft, ...(groupId !== undefined ? { groupId } : {}) },
-    ctx.signal,
-    ctx.authority.identity,
-    {
-      ...(op.objectNumber !== undefined ? { objectNumber: op.objectNumber } : {}),
-      ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
-    },
-  );
+  ).createField({ ...op.draft, groupId }, ctx.signal, ctx.authority.identity, {
+    ...(op.objectNumber !== undefined ? { objectNumber: op.objectNumber } : {}),
+    ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
+  });
   // Its undo deletes the field, which takes it out of the calculation order too.
   return {
     item: { type: 'forms.create', ...fieldResult(ctx, field), ...orderResult(calculationOrder) },
@@ -224,7 +219,7 @@ export function copyFields(ctx: ChangeContext, op: Op<'forms.copy'>): Done {
       actor: ctx.authority.identity,
       mayScript: allowsCapability(ctx.authority, 'doc.forms.script'),
       // A copy is the caller's own create: it keeps its source's group when
-      // the caller may set it.
+      // the caller may set it, and is in none when its source is.
       groupOf: (groupId) => newFieldGroup(ctx, groupId),
       limits: ctx.limits,
     },
@@ -249,8 +244,10 @@ export function updateField(ctx: ChangeContext, op: Op<'forms.update'>, opIndex:
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (writesScripts(op.patch.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const before = readField(ctx, op.field);
-  if (op.patch.groupId !== undefined && op.patch.groupId !== before.field.groupId) {
-    authorizeFieldGroup(ctx.authority, op.patch.groupId);
+  if (op.patch.groupId !== undefined) {
+    // Taking the field out of its group (`null`) is form design, checked above.
+    const groupId = namedGroup(op.patch.groupId);
+    if (groupId !== before.field.groupId) authorizeFieldGroup(ctx.authority, groupId);
   }
   assertExpected(opIndex, propertiesOf(before.field), op.expect);
   return writeUpdate(ctx, before, op.patch);
@@ -675,14 +672,31 @@ function authorizeRevertedFills(
 }
 
 /**
- * The group a new field goes in: the one the write names, else the caller's
- * own (`identity.groupId`); another group than their own takes
- * `fields:set-group` for it.
+ * The group a new field goes in: the one the write names, and none when it
+ * names none, whatever the caller's own group is. Another group than the
+ * caller's own takes `fields:set-group` for it.
  */
-function newFieldGroup(ctx: ChangeContext, named: string | undefined): string | undefined {
-  const groupId = named ?? ctx.authority.identity.groupId;
-  if (groupId !== undefined) authorizeFieldGroup(ctx.authority, groupId);
+function newFieldGroup(ctx: ChangeContext, named: string | null | undefined): string | null {
+  const groupId = namedGroup(named);
+  authorizeFieldGroup(ctx.authority, groupId);
   return groupId;
+}
+
+/**
+ * The group a write names for a field: `null` for none, which a draft also
+ * says by leaving it out. A group's id is 1 to 256 characters, so an empty
+ * one is refused, not read as no group.
+ */
+function namedGroup(named: string | null | undefined): string | null {
+  if (named === undefined || named === null) return null;
+  if (typeof named !== 'string' || named.length < 1 || named.length > 256) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a field's groupId is 1 to 256 characters, or null for no group",
+      { details: { field: 'groupId' } },
+    );
+  }
+  return named;
 }
 
 /** Whether a script calculates the field: it has a calculate script and is in the calculation order. */
@@ -1235,8 +1249,8 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
     noExport: field.noExport,
     alternateName: field.alternateName,
     mappingName: field.mappingName,
-    // A group is changed, never removed: a field in none has nothing to put back.
-    ...(field.groupId !== null ? { groupId: field.groupId } : {}),
+    // `null` for a field in no group: putting that back takes the field out of its group.
+    groupId: field.groupId,
     actions: scriptsOf(field),
   };
   const hasDefault = field.defaultValueEntry.kind !== 'none';

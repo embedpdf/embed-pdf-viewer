@@ -21,9 +21,10 @@ interface FormFieldPatchBase {
   mappingName?: string | null;
   /**
    * Move the field to another group: the session's own, or one it has
-   * `fields:set-group` for. A group can be changed, never removed.
+   * `fields:set-group` for. `null` takes the field out of its group, which
+   * takes no `fields:set-group` right: form design is enough.
    */
-  groupId?: string;
+  groupId?: string | null;
   /**
    * The field's scripts, by event (JavaScript only): a script sets one,
    * `null` removes it, an event left out keeps what it has. Adding a

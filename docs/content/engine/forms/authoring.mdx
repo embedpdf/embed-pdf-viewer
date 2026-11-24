@@ -47,7 +47,7 @@ and [add a widget](#add-a-widget) later.
 | `noExport`      | Left out when the form is submitted.                                                                                                                      | `false`    |
 | `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                                   | none       |
 | `mappingName`   | A second name, for other apps that export the form's data.                                                                                                | none       |
-| `groupId`       | The group it goes in: who fills it in. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | your own   |
+| `groupId`       | The group it goes in: who fills it in. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | no group   |
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
@@ -184,7 +184,8 @@ await doc.forms.update(field.ref, { required: true, maxLength: 80 });
 ```
 
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
-`{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip.
+`{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip,
+`{ groupId: null }` for no group.
 
 You can change the settings in the tables above, except the kind and the widgets. A signature
 field takes the settings every field has: `name`, `readOnly`, `required`, `noExport`,
@@ -279,7 +280,8 @@ const { fields } = await doc.forms.copy([field.ref], {
 A copy has its original's settings, scripts, default value and value, and each widget's place,
 look, flags and actions. Its name is the original's with the next free number: `email` becomes
 `email_2`, `text_1` becomes `text_2`, `billing.name` becomes `billing.name_2`. A radio group's
-copy keeps its buttons' values.
+copy keeps its buttons' values. It is in its original's group (`groupId`), which you must be
+allowed to put fields in, and in no group when its original is in none.
 
 | Option    | What it does                                                  | Default          |
 | :-------- | :------------------------------------------------------------ | :--------------- |
