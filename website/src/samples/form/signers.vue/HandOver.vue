@@ -15,7 +15,7 @@ watch([() => props.person, id], async ([person, current]) => {
   opened = person;
   const bytes = await documents.download();
   await documents.close(current);
-  await documents.open({ kind: 'bytes', bytes }, { name: 'registration.pdf' });
+  await documents.open({ kind: 'bytes', bytes }, { name: 'equipment-loan.pdf' });
 });
 </script>
 

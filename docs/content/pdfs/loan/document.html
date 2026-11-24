@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Equipment loan</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A form two people sign: printed boxes for what is lent, then a block for each of them, with
+     a name, a date and a signature. No fields are in it yet. A box is 32px high, a text field's
+     24pt; a tick box is 24px, a checkbox's 18pt; a signature box holds a 160 by 48pt field with
+     room around it. */
+  .sheet .title.form-title { margin-top: 24px; font-size: 28px; }
+  .fields { flex: none; display: grid; gap: 14px; margin-top: 12px; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+  .label { display: block; margin-bottom: 6px; font: 600 12.5px/1.2 var(--font-body); color: var(--color-ink); }
+  .box { height: 32px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
+  .choices { display: flex; align-items: center; gap: 26px; height: 32px; }
+  .choice { display: flex; align-items: center; gap: 9px; }
+  .tick { flex: none; width: 24px; height: 24px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 4px; background: #ffffff; }
+  .people { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 6px; }
+  .person { display: grid; gap: 12px; align-content: start; }
+  .person h2 { margin-bottom: 0; }
+  .sign-box { height: 84px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
+</style>
+</head>
+<body class="fernquill">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill Ltd">
+    <span class="kind">Equipment loan</span>
+  </div>
+
+  <h1 class="title form-title">Equipment loan</h1>
+  <p class="meta">IT desk · Form IT-07 · Lent equipment stays the property of Fernquill Ltd</p>
+
+  <h2>The equipment</h2>
+  <div class="fields">
+    <div class="pair">
+      <div><span class="label">Item</span><div class="box"></div></div>
+      <div><span class="label">Serial number</span><div class="box"></div></div>
+    </div>
+    <div class="pair">
+      <div><span class="label">Return by</span><div class="box"></div></div>
+      <div>
+        <span class="label">Lent with</span>
+        <div class="choices">
+          <span class="choice"><span class="tick"></span>Charger</span>
+          <span class="choice"><span class="tick"></span>Carrying case</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="people">
+    <div class="person">
+      <h2>Borrower</h2>
+      <div><span class="label">Name</span><div class="box"></div></div>
+      <div><span class="label">Date</span><div class="box"></div></div>
+      <div><span class="label">Signature</span><div class="sign-box"></div></div>
+    </div>
+    <div class="person">
+      <h2>Approved by</h2>
+      <div><span class="label">Name</span><div class="box"></div></div>
+      <div><span class="label">Date</span><div class="box"></div></div>
+      <div><span class="label">Signature</span><div class="sign-box"></div></div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>Fernquill Ltd · Equipment loan IT-07</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

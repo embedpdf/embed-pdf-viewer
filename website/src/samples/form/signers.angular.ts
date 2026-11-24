@@ -1,9 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
+  type ElementRef,
   inject,
   input,
   signal,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import {
@@ -18,12 +21,18 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
+import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
+import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
+import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { localEngine } from '@embedpdf/engine';
 
-const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('https://www.embedpdf.com/pdfs/registration.pdf');
-  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
+const engine = localEngine();
+const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
+
+const loan = async (): Promise<OpenInput> => {
+  const response = await fetch('https://www.embedpdf.com/pdfs/loan.pdf');
+  return { kind: 'bytes', id: 'loan', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // What each person may do, as permissions: the sender places fields for both signers, and each
@@ -35,25 +44,25 @@ const people = {
     scope: [
       ...see,
       'doc.forms.modify',
-      'fields:set-group:group=attendee',
-      'fields:set-group:group=manager',
+      'fields:set-group:group=borrower',
+      'fields:set-group:group=approver',
     ],
   },
-  attendee: {
+  borrower: {
     name: 'Dana Smith',
-    scope: [...see, 'fields:fill:group=attendee', 'fields:sign:group=attendee'],
+    scope: [...see, 'fields:fill:group=borrower', 'fields:sign:group=borrower'],
   },
-  manager: {
+  approver: {
     name: 'Ada Lovelace',
-    scope: [...see, 'fields:fill:group=manager', 'fields:sign:group=manager'],
+    scope: [...see, 'fields:fill:group=approver', 'fields:sign:group=approver'],
   },
 };
 type Person = keyof typeof people;
 
 // Who the document's groups are: your app's own list. The PDF holds only each field's group id.
 const signers = [
-  { id: 'attendee', label: 'Dana Smith', color: '#2563eb' },
-  { id: 'manager', label: 'Ada Lovelace' }, // a color is picked for it
+  { id: 'borrower', label: 'Dana Smith', color: '#2563eb' },
+  { id: 'approver', label: 'Ada Lovelace' }, // a color is picked for it
 ];
 
 const FIELD_TOOLS = [
@@ -101,7 +110,7 @@ export class SenderToolbar {
 
   constructor() {
     // Start by placing text fields for the first signer.
-    this.form.setDesignGroup('attendee');
+    this.form.setDesignGroup('borrower');
     this.interaction.activateTool('form-text');
   }
 }
@@ -133,6 +142,132 @@ export class SignerLegend {
   /** How many fields are in a group. */
   protected count(groupId: string) {
     return this.form.fields().filter((field) => field.groupId === groupId).length;
+  }
+}
+
+const INK = '#1d2b53';
+type Point = { x: number; y: number };
+
+/**
+ * A signer pressed their signature field, with a click or with Tab and Space: the field is the
+ * signature plugin's target, and this card opens next to it. What they draw goes into the field.
+ */
+@Component({
+  selector: 'demo-sign-card',
+  imports: [EpdfAnchored],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    @if (signature.target()) {
+      <epdf-anchored [anchor]="anchor()" placement="bottom-start" [gap]="8">
+        <div
+          #card
+          class="sign-card"
+          role="dialog"
+          aria-label="Draw your signature"
+          tabindex="-1"
+          (keydown.escape)="close()"
+        >
+          <canvas
+            #pad
+            class="sign-pad"
+            width="240"
+            height="100"
+            (pointerdown)="start($event)"
+            (pointermove)="draw($event)"
+          ></canvas>
+          <div class="sign-actions">
+            <button type="button" class="button" (click)="close()">Cancel</button>
+            <button type="button" class="button" [disabled]="!drawn()" (click)="sign()">
+              Sign
+            </button>
+          </div>
+        </div>
+      </epdf-anchored>
+    }
+  `,
+})
+export class SignCard {
+  private readonly form = inject(EpdfForm);
+  private readonly stamp = inject(EpdfStamp);
+  protected readonly signature = inject(EpdfSignature);
+  protected readonly anchor = this.form.widgetAnchorOf(() => {
+    const target = this.signature.target();
+    return target ? (this.form.getWidgets(target)[0]?.ref ?? null) : null;
+  });
+  protected readonly drawn = signal(false);
+
+  private readonly card = viewChild<ElementRef<HTMLDivElement>>('card');
+  private readonly pad = viewChild<ElementRef<HTMLCanvasElement>>('pad');
+  private strokes: Point[][] = [];
+
+  constructor() {
+    // Each field starts with an empty pad, and the card takes the cursor, so Escape closes it.
+    effect(() => {
+      const target = this.signature.target();
+      const pad = this.pad()?.nativeElement;
+      this.strokes = [];
+      this.drawn.set(false);
+      pad?.getContext('2d')?.clearRect(0, 0, pad.width, pad.height);
+      if (target) this.card()?.nativeElement.focus();
+    });
+  }
+
+  private pointOf(event: PointerEvent, canvas: HTMLCanvasElement): Point {
+    const box = canvas.getBoundingClientRect();
+    return { x: event.clientX - box.left, y: event.clientY - box.top };
+  }
+
+  protected start(event: PointerEvent) {
+    const canvas = event.currentTarget as HTMLCanvasElement;
+    canvas.setPointerCapture(event.pointerId);
+    this.strokes.push([this.pointOf(event, canvas)]);
+  }
+
+  protected draw(event: PointerEvent) {
+    const canvas = event.currentTarget as HTMLCanvasElement;
+    const stroke = this.strokes.at(-1);
+    const ink = canvas.getContext('2d');
+    if (!stroke || !ink || !canvas.hasPointerCapture(event.pointerId)) return;
+    const from = stroke.at(-1)!;
+    const to = this.pointOf(event, canvas);
+    stroke.push(to);
+    ink.strokeStyle = INK;
+    ink.lineWidth = 2;
+    ink.lineCap = 'round';
+    ink.beginPath();
+    ink.moveTo(from.x, from.y);
+    ink.lineTo(to.x, to.y);
+    ink.stroke();
+    this.drawn.set(true);
+  }
+
+  // Close without signing, and put the cursor back on the field.
+  protected close() {
+    const field = this.signature.target();
+    this.signature.setTarget(null);
+    if (field) this.form.focus(field);
+  }
+
+  // The drawing becomes a stamp among the signer's marks, and the stamp goes into the field.
+  protected async sign() {
+    const field = this.signature.target();
+    if (!field) return;
+    const library =
+      this.stamp.listLibraries().find((each) => each.name === 'Signatures') ??
+      (await this.stamp.createLibrary('Signatures', { kind: 'signatures' })).library;
+    // A new drawing takes the place of the one drawn before.
+    const before = this.stamp
+      .listAssets({ libraryId: library.id })
+      .find((each) => each.name === 'signature');
+    if (before) await this.stamp.deleteAsset(before.id);
+    const { asset } = await this.stamp.createAsset({
+      libraryId: library.id,
+      name: 'signature',
+      label: 'Signature',
+      mark: { kind: 'ink', strokes: this.strokes, color: INK, strokeWidth: 2 },
+    });
+    await this.signature.placeMark({ assetId: asset.id }, { field });
+    this.form.focus(field);
   }
 }
 
@@ -172,19 +307,23 @@ export class Toolbar {
     EpdfAnnotationLayer,
     EpdfFormLayer,
     Toolbar,
+    SignCard,
   ],
   providers: [
     provideEmbedPdf(
       {
-        engine: () => localEngine(),
+        engine,
         scope: people.sender.scope,
-        initialDocuments: [{ source: registration, name: 'registration.pdf' }],
+        initialDocuments: [{ source: loan, name: 'equipment-loan.pdf' }],
       },
       withStage(),
       withRender(),
       withInteraction(),
       withAnnotation(),
       withForm(),
+      withStamp({ assetEngine }),
+      // An empty signature field becomes a button. With no key, a mark is drawn into the field.
+      withSignature(),
     ),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -214,6 +353,7 @@ export class Toolbar {
           <epdf-annotation-layer />
           <epdf-form-layer />
         </ng-template>
+        <demo-sign-card />
       </epdf-stage>
     </ng-container>
 
@@ -237,6 +377,6 @@ export class App {
     if (!id) return;
     const bytes = await this.documents.download();
     await this.documents.close(id);
-    await this.documents.open({ kind: 'bytes', bytes }, { name: 'registration.pdf' });
+    await this.documents.open({ kind: 'bytes', bytes }, { name: 'equipment-loan.pdf' });
   }
 }

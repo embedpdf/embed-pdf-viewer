@@ -17,7 +17,7 @@ const { activeToolId } = useInteractionState();
 
 // Start by placing text fields for the first signer.
 onMounted(() => {
-  form.setDesignGroup('attendee');
+  form.setDesignGroup('borrower');
   interaction.activateTool('form-text');
 });
 </script>

@@ -17,7 +17,7 @@
 
   // Start by placing text fields for the first signer.
   onMount(() => {
-    form.setDesignGroup('attendee');
+    form.setDesignGroup('borrower');
     interaction.activateTool('form-text');
   });
 </script>

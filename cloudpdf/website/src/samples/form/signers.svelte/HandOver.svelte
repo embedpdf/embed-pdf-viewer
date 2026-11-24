@@ -16,7 +16,7 @@
   async function openAgain(id: string) {
     const bytes = await documents.download();
     await documents.close(id);
-    await documents.open({ kind: 'bytes', bytes }, { name: 'registration.pdf' });
+    await documents.open({ kind: 'bytes', bytes }, { name: 'equipment-loan.pdf' });
   }
 
   $effect(() => {

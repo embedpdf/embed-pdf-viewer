@@ -9,30 +9,45 @@ import {
   useInteractionState,
 } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
-import { FormLayer, formPlugin, useForm, useFormState } from '@embedpdf/react/form';
+import { Anchored } from '@embedpdf/react/anchored';
+import {
+  FormLayer,
+  formPlugin,
+  useForm,
+  useFormState,
+  useFormWidgetAnchor,
+} from '@embedpdf/react/form';
+import { stampPlugin, useStamp } from '@embedpdf/react/stamp';
+import { signaturePlugin, useSignature, useSignatureState } from '@embedpdf/react/signature';
 import { localEngine } from '@embedpdf/engine';
 
 import './signers.css';
 
 const engine = localEngine();
+// [!asset-engine]
+const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
+// [!/asset-engine]
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
+  stampPlugin({ assetEngine }),
+  // An empty signature field becomes a button. With no key, a mark is drawn into the field.
+  signaturePlugin(),
 ];
 
 // Who the document's groups are: your app's own list. The PDF holds only each field's group id.
 const signers = [
-  { id: 'attendee', label: 'Dana Smith', color: '#2563eb' },
-  { id: 'manager', label: 'Ada Lovelace' }, // a color is picked for it
+  { id: 'borrower', label: 'Dana Smith', color: '#2563eb' },
+  { id: 'approver', label: 'Ada Lovelace' }, // a color is picked for it
 ];
 
-// [!doc-source registration]
-const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('https://www.embedpdf.com/pdfs/registration.pdf');
-  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source loan]
+const loan = async (): Promise<OpenInput> => {
+  const response = await fetch('https://www.embedpdf.com/pdfs/loan.pdf');
+  return { kind: 'bytes', id: 'loan', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -45,17 +60,17 @@ const people = {
     scope: [
       ...see,
       'doc.forms.modify',
-      'fields:set-group:group=attendee',
-      'fields:set-group:group=manager',
+      'fields:set-group:group=borrower',
+      'fields:set-group:group=approver',
     ],
   },
-  attendee: {
+  borrower: {
     name: 'Dana Smith',
-    scope: [...see, 'fields:fill:group=attendee', 'fields:sign:group=attendee'],
+    scope: [...see, 'fields:fill:group=borrower', 'fields:sign:group=borrower'],
   },
-  manager: {
+  approver: {
     name: 'Ada Lovelace',
-    scope: [...see, 'fields:fill:group=manager', 'fields:sign:group=manager'],
+    scope: [...see, 'fields:fill:group=approver', 'fields:sign:group=approver'],
   },
 };
 type Person = keyof typeof people;
@@ -78,7 +93,7 @@ function HandOver({ person }: { person: Person }) {
     void (async () => {
       const bytes = await documents.download();
       await documents.close(id);
-      await documents.open({ kind: 'bytes', bytes }, { name: 'registration.pdf' });
+      await documents.open({ kind: 'bytes', bytes }, { name: 'equipment-loan.pdf' });
     })();
   }, [person, id, documents]);
   return null;
@@ -93,7 +108,7 @@ function SenderToolbar() {
 
   // Start by placing text fields for the first signer.
   useEffect(() => {
-    form.setDesignGroup('attendee');
+    form.setDesignGroup('borrower');
     interaction.activateTool('form-text');
   }, [form, interaction]);
 
@@ -145,6 +160,120 @@ function SignerLegend({ person }: { person: Person }) {
   );
 }
 
+const INK = '#1d2b53';
+type Point = { x: number; y: number };
+
+/**
+ * A signer pressed their signature field, with a click or with Tab and Space: the field is the
+ * signature plugin's target, and this card opens next to it. What they draw goes into the field.
+ */
+function SignCard() {
+  const form = useForm();
+  const stamp = useStamp();
+  const signature = useSignature();
+  const { target } = useSignatureState();
+  const anchor = useFormWidgetAnchor(target ? (form.getWidgets(target)[0]?.ref ?? null) : null);
+  const card = useRef<HTMLDivElement>(null);
+  const pad = useRef<HTMLCanvasElement>(null);
+  const strokes = useRef<Point[][]>([]);
+  const [drawn, setDrawn] = useState(false);
+
+  // Each field starts with an empty pad, and the card takes the cursor, so Escape closes it.
+  useEffect(() => {
+    strokes.current = [];
+    setDrawn(false);
+    pad.current?.getContext('2d')?.clearRect(0, 0, pad.current.width, pad.current.height);
+    if (target) card.current?.focus();
+  }, [target]);
+
+  if (!target) return null;
+
+  const pointOf = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - box.left, y: event.clientY - box.top };
+  };
+
+  const start = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    strokes.current.push([pointOf(event)]);
+  };
+
+  const draw = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const stroke = strokes.current.at(-1);
+    const ink = event.currentTarget.getContext('2d');
+    if (!stroke || !ink || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const from = stroke.at(-1)!;
+    const to = pointOf(event);
+    stroke.push(to);
+    ink.strokeStyle = INK;
+    ink.lineWidth = 2;
+    ink.lineCap = 'round';
+    ink.beginPath();
+    ink.moveTo(from.x, from.y);
+    ink.lineTo(to.x, to.y);
+    ink.stroke();
+    setDrawn(true);
+  };
+
+  // Close without signing, and put the cursor back on the field.
+  const close = () => {
+    signature.setTarget(null);
+    form.focus(target);
+  };
+
+  // The drawing becomes a stamp among the signer's marks, and the stamp goes into the field.
+  const sign = async () => {
+    const library =
+      stamp.listLibraries().find((each) => each.name === 'Signatures') ??
+      (await stamp.createLibrary('Signatures', { kind: 'signatures' })).library;
+    // A new drawing takes the place of the one drawn before.
+    const before = stamp
+      .listAssets({ libraryId: library.id })
+      .find((each) => each.name === 'signature');
+    if (before) await stamp.deleteAsset(before.id);
+    const { asset } = await stamp.createAsset({
+      libraryId: library.id,
+      name: 'signature',
+      label: 'Signature',
+      mark: { kind: 'ink', strokes: strokes.current, color: INK, strokeWidth: 2 },
+    });
+    await signature.placeMark({ assetId: asset.id }, { field: target });
+    form.focus(target);
+  };
+
+  return (
+    <Anchored anchor={anchor} placement="bottom-start" gap={8}>
+      <div
+        ref={card}
+        className="sign-card"
+        role="dialog"
+        aria-label="Draw your signature"
+        tabIndex={-1}
+        onKeyDown={(event) => event.key === 'Escape' && close()}
+      >
+        {/* Anchored UI keeps a press from reaching the page under it, before React hears it:
+            the pad listens while the press is on its way down. */}
+        <canvas
+          ref={pad}
+          className="sign-pad"
+          width={240}
+          height={100}
+          onPointerDownCapture={start}
+          onPointerMove={draw}
+        />
+        <div className="sign-actions">
+          <button type="button" className="button" onClick={close}>
+            Cancel
+          </button>
+          <button type="button" className="button" disabled={!drawn} onClick={() => void sign()}>
+            Sign
+          </button>
+        </div>
+      </div>
+    </Anchored>
+  );
+}
+
 function Toolbar({ person }: { person: Person }) {
   const form = useForm();
 
@@ -164,7 +293,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       scope={people[person].scope}
-      initialDocuments={[{ source: registration, name: 'registration.pdf' }]}
+      initialDocuments={[{ source: loan, name: 'equipment-loan.pdf' }]}
     >
       <div className="toolbar">
         <span className="label">Open the form as</span>
@@ -185,7 +314,7 @@ export default function App() {
       <HandOver person={person} />
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <Toolbar person={person} />
-        <Stage className="stage">
+        <Stage className="stage" overlay={<SignCard />}>
           {() => (
             <>
               <RenderLayer />

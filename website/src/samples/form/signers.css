@@ -138,6 +138,38 @@
   color: var(--ink);
 }
 
+/* The card a signer draws their signature in */
+.sign-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -12px rgb(7 32 76 / 0.35);
+}
+
+.sign-card:focus {
+  outline: none;
+}
+
+.sign-pad {
+  display: block;
+  width: 240px;
+  height: 100px;
+  background: var(--canvas);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.sign-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* The pages */
 .stage {
   height: 440px;

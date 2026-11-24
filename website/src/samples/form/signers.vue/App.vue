@@ -7,25 +7,32 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { FormLayer, formPlugin } from '@embedpdf/vue/form';
+import { stampPlugin } from '@embedpdf/vue/stamp';
+import { signaturePlugin } from '@embedpdf/vue/signature';
 import { localEngine } from '@embedpdf/engine';
 import { people, type Person } from './people';
 import HandOver from './HandOver.vue';
+import SignCard from './SignCard.vue';
 import Toolbar from './Toolbar.vue';
 
 import '../signers.css';
 
 const engine = localEngine();
+const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
+  stampPlugin({ assetEngine }),
+  // An empty signature field becomes a button. With no key, a mark is drawn into the field.
+  signaturePlugin(),
 ];
 
-const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('https://www.embedpdf.com/pdfs/registration.pdf');
-  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
+const loan = async (): Promise<OpenInput> => {
+  const response = await fetch('https://www.embedpdf.com/pdfs/loan.pdf');
+  return { kind: 'bytes', id: 'loan', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const person = ref<Person>('sender');
@@ -36,7 +43,7 @@ const person = ref<Person>('sender');
     :engine="engine"
     :plugins="plugins"
     :scope="people[person].scope"
-    :initial-documents="[{ source: registration, name: 'registration.pdf' }]"
+    :initial-documents="[{ source: loan, name: 'equipment-loan.pdf' }]"
   >
     <div class="toolbar">
       <span class="label">Open the form as</span>
@@ -62,6 +69,9 @@ const person = ref<Person>('sender');
           <RenderLayer />
           <AnnotationLayer />
           <FormLayer />
+        </template>
+        <template #overlay>
+          <SignCard />
         </template>
       </Stage>
     </DocumentGate>

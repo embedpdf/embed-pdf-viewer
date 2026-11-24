@@ -287,7 +287,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `focusedField`  | The field the cursor is in, or `null`; see [Move between fields](#move-between-fields)            | `getFocusedField()`                                  |
 | `selectedFields` | In design mode, every field with a selected box; see [Building forms](forms/building#give-fields-to-a-signer) | `listSelectedFields()` |
 | `groups`        | Every group you named or the form's fields are in, as `{ id, label, color }`; see [Fields for several people](#fields-for-several-people) | `listGroups()` |
-| `designGroup`   | In design mode, the group that fields placed with a tool go in, or `null` when it names none; see [Building forms](forms/building#place-fields-for-a-signer) | `getDesignGroup()` |
+| `designGroup`   | In design mode, the group that fields placed with a tool go in, or `null` for none; see [Building forms](forms/building#place-fields-for-a-signer) | `getDesignGroup()` |
 
 For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
 

@@ -5,27 +5,34 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { FormLayer, formPlugin } from '@embedpdf/svelte/form';
+  import { stampPlugin } from '@embedpdf/svelte/stamp';
+  import { signaturePlugin } from '@embedpdf/svelte/signature';
   import { localEngine } from '@embedpdf/engine';
   import HandOver from './HandOver.svelte';
+  import SignCard from './SignCard.svelte';
   import { people, type Person } from './people';
   import Toolbar from './Toolbar.svelte';
 
   import '../signers.css';
 
   const engine = localEngine();
+  const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
     annotationPlugin(),
     formPlugin(),
+    stampPlugin({ assetEngine }),
+    // An empty signature field becomes a button. With no key, a mark is drawn into the field.
+    signaturePlugin(),
   ];
 
-  const registration = async (): Promise<OpenInput> => {
-    const response = await fetch('https://www.embedpdf.com/pdfs/registration.pdf');
+  const loan = async (): Promise<OpenInput> => {
+    const response = await fetch('https://www.embedpdf.com/pdfs/loan.pdf');
     return {
       kind: 'bytes',
-      id: 'registration',
+      id: 'loan',
       bytes: new Uint8Array(await response.arrayBuffer()),
     };
   };
@@ -41,7 +48,7 @@
   {engine}
   {plugins}
   scope={people[person].scope}
-  initialDocuments={[{ source: registration, name: 'registration.pdf' }]}
+  initialDocuments={[{ source: loan, name: 'equipment-loan.pdf' }]}
 >
   <div class="toolbar">
     <span class="label">Open the form as</span>
@@ -68,6 +75,9 @@
       <RenderLayer />
       <AnnotationLayer />
       <FormLayer />
+      {#snippet overlay()}
+        <SignCard />
+      {/snippet}
     </Stage>
   </DocumentGate>
 </Viewer>

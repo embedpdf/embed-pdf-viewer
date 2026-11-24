@@ -82,25 +82,31 @@ form.setDesignGroup('buyer'); // fields placed with a tool are Dana's
 
 While you design, every field shows in its group's color. A field placed with a tool goes into
 the group you set, which the form's state has as <Fw only={['react', 'vue', 'svelte']}>`designGroup`</Fw><Fw only="angular">`form.designGroup()`</Fw>. With `null`, where it starts, it names
-no group, and the field goes where a field made with `create()` goes when its draft names no
-`groupId`.
+no group, and a placed field is in none.
 
 Putting a field in a group other than your own takes the `fields:set-group` permission for that
 group, and `form.canSetGroup(groupId)` says whether the user has it. Turn off the signers a user
 can't place for: `setDesignGroup()` refuses a group they may not put a field in, as `create()`,
-`update()` and `moveToGroup()` do.
+`update()` and `moveToGroup()` do. A field in no group needs no such permission: whoever may
+design the form may leave a field in none, or take it out of its group.
 
 <Engine local>
 
 <Example name="form/signers" />
 
-> **Try it:** click a printed box to place a field for Dana, pick Ada and place another: each
-> shows in its signer's color. Then open the form as Dana. Her field stands out and takes her
-> typing, and Ada's shows as the PDF has it.
+> **Try it:** as the sender, click the borrower's Name box to place a text field for Dana, then
+> pick Signature and click her Signature box. Pick Ada and do the same under "Approved by": each
+> field shows in its signer's color. Then open the form as Dana. Her fields stand out, her name
+> box takes her typing, and Ada's show as the PDF has them. Click Dana's signature field, or Tab
+> to it and press Space, draw a signature in the card and press Sign.
 
-A signature field shows in its signer's color too, for the person who may sign it. Signing it
-takes the signature plugin, which this example leaves out: see
-["Sign here" in a form](signatures#sign-here-in-a-form).
+The signers can sign because the example also has the stamp plugin and the
+[signature plugin](signatures): an empty signature field is a button, and pressing it makes the
+field the [target](signatures#sign-here-in-a-form). The example's card opens next to the target,
+turns the drawing into one of the person's marks, and places it in the field with
+`signature.placeMark()`. With no signing key, the mark is drawn into the field and nothing is
+sealed; [The key](signatures#the-key) has what a real signature takes. Escape or Cancel closes
+the card and puts the cursor back on the field.
 
 A document keeps the permissions it opened with, so the example saves the form and opens it again
 for each person, with theirs.
@@ -110,10 +116,11 @@ for each person, with theirs.
 ### Give fields to a signer
 
 A form made somewhere else, in Acrobat for example, arrives with its fields in no group. Move one
-like any setting:
+like any setting, and `null` takes it out of its group again:
 
 ```ts
 await form.update(field.ref, { groupId: 'seller' });
+await form.update(field.ref, { groupId: null }); // nobody's
 ```
 
 Or move every selected field in one call, which is one step to undo:
@@ -122,7 +129,8 @@ Or move every selected field in one call, which is one step to undo:
 
 <Fw only={['react', 'vue', 'svelte']}>`selectedFields`</Fw><Fw only="angular">`form.selectedFields()`</Fw> in the form's state has every field with a selected box, and `form.listSelectedFields()`
 reads it once. `moveToGroup(fields, groupId)` leaves out the fields already in the group, shows
-the rest in their new color at once, and resolves `{ fields }` as they are now.
+the rest in their new color at once, and resolves `{ fields }` as they are now. With `null` it
+takes the fields out of their group.
 
 ## Change a field's settings
 
@@ -159,7 +167,8 @@ field's kind: `{ properties, values }`, each property a `key` (what `update()` t
 translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choice`'s options are
 the field's own values, shown as they are. While the document has groups, `groupId` is one of the
 settings: a `choice` whose options are the ids of the groups the user may put the field in. Show
-each with its group's label, from the form's `groups`.
+each with its group's label, from the form's `groups`; none of them, `null`, takes the field out
+of its group.
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel), or from code with
@@ -360,8 +369,8 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `reorderCalculations(fields, position)` | Moves fields in the order calculate scripts run in. Resolves `{ calculationOrder }`. [Scripts and calculations](#scripts-and-calculations)                                                            |
 | `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
-| `setDesignGroup(groupId)`               | Says who the next fields are for: a field placed with a tool goes into this group; `null` names none. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields for a signer](#place-fields-for-a-signer) |
-| `moveToGroup(fields, groupId)`          | Puts fields in a group, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
+| `setDesignGroup(groupId)`               | Says who the next fields are for: a field placed with a tool goes into this group; with `null` it is in none. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields for a signer](#place-fields-for-a-signer) |
+| `moveToGroup(fields, groupId)`          | Puts fields in a group, or with `null` takes them out of theirs, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
 | `canSetGroup(groupId)`                  | Whether the user may put a field in that group. [Place fields for a signer](#place-fields-for-a-signer)                                                                                             |
 | `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
 | `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
