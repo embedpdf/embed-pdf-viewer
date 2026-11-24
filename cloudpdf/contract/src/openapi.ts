@@ -478,8 +478,7 @@ function registerSchema(
     override: (definition, refs, seen) => {
       const sharedName = sharedComponentOf(definition);
       if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
-      const nullable =
-        (definition as { typeName?: string }).typeName === z.ZodFirstPartyTypeKind.ZodNullable;
+      const nullable = isNullableDefinition(definition);
       if (nullable && !seen) nullableAt.add(refs.currentPath.join('/'));
       // A place that is nullable itself says so beside the reference.
       const at = refs.currentPath.join('/');
@@ -584,6 +583,19 @@ function withoutBorrowedNull(
       withoutBorrowedNull(child, component, componentPath, [...path, key], borrowsNull),
     ]),
   );
+}
+
+/**
+ * Whether a definition is a nullable, or an optional around one. An optional
+ * property is written at the place of the schema it wraps, so a model that
+ * reuses the optional reuses the nullable itself, and keeps its `nullable`.
+ */
+function isNullableDefinition(definition: z.ZodTypeDef): boolean {
+  const { typeName, innerType } = definition as { typeName?: string; innerType?: z.ZodTypeAny };
+  if (typeName === z.ZodFirstPartyTypeKind.ZodOptional && innerType) {
+    return isNullableDefinition(innerType._def);
+  }
+  return typeName === z.ZodFirstPartyTypeKind.ZodNullable;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

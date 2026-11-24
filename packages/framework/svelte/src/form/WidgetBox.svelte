@@ -20,7 +20,14 @@
 
   The box is also where the form's cursor reaches the control: `focus()` and Tab go through the
   form, in the document's order (`bindFieldFocus`), unless the box has nothing to focus
-  (`focusable={false}`).
+  (`focusable={false}`). `custom`: the box holds a control of the app's, and the cursor goes to
+  the first element in it that Tab stops at.
+
+  Inside a control of the app's (`isEmbedded()`) the box only fills the place it is given: the
+  app's box around it stops the press, sends the widget's events and takes the cursor. It claims
+  every click that passes through it (`claimClick`), so the app's box leaves that click alone. It
+  claims with a native listener, which runs while the click bubbles, before the handlers Svelte
+  hands to the app's root: the app's box reads the claim from one of those.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -31,6 +38,7 @@
   import {
     bindFieldFocus,
     bindWidgetEvents,
+    claimClick,
     cssText,
     isolatePointerDown,
     rectInPixels,
@@ -39,12 +47,14 @@
   import type { FormColors } from '@embedpdf/web';
   import { usePage } from '../runtime/page';
   import { useCapability } from '../runtime/readers.svelte';
+  import { isEmbedded } from './widget';
 
   let {
     item,
     colors,
     edge = true,
     focusable = true,
+    custom = false,
     style = '',
     children,
     ...rest
@@ -54,6 +64,8 @@
     edge?: boolean;
     /** Whether the box has a control the cursor can go into. */
     focusable?: boolean;
+    /** The box holds a control of the app's own. */
+    custom?: boolean;
     /** More style for the box, after its own place. */
     style?: string;
     children?: Snippet;
@@ -61,17 +73,29 @@
 
   const page = usePage();
   const form = useCapability(FormHostToken);
+  const embedded = isEmbedded();
+  // Where the box goes: the widget's frame on the page, or the place it fills inside a control
+  // of the app's, at the frame's size on screen and unturned (the app's box is turned).
+  const place = $derived.by(() => {
+    const frame = rectInPixels(item.box, page.transform);
+    return embedded
+      ? widgetBoxStyleOf(
+          { look: item.look },
+          { left: 0, top: 0, width: frame.width, height: frame.height },
+          colors,
+          { edge },
+        )
+      : widgetBoxStyleOf(item, frame, colors, { edge });
+  });
   // The box's own place and edge, then the control's additions (a cursor, an outline).
-  const boxStyle = $derived(
-    [
-      cssText(widgetBoxStyleOf(item, rectInPixels(item.box, page.transform), colors, { edge })),
-      style,
-    ]
-      .filter(Boolean)
-      .join('; '),
-  );
+  const boxStyle = $derived([cssText(place), style].filter(Boolean).join('; '));
 
+  /** The widget's event surface; inside a control of the app's, only the claim on its clicks. */
   function eventSurface(box: HTMLElement): () => void {
+    if (embedded) {
+      box.addEventListener('click', claimClick);
+      return () => box.removeEventListener('click', claimClick);
+    }
     const release = isolatePointerDown(box);
     const unbind = bindWidgetEvents(box, (event) => {
       // Read at the event: a widget the engine has just placed gets its address later.
@@ -87,9 +111,9 @@
   /** The form's cursor in this box; runs again when the widget or what it takes changes. */
   function fieldFocus(box: HTMLElement): (() => void) | undefined {
     const widget = item.annotationRef;
-    if (!widget || item.disabled || !focusable) return undefined;
+    if (embedded || !widget || item.disabled || !focusable) return undefined;
     const radio = item.control === 'toggle' && item.kind === 'radio';
-    return bindFieldFocus(box, form, widget, { radio });
+    return bindFieldFocus(box, form, widget, { radio, custom });
   }
 </script>
 

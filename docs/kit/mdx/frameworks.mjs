@@ -137,6 +137,7 @@ const ANGULAR_HOOKS = {
   useToolCursor: ['interaction.overrideCursor()', 'interaction.overrideCursor($args)'],
   useSurface: ['shell.surface($args)', 'shell.surface($args)'],
   useFormValue: ['form.valueOf($args)', 'form.valueOf($args)'],
+  useFormWidgetAnchor: ['form.widgetAnchorOf($args)', 'form.widgetAnchorOf($args)'],
   usePendingRedactions: ['redaction.pending()', 'redaction.pendingOn($args)'],
   useMeasurementReadout: ['measurement.readout()', 'measurement.readoutOf($args)'],
   useSignerRows: ['signature.signerRows()'],

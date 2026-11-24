@@ -125,10 +125,6 @@ const form = (): FieldIndex =>
 const field = (index: FieldIndex, objectNumber: number) =>
   fieldByRef(index, { kind: 'objectNumber', objectNumber }) as FormField & Record<string, unknown>;
 
-/** One op shown over a form, as `reduce` calls it: the prediction takes the session third, not an index. */
-const replay = (index: FieldIndex, op: Parameters<typeof predictFormOp>[1]): FieldIndex =>
-  predictFormOp(index, op);
-
 describe('predictFormOp', () => {
   test('a value shows on its field and draws its widgets', () => {
     const next = predictFormOp(form(), {
@@ -211,7 +207,7 @@ describe('predictFormOp', () => {
       { type: 'forms.setValue', field: name.ref, value: { value: 'x' } },
       { type: 'forms.setDisplay', field: agree.ref, display: 'hidden' },
     ] as const;
-    const after = ops.reduce(replay, before);
+    const after = ops.reduce(predictFormOp, before);
     const undo = undoLookOf(before, ops);
     // One restore per op, the last op's first.
     expect(undo.map((op) => op.type === 'forms.restore' && op.field.name)).toEqual([
@@ -219,7 +215,7 @@ describe('predictFormOp', () => {
       'name',
       'agree',
     ]);
-    const undone = undo.reduce(replay, after);
+    const undone = undo.reduce(predictFormOp, after);
     expect(field(undone, 10).checked).toBe(false);
     expect(field(undone, 4).value).toBe('abc');
     expect(widgetRowOf(undone, 11)).toEqual(widgetRowOf(before, 11));
@@ -306,7 +302,7 @@ describe('design ops', () => {
     ).toBe(unnamed);
   });
 
-  test('a field whose draft names no group shows in the session’s own', () => {
+  test('a field shows in the group its draft names, and in none when it names none', () => {
     const op = {
       type: 'forms.create' as const,
       draft: {
@@ -317,12 +313,32 @@ describe('design ops', () => {
       objectNumber: 90,
       widgetObjectNumbers: [91],
     };
-    // Where the engine puts it, so it doesn't show in no group until the engine answers.
-    expect(field(predictFormOp(form(), op, { groupId: 'legal' }), 90).groupId).toBe('legal');
-    // A group the draft names is the field's; a session with no group gives none.
+    // Where the engine puts it: nobody's, whatever the session's own group is.
+    expect(field(predictFormOp(form(), op), 90).groupId).toBeNull();
+    const none = { ...op, draft: { ...op.draft, groupId: null } };
+    expect(field(predictFormOp(form(), none), 90).groupId).toBeNull();
     const named = { ...op, draft: { ...op.draft, groupId: 'buyer' } };
-    expect(field(predictFormOp(form(), named, { groupId: 'legal' }), 90).groupId).toBe('buyer');
-    expect(field(predictFormOp(form(), { ...op }), 90).groupId).toBeNull();
+    expect(field(predictFormOp(form(), named), 90).groupId).toBe('buyer');
+  });
+
+  test('a field taken out of its group shows in none', () => {
+    const created = predictFormOp(form(), {
+      type: 'forms.create',
+      draft: {
+        kind: 'text',
+        name: 'clause',
+        groupId: 'buyer',
+        widgets: [{ page: PAGE, rect: { x: 0, y: 40, width: 80, height: 20 } }],
+      },
+      objectNumber: 90,
+      widgetObjectNumbers: [91],
+    });
+    const removed = predictFormOp(created, {
+      type: 'forms.update',
+      field: { kind: 'objectNumber', objectNumber: 90 },
+      patch: { groupId: null },
+    });
+    expect(field(removed, 90).groupId).toBeNull();
   });
 
   test('a widget moves, and its field keeps its value', () => {
@@ -404,7 +420,7 @@ describe('design ops', () => {
     const before = form();
     const after = predictFormOp(before, op);
     expect(contentOf(after)).not.toEqual(contentOf(before));
-    const undone = undoLookOf(before, [op]).reduce(replay, after);
+    const undone = undoLookOf(before, [op]).reduce(predictFormOp, after);
     expect(withoutOrder(contentOf(undone))).toEqual(withoutOrder(contentOf(before)));
     if (op.type === 'forms.reorderWidgets') {
       expect(contentOf(undone).widgetOrder).toEqual(contentOf(before).widgetOrder);

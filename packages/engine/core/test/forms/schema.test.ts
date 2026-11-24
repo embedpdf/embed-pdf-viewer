@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import {
   FormFieldDTOSchema,
+  FormFieldDraftSchema,
+  FormFieldPatchSchema,
   FormFieldValueSchema,
   FormSnapshotSchema,
   WidgetPlacementSchema,
@@ -136,5 +138,17 @@ describe('form schemas', () => {
     expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [6, 3] }).success).toBe(true);
     expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: null }).success).toBe(true);
     expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [] }).success).toBe(false);
+  });
+
+  test('a draft and a patch take a group, or null for none, and no empty id', () => {
+    const draft = { kind: 'text', name: 'note' };
+    for (const schema of [FormFieldDraftSchema, FormFieldPatchSchema]) {
+      expect(schema.safeParse(draft).success).toBe(true);
+      expect(schema.safeParse({ ...draft, groupId: 'buyer' }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, groupId: null }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, groupId: '' }).success).toBe(false);
+      expect(schema.safeParse({ ...draft, groupId: 'g'.repeat(257) }).success).toBe(false);
+    }
+    expect(FormFieldPatchSchema.parse({ groupId: null })).toEqual({ groupId: null });
   });
 });

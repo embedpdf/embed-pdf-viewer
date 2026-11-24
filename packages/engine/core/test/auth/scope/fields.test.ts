@@ -148,4 +148,18 @@ describe('putting a field in a group', () => {
     expect(() => authorizeFieldGroup(authority, 'legal')).not.toThrow();
     expect(() => authorizeFieldGroup(authority, 'buyer')).toThrow(PermissionDenied);
   });
+
+  it('no group takes no right of its own', () => {
+    const grants = (scope: string[]) => ({ scope, permissionFlags: NO_BITS });
+    const authority: ChangeAuthority = {
+      identity: { groupId: 'legal' },
+      grants: grants(['doc.forms.modify']),
+      protection: null,
+    };
+    expect(() => authorizeFieldGroup(authority, null)).not.toThrow();
+    // Rights for named groups don't come into it, and neither does the caller's own group.
+    const named = grants(['doc.forms.modify', 'fields:set-group:group=buyer']);
+    expect(() => authorizeFieldGroup({ ...authority, grants: named }, null)).not.toThrow();
+    expect(() => authorizeFieldGroup({ ...authority, identity: {} }, null)).not.toThrow();
+  });
 });

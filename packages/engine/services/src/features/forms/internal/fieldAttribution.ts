@@ -99,12 +99,12 @@ export function readFieldGroup(
   );
 }
 
-/** Put a field in `groupId`. A group is changed, never removed, so there is no clearing. */
+/** Put a field in `groupId`; `null` takes it out of its group. */
 export function writeFieldGroup(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
   fieldObjectNumber: number,
-  groupId: string,
+  groupId: string | null,
 ): void {
   writeAttribution(runtime, docPtr, fieldObjectNumber, [[KEY_GROUP_ID, groupId]]);
 }

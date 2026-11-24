@@ -253,21 +253,33 @@ describe('design through lending', () => {
     }
   });
 
-  it('a placed field shows in the session’s own group at once', async () => {
+  it('a placed field shows in the group its draft names at once, and in none without one', async () => {
     const booted = await boot(undefined, CHANGE_FIXTURE_PDF, { userId: 'lisa', groupId: 'legal' });
     try {
       const { form, page } = booted;
       booted.design();
       // The first create fills the session's pool of object numbers.
       await form.create({ kind: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
-      const created = form.create({
+      const unnamed = form.create({
         kind: 'text',
         name: 'clause',
         widgets: [{ page, rect: box(200, 60) }],
       });
-      // Before the engine answers: the group the engine puts it in, not none.
-      expect(form.get({ kind: 'fqn', name: 'clause' })?.groupId).toBe('legal');
-      expect((await created).field.groupId).toBe('legal');
+      // Before the engine answers, and after: nobody's, though the session's own group is legal.
+      expect(form.get({ kind: 'fqn', name: 'clause' })?.groupId).toBeNull();
+      expect((await unnamed).field.groupId).toBeNull();
+      const named = form.create({
+        kind: 'text',
+        name: 'annex',
+        groupId: 'legal',
+        widgets: [{ page, rect: box(200, 110) }],
+      });
+      expect(form.get({ kind: 'fqn', name: 'annex' })?.groupId).toBe('legal');
+      expect((await named).field.groupId).toBe('legal');
+      // Taken out of its group, it shows in none at once, and the engine agrees.
+      const removed = form.update({ kind: 'fqn', name: 'annex' }, { groupId: null });
+      expect(form.get({ kind: 'fqn', name: 'annex' })?.groupId).toBeNull();
+      expect((await removed).field.groupId).toBeNull();
     } finally {
       await booted.destroy();
     }
@@ -561,6 +573,48 @@ describe('design through lending', () => {
       );
       annotation.editPointer('up', page, { x: corner.x + 40, y: corner.y + 10 }, false, 1);
       await settled(booted);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it("a box's anchor follows the box while it is dragged, and stays where the drag left it", async () => {
+    const booted = await boot();
+    try {
+      const { annotation, form, page } = booted;
+      const widget = booted.widgetOf(NAME);
+      // Filling: the anchor is where the form has the box, the same object while it stays.
+      const filling = form.getWidgetAnchor(widget)!;
+      expect(filling.page).toEqual(page);
+      expect(filling.bounds).toEqual(form.getWidget(widget)!.rect);
+      expect(form.getWidgetAnchor(widget)).toBe(filling);
+
+      booted.design();
+      const resting = form.getWidgetAnchor(widget)!;
+      expect(resting.bounds).toEqual(filling.bounds);
+      annotation.selection.select([widget]);
+      const from = {
+        x: resting.bounds.x + resting.bounds.width / 2,
+        y: resting.bounds.y + resting.bounds.height / 2,
+      };
+      // At 400% the handles are small beside the box, so the press takes the box, not a handle.
+      annotation.editPointer('down', page, from, false, 4);
+      annotation.editPointer('move', page, { x: from.x + 15, y: from.y + 5 }, false, 4);
+      annotation.editPointer('move', page, { x: from.x + 30, y: from.y + 10 }, false, 4);
+      // Mid-drag, before anything is written: the anchor is where the drag has the box.
+      const dragging = form.getWidgetAnchor(widget)!;
+      expect(dragging.bounds.x).toBeCloseTo(resting.bounds.x + 30);
+      expect(dragging.bounds.y).toBeCloseTo(resting.bounds.y + 10);
+      expect(form.getWidget(widget)!.rect).toEqual(resting.bounds);
+      annotation.editPointer('up', page, { x: from.x + 30, y: from.y + 10 }, false, 4);
+      await settled(booted);
+
+      booted.interaction.activateDefaultTool();
+      const moved = form.getWidgetAnchor(widget)!;
+      expect(moved.bounds.x).toBeCloseTo(resting.bounds.x + 30);
+      expect(moved.bounds.y).toBeCloseTo(resting.bounds.y + 10);
+      // A box that isn't there has none.
+      expect(form.getWidgetAnchor({ kind: 'objectNumber', page, objectNumber: 99999 })).toBeNull();
     } finally {
       await booted.destroy();
     }

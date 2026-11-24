@@ -27,12 +27,25 @@
  * so React's synthetic events would run too late. The colors, the field
  * looks, the boxes' and controls' styles, and the toggle, text-field and
  * list-box policies are `@embedpdf/web`'s, the same for every framework.
+ *
+ * An app draws a box with a control of its own through `controls`
+ * ({@link FieldControl}), and attaches UI to a box with
+ * `useFormWidgetAnchor()` and `<Anchored>`.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { annotationKey, type EventHook } from '@embedpdf/core';
 import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
@@ -44,32 +57,49 @@ import {
   type FormCapability,
   type FormFieldRef,
   type FormFieldValue,
+  type FormSetValueResult,
+  type FormWidgetAnchor,
   type FormWidgetItem,
 } from '@embedpdf/plugin-form';
-import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import {
+  FormToken as FormHostToken,
+  type ShownWidget,
+  type WidgetPainting,
+} from '@embedpdf/plugin-form/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
   bindFieldFocus,
+  claimClick,
+  createFieldControlPress,
   createShownUrls,
   createTextFieldEditor,
+  fieldControlFor,
+  fieldControlPlaceOf,
   FORM_CONTROL_FILL,
   formColorsOf,
+  isClickClaimed,
   isolatePointerDown,
   listBoxControlStyleOf,
   loadAppearanceUrls,
   pictureOrPainting,
   pressToggle,
   rectInPixels,
+  runsActionOnClick,
+  samePageBounds,
   shownAppearance,
   svgShapesOf,
   textFieldEditorStyleOf,
   widgetBoxStyleOf,
   type AppearanceUrl,
+  type FieldControlFrame,
   type FormColors,
   type MountableFontProgram,
+  type PictureOrPainting,
 } from '@embedpdf/web';
+
+export type { FieldControlFrame } from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
 import { FormFocusRing } from './form-focus-ring';
@@ -108,16 +138,26 @@ function useFormColors(): FormColors {
  * React's own `onPointerDown` never sees it: whoever needs the press passes
  * `onPress`, which the native listener calls.
  */
-function useIsolated<T extends HTMLElement>(onPress?: () => void) {
+function useIsolated<T extends HTMLElement>(onPress?: () => void, isolated = true) {
   const ref = useRef<T>(null);
   const press = useRef(onPress);
   press.current = onPress;
   useEffect(
-    () => (ref.current ? isolatePointerDown(ref.current, () => press.current?.()) : undefined),
-    [],
+    () =>
+      ref.current && isolated
+        ? isolatePointerDown(ref.current, () => press.current?.())
+        : undefined,
+    [isolated],
   );
   return ref;
 }
+
+/**
+ * True for the layer's own control drawn inside a control of the app's
+ * (`native`): the app's box is then the widget's event surface and the
+ * cursor's way in, and the layer's control only fills it.
+ */
+const EmbeddedContext = createContext(false);
 
 /**
  * The widget's pointer and focus events, sent to the actions plugin, which
@@ -183,7 +223,13 @@ interface ControlProps<C extends FormWidgetItem['control']> {
  * the edge a field without a border of its own gets, so people see where to
  * fill in. It's also where the form's cursor reaches the control: `focus()`
  * and Tab go through the form, in the document's order (`bindFieldFocus`),
- * unless the box has nothing to focus (`focusable`).
+ * unless the box has nothing to focus (`focusable`). `custom`: the box holds
+ * a control of the app's, and the cursor goes to the first element in it that
+ * Tab stops at.
+ *
+ * Inside a control of the app's ({@link EmbeddedContext}) the box only fills
+ * the place it is given: the app's box around it sends the widget's events
+ * and takes the cursor, and a click this one handled is left alone there.
  */
 function WidgetBox({
   item,
@@ -191,6 +237,7 @@ function WidgetBox({
   colors,
   edge = true,
   focusable = true,
+  custom = false,
   onClick,
   children,
   ...rest
@@ -200,23 +247,48 @@ function WidgetBox({
   colors: FormColors;
   edge?: boolean;
   focusable?: boolean;
-  onClick?: () => void;
+  custom?: boolean;
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'>) {
   const form = useCapability(FormHostToken);
+  const embedded = useContext(EmbeddedContext);
   const { onPress, ...events } = useWidgetEvents(item.fieldRef, item.annotationRef);
-  const wrap = useIsolated<HTMLDivElement>(onPress);
+  const wrap = useIsolated<HTMLDivElement>(onPress, !embedded);
   const frame = rectInPixels(item.box, page.transform);
   const widget = item.annotationRef;
-  const takesCursor = focusable && !item.disabled;
+  const takesCursor = focusable && !item.disabled && !embedded;
   const radio = item.control === 'toggle' && item.kind === 'radio';
   useEffect(
     () =>
       wrap.current && widget && takesCursor
-        ? bindFieldFocus(wrap.current, form, widget, { radio })
+        ? bindFieldFocus(wrap.current, form, widget, { radio, custom })
         : undefined,
-    [wrap, form, widget, takesCursor, radio],
+    [wrap, form, widget, takesCursor, radio, custom],
   );
+  if (embedded) {
+    return (
+      <div
+        ref={wrap}
+        {...rest}
+        onClick={(event) => {
+          claimClick(event.nativeEvent);
+          onClick?.(event);
+        }}
+        style={{
+          ...widgetBoxStyleOf(
+            { look: item.look },
+            { left: 0, top: 0, width: frame.width, height: frame.height },
+            colors,
+            { edge },
+          ),
+          ...rest.style,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div
       ref={wrap}
@@ -241,7 +313,7 @@ function WidgetBox({
 // ── the controls ───────────────────────────────────────────────────────────
 
 /** A text box: the picture at rest, an editor in the field's own font while focused. */
-function TextControl({ item, page, colors }: ControlProps<'text'>) {
+const TextControl = React.memo(function TextControl({ item, page, colors }: ControlProps<'text'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   // The editor is always mounted, see-through at rest and shown while
@@ -291,14 +363,18 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
       )}
     </WidgetBox>
   );
-}
+});
 
 /**
  * A checkbox or a radio button: the picture is the control, a click writes the toggled value. A
  * radio button's label names its option, and it says where it comes in its group: its buttons
  * are placed apart, so no group element can.
  */
-function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
+const ToggleControl = React.memo(function ToggleControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'toggle'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
@@ -330,10 +406,14 @@ function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
   );
-}
+});
 
 /** A dropdown: an invisible native select over the field's picture. */
-function ComboControl({ item, page, colors }: ControlProps<'choice'>) {
+const ComboControl = React.memo(function ComboControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'choice'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
@@ -367,10 +447,14 @@ function ComboControl({ item, page, colors }: ControlProps<'choice'>) {
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
   );
-}
+});
 
 /** A list: a visible native select in the field's own look, the settings where it has none. */
-function ListControl({ item, page, colors }: ControlProps<'choice'>) {
+const ListControl = React.memo(function ListControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'choice'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
@@ -398,10 +482,14 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
   );
-}
+});
 
 /** A push button: a native click target over its picture that runs its action. */
-function ButtonControl({ item, page, colors }: ControlProps<'button'>) {
+const ButtonControl = React.memo(function ButtonControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'button'>) {
   const activate = useWidgetActivation(item.annotationRef);
   return (
     <WidgetBox
@@ -428,14 +516,18 @@ function ButtonControl({ item, page, colors }: ControlProps<'button'>) {
       />
     </WidgetBox>
   );
-}
+});
 
 /**
  * A signature field: with the signature plugin, an empty field is "sign
  * here" (it becomes the target the next mark goes to), and a signed one asks
  * your UI to show its details. Without it, the field is only its picture.
  */
-function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
+const SignatureControl = React.memo(function SignatureControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'signature'>) {
   const signature = useOptionalCapability(SignatureToken);
   const ref = item.fieldRef;
   // The signature plugin knows best whether it's signed (it reads again after
@@ -471,6 +563,168 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
       ) : null}
     </WidgetBox>
   );
+});
+
+// ── controls of the app's own ───────────────────────────────────────────────
+
+/**
+ * What a control's component gets: the box, the frame to draw into, the
+ * layer's own control to keep or leave out, and the write.
+ */
+export interface FieldControlProps {
+  /** The box, as `listWidgets()` gives it: its field, its control, its value and what it tells you. */
+  widget: FormWidgetItem;
+  /**
+   * The box you draw into. The layer places, turns and scales it like the
+   * field. Fill it (`width: 100%; height: 100%`) and draw at the field's 100%
+   * size: your drawing scales with the page.
+   */
+  frame: FieldControlFrame;
+  /** The layer's own control for the box, filling the frame. Render it to keep the control and add to it. */
+  native: React.ReactNode;
+  /**
+   * Fill the field in, as `form.setValue()` does for this box's field: the
+   * same checks, scripts and undo step. A click that calls it runs the
+   * widget's action after the value is written, as in Acrobat.
+   */
+  setValue: (value: FormFieldValue) => Promise<FormSetValueResult>;
+  /** True while the cursor is in this box. */
+  focused: boolean;
+}
+
+/**
+ * One rule: "draw these boxes with this component". `for` gets the box with
+ * everything it tells you; the first control that matches wins, and a box no
+ * control matches is drawn by the layer.
+ *
+ * Define the list once, outside your component or in `useMemo`.
+ */
+export interface FieldControl {
+  for: (widget: FormWidgetItem) => boolean;
+  component: React.ComponentType<FieldControlProps>;
+}
+
+export interface FormLayerProps {
+  /** Your own control for some boxes ({@link FieldControl}). */
+  controls?: readonly FieldControl[];
+}
+
+/**
+ * The layer's own control for a box, as an element. Each control is memoized: it renders again
+ * when its box, the page or the colors change, never because the layer did, so a picture that
+ * loads leaves the controls as they are.
+ */
+function nativeControlOf(
+  item: FormWidgetItem,
+  page: PageContextValue,
+  colors: FormColors,
+  key?: string,
+): React.ReactElement {
+  switch (item.control) {
+    case 'text':
+      return <TextControl key={key} item={item} page={page} colors={colors} />;
+    case 'toggle':
+      return <ToggleControl key={key} item={item} page={page} colors={colors} />;
+    case 'choice':
+      return item.kind === 'list' ? (
+        <ListControl key={key} item={item} page={page} colors={colors} />
+      ) : (
+        <ComboControl key={key} item={item} page={page} colors={colors} />
+      );
+    case 'button':
+      return <ButtonControl key={key} item={item} page={page} colors={colors} />;
+    case 'signature':
+      return <SignatureControl key={key} item={item} page={page} colors={colors} />;
+  }
+}
+
+/** A custom box's props: the box, the app's control for it, and how the field looks now. */
+type CustomControlProps = ControlProps<FormWidgetItem['control']> & {
+  control: FieldControl;
+  look: FieldLook | null;
+};
+
+/** The same look: the same picture, or the same drawing by the painter. */
+const sameLook = (left: FieldLook | null, right: FieldLook | null): boolean => {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  if (left.kind === 'picture') return right.kind === 'picture' && left.picture === right.picture;
+  return right.kind === 'painting' && left.painting === right.painting;
+};
+
+/**
+ * A box drawn by a control of the app's. The box is the layer's: placed and
+ * turned like the field, the widget's event surface, and the cursor's way in
+ * (the first element inside that Tab stops at). The control draws in a frame
+ * of the field's 100% size, scaled with the page; `native` is the field's
+ * picture and the layer's control, drawn as they are without the app's. A
+ * click runs the widget's action, after a value the click wrote. Like the layer's own, it
+ * renders again when what it is given changes: its box, its control, or its field's look.
+ */
+const CustomControl = React.memo(function CustomControl({
+  item,
+  control,
+  page,
+  colors,
+  look,
+}: CustomControlProps) {
+  const form = useCapability(FormHostToken);
+  const activate = useWidgetActivation(item.annotationRef);
+  const focused = useSelector(FormHostToken, (host) => host.isWidgetFocused(item.ref));
+  const place = fieldControlPlaceOf(item, page.transform);
+  // One press for the box's life, reading the box as it is at the write.
+  const latest = useRef({ form, field: item.fieldRef, activate });
+  latest.current = { form, field: item.fieldRef, activate };
+  const press = useMemo(
+    () =>
+      createFieldControlPress(
+        (value: FormFieldValue) => latest.current.form.setValue(latest.current.field, value),
+        () => latest.current.activate(),
+      ),
+    [],
+  );
+  const Control = control.component;
+  const native = (
+    <div style={place.nativeStyle}>
+      {look && fieldPictureOf(look, item.rect, place.pictureStyle)}
+      <EmbeddedContext.Provider value={true}>
+        {nativeControlOf(item, page, colors)}
+      </EmbeddedContext.Provider>
+    </div>
+  );
+  return (
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      edge={false}
+      custom
+      onClick={(event) => {
+        if (!isClickClaimed(event.nativeEvent) && runsActionOnClick(item)) press.click();
+      }}
+    >
+      <div style={place.frameStyle}>
+        <Control
+          widget={item}
+          frame={place.frame}
+          native={native}
+          setValue={press.setValue}
+          focused={focused}
+        />
+      </div>
+    </WidgetBox>
+  );
+}, sameCustomControl);
+
+/** Whether a custom box is given what it had: its look compared by what it shows. */
+function sameCustomControl(before: CustomControlProps, after: CustomControlProps): boolean {
+  return (
+    before.item === after.item &&
+    before.control === after.control &&
+    before.page === after.page &&
+    before.colors === after.colors &&
+    sameLook(before.look, after.look)
+  );
 }
 
 /**
@@ -480,9 +734,10 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
  * there, the render layer leaves the fields out of the page's picture. The
  * controls show while the active tool fills forms (the `pointer` and `pan`
  * tools do), and stand down in design mode, where fields are boxes you
- * select and move.
+ * select and move. `controls` draws some boxes with components of yours,
+ * which show and stand down with the layer's own.
  */
-export function FormLayer() {
+export function FormLayer({ controls }: FormLayerProps) {
   const page = usePage();
   const form = useCapability(FormHostToken);
   const colors = useFormColors();
@@ -500,31 +755,64 @@ export function FormLayer() {
     (capability) => capability.listWidgets(page.ref),
     shallowArray,
   );
+  const looks = useFieldLooks(page);
+  const shown = active ? items : NO_ITEMS;
+  // The boxes a control of the app's draws, by widget: each draws its field's picture itself.
+  const custom = useMemo(() => {
+    const drawn = new Map<string, FieldControl>();
+    if (controls?.length) {
+      for (const item of shown) {
+        const control = fieldControlFor(item, controls);
+        if (control) drawn.set(annotationKey(item.ref), control);
+      }
+    }
+    return drawn;
+  }, [shown, controls]);
+  // The pictures the layer draws itself: all of them, unless a control of the app's draws some.
+  const pictures = useMemo(
+    () => (custom.size === 0 ? looks : looks.filter(({ key }) => !custom.has(key))),
+    [looks, custom],
+  );
+  const lookOf = useMemo(
+    () => (custom.size === 0 ? NO_LOOK : new Map(looks.map(({ key, look }) => [key, look]))),
+    [looks, custom],
+  );
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      <FieldPictures page={page} />
-      {(active ? items : []).map((item) => {
+      <FieldPictures page={page} looks={pictures} />
+      {shown.map((item) => {
         const key = `${item.key}:${item.annotObjectNumber}`;
-        switch (item.control) {
-          case 'text':
-            return <TextControl key={key} item={item} page={page} colors={colors} />;
-          case 'toggle':
-            return <ToggleControl key={key} item={item} page={page} colors={colors} />;
-          case 'choice':
-            return item.kind === 'list' ? (
-              <ListControl key={key} item={item} page={page} colors={colors} />
-            ) : (
-              <ComboControl key={key} item={item} page={page} colors={colors} />
-            );
-          case 'button':
-            return <ButtonControl key={key} item={item} page={page} colors={colors} />;
-          case 'signature':
-            return <SignatureControl key={key} item={item} page={page} colors={colors} />;
-        }
+        const widget = annotationKey(item.ref);
+        const control = custom.get(widget);
+        return control ? (
+          <CustomControl
+            key={key}
+            item={item}
+            control={control}
+            page={page}
+            colors={colors}
+            look={lookOf.get(widget) ?? null}
+          />
+        ) : (
+          nativeControlOf(item, page, colors, key)
+        );
       })}
     </div>
   );
+}
+
+const NO_ITEMS: readonly FormWidgetItem[] = Object.freeze([]);
+const NO_LOOK: ReadonlyMap<string, FieldLook | null> = new Map();
+
+/** How a widget shows now: its picture, or the painter's drawing of it. */
+type FieldLook = NonNullable<PictureOrPainting<WidgetPainting>>;
+
+/** One widget the page shows: where it stands, and its look, `null` while it has nothing to show. */
+interface ShownLook {
+  key: string;
+  widget: ShownWidget;
+  look: FieldLook | null;
 }
 
 /**
@@ -532,11 +820,11 @@ export function FormLayer() {
  * engine draws it (the form plugin's, every state loaded, so a check box
  * shows its new state at once), or the painter's drawing while its look is
  * pending or its picture is of an older version (`pictureOrPainting`): a
- * value, a calculation, a restyle shows at once. Either is drawn at the
- * widget's box: a moved widget keeps its picture and takes it along. Hidden
- * widgets aren't drawn.
+ * value, a calculation, a restyle shows at once. Hidden widgets aren't
+ * listed; a widget with nothing to show yet has no look. The same list
+ * while the page's widgets and their pictures stay the same.
  */
-function FieldPictures({ page }: { page: PageContextValue }) {
+function useFieldLooks(page: PageContextValue): readonly ShownLook[] {
   const form = useCapability(FormHostToken);
   const widgets = useSelector(
     FormHostToken,
@@ -566,65 +854,99 @@ function FieldPictures({ page }: { page: PageContextValue }) {
     );
   }, [shown, form, page.ref, scale, epoch]);
 
-  const looks = widgets.map((widget) =>
-    pictureOrPainting({
-      pending: widget.pending,
-      picture: urls && shownAppearance(urls, annotationKey(widget.ref), widget.appearanceState),
-      version: widget.pictureVersion,
-      loaded: urls !== null,
-      paint: () => form.getWidgetPainting(widget.ref),
-    }),
+  // The painter's drawing changes only with the widgets: the form plugin lists them again
+  // whenever a value, a format or a font it draws with does.
+  return useMemo(
+    () =>
+      widgets.map((widget) => {
+        const key = annotationKey(widget.ref);
+        return {
+          key,
+          widget,
+          look: pictureOrPainting({
+            pending: widget.pending,
+            picture: urls && shownAppearance(urls, key, widget.appearanceState),
+            version: widget.pictureVersion,
+            loaded: urls !== null,
+            paint: () => form.getWidgetPainting(widget.ref),
+          }),
+        };
+      }),
+    [form, widgets, urls],
   );
+}
 
+/**
+ * The pictures the layer draws itself, each where its widget stands. They render again when
+ * the page's looks or its geometry change, apart from the controls.
+ */
+const FieldPictures = React.memo(function FieldPictures({
+  page,
+  looks,
+}: {
+  page: PageContextValue;
+  looks: readonly ShownLook[];
+}) {
   return (
     <>
-      {widgets.map((widget, index) => {
-        const look = looks[index];
+      {looks.map(({ key, widget, look }) => {
         if (!look) return null;
-        const key = annotationKey(widget.ref);
         // Where the widget is now: a move keeps its picture, which comes along with it.
         const frame = rectInPixels(widget.rect, page.transform);
-        if (look.kind === 'painting') {
-          const { x, y, width, height } = widget.rect;
-          return (
-            <svg
-              key={key}
-              viewBox={`${x} ${y} ${width} ${height}`}
-              style={{
-                position: 'absolute',
-                left: frame.left,
-                top: frame.top,
-                width: frame.width,
-                height: frame.height,
-                overflow: 'visible',
-                pointerEvents: 'none',
-              }}
-            >
-              <SvgShapes shapes={svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT })} />
-            </svg>
-          );
-        }
-        return (
-          <img
-            key={key}
-            src={look.picture.url}
-            alt=""
-            draggable={false}
-            style={{
-              position: 'absolute',
-              left: frame.left,
-              top: frame.top,
-              width: frame.width,
-              height: frame.height,
-              // A global `img { max-width: 100% }` reset would clamp it.
-              maxWidth: 'none',
-              maxHeight: 'none',
-              pointerEvents: 'none',
-            }}
-          />
+        return fieldPictureOf(
+          look,
+          widget.rect,
+          {
+            position: 'absolute',
+            left: frame.left,
+            top: frame.top,
+            width: frame.width,
+            height: frame.height,
+          },
+          key,
         );
       })}
     </>
+  );
+});
+
+/**
+ * One widget as it looks now, at `place`: where the widget stands, in the
+ * page layer or inside its own box. Its picture and the painter's drawing
+ * both fill `rect`, the rect the widget stands in, with its turn in them.
+ */
+function fieldPictureOf(
+  look: FieldLook,
+  rect: ShownWidget['rect'],
+  place: React.CSSProperties,
+  key?: string,
+): React.ReactElement {
+  if (look.kind === 'painting') {
+    const { x, y, width, height } = rect;
+    return (
+      <svg
+        key={key}
+        viewBox={`${x} ${y} ${width} ${height}`}
+        style={{ ...place, overflow: 'visible', pointerEvents: 'none' }}
+      >
+        <SvgShapes shapes={svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT })} />
+      </svg>
+    );
+  }
+  return (
+    <img
+      key={key}
+      src={look.picture.url}
+      alt=""
+      draggable={false}
+      style={{
+        ...place,
+        // A global `img { max-width: 100% }` reset would clamp it.
+        maxWidth: 'none',
+        maxHeight: 'none',
+        pointerEvents: 'none',
+      }}
+    />
   );
 }
 
@@ -635,6 +957,26 @@ const NO_PROGRAMS: readonly MountableFontProgram[] = Object.freeze([]);
 /** The form API for the surrounding document: reading, filling, form data and building. */
 export function useForm(): FormCapability {
   return useCapability(FormToken);
+}
+
+/**
+ * An anchor for `<Anchored>` that keeps a tag or a card attached to one box
+ * of a form field (a widget's `ref`): its page and where the box stands,
+ * following the box as it is moved in design mode. `null` for `null`, or a
+ * box that isn't here. The component re-renders when the box moves, not while
+ * people scroll or zoom.
+ */
+export function useFormWidgetAnchor(widget: AnnotationRef | null): FormWidgetAnchor | null {
+  const key = widget ? annotationKey(widget) : null;
+  // Keyed by value, so an inline ref never subscribes again.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stable = useMemo(() => widget, [key]);
+  return useOptionalSelector(
+    FormHostToken,
+    (form) => (stable ? form.getWidgetAnchor(stable) : null),
+    null,
+    samePageBounds,
+  );
 }
 
 /** Subscribe to one form event while mounted: `useFormEvent((form) => form.onValueChanged, handler)`. */

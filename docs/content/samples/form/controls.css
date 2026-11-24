@@ -1,0 +1,130 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --off: #c3cbdb;
+  --on: #2f6fed;
+  --knob: #ffffff;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The controls, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The switch. It is drawn in the field's frame, at the field's 100% size: the layer scales it
+   with the page. A printed tick box is square and a switch is wide, so this one is as tall as its
+   frame and reaches past it to the left. Its corners are the printed box's own, 4px at that
+   size, and it has a hair of its own color around it, so it covers the box it stands on. */
+.switch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  aspect-ratio: 9 / 5;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  --track: var(--off);
+  background: var(--track);
+  box-shadow: 0 0 0 0.5px var(--track);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  height: calc(100% - 4px);
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--knob);
+  box-shadow: 0 1px 2px rgb(7 32 76 / 0.3);
+  transition: left 0.15s ease;
+}
+
+.switch[aria-checked='true'] {
+  --track: var(--on);
+}
+
+/* The knob is as wide as the switch is tall, less its 2px margins: five ninths of the width. */
+.switch[aria-checked='true']::after {
+  left: calc(100% * 4 / 9 + 2px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The pages */
+.stage {
+  height: 440px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -6,6 +6,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 import { isPermissionRefusal } from './refusals';
@@ -258,6 +259,26 @@ export function runAnnotationAttributionConformance(
         const { annotation: created } = await page.annotations.create(SQUARE);
         await page.annotations.update(created.ref, { groupId: 'finance' });
         expect((await readBack(page, created.ref)).groupId).toBe('finance');
+      });
+    });
+
+    test("an annotation's group is its creator's, and can't be removed", async () => {
+      const invalid = async (write: () => Promise<unknown>) => {
+        const error = await write().then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        expect(EngineError.is(error) ? error.code : error).toBe(EngineErrorCode.InvalidArg);
+      };
+      await asSession({ scope: SCOPE, identity: ALICE }, async (page) => {
+        // Left out, the group is the creator's own; a form field's is none.
+        const { annotation: created } = await page.annotations.create(SQUARE);
+        expect(created.groupId).toBe('legal');
+        // `null` asks for no group, which a session with a group can't choose,
+        await invalid(() => page.annotations.create({ ...SQUARE, groupId: null }));
+        // and an update can't take the group away.
+        await invalid(() => page.annotations.update(created.ref, { groupId: null }));
+        expect((await readBack(page, created.ref)).groupId).toBe('legal');
       });
     });
 

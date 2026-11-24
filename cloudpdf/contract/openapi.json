@@ -22661,7 +22661,8 @@
               "groupId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "nullable": true
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22997,7 +22998,8 @@
           "groupId": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 256
+            "maxLength": 256,
+            "nullable": true
           },
           "actions": {
             "$ref": "#/components/schemas/FieldActionsPatch"

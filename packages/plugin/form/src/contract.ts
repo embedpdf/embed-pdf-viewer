@@ -39,7 +39,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
-import type { WidgetHit } from './model';
+import type { Box, WidgetHit } from './model';
 import type { FormWidgetItem } from './read/fill-items';
 
 export { FormToken } from './token';
@@ -381,6 +381,11 @@ export interface FormFieldDeletedEvent {
 export interface FormValidationRejectedEvent {
   readonly field: FormField;
   readonly issues: readonly ScriptDiagnostic[];
+}
+/** Where UI attaches to one box of a field: its page and where the box stands on it (page space). */
+export interface FormWidgetAnchor {
+  readonly page: PageRef;
+  readonly bounds: Box;
 }
 /** The cursor moved into a field, to another one, or out of the fields (`field` is then `null`). */
 export interface FormFocusChangedEvent {
