@@ -1,8 +1,7 @@
-/** Visual fills: the mark becomes the widget's appearance, nothing is sealed. */
+/** Visual fills: the mark becomes the widget's appearance, nothing is sealed; a clear takes it out. */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
-import { blankPagePdf } from '../blank-page';
 import type { Mark, SignatureCapability } from '../contract';
 import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
@@ -23,9 +22,10 @@ export function createFills(
   const { withBusy } = store;
   const { markBytes } = marks;
 
+  /** Draw `mark` into the field, or take the field's mark out (`null`). */
   const setAppearance = async (
     field: FormFieldRef,
-    pdf: Uint8Array,
+    mark: Uint8Array | null,
     options?: OperationOptions,
   ): Promise<void> => {
     const forms = ctx.doc.forms;
@@ -40,7 +40,7 @@ export function createFills(
     if (signature?.signed) {
       throw new PluginError('conflict', 'signature', `'${signature.fieldName}' is signed`);
     }
-    await ctx.cancellable(options?.signal, forms.setSignatureAppearance(field, { pdf }));
+    await ctx.cancellable(options?.signal, forms.setSignatureAppearance(field, mark));
   };
 
   const fillField = async (
@@ -59,7 +59,7 @@ export function createFills(
   const clearField = async (field: FormFieldRef, options?: OperationOptions): Promise<void> => {
     authority.assertAllowedField('sign', field, 'signature.clearField');
     return withBusy(async () => {
-      await setAppearance(field, blankPagePdf(), options);
+      await setAppearance(field, null, options);
       cleared.emit({ field });
     });
   };

@@ -7,6 +7,7 @@ import type {
   FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
+  SignatureAppearanceBytes,
   FormFieldValue,
   FormRepairResult,
   FormResetResult,
@@ -46,7 +47,7 @@ import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
 import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
 import { formMutationMeta, redrawnByValue } from './internal/formMutationMeta';
-import { bakeWidgetAppearance } from '../signature/internal/appearance';
+import { bakeWidgetAppearance, clearWidgetMark } from '../signature/internal/appearance';
 import {
   readSignaturesFromModel,
   withSignatureModel,
@@ -525,14 +526,16 @@ export class FormMutator {
   }
 
   /**
-   * Draw a PDF page into every widget of an unsigned signature field: the
-   * visual "sign" of a viewer without a signer. The field's value stays
-   * empty and nothing is sealed; a signed field is refused (its appearance
-   * is part of what the signature covers).
+   * Draw a mark (a PNG, a JPEG or a one-page PDF) into every widget of an
+   * unsigned signature field: the visual "sign" of a viewer without a
+   * signer. `null` takes the mark out again: each widget that has one draws
+   * the field's box, in its style. The field's value stays empty and nothing
+   * is sealed; a signed field is refused (its appearance is part of what the
+   * signature covers).
    */
   setSignatureAppearance(
     ref: FormFieldRef,
-    pdf: Uint8Array,
+    mark: SignatureAppearanceBytes | null,
     signal: AbortSignal,
   ): { field: FormField<PdfCoordinates> } {
     throwIfAborted(signal);
@@ -568,7 +571,8 @@ export class FormMutator {
       );
     }
     for (const widget of before.widgets) {
-      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, { recordFit: true });
+      if (mark === null) clearWidgetMark(this.runtime, docPtr, widget);
+      else bakeWidgetAppearance(this.runtime, docPtr, widget, mark, { recordFit: true });
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };

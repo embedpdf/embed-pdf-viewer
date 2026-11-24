@@ -117,7 +117,7 @@ export function createSigning(
           ? certificateCommonName(key.certificateChain[0])
           : null;
       const signer = { ...(subject ? { name: subject } : {}), ...input.signer };
-      // The appearance is the mark: its page is drawn into the widget by the engine.
+      // The appearance is the mark: the engine draws it into the widget.
       const appearance = (await appearanceOf(input))!;
       const timestampAuthority = resolveTimestampAuthority(input.timestampAuthority);
       const result = await signDocument(doc, {
@@ -126,7 +126,7 @@ export function createSigning(
         signer,
         certify: input.certify,
         lock: input.lock,
-        appearance: { pdf: appearance },
+        appearance,
         ...(timestampAuthority ? { timestampAuthority, timestampTrust: timestampTrust() } : {}),
       });
       target.clearIfTarget(input.field);
@@ -150,7 +150,7 @@ export function createSigning(
         lock: input.lock,
         subFilter: input.subFilter,
         digest: input.digest,
-        ...(appearance ? { appearance: { pdf: appearance } } : {}),
+        ...(appearance ? { appearance } : {}),
         // The token has to fit the room reserved now: the completion can't make more.
         ...(timestampAuthority ? { contentsSizeBytes: TIMESTAMPED_CONTENTS_SIZE } : {}),
       });

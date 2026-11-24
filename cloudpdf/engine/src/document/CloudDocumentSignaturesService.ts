@@ -1,5 +1,6 @@
 import {
   opIdOf,
+  resolveSignatureAppearance,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -36,6 +37,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 
 import { buildRoleMutationForm } from './buildMutationForm';
+import { assertServerTakesMark, markPart } from './signatureMark';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
@@ -215,12 +217,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
         const { appearance, ...rest } = input;
+        // A signing with no mark sends no part: only a mark is checked.
+        const read = await resolveSignatureAppearance(appearance ?? null);
+        if (read) assertServerTakesMark(read, this.http.serverVersion);
+        const mark = markPart(read);
         const form = buildRoleMutationForm(rest, {
-          appearance: appearance && {
-            bytes: appearance.pdf.slice().buffer as ArrayBuffer,
-            mimeType: 'application/pdf',
-            name: 'appearance.pdf',
-          },
+          appearance: mark ? { bytes: mark } : undefined,
         });
         const prepared = await write.send((sent) =>
           this.http.postMultipartJson(

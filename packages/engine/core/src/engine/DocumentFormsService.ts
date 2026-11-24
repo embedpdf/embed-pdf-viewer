@@ -7,7 +7,7 @@ import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
 import type { FormFieldRef } from '../identity/FormFieldRef';
-import type { SignatureAppearanceInput } from '../signature/types';
+import type { SignatureAppearance } from '../signature/types';
 import type { FormBundle } from '../transfer/FormBundle';
 import type { FormCopyOptions, FormCopyResult } from '../transfer/formCopy';
 import type { FormExportSelection } from '../transfer/formExport';
@@ -199,15 +199,18 @@ export interface DocumentFormsService {
   ): AbortablePromise<FormFieldUpdateResult>;
 
   /**
-   * Draw a PDF page into every widget of an unsigned signature field — the
-   * visual "sign" of a viewer that has no signer. The field's value stays
-   * empty and nothing is sealed; a signed field is refused. The mark is the
-   * field's signer's to place: gated by `doc.sign`, or `fields:sign` for the
-   * field's group. Emits `forms.updated`.
+   * Draw a mark into every widget of an unsigned signature field — the
+   * visual "sign" of a viewer that has no signer — or take it out again.
+   * The mark is a PNG, a JPEG or a one-page PDF, fitted whole into each box.
+   * `null` is no mark: each widget that has one shows the field's box again,
+   * in its style, and a field with no mark is left as it is. The field's
+   * value stays empty and nothing is sealed; a signed field is refused. The
+   * mark is the field's signer's to place: gated by `doc.sign`, or
+   * `fields:sign` for the field's group. Emits `forms.updated`.
    */
   setSignatureAppearance(
     ref: FormFieldRef,
-    appearance: SignatureAppearanceInput,
+    appearance: SignatureAppearance | null,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult>;
 

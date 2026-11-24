@@ -13,6 +13,14 @@ export const BANDS_PNG = Uint8Array.from(
   (c) => c.charCodeAt(0),
 );
 
+/** A 48 × 16 JPEG: the same three bands, red, green and blue. */
+export const BANDS_JPEG = Uint8Array.from(
+  atob(
+    '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAQADADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAgJ/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/EABcBAAMBAAAAAAAAAAAAAAAAAAcKCAn/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdAAMaprGABIsey8AMZrlf/9k=',
+  ),
+  (c) => c.charCodeAt(0),
+);
+
 export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }

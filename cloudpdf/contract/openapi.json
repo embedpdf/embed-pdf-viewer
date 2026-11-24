@@ -24970,7 +24970,12 @@
                 "type": "object",
                 "properties": {
                   "appearance": {
-                    "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
+                      }
+                    ],
+                    "nullable": true
                   }
                 },
                 "required": ["appearance"],

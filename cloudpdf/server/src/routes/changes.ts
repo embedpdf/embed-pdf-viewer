@@ -136,7 +136,9 @@ function opsOf(
         }
         case 'forms.setSignatureAppearance': {
           const { resources, ...rest } = op;
-          return { ...rest, appearance: { pdf: new Uint8Array(bytesOf(resources.appearance)) } };
+          // `null` names no part: the field's mark is taken out.
+          const key = resources.appearance;
+          return { ...rest, appearance: key === null ? null : new Uint8Array(bytesOf(key)) };
         }
         case 'pages.insert': {
           const { resources, ...rest } = op;
