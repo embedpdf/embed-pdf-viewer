@@ -24,12 +24,12 @@
  */
 
 import * as React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import type { CapabilityToken } from '@embedpdf/core';
-import { createScrollbarPresses, paintDefault, scrollbarLayout } from '@embedpdf/web';
-import type { ScrollbarTrack } from '@embedpdf/web';
+import { attachScrollbar, paintDefault, scrollbarLayout } from '@embedpdf/web';
+import type { ScrollbarState } from '@embedpdf/web';
 import { useCapability, useDocumentScope, useKernelValue } from './runtime';
 import { useStageToken } from './stage-scope';
 
@@ -144,19 +144,27 @@ export function Scrollbar({
     return () => ro.disconnect();
   }, [vertical, scrollable]);
 
-  // ── interactions: `@embedpdf/web`'s press handling (thumb drags, track paging and jumps),
-  //    one per bar, handed the bar as this render has it on every event. ──
-  const presses = useMemo(() => createScrollbarPresses(setDragging), []);
-  const track = (): ScrollbarTrack => ({
+  // ── interactions: `@embedpdf/web` binds the track (thumb drags, track paging and jumps) with
+  //    listeners of its own, which read the bar as the latest render has it. React's
+  //    `onPointerDown` would run from the root, after the Stage below the bar had already seen
+  //    the press and begun a pan with it. ──
+  const bar: ScrollbarState = {
     stage,
     vertical,
-    element: trackRef.current!,
     layout,
     // Fresh geometry for paging steps — read from the capability, never a stale render.
     liveLayout: () => scrollbarLayout(stage.getScrollMetrics(), vertical, trackPx, minThumbSize),
-  });
-
-  useEffect(() => () => presses.release(), [presses]); // unmount: no orphaned repeat timers
+    trackPress,
+  };
+  const latest = useRef(bar);
+  latest.current = bar;
+  useEffect(
+    () =>
+      trackRef.current
+        ? attachScrollbar(trackRef.current, { bar: () => latest.current, onDragging: setDragging })
+        : undefined,
+    [scrollable],
+  );
 
   if (!scrollable) return null;
 
@@ -202,12 +210,6 @@ export function Scrollbar({
         pointerEvents: shown ? 'auto' : 'none',
         ...style,
       }}
-      // Pointer capture retargets to the pressed element and bubbles here — one
-      // move/up pair serves thumb drags, jump-drags, and paging alike.
-      onPointerDown={(event) => presses.pressTrack(event, track(), trackPress)}
-      onPointerMove={(event) => presses.move(event, track())}
-      onPointerUp={() => presses.release()}
-      onPointerCancel={() => presses.release()}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
@@ -220,7 +222,6 @@ export function Scrollbar({
           background: paintDefault('scrollbar-thumb'),
           ...thumbStyle,
         }}
-        onPointerDown={(event) => presses.pressThumb(event, track())}
       />
     </div>
   );
