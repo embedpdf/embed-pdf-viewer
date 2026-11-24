@@ -153,7 +153,7 @@ export interface SignFieldInput {
   timestampAuthority?: CmsSigner | null;
   /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
   signer?: SignatureSignerInput;
-  /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
+  /** Instead of the mark: a ready appearance the embedder composed itself, as a PNG, a JPEG or a one-page PDF. */
   appearance?: BinarySource;
   certify?: { permission: DocMdpPermission };
   lock?: FieldLockSpec;
@@ -163,6 +163,7 @@ export interface SignFieldInput {
 export interface PrepareSignatureInput {
   field: FormFieldRef;
   mark?: Mark;
+  /** Instead of the mark: a ready appearance the embedder composed itself, as a PNG, a JPEG or a one-page PDF. */
   appearance?: BinarySource;
   signer?: SignatureSignerInput;
   certify?: { permission: DocMdpPermission };

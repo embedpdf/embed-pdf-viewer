@@ -1181,14 +1181,18 @@ export class LayerService {
     );
   }
 
-  /** The visual fill of an unsigned signature field: a one-page PDF drawn into its widgets, nothing sealed. */
+  /**
+   * The visual fill of an unsigned signature field: a mark (a PNG, a JPEG or
+   * a one-page PDF) drawn into its widgets, nothing sealed. `null` takes the
+   * mark out.
+   */
   async setSignatureAppearance(
     ctx: LayerWriteContext,
     input: {
       docId: string;
       layerName: string;
       ref: FormFieldRef;
-      pdf: Uint8Array;
+      appearance: Uint8Array | null;
       /** Who writes, their grants and the document's protection: checked field by field in the write. */
       authority: ChangeAuthority;
     },
@@ -1200,7 +1204,7 @@ export class LayerService {
       {
         type: 'forms.setSignatureAppearance',
         field: input.ref,
-        appearance: { pdf: input.pdf },
+        appearance: input.appearance,
       },
       input.authority,
       'form.setSignatureAppearance',
