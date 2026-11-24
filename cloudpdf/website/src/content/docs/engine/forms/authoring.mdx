@@ -381,9 +381,10 @@ await doc.forms.update(field.ref, { format: null });
 The two scripts also read back in `field.actions`, as any script does. Changing or removing one
 there changes what `format` reads.
 
-Undoing a format puts back the scripts the field had before, a number format's too. If someone
-wrote one of the field's scripts since, the undo leaves the field as it is, as it does for any
-script: see
+Undoing a format puts back the scripts the field had before, a number format's too. After a
+later change to the field, two cases leave the field as it is, as they do for any script:
+someone wrote one of its scripts since, or the format replaced actions a script can't make again,
+such as a script that goes on to a GoTo. See
 [When the document changed since](/docs/engine/documents/changes#when-the-document-changed-since).
 
 A [copy](#copy-a-field) and an [import](import-export) keep a date or a time format, without
@@ -436,7 +437,8 @@ A server can be older than your app. `purpose` and `format` need a server of ver
 older one is never sent them, so a `create()` or an `update()` that names either fails with
 `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update.
 Reading still works against it, an exported bundle included: `format` is read from the field's
-scripts as described above, and `purpose` reads `null`.
+scripts as described above, and `purpose` reads `null`. An [`import()`](import-export) of a bundle
+in which a field has a purpose fails the same way: such a server would make the field without it.
 
 </Engine>
 

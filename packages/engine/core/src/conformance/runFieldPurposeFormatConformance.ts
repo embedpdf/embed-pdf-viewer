@@ -47,6 +47,8 @@ interface FixtureField {
   readonly keystroke?: string;
   /** A script run after the format script (`/Next`). */
   readonly next?: string;
+  /** An action run after the format script that is no script, as its dictionary. */
+  readonly nextAction?: string;
   /** Its `/EMBD_Metadata`, without the schema version. */
   readonly metadata?: string;
 }
@@ -96,6 +98,8 @@ const FIXTURE_FIELDS: readonly FixtureField[] = [
   { name: 'full_name', metadata: '/GroupID (attendee) /Purpose (name)' },
   { name: 'spaced_purpose', metadata: '/Purpose ( name )' },
   { name: 'sign_here', family: '/FT /Sig', metadata: '/Purpose (signature)' },
+  // A format script that goes on to a GoTo: actions no script write can make again.
+  { name: 'goes_on', format: DATE_FORMAT, nextAction: '<< /S /GoTo /D [3 0 R /Fit] >>' },
 ];
 
 /** The format each text field and dropdown of the fixture reads. */
@@ -125,6 +129,7 @@ const FIXTURE_FORMATS: Readonly<Record<string, FormFieldFormat | null>> = {
   dropdown_date: { kind: 'date', pattern: 'yyyy-mm-dd' },
   full_name: null,
   spaced_purpose: null,
+  goes_on: { kind: 'other' },
 };
 
 /**
@@ -135,14 +140,16 @@ const FIXTURE_FORMATS: Readonly<Record<string, FormFieldFormat | null>> = {
  */
 export const FIELD_PURPOSE_FORMAT_PDF = (() => {
   const text = (value: string) => `(${value.replace(/[\\()]/g, (character) => `\\${character}`)})`;
-  const script = (code: string, next?: string) =>
-    `<< /S /JavaScript /JS ${text(code)}${next ? ` /Next << /S /JavaScript /JS ${text(next)} >>` : ''} >>`;
+  const script = (code: string, next?: string, nextAction?: string) => {
+    const after = next ? `<< /S /JavaScript /JS ${text(next)} >>` : nextAction;
+    return `<< /S /JavaScript /JS ${text(code)}${after ? ` /Next ${after}` : ''} >>`;
+  };
   const first = 4;
   const refs = FIXTURE_FIELDS.map((_, at) => `${first + at} 0 R`).join(' ');
   const fields = FIXTURE_FIELDS.map((field, at) => {
     const top = 770 - at * 27;
     const actions = [
-      field.format ? `/F ${script(field.format, field.next)}` : '',
+      field.format ? `/F ${script(field.format, field.next, field.nextAction)}` : '',
       field.keystroke ? `/K ${script(field.keystroke)}` : '',
     ].filter(Boolean);
     return (
@@ -766,6 +773,54 @@ export function runFieldPurposeFormatConformance(
           formatScript: 'AFDate_FormatEx("dd/mm/yyyy");',
           keystrokeScript: own,
         });
+      });
+    });
+
+    test('the undo of a format over actions no write can make puts all back, or nothing', async () => {
+      const date = { kind: 'date', pattern: 'dd/mm/yyyy' } as const;
+      const written = {
+        format: date,
+        formatScript: 'AFDate_FormatEx("dd/mm/yyyy");',
+        keystrokeScript: 'AFDate_KeystrokeEx("dd/mm/yyyy");',
+      };
+      /** The kinds of action a field's format event runs, in order. */
+      const chain = (field: FormField): string[] => {
+        const root = field.actions?.format?.root;
+        return root ? [root.type, ...root.next.map((next) => next.type)] : [];
+      };
+      await as('designer', async (doc) => {
+        expect(chain(await read(doc, 'goes_on'))).toEqual(['javascript', 'goto']);
+        // With nothing changed since, the undo is exact: the script and its GoTo are back.
+        const set = await update(doc, 'goes_on', { format: date });
+        expect(formatted(await read(doc, 'goes_on'))).toEqual(written);
+        await doc.apply({ undoOf: set.meta.opId });
+        const back = await read(doc, 'goes_on');
+        expect([chain(back), formatOf(back), scriptOf(back, 'keystroke')]).toEqual([
+          ['javascript', 'goto'],
+          { kind: 'other' },
+          null,
+        ]);
+      });
+      await as('designer', async (doc) => {
+        // After a later change the GoTo can't go back by value, so neither script is touched:
+        // the format stays whole, and the undo says it left the field alone.
+        const set = await update(doc, 'goes_on', { format: date });
+        await update(doc, 'goes_on', { required: true });
+        const undone = await doc.apply({ undoOf: set.meta.opId });
+        expect(undone.items.map((item) => item.type)).toEqual(['skipped']);
+        const kept = await read(doc, 'goes_on');
+        expect([formatted(kept), kept.required]).toEqual([written, true]);
+      });
+      await as('everything', async (doc) => {
+        // A script written over such actions follows the same rule.
+        const own = 'event.value = event.value.trim();';
+        const set = await update(doc, 'goes_on', {
+          actions: { format: { type: 'javascript', script: own } },
+        });
+        await update(doc, 'goes_on', { required: true });
+        const undone = await doc.apply({ undoOf: set.meta.opId });
+        expect(undone.items.map((item) => item.type)).toEqual(['skipped']);
+        expect(scriptOf(await read(doc, 'goes_on'), 'format')).toBe(own);
       });
     });
 

@@ -789,7 +789,8 @@ export function revertForm(
 /**
  * The second chance of a field update's undo: each property that still holds
  * what the update set goes back, through an ordinary update. A rename goes
- * back only while no sibling has taken the old name.
+ * back only while no sibling has taken the old name, and the scripts only
+ * when all of them can ({@link scriptsCanGoBack}).
  */
 function revertProperties(
   ctx: ChangeContext,
@@ -804,7 +805,8 @@ function revertProperties(
   const kept = keys.filter(
     (key) =>
       valuesEqual(now[key], left[key]) &&
-      (key !== 'name' || nameIsFree(ctx, current.field.name, String(restore.name))),
+      (key !== 'name' || nameIsFree(ctx, current.field.name, String(restore.name))) &&
+      (key !== 'actions' || scriptsCanGoBack(left.actions, restore.actions)),
   );
   if (kept.length === 0) return leftAlone(ctx, 'forms.update');
   const done = writeUpdate(ctx, current, pick(restore, kept) as FormFieldPatch);
@@ -812,6 +814,20 @@ function revertProperties(
   const item = done.item;
   if (skipped.length === 0 || isSkippedItem(item) || item.type !== 'forms.update') return done;
   return { ...done, item: { ...item, skipped } };
+}
+
+/**
+ * Whether the scripts an update replaced can all go back by value: `restore`
+ * names every event `left` does. An event it leaves out held actions no
+ * script write can make (a script that goes on to a GoTo, say). Putting only
+ * the others back would undo half of the update and call it done, so the
+ * scripts stay as the update left them.
+ */
+function scriptsCanGoBack(left: unknown, restore: unknown): boolean {
+  const before = (restore ?? {}) as FieldActionsPatch;
+  return Object.keys((left ?? {}) as FieldActionsPatch).every(
+    (event) => before[event as FieldScriptEvent] !== undefined,
+  );
 }
 
 /** Whether the field `fullName` could be renamed to `segment`: no sibling holds that name. */

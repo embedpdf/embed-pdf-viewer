@@ -32,3 +32,24 @@ export function fieldFactsTheServerLacks(
   }
   return null;
 }
+
+/**
+ * The refusal of an import whose bundle holds a field with a purpose when
+ * the server is older than purposes, or `null` when it can go out. Such a
+ * server takes the bundle, makes the field without its purpose and lists
+ * nothing as left out, so the purpose would be lost unseen. A format needs
+ * no such check: an older server reads it from the field's scripts, and
+ * lists them among what it left out when it may not write them.
+ */
+export function bundlePurposeTheServerLacks(
+  serverVersion: string | null,
+  bundle: { readonly fields: readonly { readonly data: { readonly purpose?: unknown } }[] },
+): EngineError | null {
+  const named = bundle.fields.some(
+    ({ data }) => data.purpose !== undefined && data.purpose !== null,
+  );
+  if (!named) return null;
+  return serverLacks(serverVersion, "a field's purpose", FIELD_PURPOSE_AND_FORMAT_SINCE, {
+    field: 'purpose',
+  });
+}

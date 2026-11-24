@@ -219,6 +219,24 @@ second request with the same `opId` returns what the first one did and writes no
 
 An export is cached until the document's form or pages change, so exporting again is cheap.
 
+A server older than version 3.4 keeps no [purpose](/docs/engine/forms/authoring#purpose). An
+import of a bundle in which a field has one fails with `NotImplemented` before anything is sent,
+and `details.needs` and `details.serverVersion` say which side to update. To import without the
+purposes, clear them first:
+
+```ts
+const plain = {
+  ...bundle,
+  fields: bundle.fields.map((row) => ({
+    ...row,
+    data: { ...row.data, purpose: null },
+  })),
+};
+await doc.forms.import(plain);
+```
+
+A date or a time format needs no such step: an older server reads it from the field's scripts.
+
 </Engine>
 
 ## Permissions

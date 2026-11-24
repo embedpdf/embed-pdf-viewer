@@ -79,7 +79,7 @@ import type { CloudManifest } from './CloudDocumentHandle';
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
-import { fieldFactsTheServerLacks } from './fieldFacts';
+import { bundlePurposeTheServerLacks, fieldFactsTheServerLacks } from './fieldFacts';
 import { planesInherited } from './planes';
 import { assertServerTakesMark, markPart } from './signatureMark';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
@@ -256,6 +256,9 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   import(bundle: FormBundle, options: FormImportOptions = {}): AbortablePromise<FormImportResult> {
     const rejected = this.rejectIfClosed<FormImportResult>();
     if (rejected) return rejected;
+    // A server older than purposes would drop one without saying so.
+    const lacking = bundlePurposeTheServerLacks(this.http.serverVersion, bundle);
+    if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormImportResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {

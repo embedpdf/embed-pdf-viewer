@@ -73,9 +73,11 @@ function recordingFetch(version?: string) {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = new URL(url).pathname;
     const method = init?.method ?? 'GET';
-    const route = ['/form/fields', '/changes'].find((part) => path.includes(part));
+    const route = ['/form/fields', '/form/import', '/changes'].find((part) => path.includes(part));
     if (route && (method === 'POST' || method === 'PATCH')) {
-      sent.push({ method, route, body: JSON.parse(String(init?.body)) });
+      // An import's body is multipart: only that it went out is recorded.
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+      sent.push({ method, route, body });
     }
     const response = await fetch(input, init);
     if (version === undefined) return response;
@@ -220,6 +222,33 @@ describe("a field's purpose and format on the wire", () => {
         ['POST', '/changes'],
       ]);
       expect((await doc.forms.get(made.ref)).required).toBe(true);
+
+      // An import writes a purpose too: such a server would make the field
+      // without it and list nothing as left out, so the bundle never goes out.
+      const exported = await doc.forms.export({ fields: [named('plain_one')] });
+      const purposed = {
+        ...exported,
+        fields: exported.fields.map((row) => ({
+          ...row,
+          data: { ...row.data, purpose: 'date-signed' },
+        })),
+      };
+      const before = sent.length;
+      const refusal = await doc.forms.import(purposed, { attribution: 'stamp' }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(EngineError.is(refusal) && refusal.code).toBe(EngineErrorCode.NotImplemented);
+      expect((refusal as EngineError).details).toMatchObject({
+        field: 'purpose',
+        needs: FIELD_PURPOSE_AND_FORMAT_SINCE,
+        serverVersion: '3.2',
+      });
+      expect(sent).toHaveLength(before);
+      // A bundle with no purpose goes out, its date format with it: such a
+      // server reads that from the field's scripts.
+      await doc.forms.import(exported, { attribution: 'stamp' });
+      expect(sent.at(-1)).toMatchObject({ method: 'POST', route: '/form/import' });
     } finally {
       await doc.close();
     }
