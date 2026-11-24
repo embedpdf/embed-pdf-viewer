@@ -19,9 +19,9 @@
   before the box sends "blur", and a blur script sees the committed value.
 
   The box is also where the form's cursor reaches the control: `focus()` and Tab go through the
-  form, in the document's order (`bindFieldFocus`), unless the box has nothing to focus
-  (`focusable={false}`). `custom`: the box holds a control of the app's, and the cursor goes to
-  the first element in it that Tab stops at.
+  form, in the document's order (`bindFieldFocus`). A box with nothing to focus says so
+  (`focusable={false}`), and the cursor passes over it. `custom`: the box holds a control of the
+  app's, and the cursor goes to the first element in it that Tab stops at.
 
   Inside a control of the app's (`isEmbedded()`) the box only fills the place it is given: the
   app's box around it stops the press, sends the widget's events and takes the cursor. It claims
@@ -111,9 +111,9 @@
   /** The form's cursor in this box; runs again when the widget or what it takes changes. */
   function fieldFocus(box: HTMLElement): (() => void) | undefined {
     const widget = item.annotationRef;
-    if (embedded || !widget || item.disabled || !focusable) return undefined;
+    if (embedded || !widget || item.disabled) return undefined;
     const radio = item.control === 'toggle' && item.kind === 'radio';
-    return bindFieldFocus(box, form, widget, { radio, custom });
+    return bindFieldFocus(box, form, widget, { radio, custom, focusable });
   }
 </script>
 

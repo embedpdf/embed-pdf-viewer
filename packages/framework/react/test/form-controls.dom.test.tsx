@@ -17,6 +17,7 @@ import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host'
 import { interactionPlugin, InteractionToken } from '@embedpdf/plugin-interaction';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
+import { signaturePlugin } from '@embedpdf/plugin-signature';
 
 import {
   FormLayer,
@@ -449,6 +450,165 @@ describe('<FormLayer controls>: a turned control', () => {
         fireEvent.click(side);
         await waitFor(() => expect(form.getValue(toFieldRef('side'))).toEqual({ checked: true }));
         await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+});
+
+describe('<FormLayer>: Tab and a box with nothing to take the cursor', () => {
+  afterEach(cleanup);
+
+  type Mounted = Awaited<ReturnType<typeof mount>>;
+
+  /** A text box, a signature field and a second text box, added in that order: Tab's order. */
+  async function threeFields({ form, page }: Mounted) {
+    await form.create({
+      kind: 'text',
+      name: 'first',
+      widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+    });
+    await form.create({
+      kind: 'signature',
+      name: 'sign',
+      widgets: [{ page, rect: { x: 72, y: 140, width: 160, height: 40 } }],
+    });
+    await form.create({
+      kind: 'text',
+      name: 'second',
+      widgets: [{ page, rect: { x: 72, y: 200, width: 160, height: 20 } }],
+    });
+  }
+
+  /** Press Tab in an element; whether the layer took the press from the browser. */
+  const tab = (element: Element, shiftKey = false): boolean =>
+    !fireEvent.keyDown(element, { key: 'Tab', shiftKey });
+
+  it('passes over a signature field when nothing can sign it', { timeout: 45_000 }, async () => {
+    // No signature plugin: the signature field is only its picture.
+    const mounted = await mount(() => <FormLayer />);
+    const { form } = mounted;
+    try {
+      await threeFields(mounted);
+      mounted.show();
+      const first = await waitFor(() => screen.getByLabelText('first'));
+      const second = screen.getByLabelText('second');
+      expect(form.listWidgets(mounted.page).map((item) => item.control)).toEqual([
+        'text',
+        'signature',
+        'text',
+      ]);
+      expect(document.querySelectorAll('input, button')).toHaveLength(2);
+
+      act(() => void form.focus(toFieldRef('first')));
+      expect(document.activeElement).toBe(first);
+      // Tab goes to the second text box, over the signature field.
+      expect(tab(first)).toBe(true);
+      expect(document.activeElement).toBe(second);
+      await waitFor(() => expect(form.getFocusedField()?.name).toBe('second'));
+      // Past the last field the browser's Tab goes on, out of the form.
+      expect(tab(second)).toBe(false);
+      expect(document.activeElement).toBe(second);
+      // Shift+Tab comes back over it.
+      expect(tab(second, true)).toBe(true);
+      expect(document.activeElement).toBe(first);
+
+      // Your code's moves pass over it too.
+      expect(form.focus(toFieldRef('sign'))).toBe(false);
+      expect(document.activeElement).toBe(first);
+      act(() => void form.focusNext());
+      expect(document.activeElement).toBe(second);
+    } finally {
+      await mounted.close();
+    }
+  });
+
+  it(
+    'stops at a signature field with the signature plugin, whose "sign here" takes the cursor',
+    { timeout: 45_000 },
+    async () => {
+      const mounted = await mount(() => <FormLayer />, {
+        plugins: [interactionPlugin(), formPlugin(), signaturePlugin()],
+      });
+      const { form } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => screen.getByLabelText('first'));
+        const second = screen.getByLabelText('second');
+        const sign = screen.getByRole('button', { name: 'sign' });
+
+        act(() => void form.focus(toFieldRef('first')));
+        expect(tab(first)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        await waitFor(() => expect(form.getFocusedField()?.name).toBe('sign'));
+        expect(tab(sign)).toBe(true);
+        expect(document.activeElement).toBe(second);
+        expect(tab(second, true)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        let took = false;
+        act(() => {
+          took = form.focus(toFieldRef('sign'));
+        });
+        expect(took).toBe(true);
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+
+  it(
+    "stops at a signature field a control of the app's own draws with something to focus",
+    { timeout: 45_000 },
+    async () => {
+      function SignButton({ widget }: FieldControlProps) {
+        return <button aria-label={`Sign ${widget.label}`} style={{ width: '100%' }} />;
+      }
+      const controls: FieldControl[] = [
+        { for: (widget) => widget.control === 'signature', component: SignButton },
+      ];
+      const mounted = await mount(() => <FormLayer controls={controls} />);
+      const { form } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => screen.getByLabelText('first'));
+        const sign = screen.getByRole('button', { name: 'Sign sign' });
+
+        act(() => void form.focus(toFieldRef('first')));
+        expect(tab(first)).toBe(true);
+        expect(document.activeElement).toBe(sign);
+        expect(tab(sign)).toBe(true);
+        expect(document.activeElement).toBe(screen.getByLabelText('second'));
+      } finally {
+        await mounted.close();
+      }
+    },
+  );
+
+  it(
+    "passes over a control of the app's own that holds nothing to focus",
+    { timeout: 45_000 },
+    async () => {
+      function Note() {
+        return <span>Signed on paper</span>;
+      }
+      const controls: FieldControl[] = [
+        { for: (widget) => widget.control === 'signature', component: Note },
+      ];
+      const mounted = await mount(() => <FormLayer controls={controls} />);
+      const { form } = mounted;
+      try {
+        await threeFields(mounted);
+        mounted.show();
+        const first = await waitFor(() => screen.getByLabelText('first'));
+        screen.getByText('Signed on paper');
+
+        act(() => void form.focus(toFieldRef('first')));
+        expect(tab(first)).toBe(true);
+        expect(document.activeElement).toBe(screen.getByLabelText('second'));
+        expect(form.focus(toFieldRef('sign'))).toBe(false);
       } finally {
         await mounted.close();
       }

@@ -48,10 +48,10 @@ export interface WidgetBox {
  * The box of one widget. `edge: false` leaves out the edge for controls that
  * draw their own (a list box) or never have one (a button). The box is also
  * where the form's cursor reaches the control: `focus()` and Tab go through
- * the form, in the document's order (`bindFieldFocus`), unless the box has
- * nothing to focus (`focusable`). `custom`: the box holds a control of the
- * app's, so it draws no edge, and the cursor goes to the first element in it
- * that Tab stops at.
+ * the form, in the document's order (`bindFieldFocus`). A box with nothing to
+ * focus says so (`focusable`), and the cursor passes over it. `custom`: the
+ * box holds a control of the app's, so it draws no edge, and the cursor goes
+ * to the first element in it that Tab stops at.
  *
  * Inside a control of the app's ({@link provideEmbeddedControl}) the box only
  * fills the place it is given: the app's box around it keeps the presses from
@@ -112,15 +112,16 @@ export function useWidgetBox(
     [
       element,
       () => item().annotationRef,
-      () => !embedded && !item().disabled && (options.focusable?.() ?? true),
+      () => !embedded && !item().disabled,
       () => {
         const control = item();
         return control.control === 'toggle' && control.kind === 'radio';
       },
+      () => options.focusable?.() ?? true,
     ],
-    ([box, widget, takesCursor, radio], _previous, onCleanup) => {
-      if (box && widget && takesCursor) {
-        onCleanup(bindFieldFocus(box, form, widget, { radio, custom }));
+    ([box, widget, takesInput, radio, focusable], _previous, onCleanup) => {
+      if (box && widget && takesInput) {
+        onCleanup(bindFieldFocus(box, form, widget, { radio, custom, focusable }));
       }
     },
     { immediate: true, flush: 'post' },

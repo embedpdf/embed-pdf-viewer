@@ -222,10 +222,10 @@ interface ControlProps<C extends FormWidgetItem['control']> {
  * The positioned box every control sits in: the widget's event surface, and
  * the edge a field without a border of its own gets, so people see where to
  * fill in. It's also where the form's cursor reaches the control: `focus()`
- * and Tab go through the form, in the document's order (`bindFieldFocus`),
- * unless the box has nothing to focus (`focusable`). `custom`: the box holds
- * a control of the app's, and the cursor goes to the first element in it that
- * Tab stops at.
+ * and Tab go through the form, in the document's order (`bindFieldFocus`).
+ * A box with nothing to focus says so (`focusable={false}`), and the cursor
+ * passes over it. `custom`: the box holds a control of the app's, and the
+ * cursor goes to the first element in it that Tab stops at.
  *
  * Inside a control of the app's ({@link EmbeddedContext}) the box only fills
  * the place it is given: the app's box around it sends the widget's events
@@ -257,14 +257,14 @@ function WidgetBox({
   const wrap = useIsolated<HTMLDivElement>(onPress, !embedded);
   const frame = rectInPixels(item.box, page.transform);
   const widget = item.annotationRef;
-  const takesCursor = focusable && !item.disabled && !embedded;
+  const takesInput = !item.disabled && !embedded;
   const radio = item.control === 'toggle' && item.kind === 'radio';
   useEffect(
     () =>
-      wrap.current && widget && takesCursor
-        ? bindFieldFocus(wrap.current, form, widget, { radio, custom })
+      wrap.current && widget && takesInput
+        ? bindFieldFocus(wrap.current, form, widget, { radio, custom, focusable })
         : undefined,
-    [wrap, form, widget, takesCursor, radio, custom],
+    [wrap, form, widget, takesInput, radio, custom, focusable],
   );
   if (embedded) {
     return (

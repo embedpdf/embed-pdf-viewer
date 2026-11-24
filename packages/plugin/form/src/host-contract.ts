@@ -47,8 +47,20 @@ export type { TextEditorLayout } from '@embedpdf/core-form';
  * into view.
  */
 export interface FormFocusTarget {
-  /** Take the cursor; `select` selects a text box's text, so typing replaces it. */
-  focus(options: { readonly select: boolean }): void;
+  /**
+   * Whether the control takes the cursor, asked each time the cursor is about to move. A box
+   * that holds nothing to focus says no: a signature field with nothing to sign it, a control
+   * of an app's own with no element Tab stops at. `focus()`, `focusNext()` and Tab pass over
+   * its field. A target without it takes the cursor.
+   */
+  takesCursor?(): boolean;
+  /**
+   * Take the cursor; `select` selects a text box's text, so typing replaces it. `false` when
+   * nothing took it after all: the cursor then passes over the box, as over one that says it
+   * takes none. A target that answers anything else, or nothing, took it: the return is
+   * `unknown`, so one whose `focus` returns a timer or a promise fits too.
+   */
+  focus(options: { readonly select: boolean }): unknown;
 }
 
 /**
@@ -119,7 +131,9 @@ export interface FormHostCapability extends FormCapability {
   /**
    * Lend the plugin a box's control while it's on screen, so `focus()` and `focusNext()` can put
    * the cursor in it; a box `focus()` asked for before its page came in takes the cursor now.
-   * Returns the call that takes it back.
+   * Lend one for a box that holds nothing to focus too, saying so (`takesCursor`): the cursor
+   * passes over a box on screen that takes none, and nothing else tells the plugin that a box
+   * it hasn't seen can't take it. Returns the call that takes it back.
    */
   attachFocusTarget(widget: AnnotationRef, target: FormFocusTarget): () => void;
   /**

@@ -136,7 +136,9 @@ What you draw in the frame zooms with the page. Open a menu or a picker from it 
 [Tab, `focus()` and `focusNext()`](../forms#move-between-fields) put the cursor in the first
 element of your control that takes focus: an `<input>`, a `<button>`, or an element with
 `tabindex="0"`. Give it one, and the field takes part in the form's order like any other. While the
-cursor is anywhere inside your control, the field is the focused field.
+cursor is anywhere inside your control, the field is the focused field. An element that is hidden,
+disabled or inert doesn't count. A control with no element that does takes no cursor: Tab,
+`focus()` and `focusNext()` pass over its field.
 
 A box that is `disabled` takes no input: draw it, and leave out what people would click.
 

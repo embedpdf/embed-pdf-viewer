@@ -417,7 +417,7 @@ export class FormSignatureControl extends FormWidgetBox<WidgetOf<'signature'>> {
   protected readonly actionable = computed(
     () => this.signature.capability() !== null && (this.signed() || !this.item().disabled),
   );
-  // Without the signature plugin the box has nothing to focus.
+  // Without the signature plugin the box has nothing to focus: the cursor passes over it.
   protected override readonly focusable = this.actionable;
 
   protected readonly buttonStyle = {
