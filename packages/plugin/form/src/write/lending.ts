@@ -7,6 +7,9 @@
  * change as the rest of it. While the tool fills, nothing is lent, and the
  * form layer draws and fills every widget. A widget of no size is never lent:
  * nobody can see it, so nobody should be able to select it by hand.
+ *
+ * Each lent widget carries its field's group's color as its accent,
+ * `fields.tint` strong, so the annotation layer shows whose field it is.
  */
 import { memo } from '@embedpdf/core';
 import { refOf, type Effect, type Model } from '@embedpdf/core-annotation';
@@ -23,6 +26,7 @@ import type { AnnotationLender } from '@embedpdf/plugin-annotation/contract/host
 import type { DuplicatePlacement } from './duplicate';
 import { fieldForWidget, fieldKeyOf, hasArea } from '../model';
 import type { FormContext, FormServices } from '../services';
+import { undoLookOf } from '../sync/predict';
 
 const objectNumberOf = (ref: AnnotationRef): number =>
   ref.kind === 'objectNumber' ? ref.objectNumber : -1;
@@ -31,11 +35,11 @@ export function createWidgetLender(
   ctx: FormContext,
   {
     fields,
-    predictor,
     design,
     pictures,
     looks,
-  }: Pick<FormServices, 'fields' | 'predictor' | 'design' | 'pictures' | 'looks'>,
+    groups,
+  }: Pick<FormServices, 'fields' | 'design' | 'pictures' | 'looks' | 'groups'>,
   /** The ops that copy widgets by the designer's rule (write/fields.ts). */
   copyOps: (
     widgets: readonly AnnotationRef[],
@@ -43,8 +47,16 @@ export function createWidgetLender(
     values: boolean,
   ) => Promise<{ ops: readonly ChangeOp[]; copies: readonly AnnotationRef[] }>,
 ): AnnotationLender {
+  // Listed again when a group's color or the tint changes: the records' accents are read then.
   const records = memo(
-    () => [design.lending(), fields.get().snapshot, fields.view().snapshot] as const,
+    () =>
+      [
+        design.lending(),
+        fields.get().snapshot,
+        fields.view().snapshot,
+        groups.list(),
+        ctx.settings().get().fields.tint,
+      ] as const,
     (lending, confirmed, shown) =>
       lending && confirmed && shown
         ? { confirmed: confirmed.widgets.filter(hasArea), shown: shown.widgets.filter(hasArea) }
@@ -104,7 +116,7 @@ export function createWidgetLender(
       }
       return [...ops, ...deleteOps(deleted)];
     },
-    undoOf: (ops) => predictor.undoLook(fields.view(), ops),
+    undoOf: (ops) => undoLookOf(fields.view(), ops),
     reorderOps: (page: PageRef, refs, position) => [
       { type: 'forms.reorderWidgets', page, widgets: [...refs], position },
     ],
@@ -122,6 +134,10 @@ export function createWidgetLender(
     // A widget draws live, by the painter, while a gesture reshapes it, while its look isn't
     // confirmed (a restyle, a resize, a field just placed), and until its new picture is there.
     isPending: looks.isPending,
+    accentOf: (record) => {
+      const field = fieldForWidget(fields.view(), objectNumberOf(record.ref));
+      return groups.lookOf(field?.groupId ?? null)?.accent ?? null;
+    },
     painter: (record) =>
       record.subtype === 'widget' ? looks.painterOf(record as WidgetAnnotation) : null,
   };

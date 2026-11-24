@@ -9,6 +9,7 @@ import {
   type FormField,
   type FormFieldPatch,
   type FormFieldSetting,
+  type FormGroup,
 } from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
@@ -18,6 +19,8 @@ import { useLabel } from './labels';
 import { TooltipButton } from './tooltip';
 
 const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm';
+
+const NO_GROUPS: readonly FormGroup[] = Object.freeze([]);
 
 /** One option of a dropdown or a list, as its settings hold it. */
 interface Option {
@@ -33,9 +36,12 @@ export function FieldSettings({ field }: { field: FormField }) {
     (capability) => capability.getFieldSettings(field.ref),
     null,
   );
+  const groups = useOptionalSelector(FormToken, (capability) => capability.listGroups(), NO_GROUPS);
   if (!form || !settings || !form.canDesign()) return null;
   const write = (patch: Record<string, unknown>) =>
     void form.update(field.ref, patch as FormFieldPatch).catch(() => undefined);
+  // A group's id shows as who the group is, where the app says.
+  const groupLabel = (id: string) => groups.find((group) => group.id === id)?.label ?? id;
 
   return (
     <div>
@@ -46,6 +52,7 @@ export function FieldSettings({ field }: { field: FormField }) {
           spec={spec}
           value={settings.values[spec.key]}
           onChange={(value) => write({ [spec.key]: value })}
+          {...(spec.key === 'groupId' ? { optionLabel: groupLabel } : {})}
         />
       ))}
     </div>
@@ -57,12 +64,15 @@ function SettingControl({
   spec,
   value,
   onChange,
+  optionLabel = (option) => option,
 }: {
   /** The field it edits: a draft starts over when the selection moves to another field. */
   fieldKey: string;
   spec: FormFieldSetting;
   value: unknown;
   onChange: (value: unknown) => void;
+  /** What a choice's option shows as: the option itself, unless the setting's values have names. */
+  optionLabel?: (option: string) => string;
 }) {
   const t = useT();
   const label = useLabel();
@@ -126,7 +136,7 @@ function SettingControl({
             <option value="">{t('demo.fieldNone')}</option>
             {spec.options.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {optionLabel(option)}
               </option>
             ))}
           </select>

@@ -50,10 +50,10 @@ export interface FormImportRequest {
   /** Whether scripts, submits and links are kept (`doc.forms.script`); without it they're left out. */
   readonly mayScript: boolean;
   /**
-   * The group a field goes in, given the one it had in the bundle (if any):
-   * checked by the caller, which refuses one it may not set.
+   * The group a field goes in, given the one it had in the bundle (`null`
+   * for none): checked by the caller, which refuses one it may not set.
    */
-  readonly groupOf: (groupId: string | undefined) => string | undefined;
+  readonly groupOf: (groupId: string | null) => string | null;
 }
 
 /** What a values import writes, decided before the first write. */

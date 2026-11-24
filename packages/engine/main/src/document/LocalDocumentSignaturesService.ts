@@ -3,6 +3,8 @@ import {
   EngineError,
   EngineErrorCode,
   opIdOf,
+  resolveSignatureAppearance,
+  signatureAppearanceBytes,
   wirePack,
   type AnalyzeInput,
   type ChangeAnalysis,
@@ -133,16 +135,27 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const authority = this.guard.changeAuthority();
+    // Queued now, so it keeps its place among this document's calls while
+    // the mark's bytes are read.
     const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack({
-          kind: 'signatures.prepare',
-          effect: 'snapshot',
-          jobId,
-          docId,
-          input,
-          authority,
-        }),
+      line: { effect: 'snapshot', docId },
+      buildPack: async (jobId: JobId) => {
+        // The mark as a copy the job owns, in the spelling the caller chose:
+        // the caller's bytes are only read.
+        const appearance = await resolveSignatureAppearance(input.appearance ?? null);
+        const mark = signatureAppearanceBytes(appearance);
+        return wirePack(
+          {
+            kind: 'signatures.prepare',
+            effect: 'snapshot',
+            jobId,
+            docId,
+            input: appearance ? { ...input, appearance } : input,
+            authority,
+          },
+          mark ? [mark.bytes.buffer as ArrayBuffer] : [],
+        );
+      },
     });
     return this.await(submission, 'signatures.prepare', (payload) => {
       // The field that was named, or the one the engine made for a timestamp.

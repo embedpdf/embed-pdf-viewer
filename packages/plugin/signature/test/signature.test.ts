@@ -7,6 +7,7 @@
  * ever asks them for a widget hit, a field, and an asset's bytes.
  */
 import { readFile } from 'node:fs/promises';
+import { deflateSync } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -35,6 +36,7 @@ import {
   type SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
+import { BANDS_JPEG, BANDS_PNG } from '@embedpdf/engine-core/conformance';
 import { FormToken } from '@embedpdf/plugin-form/contract';
 import type { PointerSample } from '@embedpdf/plugin-interaction/contract/host';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
@@ -377,6 +379,332 @@ describe('visual fill', () => {
         code: 'not-found',
         message: expect.stringMatching(/unknown mark/),
       });
+    } finally {
+      await doc.close();
+    }
+  });
+});
+
+type OpenDocument = Awaited<ReturnType<typeof openDoc>>;
+type Rgb = readonly [number, number, number];
+const RED: Rgb = [255, 0, 0];
+const GREEN: Rgb = [0, 255, 0];
+const BLUE: Rgb = [0, 0, 255];
+
+/** The fixture's signature widget, as the forms list reads it. */
+async function widgetRow(doc: OpenDocument) {
+  const widget = (await doc.signatures.list()).signatures[0]!.widget!;
+  return (await doc.forms.list()).widgets.find(
+    (row) => row.ref.kind === 'objectNumber' && row.ref.objectNumber === widget.objectNumber,
+  )!;
+}
+
+/** Pixels the fixture's signature widget draws within 40 of `rgb` in each channel. */
+async function pixelsOf(doc: OpenDocument, rgb: Rgb): Promise<number> {
+  const { ref } = await widgetRow(doc);
+  const { appearances } = await doc
+    .page(ref.page)
+    .forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
+  const widget = appearances.find(
+    (a) =>
+      a.mode === 'normal' &&
+      a.ref.kind === 'objectNumber' &&
+      ref.kind === 'objectNumber' &&
+      a.ref.objectNumber === ref.objectNumber,
+  );
+  if (!widget) return 0;
+  const px = new Uint8Array(widget.raster.data);
+  let count = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const near = rgb.every((channel, at) => Math.abs(px[i + at]! - channel) <= 40);
+    if (near && px[i + 3]! > 200) count++;
+  }
+  return count;
+}
+
+/** Whether the widget shows the three bands of the picture. */
+async function showsBands(doc: OpenDocument): Promise<boolean> {
+  const counts = await Promise.all([RED, GREEN, BLUE].map((band) => pixelsOf(doc, band)));
+  return counts.every((count) => count > 50);
+}
+
+/**
+ * An RGBA PNG as a canvas makes one: clear all over, with a bar of opaque
+ * black ink across the middle third of its height.
+ */
+function inkPng(width: number, height: number): Uint8Array<ArrayBuffer> {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc32 = (bytes: Uint8Array) => {
+    let c = 0xffffffff;
+    for (const b of bytes) c = crcTable[(c ^ b) & 0xff]! ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Uint8Array) => {
+    const out = new Uint8Array(12 + data.length);
+    const view = new DataView(out.buffer);
+    view.setUint32(0, data.length);
+    out.set(
+      [...type].map((ch) => ch.charCodeAt(0)),
+      4,
+    );
+    out.set(data, 8);
+    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    return out;
+  };
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, width);
+  headerView.setUint32(4, height);
+  header.set([8, 6, 0, 0, 0], 8); // 8 bits a channel, RGBA, not interlaced
+  const rows = new Uint8Array(height * (1 + width * 4));
+  for (let y = Math.floor(height / 3); y < Math.ceil((2 * height) / 3); y++) {
+    for (let x = 0; x < width; x++) rows[y * (1 + width * 4) + 1 + x * 4 + 3] = 255;
+  }
+  const parts = [
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(rows)),
+    chunk('IEND', new Uint8Array(0)),
+  ];
+  const png = new Uint8Array(parts.reduce((length, part) => length + part.length, 0));
+  let at = 0;
+  for (const part of parts) {
+    png.set(part, at);
+    at += part.length;
+  }
+  return png;
+}
+
+describe('an image as the mark', () => {
+  it('fills a field made with forms.create from a canvas PNG, as bytes and as a Blob (issue 1109)', async () => {
+    const doc = await openDoc();
+    try {
+      const page = (await doc.pages.list()).pages[0]!;
+      const approval: FormFieldRef = { kind: 'fqn', name: 'approval' };
+      // Three to one, as the picture is: the picture fills the box.
+      const { field } = await doc.forms.create({
+        kind: 'signature',
+        name: 'approval',
+        widgets: [{ page: page.ref, rect: { x: 50, y: 50, width: 150, height: 50 } }],
+      });
+      const widget = field.widgets[0]!;
+      /** The widget's pixels at scale 1, and how many of them are opaque black ink. */
+      const drawn = async () => {
+        const { appearances } = await doc
+          .page(page.ref)
+          .forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
+        const { raster } = appearances.find(
+          (a) =>
+            a.mode === 'normal' &&
+            a.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === widget.objectNumber,
+        )!;
+        const px = new Uint8Array(raster.data);
+        let ink = 0;
+        let clear = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i + 3]! > 200 && px[i]! < 40 && px[i + 1]! < 40 && px[i + 2]! < 40) ink++;
+          if (px[i + 3] === 0) clear++;
+        }
+        return { ink, clear, pixels: px.length / 4 };
+      };
+      const { signature } = makeSignature(doc);
+      const png = inkPng(300, 100);
+
+      for (const source of [png, new Blob([png], { type: 'image/png' })]) {
+        expect((await drawn()).ink).toBe(0);
+        await signature.fillField(approval, { source });
+        const { ink, clear, pixels } = await drawn();
+        // The bar of ink is a third of the picture, and what is clear in it stays clear.
+        expect(ink / pixels).toBeGreaterThan(0.25);
+        expect(ink / pixels).toBeLessThan(0.42);
+        expect(clear / pixels).toBeGreaterThan(0.55);
+        await signature.clearField(approval);
+      }
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('fillField takes a PNG or a JPEG, as bytes and as a Blob', async () => {
+    for (const source of [
+      BANDS_PNG,
+      new Blob([BANDS_PNG.slice()], { type: 'image/png' }),
+      BANDS_JPEG,
+      new Blob([BANDS_JPEG.slice()]),
+      { data: new Blob([BANDS_PNG.slice()]), mimeType: 'image/png', name: 'signature.png' },
+    ]) {
+      const doc = await openDoc();
+      try {
+        const { signature } = makeSignature(doc);
+        const events: SignatureChange[] = [];
+        collectEvents(signature, events);
+        expect(await showsBands(doc)).toBe(false);
+
+        await signature.fillField(SIG, { source });
+        expect(events.at(-1)).toEqual({ type: 'filled', field: SIG });
+        expect((await widgetRow(doc)).hasMark).toBe(true);
+        expect(await showsBands(doc)).toBe(true);
+        expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
+      } finally {
+        await doc.close();
+      }
+    }
+  });
+
+  it('placeMark on a field draws an image in mode visual, and seals with it in mode sign', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    try {
+      const { signature: visual } = makeSignature(doc, { mode: 'visual' });
+      await visual.placeMark(
+        { source: new Blob([BANDS_PNG.slice()], { type: 'image/png' }) },
+        { field: SIG },
+      );
+      expect((await widgetRow(doc)).hasMark).toBe(true);
+      expect(await showsBands(doc)).toBe(true);
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
+      await visual.clearField(SIG);
+
+      const { signature: sealing } = makeSignature(doc, { mode: 'sign', signingKey: signer });
+      const events: SignatureChange[] = [];
+      collectEvents(sealing, events);
+      await sealing.placeMark({ source: BANDS_JPEG }, { field: SIG });
+      expect(events.some((event) => event.type === 'signed')).toBe(true);
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(true);
+      expect(await showsBands(doc)).toBe(true);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('sign and prepareSignature take an image as the mark, as bytes and as a Blob', async () => {
+    for (const source of [BANDS_PNG, new Blob([BANDS_PNG.slice()], { type: 'image/png' })]) {
+      const doc = await openDoc();
+      const signer = await createTestSigner({ commonName: 'Bob Singor' });
+      try {
+        const { signature } = makeSignature(doc, { signingKey: signer });
+        const result = await signature.sign({ field: SIG, mark: { source } });
+        expect(result.status).toBe('completed');
+        expect(result.signature.signer).toMatchObject({ name: 'Bob Singor' });
+        expect((await widgetRow(doc)).hasMark).toBe(true);
+        expect(await showsBands(doc)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+
+      const parked = await openDoc();
+      try {
+        const { signature } = makeSignature(parked);
+        const prepared = await signature.prepareSignature({ field: SIG, mark: { source } });
+        expect(prepared.digest.byteLength).toBeGreaterThan(0);
+        await signature.cancelPending();
+      } finally {
+        await parked.close();
+      }
+    }
+  });
+
+  it('`appearance`, given instead of the mark, takes an image too', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    try {
+      // The stamp's asset is a PDF with no bands: what shows is the appearance.
+      const { signature } = makeSignature(
+        doc,
+        { signingKey: signer },
+        { stamp: stampStub(artwork) },
+      );
+      const result = await signature.sign({
+        field: SIG,
+        mark: { assetId: 'people:signature' },
+        appearance: new Blob([BANDS_PNG.slice()], { type: 'image/png' }),
+      });
+      expect(result.status).toBe('completed');
+      expect(await showsBands(doc)).toBe(true);
+    } finally {
+      await doc.close();
+    }
+
+    const parked = await openDoc();
+    try {
+      const { signature } = makeSignature(parked);
+      const prepared = await signature.prepareSignature({ field: SIG, appearance: BANDS_JPEG });
+      expect(prepared.digest.byteLength).toBeGreaterThan(0);
+      await signature.cancelPending();
+    } finally {
+      await parked.close();
+    }
+  });
+
+  it('refuses bytes that are no PNG, JPEG or PDF, and draws nothing', async () => {
+    const doc = await openDoc();
+    try {
+      const { signature } = makeSignature(doc);
+      const events: SignatureChange[] = [];
+      collectEvents(signature, events);
+      const source = new TextEncoder().encode('GIF89a: not a format a mark is read from');
+      await expect(signature.fillField(SIG, { source })).rejects.toThrow(
+        /PNG, JPEG or one-page PDF bytes/,
+      );
+      expect(events.some((event) => event.type === 'filled')).toBe(false);
+      expect((await widgetRow(doc)).hasMark).toBe(false);
+      expect(signature.isBusy()).toBe(false);
+    } finally {
+      await doc.close();
+    }
+  });
+});
+
+describe('a cleared field', () => {
+  it('is empty: no mark, its box in its style, a style that can change, and an undo that brings the mark back', async () => {
+    const doc = await openDoc();
+    try {
+      const { signature } = makeSignature(doc);
+      const events: SignatureChange[] = [];
+      collectEvents(signature, events);
+      const widget = (await widgetRow(doc)).ref;
+      // A look for the box, so an empty field can be told from one that draws nothing.
+      await doc.forms.updateWidget(widget, { color: '#1a1a1a', interiorColor: '#eeeeee' });
+      const empty = await widgetRow(doc);
+      expect(empty).toMatchObject({ hasMark: false, hasAppearance: true });
+
+      await signature.fillField(SIG, { source: BANDS_PNG });
+      expect((await widgetRow(doc)).hasMark).toBe(true);
+      await expect(
+        doc.forms.updateWidget(widget, { interiorColor: '#00aa00' }),
+      ).rejects.toMatchObject({ message: expect.stringMatching(/has a mark in it/) });
+
+      // What the engine answers the clear with: the op another undo names.
+      const cleared: { opId?: string } = {};
+      const stop = doc.events.on('forms.updated', (event) => {
+        cleared.opId = event.meta.opId;
+      });
+      await signature.clearField(SIG);
+      stop();
+      expect(events.at(-1)).toEqual({ type: 'cleared', field: SIG });
+      expect(await widgetRow(doc)).toMatchObject({
+        hasMark: false,
+        hasAppearance: true,
+        color: '#1a1a1a',
+        interiorColor: '#eeeeee',
+      });
+
+      // Its style is its own again.
+      const restyled = await doc.forms.updateWidget(widget, { interiorColor: '#00aa00' });
+      expect(restyled.appearance).toEqual({ action: 'regenerated', changed: true });
+      await doc.apply({ undoOf: restyled.meta.opId });
+
+      // Clearing an empty field is no error, and leaves it empty.
+      await signature.clearField(SIG);
+      expect((await widgetRow(doc)).hasMark).toBe(false);
+
+      await doc.apply({ undoOf: cleared.opId! });
+      expect((await widgetRow(doc)).hasMark).toBe(true);
     } finally {
       await doc.close();
     }

@@ -207,8 +207,10 @@ export interface Identity {
   readonly organization?: string;
   readonly organizationalUnit?: string;
   /**
-   * The group what they create goes into: a new annotation's or form
-   * field's `/EMBD_Metadata/GroupID`, unless the write names another.
+   * Their own group. A new annotation goes into it
+   * (`/EMBD_Metadata/GroupID`), unless the write names another. A new form
+   * field is in no group unless its draft names one; naming this one takes
+   * no `fields:set-group` right.
    */
   readonly groupId?: string;
 }

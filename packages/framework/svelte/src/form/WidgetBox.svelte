@@ -80,7 +80,7 @@
     const frame = rectInPixels(item.box, page.transform);
     return embedded
       ? widgetBoxStyleOf(
-          { look: item.look },
+          { look: item.look, accent: item.accent },
           { left: 0, top: 0, width: frame.width, height: frame.height },
           colors,
           { edge },

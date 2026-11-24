@@ -325,10 +325,15 @@ will fail. See [Permissions](/docs/headless/concepts/permissions) in the headles
 ### Groups
 
 An annotation or a form field can belong to a group (`groupId`): a team or a department for
-annotations, whoever fills them in for fields. What a user creates goes in their own group
-(`identity.groupId`). `annotations:set-group:group=<id>` and `fields:set-group:group=<id>` let a
-user put annotations or fields in that group; `annotations:update:group=<id>` lets them edit that
-group's annotations, and `fields:fill:group=<id>` fill in that group's fields.
+annotations, whoever fills them in for fields. An annotation a user creates goes in their own
+group (`identity.groupId`). A form field is in no group until its designer names one, because a
+field is usually made for someone else. `annotations:set-group:group=<id>` and
+`fields:set-group:group=<id>` let a user put annotations or fields in that group;
+`annotations:update:group=<id>` lets them edit that group's annotations, and
+`fields:fill:group=<id>` fill in that group's fields.
+
+A user's own group takes no `set-group` permission. An annotation's group can be changed, never
+removed. A field's can be removed (`groupId: null`), which takes `doc.forms.modify` alone.
 
 A `group=<id>` permission names the group it covers: the user doesn't need to be in it. To give
 someone several groups, give them one permission per group.

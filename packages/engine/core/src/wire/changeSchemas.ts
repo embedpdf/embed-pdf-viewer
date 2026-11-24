@@ -70,7 +70,7 @@ import { PageRefSchema } from '../identity/PageRef.schema';
 import type { ChangeItemType } from '../mutation/Change';
 import {
   AnnotationResourceKeysSchema,
-  AppearanceResourceKeysSchema,
+  FieldAppearanceResourceKeysSchema,
   FileResourceKeysSchema,
   SourceResourceKeysSchema,
 } from './resourceKeys';
@@ -213,8 +213,11 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
   op({
     type: z.literal('forms.setSignatureAppearance'),
     field: FormFieldRefSchema,
-    /** The one-page PDF drawn in, as the key of its multipart part. */
-    resources: AppearanceResourceKeysSchema,
+    /**
+     * The mark drawn in (a PNG, a JPEG or a one-page PDF), as the key of its
+     * multipart part; `null` takes the field's mark out.
+     */
+    resources: FieldAppearanceResourceKeysSchema,
   }),
   op({
     type: z.literal('metadata.update'),

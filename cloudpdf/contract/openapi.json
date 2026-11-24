@@ -22661,7 +22661,8 @@
               "groupId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "nullable": true
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22997,7 +22998,8 @@
           "groupId": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 256
+            "maxLength": 256,
+            "nullable": true
           },
           "actions": {
             "$ref": "#/components/schemas/FieldActionsPatch"
@@ -24970,7 +24972,12 @@
                 "type": "object",
                 "properties": {
                   "appearance": {
-                    "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
+                      }
+                    ],
+                    "nullable": true
                   }
                 },
                 "required": ["appearance"],

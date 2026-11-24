@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createScrollbarPresses, scrollbarLayout } from '../src/scrollbar';
+import { attachScrollbar, createScrollbarPresses, scrollbarLayout } from '../src/scrollbar';
 import type { ScrollbarMetrics, ScrollbarTrack } from '../src/scrollbar';
+import { asElement, fakeElement } from './helpers/fake-element';
 
 /** A 1000 px view over 4000 px of content, scrolled `scrollTop` down. */
 const metricsAt = (scrollTop: number): ScrollbarMetrics => ({
@@ -129,9 +130,143 @@ describe('createScrollbarPresses', () => {
     expect(dragging).toEqual([true]);
   });
 
+  it('keeps a press on the thumb or the track from the page below the bar', () => {
+    const presses = createScrollbarPresses(() => {});
+    const onThumb = press(110, {});
+    presses.pressThumb(onThumb, track());
+    expect(onThumb.stopPropagation).toHaveBeenCalled();
+    presses.release();
+    const onTrack = press(350);
+    presses.pressTrack(onTrack, track(), 'page');
+    expect(onTrack.stopPropagation).toHaveBeenCalled();
+    presses.release();
+  });
+
   it("leaves a press that reached the track from the thumb to the thumb's handler", () => {
     const presses = createScrollbarPresses(() => {});
     presses.pressTrack(press(350, {}), track(), 'jump');
     expect(stage.scrollTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('attachScrollbar', () => {
+  let scrollTop = 0;
+  let trackPress: 'page' | 'jump' = 'page';
+  const stage = {
+    scrollTo: vi.fn((position: { top?: number }) => {
+      scrollTop = position.top ?? scrollTop;
+    }),
+    scrollBy: vi.fn((delta: { top?: number }) => {
+      scrollTop += delta.top ?? 0;
+    }),
+    panBy: vi.fn(),
+  };
+  const thumb = { setPointerCapture: vi.fn() };
+
+  /** A bound bar: a 400 px track that starts 100 px down the screen, the thumb inside it. */
+  const bind = () => {
+    const element = fakeElement({
+      getBoundingClientRect: () => ({ left: 0, top: 100 }),
+      setPointerCapture: vi.fn(),
+    });
+    const dragging: boolean[] = [];
+    const detach = attachScrollbar(asElement(element), {
+      bar: () => ({
+        stage,
+        vertical: true,
+        layout: scrollbarLayout(metricsAt(scrollTop), true, 400, 24),
+        liveLayout: () => scrollbarLayout(metricsAt(scrollTop), true, 400, 24),
+        trackPress,
+      }),
+      onDragging: (value) => dragging.push(value),
+    });
+    /** A pointer event at `y` client pixels; on the track itself unless `target` says otherwise. */
+    const send = (type: string, clientY: number, target: unknown = element) =>
+      element.dispatch(type, {
+        button: 0,
+        clientX: 0,
+        clientY,
+        pointerId: 1,
+        target,
+        currentTarget: element,
+        preventDefault: vi.fn(),
+      });
+    return { element, dragging, detach, send };
+  };
+
+  beforeEach(() => {
+    scrollTop = 0;
+    trackPress = 'page';
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.stubGlobal('window', { setTimeout, setInterval });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps a press on the thumb from the page below the bar, and drags with the moves', () => {
+    const bar = bind();
+    // The thumb is 100 px at the top of the track; grab it 20 px down.
+    expect(bar.send('pointerdown', 120, thumb).stopped).toBe(true);
+    expect(thumb.setPointerCapture).toHaveBeenCalledWith(1);
+    expect(bar.dragging).toEqual([true]);
+    bar.send('pointermove', 150, thumb);
+    // 30 px of the 300 px travel is a tenth of the 3000 px range.
+    expect(stage.panBy).toHaveBeenLastCalledWith(0, -300);
+    bar.send('pointerup', 150, thumb);
+    bar.send('pointermove', 200, thumb);
+    expect(stage.panBy).toHaveBeenCalledTimes(1);
+    expect(bar.dragging).toEqual([true, false]);
+  });
+
+  it('keeps a press on the track from the page below the bar, and pages toward the pointer', () => {
+    const bar = bind();
+    expect(bar.send('pointerdown', 450).stopped).toBe(true);
+    expect(stage.scrollBy).toHaveBeenLastCalledWith({ top: 900 });
+    expect(bar.dragging).toEqual([]);
+    bar.send('pointercancel', 450);
+    const calls = stage.scrollBy.mock.calls.length;
+    vi.advanceTimersByTime(350 + 80 * 5);
+    expect(stage.scrollBy).toHaveBeenCalledTimes(calls);
+  });
+
+  it('reads the bar at each event', () => {
+    const bar = bind();
+    trackPress = 'jump';
+    bar.send('pointerdown', 350);
+    // Centred under the pointer: (250 - 50) / 300 of the range.
+    expect(stage.scrollTo).toHaveBeenLastCalledWith({ top: 2000 });
+    expect(bar.dragging).toEqual([true]);
+  });
+
+  it('keeps a press of any button from the page, and acts only on the main one', () => {
+    const bar = bind();
+    const press = bar.element.dispatch('pointerdown', {
+      button: 2,
+      clientX: 0,
+      clientY: 450,
+      pointerId: 1,
+      target: bar.element,
+      currentTarget: bar.element,
+      preventDefault: vi.fn(),
+    });
+    expect(press.stopped).toBe(true);
+    expect(stage.scrollBy).not.toHaveBeenCalled();
+  });
+
+  it('detached, it listens to nothing and ends the press under way', () => {
+    const bar = bind();
+    bar.send('pointerdown', 450);
+    const calls = stage.scrollBy.mock.calls.length;
+    bar.detach();
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+      expect(bar.element.listenerCount(type)).toBe(0);
+    }
+    // The held press no longer repeats.
+    vi.advanceTimersByTime(350 + 80 * 5);
+    expect(stage.scrollBy).toHaveBeenCalledTimes(calls);
+    expect(bar.send('pointerdown', 450).stopped).toBe(false);
   });
 });

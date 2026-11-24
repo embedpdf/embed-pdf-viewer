@@ -37,6 +37,14 @@ export const API_VERSION: string = apiVersionOf(version);
  */
 export const VALIDATION_INFO_SINCE = '3.3';
 
+/**
+ * The version a signature field's mark may be a PNG or a JPEG in, and may be
+ * taken out with `null`, on the wire: in the `appearance` part of a visual
+ * fill, of a prepare and of the change op `forms.setSignatureAppearance`. A
+ * client sends neither to an older server, which takes a one-page PDF only.
+ */
+export const MARK_IMAGE_OR_NONE_SINCE = '3.4';
+
 const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
   version.major < than.major || (version.major === than.major && version.minor < than.minor);
 

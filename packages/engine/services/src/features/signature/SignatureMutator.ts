@@ -13,6 +13,7 @@ import {
   authorizeFieldWrite,
   EngineError,
   EngineErrorCode,
+  signatureAppearanceBytes,
   toPageRef,
   type ChangeAuthority,
   type FieldLockSpec,
@@ -251,8 +252,9 @@ export class SignatureMutator {
           'the engine refused to author the signature (the field is signed, read-only or locked, a certification is not allowed here, the seed value requires what is not implemented, or the request is inconsistent)',
         );
       }
-      if (input.appearance && field?.widget) {
-        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf, {
+      const mark = signatureAppearanceBytes(input.appearance ?? null);
+      if (mark && field?.widget) {
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark, {
           recordFit: false,
         });
       }

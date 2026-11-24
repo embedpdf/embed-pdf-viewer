@@ -132,7 +132,7 @@ export function useWidgetBox(
     (): CSSProperties =>
       embedded
         ? widgetBoxStyleOf(
-            { look: item().look },
+            { look: item().look, accent: item().accent },
             { left: 0, top: 0, width: frame.value.width, height: frame.value.height },
             colors(),
             { edge },

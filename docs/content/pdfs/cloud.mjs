@@ -50,10 +50,11 @@ const ANNOTATE = ['doc.annotate.modify'];
 const FILL = ['doc.forms.fill'];
 
 /**
- * Files the examples load by URL but never open as a document, such as a stamp library: they need
- * no grant.
+ * Files that need no grant: one the examples load by URL but never open as a document, such as a
+ * stamp library, and a document only embedpdf.com's examples open (`loan`: its example opens the
+ * form again as each signer, with that signer's permissions, which a grant can't do).
  */
-const NOT_OPENED = new Set(['marks']);
+const NOT_OPENED = new Set(['marks', 'loan']);
 
 /**
  * What each document's examples change, on top of reading. A signature makes a version of the

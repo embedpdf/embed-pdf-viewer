@@ -62,8 +62,8 @@ export function createPlannedFields(
   calculationOrder: readonly number[],
   write: {
     readonly actor: AnnotationActor;
-    /** The group a field goes in, given the one its source had (if any). */
-    readonly groupOf: (groupId: string | undefined) => string | undefined;
+    /** The group a field goes in, given the one its source had (`null` for none). */
+    readonly groupOf: (groupId: string | null) => string | null;
     readonly signal: AbortSignal;
     readonly made?: (objectNumber: number, at: number) => void;
   },
@@ -74,10 +74,10 @@ export function createPlannedFields(
   const forms = new FormMutator(runtime, session, fonts);
   const created = creates.map((planned, at) => {
     const { groupId: sourceGroup, ...draft } = pdfFormFieldDraftOf(planned.draft, boxOf);
-    const groupId = write.groupOf(sourceGroup);
+    const groupId = write.groupOf(sourceGroup ?? null);
     const [objectNumber, ...widgetObjectNumbers] = planned.objectNumbers ?? [];
     const { field } = forms.createField(
-      { ...draft, ...(groupId !== undefined ? { groupId } : {}) },
+      { ...draft, groupId },
       write.signal,
       write.actor,
       objectNumber === undefined ? {} : { objectNumber, widgetObjectNumbers },

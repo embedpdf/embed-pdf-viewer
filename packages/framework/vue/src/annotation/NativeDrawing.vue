@@ -3,7 +3,8 @@
   raster where the core places it (following a move as it happens), or the
   vector scene for everything drawn live (shapes, clouds, markup, a drawing
   in progress, a tool's ghost, a picture older than the annotation). One rule
-  picks (`pictureOrPainting`). A renderer gets it as `native`.
+  picks (`pictureOrPainting`). A lent record's accent (a form field's group's
+  color) fills the frame above it. A renderer gets it all as `native`.
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
@@ -12,6 +13,7 @@ import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
 import {
   pictureOrPainting,
   rasterInFrame,
+  recordAccentStyleOf,
   shownAppearance,
   type AppearanceUrl,
 } from '@embedpdf/web';
@@ -61,9 +63,14 @@ const baked = computed((): { url: string; style: CSSProperties } | null => {
     },
   };
 });
+
+const accent = computed((): CSSProperties | null =>
+  props.item.accent ? recordAccentStyleOf(props.item.accent) : null,
+);
 </script>
 
 <template>
   <img v-if="baked" :src="baked.url" alt="" draggable="false" :style="baked.style" />
   <AnnotationScene v-else-if="shows?.kind === 'painting'" :item="item" />
+  <div v-if="accent" :style="accent" />
 </template>

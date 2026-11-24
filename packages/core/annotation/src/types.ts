@@ -236,6 +236,8 @@ export interface ModelAnnotation {
    * record draws live while a gesture reshapes it, as a square does.
    */
   painter?: (box: Rect) => readonly SceneNode[];
+  /** A lent record's accent, from its lender ({@link RecordAccent}); absent for a record without one. */
+  accent?: RecordAccent;
   /**
    * This session's authority over this record (see permissions.md), set by the
    * plugin from the security service; the core only reads it. Fused into
@@ -822,6 +824,18 @@ export type Effect =
   /** Delete one record from the document. */
   | { type: 'delete'; id: Id };
 
+/**
+ * A color a lent record shows in beside its own look, from its lender (a form
+ * field's group): a renderer draws it over the record's box as a light fill,
+ * `strength` strong, and an edge. It is never part of the record itself.
+ */
+export interface RecordAccent {
+  /** A CSS color. */
+  readonly color: string;
+  /** How strong the fill shows: from `0`, not at all, to `1`. */
+  readonly strength: number;
+}
+
 /** Per-annotation render data — its content geometry + style + live state. */
 export interface RenderItem {
   id: Id;
@@ -878,6 +892,8 @@ export interface RenderItem {
    * of the kind's own. Made when it's first asked for, not before.
    */
   lentScene?: () => readonly SceneNode[];
+  /** A lent record's accent (`ModelAnnotation.accent`), drawn over its frame; absent for a record without one. */
+  accent?: RecordAccent;
   /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
   ghostOpacity?: number;
   selected: boolean;

@@ -40,6 +40,7 @@ import {
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
   type FormsSetSignatureAppearanceWorkerRequest,
+  type SignatureAppearance,
   type FormsResetWorkerRequest,
   type FormsSetValueWorkerRequest,
   type SignaturesListWorkerRequest,
@@ -2660,7 +2661,7 @@ export class WorkerHost {
       {
         type: 'forms.setSignatureAppearance',
         field: req.ref,
-        appearance: { pdf: new Uint8Array(req.pdf) },
+        appearance: signatureAppearanceOfRequest(req),
       },
       req.authority,
       signal,
@@ -3065,6 +3066,22 @@ function passwordRequiredProbe() {
     pdfOpenedAs: null,
     securityProbedAt: Date.now(),
   };
+}
+
+/**
+ * The mark a `forms.setSignatureAppearance` request carries, in the spelling
+ * its caller chose: its `appearance` (bytes, or `null` for no mark), or its
+ * `pdf` as `{ pdf }`.
+ */
+function signatureAppearanceOfRequest(
+  req: FormsSetSignatureAppearanceWorkerRequest,
+): SignatureAppearance | null {
+  if (req.appearance !== undefined) return req.appearance && new Uint8Array(req.appearance);
+  if (req.pdf !== undefined) return { pdf: new Uint8Array(req.pdf) };
+  throw new EngineError(
+    EngineErrorCode.InvalidArg,
+    "a signature appearance request carries 'appearance' (the mark's bytes, or null for no mark) or 'pdf'",
+  );
 }
 
 /**

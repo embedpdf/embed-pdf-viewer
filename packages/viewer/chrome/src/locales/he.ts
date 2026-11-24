@@ -476,6 +476,7 @@ export const he: Locale = {
         required: 'חובה',
         readOnly: 'לקריאה בלבד',
         noExport: 'אל תייצא',
+        group: 'למילוי על ידי',
         defaultValue: 'ערך ברירת מחדל',
         maxLength: 'אורך מרבי',
         multiline: 'מספר שורות',

@@ -92,6 +92,9 @@ its events arrive together.
 `pages.setScale` arrived in 3.1, and `annotations.copy` and `forms.copy` in 3.2. Every other op
 is as old as 3.0.
 
+`forms.setSignatureAppearance` takes its `appearance` as the call does: a PNG, a JPEG or a
+one-page PDF, or `null` to take the mark out. An image and `null` arrived in 3.4.
+
 ### What comes back
 
 `result.items` has one item per op, in op order. Each item is what the op's call returns, with

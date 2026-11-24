@@ -15,12 +15,7 @@
   Build anything else (a minimap, a progress ring) from `useScrollMetrics()` and `stage.scrollTo()`.
 -->
 <script lang="ts">
-  import {
-    createScrollbarPresses,
-    paintDefault,
-    scrollbarLayout,
-    type ScrollbarTrack,
-  } from '@embedpdf/web';
+  import { attachScrollbar, paintDefault, scrollbarLayout } from '@embedpdf/web';
   import { useCapability } from '../runtime/readers.svelte';
   import type { ScrollbarProps } from './props';
   import { asHost, scrollMetricsOf } from './readers.svelte';
@@ -80,20 +75,23 @@
     return () => observer.disconnect();
   });
 
-  // ── input: `@embedpdf/web`'s press handling (thumb drags, track paging and jumps), handed the
-  //    bar as it is now on every event. ──
-  const presses = createScrollbarPresses((value) => (dragging = value));
-  const pressedTrack = (): ScrollbarTrack => ({
-    stage,
-    vertical,
-    element: track!,
-    layout,
-    // Fresh geometry for paging steps, from the capability rather than the last drawn frame.
-    liveLayout: () => scrollbarLayout(stage.getScrollMetrics(), vertical, trackPx, minThumbSize),
-  });
-
-  // No repeat timer outlives the bar.
-  $effect(() => () => presses.release());
+  // ── input: `@embedpdf/web` binds the track (thumb drags, track paging and jumps) with
+  //    listeners of its own, which read the bar as it is now on every event. Svelte would hand
+  //    `onpointerdown` to the root, after the Stage below the bar had already seen the press and
+  //    begun a pan with it. ──
+  const bindBar = (element: HTMLElement) =>
+    attachScrollbar(element, {
+      bar: () => ({
+        stage,
+        vertical,
+        layout,
+        // Fresh geometry for paging steps, from the capability rather than the last drawn frame.
+        liveLayout: () =>
+          scrollbarLayout(stage.getScrollMetrics(), vertical, trackPx, minThumbSize),
+        trackPress,
+      }),
+      onDragging: (value) => (dragging = value),
+    });
 
   const trackDefaults = $derived(
     vertical
@@ -128,21 +126,16 @@
       : 0}; transition: opacity 200ms; pointer-events: {shown ? 'auto' : 'none'};{style
       ? ` ${style}`
       : ''}"
-    onpointerdown={(event) => presses.pressTrack(event, pressedTrack(), trackPress)}
-    onpointermove={(event) => presses.move(event, pressedTrack())}
-    onpointerup={() => presses.release()}
-    onpointercancel={() => presses.release()}
+    {@attach bindBar}
     onpointerenter={() => (hovered = true)}
     onpointerleave={() => (hovered = false)}
   >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-embedpdf-scrollbar-thumb=""
       class={thumbClass}
       style="{thumbDefaults} border-radius: 6px; background: {paintDefault(
         'scrollbar-thumb',
       )};{thumbStyle ? ` ${thumbStyle}` : ''}"
-      onpointerdown={(event) => presses.pressThumb(event, pressedTrack())}
     ></div>
   </div>
 {/if}

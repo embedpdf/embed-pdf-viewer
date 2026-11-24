@@ -54,11 +54,13 @@ const samePlain = (left: FormPlainValue, right: FormPlainValue): boolean =>
     : left === right;
 
 /**
- * The form: `fields()`, `status()`, `formKind()`, `selectedField()` and `focusedField()` as signals; reading,
- * filling, form data and building as methods (`setValue()`, `importValues()`, `export()`,
- * `create()`, `update()`, …, the Methods tables of the Filling forms and Building forms pages);
- * the events as streams (`valueChanged$`, `validationRejected$`, `fieldCreated$`, …); and the
- * settings. Without a document, `fields()` is empty and a method refuses with `not-ready`.
+ * The form: `fields()`, `status()`, `formKind()`, `selectedField()`, `selectedFields()`,
+ * `focusedField()`, `groups()` and `designGroup()` as signals; reading, filling, form data and
+ * building as methods (`setValue()`, `importValues()`, `export()`, `create()`, `update()`,
+ * `setGroups()`, `setDesignGroup()`, `moveToGroup()`, …, the Methods tables of the Filling forms
+ * and Building forms pages); the events as streams (`valueChanged$`, `validationRejected$`,
+ * `fieldCreated$`, `groupsChanged$`, `designGroupChanged$`, …); and the settings. Without a
+ * document, `fields()` is empty and a method refuses with `not-ready`.
  */
 @Injectable({ providedIn: 'root' })
 export class EpdfForm extends pluginService({
@@ -79,7 +81,10 @@ export class EpdfForm extends pluginService({
     'listWidgets',
     'getWidgetAt',
     'getSelectedField',
+    'listSelectedFields',
     'getFocusedField',
+    'listGroups',
+    'getDesignGroup',
     'validate',
     'exportValues',
     'setValue',
@@ -95,6 +100,9 @@ export class EpdfForm extends pluginService({
     'create',
     'duplicate',
     'duplicateWidgets',
+    'setGroups',
+    'setDesignGroup',
+    'moveToGroup',
     'update',
     'delete',
     'removeWidget',
@@ -104,6 +112,7 @@ export class EpdfForm extends pluginService({
     'canRead',
     'canFill',
     'canDesign',
+    'canSetGroup',
     'canRestoreAttribution',
     'canWriteScripts',
   ],
@@ -115,6 +124,8 @@ export class EpdfForm extends pluginService({
     'onValidationRejected',
     'onResynced',
     'onFocusChanged',
+    'onDesignGroupChanged',
+    'onGroupsChanged',
   ],
 }) {
   /** The same capability, typed with the reads only framework code has (a box's anchor). */
