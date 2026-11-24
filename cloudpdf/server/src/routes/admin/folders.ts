@@ -137,7 +137,7 @@ function folderPublic(folder: FolderRow): FolderRecord {
   };
 }
 
-function parse<Schema extends z.ZodTypeAny>(schema: Schema, input: unknown): z.infer<Schema> {
+function parse<Schema extends z.ZodType>(schema: Schema, input: unknown): z.infer<Schema> {
   const result = schema.safeParse(input);
   if (!result.success) {
     const err = new Error(formatIssues(result.error.issues)) as Error & {

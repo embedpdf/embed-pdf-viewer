@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../zod';
 
 import type { WidgetAnnotation, WidgetPatch } from './widget';
 import { WidgetDeclaration } from './widget/declaration';
@@ -11,9 +11,9 @@ export type WidgetStylePatchFields = WidgetStyleDraftFields;
 export type WidgetAppearance = WidgetStyleDraftFields;
 
 /** The style fields' schemas, as a widget annotation's update takes them. */
-export const WIDGET_STYLE_SHAPE: Record<WidgetStyleName, z.ZodTypeAny> = Object.fromEntries(
+export const WIDGET_STYLE_SHAPE: Record<WidgetStyleName, z.ZodType> = Object.fromEntries(
   WIDGET_STYLE_NAMES.map((name) => [name, WidgetDeclaration.shapes.update[name]!]),
-) as Record<WidgetStyleName, z.ZodTypeAny>;
+) as Record<WidgetStyleName, z.ZodType>;
 
 export const WidgetAppearanceSchema = z
   .object(WIDGET_STYLE_SHAPE)

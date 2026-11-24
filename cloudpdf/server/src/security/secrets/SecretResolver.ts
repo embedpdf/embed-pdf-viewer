@@ -1,4 +1,4 @@
-import { z, type ZodTypeAny } from 'zod';
+import { z, type ZodType } from 'zod';
 import type { SecretRef } from './SecretsProvider';
 import type { SecretsProviderRegistry } from './createSecretsProvider';
 
@@ -6,14 +6,14 @@ export type SecretResolveRequest =
   | SecretRef
   | { readonly ref: SecretRef; readonly as?: 'buffer' }
   | { readonly ref: SecretRef; readonly as: 'string' }
-  | { readonly ref: SecretRef; readonly as: 'json'; readonly schema?: ZodTypeAny };
+  | { readonly ref: SecretRef; readonly as: 'json'; readonly schema?: ZodType };
 
 export type ResolvedSecret<TRequest> = TRequest extends SecretRef
   ? Buffer
   : TRequest extends { readonly as: 'string' }
     ? string
     : TRequest extends { readonly as: 'json'; readonly schema: infer TSchema }
-      ? TSchema extends ZodTypeAny
+      ? TSchema extends ZodType
         ? z.infer<TSchema>
         : unknown
       : Buffer;
@@ -72,7 +72,7 @@ export async function resolveSecretRequest(
 function normalizeRequest(request: SecretResolveRequest): {
   ref: SecretRef;
   as: 'buffer' | 'string' | 'json';
-  schema?: ZodTypeAny;
+  schema?: ZodType;
 } {
   if ('ref' in request) {
     return {

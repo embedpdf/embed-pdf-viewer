@@ -1451,7 +1451,7 @@ export interface AdminOperationResponse {
    */
   contentType?: string | ReadonlyArray<string>;
   /** Body schema; absent for empty or binary bodies. */
-  schema?: z.ZodTypeAny;
+  schema?: z.ZodType;
 }
 
 /**
@@ -1467,7 +1467,7 @@ export interface AdminOperationBody {
   /** Accepted request MIME type(s). */
   contentType: string | ReadonlyArray<string>;
   /** Body schema; absent for binary bodies. */
-  schema?: z.ZodTypeAny;
+  schema?: z.ZodType;
   /** Defaults to true; false when the operation accepts an empty body. */
   required?: boolean;
 }
@@ -1516,9 +1516,9 @@ export interface AdminOperation {
   /** Documented request headers (beyond Authorization). */
   requestHeaders?: ReadonlyArray<AdminOperationHeader>;
   /** Path-parameter schema, keyed by template name. */
-  params?: z.ZodTypeAny;
+  params?: z.ZodType;
   /** Query-string schema. */
-  query?: z.ZodTypeAny;
+  query?: z.ZodType;
   /** Request body. */
   body?: AdminOperationBody;
   /** Success and known-error responses by HTTP status code. */

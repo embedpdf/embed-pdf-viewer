@@ -45,7 +45,7 @@ export type SecretProviderConfig = z.infer<typeof SecretProviderConfigSchema>;
  * env-driven deployments get caching by default.
  */
 export const SecretsConfigSchema = z.object({
-  providers: z.record(SecretProviderConfigSchema),
+  providers: z.record(z.string(), SecretProviderConfigSchema),
   cache: z
     .object({
       ttlSec: z.number().int().positive(),

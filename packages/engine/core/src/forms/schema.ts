@@ -1,7 +1,7 @@
 import { FormFieldRefSchema } from '../identity/FormFieldRef.schema';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import { AnnotationRefSchema } from '../annotation/base.schema';
-import { z } from 'zod';
+import * as z from '../zod';
 
 import { WidgetDTOSchema } from '../annotation/kinds/widget';
 import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';

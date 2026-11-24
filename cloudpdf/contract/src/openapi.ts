@@ -25,7 +25,6 @@ import {
   SignatureWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
-import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
   ModuleManifestSchema,
@@ -39,6 +38,7 @@ import {
   type AdminOperationBody,
   type AdminOperationResponse,
 } from './index';
+import { defOf, writeSchema } from './openapi-schema';
 
 const STATUS_TEXT: Record<number, string> = {
   200: 'OK',
@@ -91,30 +91,35 @@ export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   SignatureWireComponents,
 ]);
 
-const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
-  Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),
+const SHARED_COMPONENT_NAMES = new Map<z.core.$ZodType, string>(
+  Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema, name]),
 );
-/**
- * A response ignores fields it doesn't know and a request refuses them, so
- * the model a request names can be the response model's `.strict()` twin:
- * the same object, so the same component.
- */
-const SHARED_OBJECT_COMPONENT_BY_SHAPE = new Map<unknown, string>(
-  Object.entries(SHARED_COMPONENT_SCHEMAS).flatMap(([name, schema]) => {
-    const definition = schema._def as Partial<z.ZodObjectDef>;
-    return definition.typeName === z.ZodFirstPartyTypeKind.ZodObject
-      ? [[definition.shape, name] as const]
-      : [];
-  }),
+const SHARED_OBJECT_COMPONENTS = Object.entries(SHARED_COMPONENT_SCHEMAS).flatMap(
+  ([name, schema]) => {
+    const def = defOf(schema);
+    return def.type === 'object' ? [{ name, shape: def.shape }] : [];
+  },
 );
 
-function sharedComponentOf(definition: z.ZodTypeDef): string | undefined {
-  const shared = SHARED_COMPONENT_BY_DEFINITION.get(definition);
+/**
+ * The component `schema` is. A response ignores fields it doesn't know and a
+ * request refuses them, so the model a request names can be the response
+ * model's `.strict()` twin: the same object, so the same component.
+ */
+function sharedComponentOf(schema: z.core.$ZodType): string | undefined {
+  const shared = SHARED_COMPONENT_NAMES.get(schema);
   if (shared) return shared;
-  const object = definition as Partial<z.ZodObjectDef>;
-  return object.typeName === z.ZodFirstPartyTypeKind.ZodObject && object.unknownKeys === 'strict'
-    ? SHARED_OBJECT_COMPONENT_BY_SHAPE.get(object.shape)
-    : undefined;
+  const def = defOf(schema);
+  if (def.type !== 'object' || !def.catchall || defOf(def.catchall).type !== 'never') {
+    return undefined;
+  }
+  return SHARED_OBJECT_COMPONENTS.find(({ shape }) => isSameShape(shape, def.shape))?.name;
+}
+
+/** Whether two objects hold the same fields, each the very same schema. */
+function isSameShape(a: z.core.$ZodShape, b: z.core.$ZodShape): boolean {
+  const names = Object.keys(a);
+  return names.length === Object.keys(b).length && names.every((name) => a[name] === b[name]);
 }
 
 const SHARED_COMPONENT_REFS = new Set(
@@ -122,9 +127,9 @@ const SHARED_COMPONENT_REFS = new Set(
 );
 
 function sharedComponents(
-  registries: ReadonlyArray<Record<string, z.ZodTypeAny>>,
-): Record<string, z.ZodTypeAny> {
-  const components: Record<string, z.ZodTypeAny> = {};
+  registries: ReadonlyArray<Record<string, z.ZodType>>,
+): Record<string, z.ZodType> {
+  const components: Record<string, z.ZodType> = {};
   for (const registry of registries) {
     for (const [name, schema] of Object.entries(registry)) {
       if (components[name]) throw new Error(`Duplicate shared component name: ${name}`);
@@ -375,9 +380,9 @@ function queryParameters(op: AdminOperation): Array<Record<string, unknown>> {
   }));
 }
 
-function unwrapOptional(schema: z.ZodTypeAny): z.ZodTypeAny {
+function unwrapOptional(schema: z.ZodType): z.ZodType {
   let current = schema;
-  while (current instanceof z.ZodOptional) current = current.unwrap() as z.ZodTypeAny;
+  while (current instanceof z.ZodOptional) current = current.unwrap() as z.ZodType;
   return current;
 }
 
@@ -461,7 +466,7 @@ function mediaObject(
 function registerSchema(
   schemas: Record<string, Record<string, unknown>>,
   name: string,
-  schema: z.ZodTypeAny,
+  schema: z.ZodType,
 ): Record<string, unknown> {
   if (schemas[name]) throw new Error(`Duplicate OpenAPI schema name: ${name}`);
   const componentPath = ['components', 'schemas', name];
@@ -469,29 +474,25 @@ function registerSchema(
   // isn't nullable points at one of those: see `withoutBorrowedNull`.
   const nullableAt = new Set<string>();
   const borrowsNull = new Set<string>();
-  const referenced = zodToJsonSchema(schema, {
-    target: 'openApi3',
-    // A `Date` a write takes in process arrives over HTTP as its ISO string.
-    dateStrategy: 'format:date-time',
-    $refStrategy: 'root',
+  const referenced = writeSchema(schema, {
     basePath: ['#', ...componentPath],
-    override: (definition, refs, seen) => {
-      const sharedName = sharedComponentOf(definition);
+    reuse: 'ref',
+    override: (current, path, writtenAt) => {
+      const sharedName = sharedComponentOf(current);
       if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
-      const nullable = isNullableDefinition(definition);
-      if (nullable && !seen) nullableAt.add(refs.currentPath.join('/'));
+      const nullable = isNullable(current);
+      const at = path.join('/');
+      if (nullable && !writtenAt) nullableAt.add(at);
       // A place that is nullable itself says so beside the reference.
-      const at = refs.currentPath.join('/');
-      if (!nullable && seen && nullableAt.has(seen.path.join('/')) && !nullableAt.has(at)) {
+      if (!nullable && writtenAt && nullableAt.has(writtenAt.join('/')) && !nullableAt.has(at)) {
         borrowsNull.add(at);
       }
-      return wholeNumberEnumOf(definition) ?? ignoreOverride;
+      return wholeNumberEnumOf(current);
     },
-  }) as Record<string, unknown>;
+  });
   // Fern's OpenAPI importer currently expands property-level recursive refs
   // until it exhausts the Node heap. Preserve every ordinary reuse ref and
-  // replace only the recursive back-edge with the same valid open schema (`{}`)
-  // that zod-to-json-schema uses for its non-reference strategy.
+  // replace only the recursive back-edge with a valid open schema (`{}`).
   const canonical = collapseSharedReferenceAliases(referenced, referenced, componentPath);
   const owned = withoutBorrowedNull(
     canonical,
@@ -505,8 +506,7 @@ function registerSchema(
 }
 
 /**
- * zod-to-json-schema aliases repeated definitions to their first property
- * location before invoking `override` again. If that first location is already
+ * A schema reached again points at its first place (`writeSchema`). If that first location is already
  * one of our shared component refs, collapse the alias to the component itself
  * so SDK importers see one stable public type instead of a path-shaped type.
  */
@@ -544,7 +544,7 @@ function collapseSharedReferenceAliases(
 }
 
 /**
- * zod-to-json-schema writes a schema a model reuses once, at its first place,
+ * A schema a model reuses is written once (`writeSchema`), at its first place,
  * and points the others at it. When that first place is a nullable's, the
  * schema is written there with the `nullable`, and every place that reuses
  * the schema itself (not the nullable) took the `nullable` along: a grant's
@@ -586,16 +586,13 @@ function withoutBorrowedNull(
 }
 
 /**
- * Whether a definition is a nullable, or an optional around one. An optional
+ * Whether a schema is a nullable, or an optional around one. An optional
  * property is written at the place of the schema it wraps, so a model that
  * reuses the optional reuses the nullable itself, and keeps its `nullable`.
  */
-function isNullableDefinition(definition: z.ZodTypeDef): boolean {
-  const { typeName, innerType } = definition as { typeName?: string; innerType?: z.ZodTypeAny };
-  if (typeName === z.ZodFirstPartyTypeKind.ZodOptional && innerType) {
-    return isNullableDefinition(innerType._def);
-  }
-  return typeName === z.ZodFirstPartyTypeKind.ZodNullable;
+function isNullable(schema: z.core.$ZodType): boolean {
+  const def = defOf(schema);
+  return def.type === 'optional' ? isNullable(def.innerType) : def.type === 'nullable';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -654,22 +651,22 @@ function breakAncestorReferences(value: unknown, path: string[]): unknown {
  * integer enum, not an `anyOf` of one-value enums: every SDK reads it as an
  * integer, and a named one keeps its name.
  */
-function wholeNumberEnumOf(definition: z.ZodTypeDef): Record<string, unknown> | undefined {
-  const union = definition as Partial<z.ZodUnionDef>;
-  if (union.typeName !== z.ZodFirstPartyTypeKind.ZodUnion || !union.options) return undefined;
-  const values = union.options.map((option) =>
-    option instanceof z.ZodLiteral ? (option.value as unknown) : undefined,
-  );
+function wholeNumberEnumOf(schema: z.core.$ZodType): Record<string, unknown> | undefined {
+  const def = defOf(schema);
+  if (def.type !== 'union' || 'discriminator' in def) return undefined;
+  const values = def.options.map((option) => {
+    const literal = defOf(option);
+    return literal.type === 'literal' && literal.values.length === 1
+      ? literal.values[0]
+      : undefined;
+  });
   return values.every((value) => Number.isInteger(value))
     ? { type: 'integer', enum: values }
     : undefined;
 }
 
-function inlineSchemaOf(schema: z.ZodTypeAny): Record<string, unknown> {
-  return zodToJsonSchema(schema, {
-    target: 'openApi3',
-    $refStrategy: 'none',
-  }) as Record<string, unknown>;
+function inlineSchemaOf(schema: z.ZodType): Record<string, unknown> {
+  return writeSchema(schema, { reuse: 'inline' });
 }
 
 function sdkTypeName(operationId: string): string {
@@ -679,9 +676,9 @@ function sdkTypeName(operationId: string): string {
     .join('');
 }
 
-function objectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
+function objectShape(schema: z.ZodType): Record<string, z.ZodType> {
   if (schema instanceof z.ZodObject) {
-    return schema.shape as Record<string, z.ZodTypeAny>;
+    return schema.shape as Record<string, z.ZodType>;
   }
   return {};
 }

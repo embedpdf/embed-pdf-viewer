@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import * as z from '../zod';
 
 import { readingOf } from '../wire/reading';
 
@@ -7,10 +7,31 @@ export const UNKNOWN_FIELD = 'fieldFromANewerServer';
 
 const UNKNOWN_VALUE = { nested: { values: [1, 'two', null] } };
 
-type AnyDef = Record<string, any> & { typeName: string };
+/** Every kind of schema zod makes, told apart by its definition's `type`. */
+type Def = z.core.$ZodTypes['_zod']['def'];
+type UnionDef = Extract<Def, { type: 'union' }>;
+type DiscriminatedUnionDef = z.core.$ZodDiscriminatedUnionDef;
 
-function defOf(schema: z.ZodTypeAny): AnyDef {
-  return schema._def as AnyDef;
+function defOf(schema: z.core.$ZodType): Def {
+  return (schema as z.core.$ZodTypes)._zod.def;
+}
+
+function isDiscriminated(def: UnionDef): def is DiscriminatedUnionDef {
+  return 'discriminator' in def;
+}
+
+/** A discriminated union's kinds, each with the object it reads. */
+function kindsOf(union: DiscriminatedUnionDef): Map<unknown, z.core.$ZodType> {
+  return new Map(
+    union.options.flatMap((option) =>
+      [...(option._zod.propValues?.[union.discriminator] ?? [])].map((kind) => [kind, option]),
+    ),
+  );
+}
+
+/** What a pipe checks: `z.preprocess(…)`'s schema is its `out`, `.transform(…)`'s its `in`. */
+function checkedBy(pipe: Extract<Def, { type: 'pipe' }>): z.core.$ZodType {
+  return defOf(pipe.in).type === 'transform' ? pipe.out : pipe.in;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -24,30 +45,31 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * key, since its keys are its data, and neither does an object that names
  * what its other keys hold.
  */
-export function withUnknownFields(schema: z.ZodTypeAny, value: unknown): unknown {
+export function withUnknownFields(schema: z.core.$ZodType, value: unknown): unknown {
   const def = defOf(schema);
-  switch (def.typeName) {
-    case 'ZodObject': {
+  switch (def.type) {
+    case 'object': {
       if (!isPlainObject(value)) return value;
-      const shape = def.shape() as Record<string, z.ZodTypeAny>;
       const out: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(value)) {
-        const field = shape[key];
+        const field = def.shape[key];
         out[key] = field ? withUnknownFields(field, child) : child;
       }
-      if (defOf(def.catchall).typeName !== 'ZodNever') return out;
+      if (def.catchall && defOf(def.catchall).type !== 'never') return out;
       return { ...out, [UNKNOWN_FIELD]: UNKNOWN_VALUE };
     }
-    case 'ZodArray':
-      return Array.isArray(value) ? value.map((item) => withUnknownFields(def.type, item)) : value;
-    case 'ZodTuple':
+    case 'array':
+      return Array.isArray(value)
+        ? value.map((item) => withUnknownFields(def.element, item))
+        : value;
+    case 'tuple':
       return Array.isArray(value)
         ? value.map((item, index) => {
             const element = def.items[index] ?? def.rest;
             return element ? withUnknownFields(element, item) : item;
           })
         : value;
-    case 'ZodRecord':
+    case 'record':
       return isPlainObject(value)
         ? Object.fromEntries(
             Object.entries(value).map(([key, child]) => [
@@ -56,33 +78,24 @@ export function withUnknownFields(schema: z.ZodTypeAny, value: unknown): unknown
             ]),
           )
         : value;
-    case 'ZodOptional':
-    case 'ZodNullable':
-    case 'ZodDefault':
-    case 'ZodCatch':
-    case 'ZodReadonly':
+    case 'optional':
+    case 'nullable':
+    case 'default':
+    case 'catch':
+    case 'readonly':
       return value === undefined || value === null
         ? value
         : withUnknownFields(def.innerType, value);
-    case 'ZodBranded':
-      return withUnknownFields(def.type, value);
-    case 'ZodLazy':
+    case 'lazy':
       return withUnknownFields(def.getter(), value);
-    case 'ZodEffects':
-      return withUnknownFields(def.schema, value);
-    case 'ZodPipeline':
-      return withUnknownFields(def.in, value);
-    case 'ZodIntersection':
+    case 'pipe':
+      return withUnknownFields(checkedBy(def), value);
+    case 'intersection':
       return withUnknownFields(def.right, withUnknownFields(def.left, value));
-    case 'ZodDiscriminatedUnion': {
-      if (!isPlainObject(value)) return value;
-      const option = def.optionsMap.get(value[def.discriminator]);
-      return option ? withUnknownFields(option, value) : value;
-    }
-    case 'ZodUnion': {
-      const option = (def.options as z.ZodTypeAny[]).find(
-        (candidate) => candidate.safeParse(value).success,
-      );
+    case 'union': {
+      const option = isDiscriminated(def)
+        ? isPlainObject(value) && kindsOf(def).get(value[def.discriminator])
+        : def.options.find((candidate) => z.safeParse(candidate, value).success);
       return option ? withUnknownFields(option, value) : value;
     }
     default:
@@ -90,30 +103,30 @@ export function withUnknownFields(schema: z.ZodTypeAny, value: unknown): unknown
   }
 }
 
-function describeSet(def: AnyDef): string {
-  switch (def.typeName) {
-    case 'ZodEnum':
-      return JSON.stringify(def.values);
-    case 'ZodNativeEnum':
-      return JSON.stringify(Object.values(def.values));
-    case 'ZodLiteral':
-      return JSON.stringify(def.value);
-    case 'ZodDiscriminatedUnion':
-      return `the union of ${JSON.stringify([...def.optionsMap.keys()])}`;
+function describeSet(def: Def): string {
+  switch (def.type) {
+    case 'enum':
+      return JSON.stringify(Object.values(def.entries));
+    case 'literal':
+      return JSON.stringify(def.values.length === 1 ? def.values[0] : def.values);
+    case 'union':
+      return isDiscriminated(def)
+        ? `the union of ${JSON.stringify([...kindsOf(def).keys()])}`
+        : `the union of ${def.options.length} kinds`;
     default:
-      return `the union of ${(def.options as z.ZodTypeAny[]).length} kinds`;
+      return def.type;
   }
 }
 
 /** The field whose literal tells a union's objects apart, the way a discriminated union's does. */
-function tagOf(options: z.ZodTypeAny[]): string | undefined {
+function tagOf(options: readonly z.core.$ZodType[]): string | undefined {
   const shapes = options.map((option) => {
     const def = defOf(option);
-    return def.typeName === 'ZodObject' ? (def.shape() as Record<string, z.ZodTypeAny>) : null;
+    return def.type === 'object' ? def.shape : null;
   });
   if (shapes.some((shape) => shape === null)) return undefined;
   return Object.keys(shapes[0]!).find((key) =>
-    shapes.every((shape) => shape![key] && defOf(shape![key]!).typeName === 'ZodLiteral'),
+    shapes.every((shape) => shape![key] && defOf(shape![key]!).type === 'literal'),
   );
 }
 
@@ -136,32 +149,32 @@ export interface OpenUnion {
  * that is neither closed nor names what a value it doesn't know reads as.
  * Each is reported once, at the first path that reaches it.
  */
-export function readingProblems(schema: z.ZodTypeAny, path = 'response'): string[] {
+export function readingProblems(schema: z.core.$ZodType, path = 'response'): string[] {
   const problems: string[] = [];
   walk(schema, path, { problem: (problem) => problems.push(problem), openUnion: () => {} });
   return problems;
 }
 
 /** Every union with a catch-all kind a response read with `schema` carries, nested ones included. */
-export function openUnionsIn(schema: z.ZodTypeAny, path = 'response'): OpenUnion[] {
+export function openUnionsIn(schema: z.core.$ZodType, path = 'response'): OpenUnion[] {
   const unions: OpenUnion[] = [];
   walk(schema, path, { problem: () => {}, openUnion: (union) => unions.push(union) });
   return unions;
 }
 
 /** `schema` itself as a union with a catch-all kind, or `undefined` when it isn't one. */
-export function openUnionOf(schema: z.ZodTypeAny): OpenUnion | undefined {
+export function openUnionOf(schema: z.core.$ZodType): OpenUnion | undefined {
   const def = defOf(schema);
-  switch (def.typeName) {
-    case 'ZodLazy':
+  switch (def.type) {
+    case 'lazy':
       return openUnionOf(def.getter());
-    case 'ZodOptional':
-    case 'ZodNullable':
+    case 'optional':
+    case 'nullable':
       return openUnionOf(def.innerType);
-    case 'ZodEffects': {
+    case 'pipe': {
       const reading = readingOf(schema);
-      const inner = defOf(def.schema);
-      return reading && 'unknownAs' in reading && inner.typeName === 'ZodDiscriminatedUnion'
+      const inner = defOf(checkedBy(def));
+      return reading && 'unknownAs' in reading && inner.type === 'union' && isDiscriminated(inner)
         ? unionAt('response', inner, reading.unknownAs)
         : undefined;
     }
@@ -170,23 +183,18 @@ export function openUnionOf(schema: z.ZodTypeAny): OpenUnion | undefined {
   }
 }
 
-function unionAt(at: string, union: AnyDef, catchAll: string): OpenUnion {
-  return {
-    at,
-    tag: union.discriminator,
-    catchAll,
-    kinds: [...(union.optionsMap as Map<unknown, unknown>).keys()].map(String),
-  };
+function unionAt(at: string, union: DiscriminatedUnionDef, catchAll: string): OpenUnion {
+  return { at, tag: union.discriminator, catchAll, kinds: [...kindsOf(union).keys()].map(String) };
 }
 
 function walk(
-  schema: z.ZodTypeAny,
+  schema: z.core.$ZodType,
   path: string,
   report: { problem(problem: string): void; openUnion(union: OpenUnion): void },
 ): void {
   const seen = new Set<unknown>();
 
-  const unmarked = (set: z.ZodTypeAny, at: string) => {
+  const unmarked = (set: z.core.$ZodType, at: string) => {
     if (!readingOf(set)) {
       report.problem(
         `${at}: ${describeSet(defOf(set))} is neither closed nor read with a fallback`,
@@ -195,99 +203,94 @@ function walk(
   };
 
   /** `discriminator` names the key an object's union reads, which that union's reading covers. */
-  const visit = (current: z.ZodTypeAny, at: string, discriminator?: string): void => {
+  const visit = (current: z.core.$ZodType, at: string, discriminator?: string): void => {
     const def = defOf(current);
     if (seen.has(def)) return;
     seen.add(def);
-    switch (def.typeName) {
-      case 'ZodObject': {
-        if (def.unknownKeys === 'strict') report.problem(`${at}: refuses unknown fields`);
-        const shape = def.shape() as Record<string, z.ZodTypeAny>;
-        for (const [key, field] of Object.entries(shape)) {
+    switch (def.type) {
+      case 'object': {
+        const rest = def.catchall && defOf(def.catchall).type;
+        if (rest === 'never') report.problem(`${at}: refuses unknown fields`);
+        for (const [key, field] of Object.entries(def.shape)) {
           if (key === discriminator) continue;
           visit(field, `${at}.${key}`);
         }
-        if (defOf(def.catchall).typeName !== 'ZodNever') visit(def.catchall, `${at}.*`);
+        if (def.catchall && rest !== 'never') visit(def.catchall, `${at}.*`);
         return;
       }
-      case 'ZodEnum':
-      case 'ZodNativeEnum':
-      case 'ZodLiteral':
+      case 'enum':
+      case 'literal':
         unmarked(current, at);
         return;
-      case 'ZodDiscriminatedUnion':
-        unmarked(current, at);
-        for (const [kind, option] of def.optionsMap as Map<unknown, z.ZodTypeAny>) {
-          visit(option, `${at}<${String(kind)}>`, def.discriminator);
+      case 'union': {
+        if (isDiscriminated(def)) {
+          unmarked(current, at);
+          for (const [kind, option] of kindsOf(def)) {
+            visit(option, `${at}<${String(kind)}>`, def.discriminator);
+          }
+          return;
         }
-        return;
-      case 'ZodUnion': {
-        const options = def.options as z.ZodTypeAny[];
+        const options = def.options;
         const kinds = options.filter((option) =>
-          ['ZodLiteral', 'ZodObject', 'ZodEnum'].includes(defOf(option).typeName),
+          ['literal', 'object', 'enum'].includes(defOf(option).type),
         );
         // A union of kinds is a set; a union of types (a string or a number) is not.
         if (kinds.length > 1) {
           unmarked(current, at);
           const tag = tagOf(options);
           options.forEach((option, index) => {
-            if (defOf(option).typeName !== 'ZodLiteral') visit(option, `${at}|${index}`, tag);
+            if (defOf(option).type !== 'literal') visit(option, `${at}|${index}`, tag);
           });
           return;
         }
         options.forEach((option, index) => visit(option, `${at}|${index}`));
         return;
       }
-      case 'ZodEffects': {
+      case 'pipe': {
         const reading = readingOf(current);
         if (reading === undefined) {
-          visit(def.schema, at, discriminator);
+          for (const side of [def.in, def.out]) {
+            if (defOf(side).type !== 'transform') visit(side, at, discriminator);
+          }
           return;
         }
         // An open enum is read whole; a union with a catch-all still reads each kind.
-        const inner = defOf(def.schema);
-        if (inner.typeName === 'ZodDiscriminatedUnion') {
+        const inner = defOf(checkedBy(def));
+        if (inner.type === 'union' && isDiscriminated(inner)) {
           if ('unknownAs' in reading) report.openUnion(unionAt(at, inner, reading.unknownAs));
           seen.add(inner);
-          for (const [kind, option] of inner.optionsMap as Map<unknown, z.ZodTypeAny>) {
+          for (const [kind, option] of kindsOf(inner)) {
             visit(option, `${at}<${String(kind)}>`, inner.discriminator);
           }
         }
         return;
       }
-      case 'ZodArray':
-        visit(def.type, `${at}[]`);
+      case 'array':
+        visit(def.element, `${at}[]`);
         return;
-      case 'ZodSet':
+      case 'set':
         visit(def.valueType, `${at}[]`);
         return;
-      case 'ZodTuple':
-        (def.items as z.ZodTypeAny[]).forEach((item, index) => visit(item, `${at}[${index}]`));
+      case 'tuple':
+        def.items.forEach((item, index) => visit(item, `${at}[${index}]`));
         if (def.rest) visit(def.rest, `${at}[]`);
         return;
-      case 'ZodRecord':
-      case 'ZodMap':
+      case 'record':
+      case 'map':
         visit(def.keyType, `${at}{key}`);
         visit(def.valueType, `${at}{}`);
         return;
-      case 'ZodOptional':
-      case 'ZodNullable':
-      case 'ZodDefault':
-      case 'ZodCatch':
-      case 'ZodReadonly':
+      case 'optional':
+      case 'nullable':
+      case 'default':
+      case 'catch':
+      case 'readonly':
         visit(def.innerType, at, discriminator);
         return;
-      case 'ZodBranded':
-        visit(def.type, at, discriminator);
-        return;
-      case 'ZodLazy':
+      case 'lazy':
         visit(def.getter(), at, discriminator);
         return;
-      case 'ZodPipeline':
-        visit(def.in, at, discriminator);
-        visit(def.out, at, discriminator);
-        return;
-      case 'ZodIntersection':
+      case 'intersection':
         visit(def.left, at, discriminator);
         visit(def.right, at, discriminator);
         return;

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import {
   AnnotationCopyResultSchema,
@@ -351,12 +351,8 @@ export const CHANGE_KINDS: readonly string[] = ChangeItemTypeSchema.options;
 const SkippedFieldsSchema = z.array(z.string()).optional();
 
 /** An item of `type`: its verb's result, after the type and what else the item adds. */
-function itemOf<T extends ChangeItemType>(
-  type: T,
-  result: z.ZodTypeAny,
-  extra: z.ZodRawShape = {},
-) {
-  return z.object({ type: z.literal(type), ...extra }).merge(result as z.AnyZodObject);
+function itemOf<T extends ChangeItemType>(type: T, result: z.ZodType, extra: z.ZodRawShape = {}) {
+  return z.object({ type: z.literal(type), ...extra }).merge(result as z.ZodObject);
 }
 
 /**
@@ -462,4 +458,4 @@ export const ChangeWireComponents = {
   ChangeOp: ChangeOpWireSchema,
   ChangeItem: ChangeItemSchema,
   ChangeResult: ChangeResultSchema,
-} as const satisfies Record<string, z.ZodTypeAny>;
+} as const satisfies Record<string, z.ZodType>;

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 /**
  * How a client reads a set a response carries: an enum, a literal or a
@@ -15,19 +15,19 @@ export type SetReading = { readonly closed: true } | { readonly unknownAs: strin
  */
 const READING = Symbol.for('@embedpdf/engine-core/reading');
 
-type MarkedDef = z.ZodTypeDef & { [READING]?: SetReading };
+type MarkedDef = z.core.$ZodTypeDef & { [READING]?: SetReading };
 
-function mark(schema: z.ZodTypeAny, reading: SetReading): void {
-  (schema._def as MarkedDef)[READING] = reading;
+function mark(schema: z.core.$ZodType, reading: SetReading): void {
+  (schema._zod.def as MarkedDef)[READING] = reading;
 }
 
 /** How a set a response carries is read; `undefined` when it says neither. */
-export function readingOf(schema: z.ZodTypeAny): SetReading | undefined {
-  return (schema._def as MarkedDef)[READING];
+export function readingOf(schema: z.core.$ZodType): SetReading | undefined {
+  return (schema._zod.def as MarkedDef)[READING];
 }
 
 /** Marks a set a response carries as closed: adding a value to it is a breaking change. */
-export function closed<T extends z.ZodTypeAny>(set: T): T {
+export function closed<T extends z.ZodType>(set: T): T {
   mark(set, { closed: true });
   return set;
 }
@@ -37,15 +37,15 @@ export function closed<T extends z.ZodTypeAny>(set: T): T {
  * doesn't know reads as `unknownAs`. Only responses are read this way; a
  * request is parsed with `set` itself, which refuses a value it doesn't know.
  */
-export function readsUnknownAs<T extends [string, ...string[]]>(
-  set: z.ZodEnum<T>,
-  unknownAs: T[number],
-): z.ZodType<T[number]> {
+export function readsUnknownAs<T extends string>(
+  set: z.ZodEnum<{ [Value in T]: Value }>,
+  unknownAs: NoInfer<T>,
+): z.ZodType<T> {
   const known = new Set<string>(set.options);
   const reading = z.preprocess(
     (value) => (typeof value === 'string' && !known.has(value) ? unknownAs : value),
     set,
-  ) as z.ZodType<T[number]>;
+  ) as unknown as z.ZodType<T>;
   mark(reading, { unknownAs });
   return reading;
 }
@@ -68,16 +68,15 @@ export function withCatchAll<T>(
   asCatchAll: (value: Record<string, unknown>) => Record<string, unknown> = (value) => value,
   withLeftOut: (value: Record<string, unknown>) => Record<string, unknown> = (value) => value,
 ): z.ZodType<T> {
-  const { discriminator, optionsMap } = (
-    union as unknown as z.ZodDiscriminatedUnion<string, z.ZodDiscriminatedUnionOption<string>[]>
-  )._def;
+  const kinds = union as unknown as z.ZodDiscriminatedUnion<z.ZodObject[], string>;
+  const { discriminator } = kinds.def;
   const reading = z.preprocess((value) => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
     const whole = withLeftOut(value as Record<string, unknown>);
     const kind = whole[discriminator];
-    if (typeof kind !== 'string' || optionsMap.has(kind)) return whole;
+    if (typeof kind !== 'string' || z.getDiscriminatedOption(kinds, kind)) return whole;
     return asCatchAll({ ...whole, [discriminator]: unknownAs });
-  }, union) as z.ZodType<T>;
+  }, union) as unknown as z.ZodType<T>;
   mark(reading, { unknownAs });
   return reading;
 }

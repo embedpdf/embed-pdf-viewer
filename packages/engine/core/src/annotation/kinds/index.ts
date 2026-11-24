@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../zod';
 
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { withCatchAll } from '../../wire/reading';
@@ -142,10 +142,7 @@ const KnownAnnotationSchema: z.ZodType<Annotation> = z.discriminatedUnion('subty
   RedactKind.dtoSchema,
   PopupKind.dtoSchema,
   UnsupportedKind.dtoSchema,
-] as unknown as [
-  z.ZodDiscriminatedUnionOption<'subtype'>,
-  ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-]) as unknown as z.ZodType<Annotation>;
+] as unknown as [z.ZodObject, ...z.ZodObject[]]) as unknown as z.ZodType<Annotation>;
 
 /**
  * Every annotation on the wire, as servers and cloud clients read it. A
@@ -193,10 +190,7 @@ export const AnnotationDraftSchema: z.ZodType<AnnotationDraft> = z.discriminated
   WidgetKind.draftSchema,
   RedactKind.draftSchema,
   PopupKind.draftSchema,
-] as unknown as [
-  z.ZodDiscriminatedUnionOption<'subtype'>,
-  ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-]) as unknown as z.ZodType<AnnotationDraft>;
+] as unknown as [z.ZodObject, ...z.ZodObject[]]) as unknown as z.ZodType<AnnotationDraft>;
 
 /**
  * Validates a patch against every kind. A
@@ -206,7 +200,7 @@ export const AnnotationDraftSchema: z.ZodType<AnnotationDraft> = z.discriminated
 export const AnnotationPatchSchema: z.ZodType<AnnotationPatch> = z.union(
   ANNOTATION_KINDS.filter((kind) => kind.subtype !== 'unsupported').map(
     (kind) => kind.patchSchema,
-  ) as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]],
+  ) as unknown as [z.ZodType, z.ZodType, ...z.ZodType[]],
 ) as unknown as z.ZodType<AnnotationPatch>;
 
 /** The patch schema of one kind: how an update of an annotation of that kind is checked. */
@@ -225,10 +219,7 @@ export const FileAnnotationDraftSchema: z.ZodType<AnnotationDraft<PdfCoordinates
     'subtype',
     ANNOTATION_DECLARATIONS.filter((declaration) => declaration.subtype !== 'unsupported').map(
       (declaration) => declaration.fileSchemas.create,
-    ) as unknown as [
-      z.ZodDiscriminatedUnionOption<'subtype'>,
-      ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-    ],
+    ) as unknown as [z.ZodObject, ...z.ZodObject[]],
   ) as unknown as z.ZodType<AnnotationDraft<PdfCoordinates>>;
 
 /** An update's data in the file's coordinates, checked against the kind it changes. */

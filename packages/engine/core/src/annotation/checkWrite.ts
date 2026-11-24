@@ -8,7 +8,7 @@
  * zod, so it runs where the engine does (its worker, the server), never on
  * the page: `@embedpdf/engine-core/validation` exports it.
  */
-import type { z } from 'zod';
+import type * as z from '../zod';
 
 import {
   declarationOf,
@@ -52,9 +52,7 @@ export function assertAnnotationDraft(
   const linked = options.linked ?? [];
   const schema =
     declaration && linked.length > 0
-      ? (declaration.fileSchemas.create as unknown as z.AnyZodObject).omit(
-          Object.fromEntries(linked.map((name) => [name, true])),
-        )
+      ? without(declaration.fileSchemas.create as unknown as z.ZodObject, linked)
       : FileAnnotationDraftSchema;
   const checked = schema.safeParse(draft);
   if (!checked.success) throw invalidWrite(checked.error, `${String(draft.subtype)} create`);
@@ -126,6 +124,14 @@ export function pdfResolveAnnotationPatch(
   const prepared = pdfPrepareAnnotationPatch(current, patch);
   assertAnnotationPatch(current, prepared);
   return pdfDeriveAnnotationPatch(current, prepared, options);
+}
+
+/** `schema` without the fields `names` names; a name it doesn't have is ignored. */
+function without(schema: z.ZodObject, names: readonly string[]): z.ZodObject {
+  const known = names.filter((name) => name in schema.shape);
+  return schema.omit(
+    Object.fromEntries(known.map((name) => [name, true])) as Record<string, never>,
+  );
 }
 
 function invalidWrite(error: z.ZodError, where: string): EngineError {
