@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { renderFunctionTable } from './render-function-table.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const target = process.argv[2] ?? process.env.PDF_RUNTIME_TARGET ?? 'wasm32';
@@ -207,37 +209,12 @@ const tsReturn = (fn) => tsTypeOf(fn.result);
 const abiSlot = (meta) =>
   meta.ts === 'void' ? null : { ts: meta.ts, wasm: meta.wasm, native: meta.native };
 
-writeFileSync(
-  tsOut,
-  `/* Auto-generated - do not edit by hand. */\n` +
-    `import type { Ptr } from './pdf-runtime-module';\n\n` +
-    `export interface PdfFunctions {\n${functions
-      .map((fn) => `  ${fn.name}: (${tsParams(fn)}) => ${tsReturn(fn)};`)
-      .join('\n')}\n}\n\n` +
-    `export type PdfFunctionTsKind = 'Ptr' | 'number' | 'string' | 'boolean' | 'bigint' | 'void';\n` +
-    `export type PdfFunctionAbiKind = 'void' | 'bool' | 'i32' | 'i64' | 'f32' | 'f64' | 'pointer' | 'cstring' | 'utf16ptr';\n` +
-    `export type PdfFunctionCwrapKind = 'number' | 'string' | 'boolean' | 'bigint' | null;\n` +
-    `export interface PdfFunctionAbiTarget {\n` +
-    `  readonly kind: PdfFunctionAbiKind;\n` +
-    `  readonly cwrap: PdfFunctionCwrapKind;\n` +
-    `}\n` +
-    `export interface PdfFunctionAbiSlot {\n` +
-    `  readonly ts: PdfFunctionTsKind;\n` +
-    `  readonly wasm: PdfFunctionAbiTarget;\n` +
-    `  readonly native: PdfFunctionAbiTarget;\n` +
-    `}\n` +
-    `export interface PdfFunctionSignature {\n` +
-    `  readonly params: readonly PdfFunctionAbiSlot[];\n` +
-    `  readonly result: PdfFunctionAbiSlot | null;\n` +
-    `}\n\n` +
-    `export const pdfFunctionSignatures = {\n${functions
-      .map(
-        (fn) =>
-          `  ${fn.name}: { params: ${JSON.stringify(fn.params.map(abiSlot))}, result: ${JSON.stringify(
-            abiSlot(fn.result),
-          )} },`,
-      )
-      .join('\n')}\n} as const;\n`,
-);
+writeFileSync(tsOut, renderFunctionTable(functions.map((fn) => ({
+  name: fn.name,
+  tsParams: tsParams(fn),
+  tsReturn: tsReturn(fn),
+  params: fn.params.map(abiSlot),
+  result: abiSlot(fn.result),
+}))));
 
 console.log(`generated ${functions.length} PDF runtime functions for ${target}`);
