@@ -33,9 +33,12 @@ export interface EngineWorkerInit {
   wasmUrl?: string;
   /** Pre-fetched `embedpdf.wasm` bytes (transferred) — wins over `wasmUrl`. */
   wasmBinary?: ArrayBuffer;
-  /** `embedpdf.wasm` already compiled by the main thread (from `wasmUrl`,
-   *  which stays set): the worker only instantiates it. */
-  wasmModule?: WebAssembly.Module;
+  /** Where `embedpdf.wasm`, compiled from `wasmUrl` in a worker of its own,
+   *  arrives as `{ module }`: the worker only instantiates it. A null module
+   *  (that compile failed), like a `{ kind: 'wasm-module', module: null }`
+   *  message from the main thread (that worker never ran), makes the worker
+   *  fetch and compile `wasmUrl` itself. */
+  wasmPort?: MessagePort;
 }
 
 /**
@@ -44,22 +47,45 @@ export interface EngineWorkerInit {
  * carries, then post `{ kind: 'ready' }` (or `{ kind: 'init-error' }`).
  */
 export function startEngineWorker(scope: DedicatedWorkerGlobalScope): void {
+  let compiled: ((module: WebAssembly.Module | null) => void) | null = null;
   scope.onmessage = (event: MessageEvent) => {
-    const data = event.data as EngineWorkerInit | undefined;
-    if (!data || typeof data !== 'object' || data.kind !== 'init') return;
-    boot(scope, data);
+    const data = event.data as
+      | EngineWorkerInit
+      | { kind: 'wasm-module'; module: null }
+      | undefined;
+    if (!data || typeof data !== 'object') return;
+    if (data.kind === 'wasm-module') {
+      compiled?.(null);
+      return;
+    }
+    if (data.kind !== 'init') return;
+    let module: Promise<WebAssembly.Module | null> | undefined;
+    if (data.wasmPort) {
+      const port = data.wasmPort;
+      module = new Promise((resolve) => {
+        compiled = resolve;
+        port.onmessage = (message: MessageEvent<{ module: WebAssembly.Module | null }>) =>
+          resolve(message.data?.module ?? null);
+      });
+      void module.then(() => port.close());
+    }
+    boot(scope, data, module);
   };
 }
 
-function boot(scope: DedicatedWorkerGlobalScope, init: EngineWorkerInit): void {
+function boot(
+  scope: DedicatedWorkerGlobalScope,
+  init: EngineWorkerInit,
+  compiledModule?: Promise<WebAssembly.Module | null>,
+): void {
   (async () => {
     const source = resolveBootSource(init);
     const runtime = await createPdfRuntime({
       prefer: 'wasm',
       wasmUrl: source.wasmUrl,
       wasmBinary: source.wasmBinary,
-      wasm: init.wasmModule
-        ? instantiateCompiled(init.wasmModule, (err) =>
+      wasm: compiledModule
+        ? instantiateCompiled(compiledModule, init.wasmUrl, (err) =>
             scope.postMessage({ kind: 'init-error', error: describeBootError(err, init) }),
           )
         : undefined,
@@ -92,9 +118,14 @@ function resolveBootSource(init: EngineWorkerInit): { wasmUrl?: string; wasmBina
   return { wasmUrl: init.wasmUrl, wasmBinary: init.wasmBinary };
 }
 
-/** Emscripten's `instantiateWasm` hook over a module the main thread compiled. */
+/**
+ * Emscripten's `instantiateWasm` hook over a module compiled elsewhere. When
+ * none arrives (null), it fetches and compiles `wasmUrl` here, as the glue
+ * would: streaming, or from the bytes when the server's MIME type rules that out.
+ */
 function instantiateCompiled(
-  module: WebAssembly.Module,
+  compiled: Promise<WebAssembly.Module | null>,
+  wasmUrl: string | undefined,
   onError: (err: unknown) => void,
 ): Record<string, unknown> {
   return {
@@ -102,13 +133,31 @@ function instantiateCompiled(
       imports: WebAssembly.Imports,
       receiveInstance: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
     ) {
-      void WebAssembly.instantiate(module, imports).then(
-        (instance) => receiveInstance(instance, module),
-        onError,
-      );
+      void compiled
+        .then((module) => (module ? module : compileFromUrl(wasmUrl)))
+        .then((module) =>
+          WebAssembly.instantiate(module, imports).then((instance) =>
+            receiveInstance(instance, module),
+          ),
+        )
+        .catch(onError);
       return {};
     },
   };
+}
+
+async function compileFromUrl(wasmUrl: string | undefined): Promise<WebAssembly.Module> {
+  if (!wasmUrl) throw new Error('no wasm URL to compile from');
+  if (typeof WebAssembly.compileStreaming === 'function') {
+    try {
+      return await WebAssembly.compileStreaming(fetch(wasmUrl, { credentials: 'same-origin' }));
+    } catch {
+      // A wrong MIME type, for one: compile from the bytes below.
+    }
+  }
+  const response = await fetch(wasmUrl, { credentials: 'same-origin' });
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${wasmUrl}`);
+  return WebAssembly.compile(await response.arrayBuffer());
 }
 
 function describeBootError(err: unknown, init: EngineWorkerInit): string {
