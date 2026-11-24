@@ -480,6 +480,7 @@ export const pt: Locale = {
         required: 'Obrigatório',
         readOnly: 'Somente leitura',
         noExport: 'Não exportar',
+        group: 'Preenchido por',
         defaultValue: 'Valor padrão',
         maxLength: 'Comprimento máximo',
         multiline: 'Várias linhas',

@@ -284,6 +284,7 @@ export type {
   Paint,
   Session,
   UpdateResult,
+  RecordAccent,
   RenderItem,
   RenderNode,
   SceneFontProgram,

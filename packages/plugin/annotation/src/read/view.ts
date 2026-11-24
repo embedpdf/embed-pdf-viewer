@@ -24,6 +24,7 @@ import {
   type Id,
   type Model,
   type ModelAnnotation,
+  type RecordAccent,
   sourceOfConfirmed,
   sourceOfNew,
 } from '@embedpdf/core-annotation';
@@ -130,18 +131,32 @@ export function createView(
     return painter ? { painter } : {};
   };
 
-  /** A lent record as the model has it, cached per shown row and the confirmed row it was made from. */
+  /** The same accent: none on both sides, or the same color as strong. */
+  const sameAccent = (left: RecordAccent | null, right: RecordAccent | null): boolean =>
+    left === right ||
+    (left !== null &&
+      right !== null &&
+      left.color === right.color &&
+      left.strength === right.strength);
+
+  /**
+   * A lent record as the model has it, cached per shown row, the confirmed row it was made from
+   * and the accent its lender gives it.
+   */
   const lent = new WeakMap<
     Annotation,
-    { truth: Annotation | undefined; record: ModelAnnotation }
+    { truth: Annotation | undefined; accent: RecordAccent | null; record: ModelAnnotation }
   >();
   const lentRecord = (
     shown: Annotation,
     truth: Annotation | undefined,
     lender: AnnotationLender,
   ): ModelAnnotation => {
+    const accent = lender.accentOf?.(shown) ?? null;
     const cached = lent.get(shown);
-    if (cached && cached.truth === truth) return cached.record;
+    if (cached && cached.truth === truth && sameAccent(cached.accent, accent)) {
+      return cached.record;
+    }
     let record: ModelAnnotation;
     if (!truth) {
       // Only shown: one an undo brings back draws the picture it had (the
@@ -175,7 +190,8 @@ export function createView(
       if (lender.isPending(shown.ref) && drawsLive(record))
         record = { ...record, source: 'vector' };
     }
-    lent.set(shown, { truth, record });
+    if (accent) record = { ...record, accent };
+    lent.set(shown, { truth, accent, record });
     return record;
   };
 

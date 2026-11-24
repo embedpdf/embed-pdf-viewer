@@ -60,11 +60,23 @@ export function placedOnPage(
 
 /**
  * The field a palette tool places: one widget at `widget`, named like
- * `text_1`. A radio button stands for `'Choice1'` and a dropdown or a list
- * starts with two options, as in Acrobat; rename and change them in a
- * settings panel.
+ * `text_1`, in `groupId` when the palette places for a group (the form's
+ * design group); without one it is in no group. A
+ * radio button stands for `'Choice1'` and a dropdown or a list starts with
+ * two options, as in Acrobat; rename and change them in a settings panel.
  */
 export function toolDraft(
+  tool: FormToolDefinition,
+  name: string,
+  widget: WidgetPlacement,
+  groupId: string | null = null,
+): FormFieldDraft {
+  const draft = kindDraft(tool, name, widget);
+  return groupId === null ? draft : { ...draft, groupId };
+}
+
+/** {@link toolDraft}'s field, as the tool's kind starts one. */
+function kindDraft(
   tool: FormToolDefinition,
   name: string,
   widget: WidgetPlacement,
@@ -149,7 +161,9 @@ export function createPlaceHandler(
     const name = nextFieldName(tool.fieldKind, new Set(form.list().map((field) => field.name)));
     // The new field shows at once, when the document holds the numbers it
     // takes: then it is selected in the same frame. Otherwise once it shows.
-    const created = form.create(toolDraft(tool, name, { page, ...placed, ...look }));
+    const created = form.create(
+      toolDraft(tool, name, { page, ...placed, ...look }, form.getDesignGroup()),
+    );
     const field = form.get({ kind: 'fqn', name }) ?? (await created).field;
     // Skip the follow-up when the tool changed meanwhile.
     if (!annotation || interaction.getActiveToolId() !== tool.id) return;

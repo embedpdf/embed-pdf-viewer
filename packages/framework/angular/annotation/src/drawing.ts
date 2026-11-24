@@ -13,6 +13,7 @@ import { MITER_LIMIT, scene, type RenderItem } from '@embedpdf/core-annotation';
 import {
   ghostOpacity,
   rasterInFrame,
+  recordAccentStyleOf,
   sceneViewBox,
   svgShapesOf,
   type FramePixels,
@@ -87,7 +88,8 @@ export class EpdfAnnotationScene {
 /**
  * An annotation's own drawing, filling its frame: the engine's picture where the core places it
  * (following a move as it happens), or its scene, as the layer's one rule picks (`shows`,
- * `pictureOrPainting`).
+ * `pictureOrPainting`). A lent record's accent (a form field's group's color) fills the frame
+ * above it.
  */
 @Component({
   selector: 'epdf-annotation-native',
@@ -113,6 +115,9 @@ export class EpdfAnnotationScene {
         [style.transform]="box.transform ?? null"
       />
     }
+    @if (accent(); as accentStyle) {
+      <div [style]="accentStyle"></div>
+    }
   `,
 })
 export class EpdfAnnotationNative {
@@ -127,5 +132,9 @@ export class EpdfAnnotationNative {
   protected readonly raster = computed(() => {
     const item = this.item();
     return item.raster ? rasterInFrame(item.raster, item.frame) : null;
+  });
+  protected readonly accent = computed(() => {
+    const { accent } = this.item();
+    return accent ? recordAccentStyleOf(accent) : null;
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { FieldLook, FormColors } from '../src/form-field';
+import { fieldTintOf, type FieldLook, type FormColors } from '../src/form-field';
 import {
   FORM_CONTROL_FILL,
   formFocusRingStyleOf,
@@ -64,6 +64,45 @@ describe('widgetBoxStyleOf', () => {
     expect(widgetBoxStyleOf({ look }, frame, colors, { edge: false })).not.toHaveProperty(
       'boxShadow',
     );
+  });
+
+  it('shows a field’s group’s color: a fill as strong as the accent says, and an edge of the color', () => {
+    const accent = { color: '#2563eb', strength: 0.2 };
+    const tint = fieldTintOf(accent);
+    for (const border of [null, '#000']) {
+      expect(widgetBoxStyleOf({ look: { border }, accent }, frame, colors)).toEqual({
+        position: 'absolute',
+        left: '10px',
+        top: '20px',
+        width: '200px',
+        height: '40px',
+        pointerEvents: 'auto',
+        boxShadow: `inset 0 0 0 1px ${tint.edge}`,
+        background: tint.fill,
+      });
+    }
+    // The variable wins over the accent's own strength.
+    expect(tint.fill).toBe(
+      'color-mix(in srgb, #2563eb calc(var(--epdf-form-field-tint, 0.2) * 100%), transparent)',
+    );
+  });
+
+  it('a box without an accent is styled as it is without the setting', () => {
+    const plain = widgetBoxStyleOf({ look }, frame, colors);
+    expect(widgetBoxStyleOf({ look, accent: null }, frame, colors)).toEqual(plain);
+    expect(widgetBoxStyleOf({ look, accent: undefined }, frame, colors)).toEqual(plain);
+    expect(plain).not.toHaveProperty('background');
+  });
+
+  it('leaves the group’s color out with the edge, for a control that draws its own', () => {
+    const style = widgetBoxStyleOf(
+      { look, accent: { color: '#2563eb', strength: 0.16 } },
+      frame,
+      colors,
+      { edge: false },
+    );
+    expect(style).not.toHaveProperty('boxShadow');
+    expect(style).not.toHaveProperty('background');
   });
 });
 

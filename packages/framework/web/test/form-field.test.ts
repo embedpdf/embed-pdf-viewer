@@ -4,9 +4,11 @@ import {
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
+  fieldTintOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,
+  recordAccentStyleOf,
   showSelectedOptions,
   textFieldStyleOf,
   type FieldLook,
@@ -37,6 +39,34 @@ describe('formColorsOf', () => {
     expect(painted.border).toContain('color-mix(in srgb');
     expect(painted.background).toBe('var(--epdf-form-field-background, #fff)');
     expect(painted.text).toBe('var(--epdf-form-field-color, #000)');
+  });
+});
+
+describe('a group’s color on a field', () => {
+  it('is a fill of the color as strong as the accent says, with the variable over it', () => {
+    expect(fieldTintOf({ color: '#2563eb', strength: 0.2 }).fill).toBe(
+      'color-mix(in srgb, #2563eb calc(var(--epdf-form-field-tint, 0.2) * 100%), transparent)',
+    );
+    expect(fieldTintOf({ color: 'var(--signer-1)', strength: 0.16 }).fill).toBe(
+      'color-mix(in srgb, var(--signer-1) calc(var(--epdf-form-field-tint, 0.16) * 100%), transparent)',
+    );
+  });
+
+  it('is an edge of the color itself, whatever the strength', () => {
+    expect(fieldTintOf({ color: '#2563eb', strength: 0.2 }).edge).toBe('#2563eb');
+    expect(fieldTintOf({ color: 'var(--signer-1)', strength: 1 }).edge).toBe('var(--signer-1)');
+  });
+
+  it('fills a lent record’s frame, above its drawing, with the variable over its strength', () => {
+    expect(recordAccentStyleOf({ color: '#2563eb', strength: 0.4 })).toEqual({
+      position: 'absolute',
+      inset: '0',
+      boxSizing: 'border-box',
+      background:
+        'color-mix(in srgb, #2563eb calc(var(--epdf-form-field-tint, 0.4) * 100%), transparent)',
+      boxShadow: 'inset 0 0 0 1px #2563eb',
+      pointerEvents: 'none',
+    });
   });
 });
 
@@ -89,6 +119,21 @@ describe('field looks', () => {
       borderStyle: 'dashed',
       borderColor: 'B',
     });
+  });
+
+  it('a list box shows its group’s color over its own background, and as its border', () => {
+    const style = listBoxStyleOf(
+      {
+        box: { width: 100 },
+        look: { ...look, background: '#fafafa' },
+        accent: { color: '#2563eb', strength: 0.2 },
+      },
+      { left: 0, top: 0, width: 200, height: 50 },
+      colors,
+    );
+    const tint = fieldTintOf({ color: '#2563eb', strength: 0.2 });
+    expect(style.background).toBe(`linear-gradient(${tint.fill}, ${tint.fill}), #fafafa`);
+    expect(style.borderColor).toBe(tint.edge);
   });
 });
 

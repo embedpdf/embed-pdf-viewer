@@ -475,6 +475,7 @@ export const zhCN: Locale = {
         required: '必填',
         readOnly: '只读',
         noExport: '不导出',
+        group: '填写人',
         defaultValue: '默认值',
         maxLength: '最大长度',
         multiline: '多行',

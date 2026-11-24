@@ -477,6 +477,7 @@ export const sv: Locale = {
         required: 'Obligatoriskt',
         readOnly: 'Skrivskyddat',
         noExport: 'Exportera inte',
+        group: 'Fylls i av',
         defaultValue: 'Standardvärde',
         maxLength: 'Maxlängd',
         multiline: 'Flera rader',

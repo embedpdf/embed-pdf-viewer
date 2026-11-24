@@ -481,6 +481,7 @@ export const pl: Locale = {
         required: 'Wymagane',
         readOnly: 'Tylko do odczytu',
         noExport: 'Nie eksportuj',
+        group: 'Wypełnia',
         defaultValue: 'Wartość domyślna',
         maxLength: 'Maksymalna długość',
         multiline: 'Wiele wierszy',

@@ -482,6 +482,7 @@ export const fr: Locale = {
         required: 'Obligatoire',
         readOnly: 'Lecture seule',
         noExport: 'Ne pas exporter',
+        group: 'À remplir par',
         defaultValue: 'Valeur par défaut',
         maxLength: 'Longueur maximale',
         multiline: 'Multiligne',

@@ -483,6 +483,7 @@ export const ar: Locale = {
         required: 'مطلوب',
         readOnly: 'للقراءة فقط',
         noExport: 'عدم التصدير',
+        group: 'يملؤه',
         defaultValue: 'القيمة الافتراضية',
         maxLength: 'الحد الأقصى للطول',
         multiline: 'أسطر متعددة',

@@ -22,6 +22,7 @@ export const FormToken = createCapabilityToken<FormCapability>('form', {
     duplicate: true,
     duplicateWidgets: true,
     update: true,
+    moveToGroup: true,
     delete: true,
     removeWidget: true,
     updateWidget: true,
