@@ -639,6 +639,22 @@ describe('a box that holds nothing to take the cursor', () => {
     expect(capability.focus(SIGN.ref)).toBe(false);
   });
 
+  it('a target whose `focus` returns something of its own takes the cursor', async () => {
+    const { capability, focused } = await form(page);
+    // Only `false` says nothing took it: a host's `focus` may return a timer, or a promise.
+    const timer: FormFocusTarget = { focus: () => 7 };
+    const promise: FormFocusTarget = { focus: async () => {} };
+    capability.attachFocusTarget(widgetRef(18, P1), timer);
+    capability.focus(FIRST.ref);
+    expect(capability.focus(SIGN.ref)).toBe(true);
+    capability.attachFocusTarget(widgetRef(18, P1), promise);
+    expect(capability.focus(SIGN.ref)).toBe(true);
+    // Tab stops at it too: the cursor doesn't go on to the box after it.
+    capability.focus(FIRST.ref);
+    expect(capability.focusNext()).toBe(true);
+    expect(focused).toEqual([11, 11]);
+  });
+
   it('asks only the stops it comes to', async () => {
     // A text box, then forty radio groups: Tab from the text box needs the first group alone.
     const fields: FormField[] = [FIRST];
