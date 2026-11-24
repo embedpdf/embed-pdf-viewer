@@ -1005,7 +1005,13 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
     (after) => {
       const was = propertiesOf(before.field) as Record<string, unknown>;
       const is = propertiesOf(after) as Record<string, unknown>;
-      const keys = Object.keys(patch).filter(
+      // A format is the field's format and keystroke scripts, so what a
+      // format write changed is its `actions`. Its undo puts those back by
+      // the rule of any script write: a script someone wrote since is never
+      // removed, and a format no write can name (`other`) comes back as the
+      // scripts it was.
+      const named = Object.keys(patch).map((key) => (key === 'format' ? 'actions' : key));
+      const keys = [...new Set(named)].filter(
         (key) => key !== 'kind' && !valuesEqual(was[key], is[key]),
       );
       return {

@@ -412,7 +412,11 @@ export type {
   FormBundleWidget,
   WireFormBundle,
 } from './transfer/FormBundle';
-export { assertFormBundle, assertFormBundleManifest } from './transfer/FormBundle';
+export {
+  assertFormBundle,
+  assertFormBundleManifest,
+  completeFormBundle,
+} from './transfer/FormBundle';
 export { FormTransfer } from './transfer/FormTransfer';
 export type { FormExportRows, FormExportSelection } from './transfer/formExport';
 export { fieldMatches, formExportRowsOf } from './transfer/formExport';

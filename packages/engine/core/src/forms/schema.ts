@@ -9,20 +9,9 @@ import { PageBoxSchema, PdfRotationSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
 import { isDatePattern, isTimePattern } from './datePattern';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
-import {
-  formatOfActions,
-  takesFormat,
-  type FormFieldFormat,
-  type FormFieldFormatWritable,
-} from './format';
+import { withPurposeAndFormat, type FormFieldFormat, type FormFieldFormatWritable } from './format';
 import type { FormFieldPatch } from './patch';
-import type {
-  FormField,
-  FormFieldKind,
-  FormFieldOption,
-  FormFieldWidget,
-  ToggleFieldWidget,
-} from './field';
+import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import { FIELD_PURPOSE_MAX_LENGTH, isFieldPurpose } from './purpose';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormFieldValue } from './value';
@@ -100,8 +89,9 @@ const DatePatternSchema = z
   .max(64)
   .refine(isDatePattern, {
     message:
-      'a date pattern is made of the groups yyyy yy mmmm mmm mm m dd d, at least one of them, ' +
-      'with spaces and / - . , between them, and at most one time such as HH:MM or h:MM:ss tt',
+      'a date pattern is made of the groups yyyy yy mmmm mmm mm m dd d, at least one of them ' +
+      'and the year, the month and the day each once at most, with spaces and / - . , between ' +
+      'them, and at most one time such as HH:MM or h:MM:ss tt',
   });
 
 /** A pattern a time format is written with: see `isTimePattern`. */
@@ -123,31 +113,9 @@ export const FormFieldFormatWritableSchema: z.ZodType<FormFieldFormatWritable> =
   ]);
 
 /** A field's purpose as a create or an update names it: see `isFieldPurpose`. */
-const FieldPurposeSchema = z
-  .string()
-  .min(1)
-  .max(FIELD_PURPOSE_MAX_LENGTH)
-  .refine(isFieldPurpose, { message: 'a purpose has no space at its start or its end' });
-
-/**
- * A field as a server older than `purpose` and `format` sends it, made
- * whole: no purpose, since such a server reads none, and the format the
- * field's own scripts give it, which is how a server of this version reads
- * it too.
- */
-function withFactsOlderServersLeaveOut(field: Record<string, unknown>): Record<string, unknown> {
-  const noPurpose = field.purpose === undefined;
-  const noFormat =
-    field.format === undefined &&
-    typeof field.kind === 'string' &&
-    takesFormat(field.kind as FormFieldKind);
-  if (!noPurpose && !noFormat) return field;
-  return {
-    ...field,
-    ...(noPurpose ? { purpose: null } : {}),
-    ...(noFormat ? { format: formatOfActions(field.actions as never) } : {}),
-  };
-}
+const FieldPurposeSchema = z.string().min(1).max(FIELD_PURPOSE_MAX_LENGTH).refine(isFieldPurpose, {
+  message: 'a purpose has no space at its start or its end, and no NUL character',
+});
 
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
@@ -238,7 +206,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
-  withFactsOlderServersLeaveOut,
+  withPurposeAndFormat,
 ).describe(
   'A form field, by its `family`. A newer server can add families: read one your client ' +
     "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +

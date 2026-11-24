@@ -141,6 +141,27 @@ export function formatOfActions(
 }
 
 /**
+ * A field as something older than `purpose` and `format` wrote it, made
+ * whole: no purpose, since nothing older kept one, and the format the
+ * field's own scripts give it, which is how a read of this version works it
+ * out too. An older server answers with such a field, and a bundle kept from
+ * an earlier version holds them. A field that has both comes back as it is.
+ */
+export function withPurposeAndFormat<Field extends Record<string, unknown>>(field: Field): Field {
+  const noPurpose = field.purpose === undefined;
+  const noFormat =
+    field.format === undefined &&
+    typeof field.kind === 'string' &&
+    takesFormat(field.kind as FormFieldKind);
+  if (!noPurpose && !noFormat) return field;
+  return {
+    ...field,
+    ...(noPurpose ? { purpose: null } : {}),
+    ...(noFormat ? { format: formatOfActions(field.actions as PdfFieldActions<unknown>) } : {}),
+  };
+}
+
+/**
  * The script of a tree that is one JavaScript action and nothing after it;
  * `null` for any other tree. It reads a tree as it comes, a response not
  * yet checked included, so it takes nothing about its shape for granted.
@@ -236,9 +257,9 @@ export function formatsEqual(left: FormFieldFormat | null, right: FormFieldForma
 const PATTERN_RULE: Record<Kind, string> = {
   date:
     "a date format's pattern is 1 to 64 characters: the groups yyyy yy mmmm mmm mm m dd d, " +
-    'at least one of them, with spaces and / - . , between them, and at most one time ' +
-    '(HH, H, hh or h, then :MM, then :ss and tt when it has them); two groups written in ' +
-    'digits never touch',
+    'at least one of them and the year, the month and the day each once at most, with ' +
+    'spaces and / - . , between them, and at most one time (HH, H, hh or h, then :MM, then ' +
+    ':ss and tt when it has them); two groups written in digits never touch',
   time:
     "a time format's pattern is a time and nothing else, at most 64 characters: HH, H, hh " +
     'or h, then :MM, then :ss when it has seconds, then tt when it has one',

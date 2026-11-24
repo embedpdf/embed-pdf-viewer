@@ -241,8 +241,8 @@ every app reading the file agrees:
 
 The first four are the web's own names for these values, the ones HTML's `autocomplete` takes.
 
-- **What it takes.** 1 to 256 characters, with no space at the start or the end. Anything else
-  fails with `InvalidArg`.
+- **What it takes.** 1 to 256 characters, with no space at the start or the end and no NUL
+  character (`\u0000`). Anything else fails with `InvalidArg`.
 - **None.** Left out or `null`, a field has no purpose, and reads `purpose: null`.
 - **Every kind of field has one.** A signature field and a push button too.
 - **Permission.** Setting it needs `doc.forms.modify`, like any setting. Whoever may read the
@@ -328,6 +328,9 @@ These rules keep a pattern to what a field can show and then read back:
   own and `tt h:MM` are not.
 - **Two numbers never touch.** `yyyymmdd` is no pattern: its digits would read back as one
   number. A month's name between them is enough, as in `dmmmyy`.
+- **The year, the month and the day each go in once at most.** `yyyy/mm/mm/dd` is no pattern:
+  read back, the month's second copy would be taken for the day. A month by its name and by its
+  number is the month twice.
 - **Nothing else.** Another letter (`dddd` for a weekday), a quote or words of your own make it
   a pattern the engine doesn't take.
 
@@ -378,6 +381,11 @@ await doc.forms.update(field.ref, { format: null });
 The two scripts also read back in `field.actions`, as any script does. Changing or removing one
 there changes what `format` reads.
 
+Undoing a format puts back the scripts the field had before, a number format's too. If someone
+wrote one of the field's scripts since, the undo leaves the field as it is, as it does for any
+script: see
+[When the document changed since](/docs/engine/documents/changes#when-the-document-changed-since).
+
 A [copy](#copy-a-field) and an [import](import-export) keep a date or a time format, without
 `doc.forms.script` too.
 
@@ -427,8 +435,8 @@ time of day is midnight when you leave it out.
 A server can be older than your app. `purpose` and `format` need a server of version 3.4: an
 older one is never sent them, so a `create()` or an `update()` that names either fails with
 `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update.
-Reading still works against it: `format` is read from the field's scripts as described above, and
-`purpose` reads `null`.
+Reading still works against it, an exported bundle included: `format` is read from the field's
+scripts as described above, and `purpose` reads `null`.
 
 </Engine>
 

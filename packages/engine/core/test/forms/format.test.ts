@@ -74,6 +74,7 @@ describe("a field's format", () => {
       'AFDate_FormatEx("yyyymmdd");',
       'AFTime_FormatEx("HH.MM");',
       'AFDate_FormatEx("");',
+      'AFDate_FormatEx("yyyy/mm/mm/dd");',
       // A pattern of the other kind: a date call with a time alone, a time call with a date in it.
       'AFDate_FormatEx("HH:MM");',
       'AFDate_FormatEx("h:MM:ss tt");',
@@ -325,7 +326,7 @@ describe("a field's format", () => {
 });
 
 describe("a field's purpose", () => {
-  test('a purpose is 1 to 256 characters with no space at either end', () => {
+  test('a purpose is 1 to 256 characters with no space at either end and no NUL', () => {
     for (const purpose of [
       'name',
       'date-signed',
@@ -333,11 +334,28 @@ describe("a field's purpose", () => {
       'p'.repeat(256),
       'naïve',
       '署名',
+      // Any other character is kept as it is, a line break inside included.
+      'two\nlines',
+      'a(b)\\c',
     ]) {
       expect(isFieldPurpose(purpose), purpose).toBe(true);
       expect(checkedPurpose(purpose)).toBe(purpose);
     }
-    for (const purpose of ['', ' ', ' name', 'name ', 'name\n', '\tname', 'p'.repeat(257), 5, {}]) {
+    for (const purpose of [
+      '',
+      ' ',
+      ' name',
+      'name ',
+      'name\n',
+      '\tname',
+      'p'.repeat(257),
+      // A NUL would cut the purpose short where it is stored.
+      'billing\u0000account',
+      '\u0000',
+      'name\u0000',
+      5,
+      {},
+    ]) {
       expect(isFieldPurpose(purpose), String(purpose)).toBe(false);
       expect(refusal(() => checkedPurpose(purpose))).toEqual({
         code: EngineErrorCode.InvalidArg,

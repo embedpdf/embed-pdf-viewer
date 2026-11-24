@@ -10,6 +10,7 @@ import {
   formResetFacts,
   formValuesImportFacts,
   assertFormBundle,
+  completeFormBundle,
   assertFormBundleManifest,
   type BundleLimits,
   type DocumentEventInit,
@@ -241,7 +242,8 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
       const { body, resources } = await readBundleParts('form', form);
       const bundle = { ...(body as Omit<FormBundle, 'resources'>), resources };
       await assertFormBundle(bundle, NO_BUNDLE_LIMITS);
-      return bundle;
+      // An older server's fields come without a purpose and a format.
+      return completeFormBundle(bundle);
     });
   }
 

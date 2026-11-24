@@ -81,7 +81,19 @@ function recordingFetch(version?: string) {
     if (version === undefined) return response;
     const headers = new Headers(response.headers);
     headers.set('EmbedPDF-Server-Version', version);
-    if (!(headers.get('content-type') ?? '').includes('application/json')) {
+    const type = headers.get('content-type') ?? '';
+    if (type.includes('multipart/form-data')) {
+      // An exported bundle: its `body` part holds the fields.
+      const older = new FormData();
+      for (const [name, value] of (await response.formData()).entries()) {
+        const stripped = name === 'body' && typeof value === 'string';
+        older.append(name, stripped ? JSON.stringify(withoutFacts(JSON.parse(value))) : value);
+      }
+      headers.delete('content-type');
+      headers.delete('content-length');
+      return new Response(older, { status: response.status, headers });
+    }
+    if (!type.includes('application/json')) {
       return new Response(response.body, { status: response.status, headers });
     }
     headers.delete('content-length');
@@ -237,6 +249,16 @@ describe("a field's purpose and format on the wire", () => {
       // An answer to a write reads the same way.
       const { field } = await doc.forms.update(named('plain_one'), { required: true });
       expect([field.purpose, formatOf(field)]).toEqual([null, { kind: 'date', pattern: 'm/d/yy' }]);
+      // And so do the fields of a bundle it exports.
+      const bundle = await doc.forms.export({
+        fields: [named('plain_one'), named('plain_five'), named('full_name'), named('sign_here')],
+      });
+      expect(bundle.fields.map(({ data }) => [data.name, data.purpose, formatOf(data)])).toEqual([
+        ['plain_one', null, { kind: 'date', pattern: 'm/d/yy' }],
+        ['plain_five', null, { kind: 'other' }],
+        ['full_name', null, null],
+        ['sign_here', null, undefined],
+      ]);
     } finally {
       await doc.close();
     }

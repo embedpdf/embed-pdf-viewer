@@ -11,14 +11,17 @@ export const FIELD_PURPOSE_MAX_LENGTH = 256;
 
 /**
  * Whether `purpose` is one a field takes: 1 to 256 characters, with no white
- * space at its start or its end.
+ * space at its start or its end and no NUL character (`\u0000`) in it. The
+ * runtime takes a string up to its first NUL, so a purpose with one would be
+ * stored cut short.
  */
 export function isFieldPurpose(purpose: unknown): purpose is string {
   return (
     typeof purpose === 'string' &&
     purpose.length >= 1 &&
     purpose.length <= FIELD_PURPOSE_MAX_LENGTH &&
-    purpose.trim() === purpose
+    purpose.trim() === purpose &&
+    !purpose.includes('\u0000')
   );
 }
 
@@ -32,7 +35,8 @@ export function checkedPurpose(purpose: unknown): string | null {
   if (!isFieldPurpose(purpose)) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      "a field's purpose is 1 to 256 characters with no space at its start or end, or null for none",
+      "a field's purpose is 1 to 256 characters with no space at its start or end and no NUL " +
+        'character, or null for none',
       { details: { field: 'purpose' } },
     );
   }

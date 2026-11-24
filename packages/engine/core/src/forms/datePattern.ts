@@ -36,10 +36,23 @@ export const STANDARD_TIME_PATTERNS: readonly string[] = Object.freeze([
   'h:MM:ss tt',
 ]);
 
-/** The groups a date is written in as a number: the year, the month and the day. */
-const NUMBER_GROUPS: ReadonlySet<string> = new Set(['yyyy', 'yy', 'mm', 'm', 'dd', 'd']);
-/** The groups a month is written in by its name. */
-const NAME_GROUPS: ReadonlySet<string> = new Set(['mmmm', 'mmm']);
+/** What a date group writes: the year, the month or the day. */
+type DatePart = 'year' | 'month' | 'day';
+
+/** How a part of a pattern is written: in digits, in letters, or as a separator. */
+type Written = 'digits' | 'letters' | 'separator';
+
+/** The groups a date is written in: what each writes, and whether as a number or by name. */
+const DATE_GROUPS: ReadonlyMap<string, { part: DatePart; written: Written }> = new Map([
+  ['yyyy', { part: 'year', written: 'digits' }],
+  ['yy', { part: 'year', written: 'digits' }],
+  ['mmmm', { part: 'month', written: 'letters' }],
+  ['mmm', { part: 'month', written: 'letters' }],
+  ['mm', { part: 'month', written: 'digits' }],
+  ['m', { part: 'month', written: 'digits' }],
+  ['dd', { part: 'day', written: 'digits' }],
+  ['d', { part: 'day', written: 'digits' }],
+]);
 /** What stands between groups. A colon is not among them: it belongs to a time. */
 const SEPARATORS = ' /-.,';
 /**
@@ -49,24 +62,34 @@ const SEPARATORS = ' /-.,';
 const TIME = /(?:HH|H|hh|h):MM(?::ss)?(?: *tt)?/;
 const LONGEST_PATTERN = 64;
 
-/** What a pattern is made of, by how it is written: in digits, in letters, or a separator. */
-type Part = 'digits' | 'letters' | 'separator';
+/** A stretch of a pattern outside its time. */
+interface Stretch {
+  /** How each of its parts is written, in order. */
+  readonly written: Written[];
+  /** What each of its date groups writes, in order. */
+  readonly groups: DatePart[];
+}
 
 /**
- * The parts of a stretch of a pattern outside its time, in order, or `null`
- * when it holds anything a pattern isn't made of: another letter, a letter
- * group cut short or run on (`yyy`, `dddd`), a time's letter, a colon.
+ * A stretch of a pattern outside its time, read: `null` when it holds
+ * anything a pattern isn't made of: another letter, a letter group cut short
+ * or run on (`yyy`, `dddd`), a time's letter, a colon.
  */
-function partsOf(stretch: string): Part[] | null {
-  const parts: Part[] = [];
+function stretchOf(text: string): Stretch | null {
+  const stretch: Stretch = { written: [], groups: [] };
   // A run of one letter, or any single character that is no letter.
-  for (const run of stretch.match(/([A-Za-z])\1*|[^A-Za-z]/g) ?? []) {
-    if (NUMBER_GROUPS.has(run)) parts.push('digits');
-    else if (NAME_GROUPS.has(run)) parts.push('letters');
-    else if (SEPARATORS.includes(run)) parts.push('separator');
-    else return null;
+  for (const run of text.match(/([A-Za-z])\1*|[^A-Za-z]/g) ?? []) {
+    const group = DATE_GROUPS.get(run);
+    if (group) {
+      stretch.written.push(group.written);
+      stretch.groups.push(group.part);
+    } else if (SEPARATORS.includes(run)) {
+      stretch.written.push('separator');
+    } else {
+      return null;
+    }
   }
-  return parts;
+  return stretch;
 }
 
 /**
@@ -74,7 +97,8 @@ function partsOf(stretch: string): Part[] | null {
  * script runtime writes a date by, and reads its own writing back by. It is
  * 1 to 64 characters, made of:
  *
- * - the date groups `yyyy yy mmmm mmm mm m dd d`, at least one of them;
+ * - the date groups `yyyy yy mmmm mmm mm m dd d`, at least one of them, with
+ *   the year, the month and the day each written once at most;
  * - at most one time, written with colons: `HH`, `H`, `hh` or `h`, then
  *   `:MM`, then `:ss` when it has seconds, then `tt` when it has one;
  * - spaces and `/ - . ,` between them.
@@ -82,27 +106,32 @@ function partsOf(stretch: string): Part[] | null {
  * A run of one letter is one group, whole: `yyy` and `dddd` are no pattern.
  * Two groups written in digits never touch, since their digits would read
  * as one number: `yyyymmdd` is no pattern, and neither is a day right before
- * a time. A time in another shape (`HH.MM`, `H:M`, minutes alone, `tt`
- * before it) is none either: the runtime prints it and can't read it back,
- * and a field that refuses what it shows is a broken field. A time on its
- * own is a time's pattern ({@link isTimePattern}), not a date's.
+ * a time. A part written twice is none either (`yyyy/mm/mm/dd`, `mmm mm`):
+ * read back, the second takes the next part's number. A time in another
+ * shape (`HH.MM`, `H:M`, minutes alone, `tt` before it) is none: the runtime
+ * prints it and can't read it back, and a field that refuses what it shows,
+ * or reads another date from it, is a broken field. A time on its own is a
+ * time's pattern ({@link isTimePattern}), not a date's.
  */
 export function isDatePattern(pattern: unknown): pattern is string {
   if (typeof pattern !== 'string') return false;
   if (pattern.length < 1 || pattern.length > LONGEST_PATTERN) return false;
   const time = TIME.exec(pattern);
-  const before = partsOf(time ? pattern.slice(0, time.index) : pattern);
-  const after = partsOf(time ? pattern.slice(time.index + time[0].length) : '');
+  const before = stretchOf(time ? pattern.slice(0, time.index) : pattern);
+  const after = stretchOf(time ? pattern.slice(time.index + time[0].length) : '');
   if (!before || !after) return false;
+  const groups = [...before.groups, ...after.groups];
+  if (groups.length === 0 || new Set(groups).size !== groups.length) return false;
   // A time starts in digits, and ends in them unless `tt` closes it.
-  const timeParts: Part[] = time ? ['digits', time[0].endsWith('tt') ? 'letters' : 'digits'] : [];
-  const parts = [...before, ...timeParts, ...after];
+  const timeWritten: Written[] = time
+    ? ['digits', time[0].endsWith('tt') ? 'letters' : 'digits']
+    : [];
+  const written = [...before.written, ...timeWritten, ...after.written];
   // The time's own two ends are one time, not two groups that touch.
-  const touching = parts.some(
-    (part, at) => part === 'digits' && parts[at + 1] === 'digits' && at !== before.length,
+  const touching = written.some(
+    (part, at) => part === 'digits' && written[at + 1] === 'digits' && at !== before.written.length,
   );
-  if (touching) return false;
-  return [...before, ...after].some((part) => part !== 'separator');
+  return !touching;
 }
 
 /** A time and nothing else: the whole of a time format's pattern. */

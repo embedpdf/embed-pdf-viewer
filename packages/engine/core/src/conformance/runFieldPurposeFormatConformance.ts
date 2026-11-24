@@ -352,7 +352,17 @@ export function runFieldPurposeFormatConformance(
 
     test('a purpose that is none is refused, and nothing is written', async () => {
       await as('designer', async (doc) => {
-        for (const purpose of ['', ' email', 'email ', '\tname', 'p'.repeat(257), 7, {}]) {
+        const none = [
+          '',
+          ' email',
+          'email ',
+          '\tname',
+          'p'.repeat(257),
+          'billing\u0000account',
+          7,
+          {},
+        ];
+        for (const purpose of none) {
           expect(await refused(doc.forms.update(named('full_name'), loose({ purpose })))).toBe(
             EngineErrorCode.InvalidArg,
           );
@@ -366,6 +376,11 @@ export function runFieldPurposeFormatConformance(
         expect(
           (await doc.forms.update(named('full_name'), { purpose: longest })).field.purpose,
         ).toBe(longest);
+        // Any character but a NUL is kept as it was written.
+        for (const purpose of ['two\nlines', 'caf\u00e9', '\u65e5\u4ed8', 'a(b)\\c', 'a\u0001b']) {
+          await doc.forms.update(named('full_name'), { purpose });
+          expect((await read(doc, 'full_name')).purpose).toBe(purpose);
+        }
       });
     });
 
@@ -572,7 +587,10 @@ export function runFieldPurposeFormatConformance(
           { kind: 'time', pattern: 'H:M' },
           { kind: 'date', pattern: 'dd:mm:yyyy' },
           { kind: 'date', pattern: '/ - .' },
-          { kind: 'date', pattern: `${'dd/'.repeat(21)}yy` },
+          { kind: 'date', pattern: `dd${' '.repeat(59)}yyyy` },
+          // A part of the date written twice.
+          { kind: 'date', pattern: 'yyyy/mm/mm/dd' },
+          { kind: 'date', pattern: 'mmm mm d' },
           { kind: 'time', pattern: 'HH:MM s' },
           // A pattern of the other kind: a time alone as a date, a date as a time.
           { kind: 'date', pattern: 'HH:MM' },
@@ -592,7 +610,7 @@ export function runFieldPurposeFormatConformance(
         expect(formatted(await read(doc, 'plain_one'))).toEqual(before);
         expect(await refused(doc.forms.get(named('never_made')))).toBe(EngineErrorCode.NotFound);
         // The longest pattern is taken.
-        const longest = `${'dd/'.repeat(20)}yyyy`;
+        const longest = `dd${' '.repeat(58)}yyyy`;
         const taken = await doc.forms.update(named('plain_one'), {
           format: { kind: 'date', pattern: longest },
         });
@@ -699,6 +717,55 @@ export function runFieldPurposeFormatConformance(
         await doc.apply({ undoOf: set.meta.opId });
         const restored = await read(doc, 'plain_six');
         expect([formatOf(restored), restored.required]).toEqual([null, true]);
+      });
+    });
+
+    test('after a later change, the undo of a format puts back the scripts it replaced', async () => {
+      await as('designer', async (doc) => {
+        const date = { kind: 'date', pattern: 'dd/mm/yyyy' } as const;
+        // A number format a date replaced comes back whole, though no write names it.
+        const overNumber = await update(doc, 'plain_five', { format: date });
+        await update(doc, 'plain_five', { required: true });
+        await doc.apply({ undoOf: overNumber.meta.opId });
+        const numbered = await read(doc, 'plain_five');
+        expect([formatted(numbered), numbered.required]).toEqual([
+          {
+            format: { kind: 'other' },
+            formatScript: NUMBER_FORMAT,
+            keystrokeScript: NUMBER_KEYSTROKE,
+          },
+          true,
+        ]);
+        // An older wording comes back as it was written.
+        const overOlder = await update(doc, 'plain_four', {
+          format: { kind: 'time', pattern: 'HH:MM' },
+        });
+        await update(doc, 'plain_four', { required: true });
+        await doc.apply({ undoOf: overOlder.meta.opId });
+        expect(formatted(await read(doc, 'plain_four'))).toEqual({
+          format: { kind: 'date', pattern: 'm/d' },
+          formatScript: 'AFDate_Format(0);',
+          keystrokeScript: 'AFDate_Keystroke(0);',
+        });
+      });
+    });
+
+    test('the undo of a format leaves a script written since', async () => {
+      await as('everything', async (doc) => {
+        const date = { kind: 'date', pattern: 'dd/mm/yyyy' } as const;
+        const own = 'event.rc = /^[0-9/]*$/.test(event.value);';
+        const set = await update(doc, 'plain_six', { format: date });
+        await update(doc, 'plain_six', {
+          actions: { keystroke: { type: 'javascript', script: own } },
+        });
+        // The keystroke script is someone's later work: the undo removes neither script.
+        const undone = await doc.apply({ undoOf: set.meta.opId });
+        expect(undone.items.map((item) => item.type)).toEqual(['skipped']);
+        expect(formatted(await read(doc, 'plain_six'))).toEqual({
+          format: date,
+          formatScript: 'AFDate_FormatEx("dd/mm/yyyy");',
+          keystrokeScript: own,
+        });
       });
     });
 

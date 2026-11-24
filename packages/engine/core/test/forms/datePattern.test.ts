@@ -29,8 +29,31 @@ describe('date patterns', () => {
       'h:MM tt, d mmm',
       // A time that ends in letters can touch a number.
       'h:MM ttdd',
+      // The longest: 64 characters.
+      `dd${' '.repeat(58)}yyyy`,
+    ]) {
+      expect(isDatePattern(pattern), pattern).toBe(true);
+    }
+  });
+
+  test('the year, the month and the day are each written once at most', () => {
+    // Read back, a part written twice takes the next part's number, or the field refuses the text.
+    for (const pattern of [
+      'yyyy/mm/mm/dd',
+      'dd/dd/mm/yyyy',
+      'yyyy-yy-mm-dd',
+      'd/m/yyyy d',
+      // A month by its name and by its number are the month twice.
+      'mmm mm d',
+      'mmmm d, mmm yyyy',
+      'd d',
+      'yy yyyy',
+      'm/d/yy HH:MM m',
       `${'dd/'.repeat(20)}yyyy`,
     ]) {
+      expect(isDatePattern(pattern), pattern).toBe(false);
+    }
+    for (const pattern of ['yyyy/mm/dd', 'd mmmm yyyy', 'mmm yyyy', 'dd', 'yy-m']) {
       expect(isDatePattern(pattern), pattern).toBe(true);
     }
   });
@@ -120,7 +143,7 @@ describe('date patterns', () => {
       'dd\nmm',
       'dd_mm',
       'yyyy年mm月',
-      `${'dd/'.repeat(21)}yy`,
+      `dd${' '.repeat(59)}yyyy`,
       5,
       null,
       undefined,

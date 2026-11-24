@@ -21,7 +21,8 @@ export interface BundleCodec<Bundle> {
    * The bundle a file holds, checked whole: `InvalidArg` for anything that
    * isn't a bundle of this family and version, a resource that doesn't match
    * its id, a row naming a resource that isn't there, or a resource no row
-   * names; `PayloadTooLarge` past a limit. Limits come first, so a file that
+   * names; `PayloadTooLarge` past a limit. A file an earlier version wrote
+   * reads as this version's bundle. Limits come first, so a file that
    * is refused is never decoded: the text's length, then the counts and
    * every resource's size from its base64, and only then the resources,
    * decoded and hashed.
@@ -44,6 +45,11 @@ export interface BundleFileSpec<Bundle> {
     resourceSizes: ReadonlyMap<string, number>,
     limits: BundleLimits,
   ): void;
+  /**
+   * A parsed bundle with what an earlier version's file leaves out filled
+   * in, when the family's rows have gained members since.
+   */
+  complete?(bundle: Bundle): Bundle;
 }
 
 /** A resource's entry in the file besides its base64: its id, quotes and separators. */
@@ -138,7 +144,8 @@ export function bundleCodec<
       const bundle: Record<string, unknown> = {};
       for (const key of spec.keys) bundle[key] = (file as Record<string, unknown>)[key];
       bundle.resources = resources;
-      return bundle as unknown as Bundle;
+      const parsed = bundle as unknown as Bundle;
+      return spec.complete ? spec.complete(parsed) : parsed;
     },
   };
 }

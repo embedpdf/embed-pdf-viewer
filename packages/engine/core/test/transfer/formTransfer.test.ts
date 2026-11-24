@@ -51,6 +51,7 @@ function textField(
     mappingName: null,
     valueEntry: { kind: 'scalar', value: `${name} value` },
     defaultValueEntry: { kind: 'none' },
+    purpose: null,
     createdBy: 'alice',
     createdAt: '2026-10-08T10:42:00Z',
     filledBy: 'alice',
@@ -63,6 +64,7 @@ function textField(
     multiline: false,
     password: false,
     comb: false,
+    format: null,
     widgets: widgets.map((number) => ({ ref: widgetRef(number), objectNumber: number, page })),
     ...fields,
   } as unknown as FormField;
@@ -291,6 +293,51 @@ describe('a form bundle through the file', () => {
 
   test('comes back as the same bundle', async () => {
     expect(await FormTransfer.parse(FormTransfer.stringify(bundle))).toEqual(bundle);
+  });
+
+  test('a file from before a field had a purpose and a format reads with both', async () => {
+    const script = (code: string) => tree({ type: 'javascript', script: code });
+    const dated = { format: script('AFDate_FormatEx("dd/mm/yyyy");') };
+    const counted = { format: script('AFNumber_Format(2, 0, 0, 0, "", true);') };
+    const now = bundleOf(
+      [
+        textField('when', 10, [20], {
+          purpose: 'date-signed',
+          actions: dated,
+          format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+        }),
+        textField('sum', 11, [21], { actions: counted, format: { kind: 'other' } }),
+        textField('plain', 12, [22]),
+        // A list: a kind that has no format.
+        textField('choice', 13, [23], { kind: 'listbox', format: undefined }),
+      ],
+      [10, 11, 12, 13].map((field, at) => widgetRow(20 + at, refOf(field))),
+    );
+    // The file as the version before wrote it: the same rows without the two members.
+    const older = JSON.parse(FormTransfer.stringify(now)) as {
+      fields: { data: Record<string, unknown> }[];
+    };
+    for (const row of older.fields) {
+      delete row.data.purpose;
+      delete row.data.format;
+    }
+    const read = await FormTransfer.parse(JSON.stringify(older));
+    const facts = read.fields.map(({ data }) => [
+      data.name,
+      data.purpose,
+      'format' in data ? data.format : 'none',
+    ]);
+    expect(facts).toEqual([
+      // No purpose: nothing older kept one. The format is the one the scripts give.
+      ['when', null, { kind: 'date', pattern: 'dd/mm/yyyy' }],
+      ['sum', null, { kind: 'other' }],
+      ['plain', null, null],
+      // A kind without a format gets none.
+      ['choice', null, 'none'],
+    ]);
+    // A file of this version comes back as it is, its purpose kept.
+    const same = await FormTransfer.parse(FormTransfer.stringify(now));
+    expect(same.fields[0]!.data.purpose).toBe('date-signed');
   });
 
   test("refuses another family's file, and one past a limit", async () => {

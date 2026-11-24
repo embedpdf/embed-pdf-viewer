@@ -390,6 +390,51 @@ describe('a pattern the engine takes', () => {
     expect(times).toHaveLength(24);
   });
 
+  it('reads back what it writes, for patterns made at random', () => {
+    // A family written by hand holds what its author thought of. This one
+    // strings groups, separators and a time together by chance, so it holds
+    // the rest: a part of the date written twice, a time in the middle.
+    let state = 20261124;
+    const random = (): number => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let mixed = state;
+      mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+      mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+      return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+    };
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+    const groups = ['yyyy', 'yy', 'mmmm', 'mmm', 'mm', 'm', 'dd', 'd'];
+    const between = [' ', '/', '-', '.', ',', ', ', ' - ', '  ', '. ', ''];
+    const timesOfDay = ['HH:MM', 'H:MM', 'hh:MM tt', 'h:MM tt', 'HH:MM:ss', 'h:MM:sstt'];
+    const made = new Set<string>();
+    for (let round = 0; round < 60_000; round++) {
+      const count = 1 + Math.floor(random() * 5);
+      const timeAt = random() < 1 / 3 ? Math.floor(random() * (count + 1)) : -1;
+      const tokens: string[] = [];
+      for (let at = 0; at <= count; at++) {
+        if (at === timeAt) tokens.push(pick(timesOfDay), pick(between));
+        if (at < count) tokens.push(pick(groups), pick(between));
+      }
+      made.add(tokens.slice(0, -1).join(''));
+    }
+    const takenAtRandom = [...made].filter((pattern) => isDatePattern(pattern));
+    expect(takenAtRandom.filter((pattern) => !readsBack(pattern))).toEqual([]);
+    // Enough of both kinds were made for the check to mean something.
+    expect(takenAtRandom.length).toBeGreaterThan(2_000);
+    expect(made.size - takenAtRandom.length).toBeGreaterThan(20_000);
+  });
+
+  it('takes no pattern that writes a part of the date twice', () => {
+    for (const pattern of ['yyyy/mm/mm/dd', 'dd/dd/mm/yyyy', 'yyyy-yy-mm-dd', 'mmm mm d']) {
+      expect(isDatePattern(pattern), pattern).toBe(false);
+      expect(readsBack(pattern), pattern).toBe(false);
+    }
+    // 24 November reads back as the 11th: the month's second writing is taken for the day.
+    const day = { year: 2026, month: 11, day: 24 };
+    expect(formatDate(day, 'yyyy/mm/mm/dd')).toBe('2026/11/11/24');
+    expect(parseDate('2026/11/11/24', 'yyyy/mm/mm/dd', day)).toMatchObject({ month: 11, day: 11 });
+  });
+
   it('is a date or a time, never both', () => {
     expect(dates.filter((pattern) => isTimePattern(pattern))).toEqual([]);
     for (const pattern of STANDARD_DATE_PATTERNS) {

@@ -160,7 +160,7 @@ describe('form schemas', () => {
       expect(schema.safeParse({ ...draft, purpose: 'signature' }).success).toBe(true);
       expect(schema.safeParse({ ...draft, purpose: 'p'.repeat(256) }).success).toBe(true);
       expect(schema.safeParse({ ...draft, purpose: null }).success).toBe(true);
-      for (const purpose of ['', ' name', 'name ', 'p'.repeat(257), 5]) {
+      for (const purpose of ['', ' name', 'name ', 'p'.repeat(257), 'billing\u0000account', 5]) {
         expect(schema.safeParse({ ...draft, purpose }).success).toBe(false);
       }
     }
@@ -184,7 +184,8 @@ describe('form schemas', () => {
         { kind: 'date', pattern: '' },
         { kind: 'date', pattern: 'dddd' },
         { kind: 'date', pattern: 'd");x("' },
-        { kind: 'date', pattern: 'dd/'.repeat(21) + 'yy' },
+        { kind: 'date', pattern: `dd${' '.repeat(59)}yyyy` },
+        { kind: 'date', pattern: 'yyyy/mm/mm/dd' },
         { kind: 'date', pattern: 'dd/mm', script: 'x' },
         // A pattern of the other kind.
         { kind: 'date', pattern: 'HH:MM' },
