@@ -1,6 +1,6 @@
 # @embedpdf/core-fonts — .
 
-BUILT_IN_PROGRAMS [VariableDeclaration] (from packages/core/fonts/src/built-in.ts): BUILT_IN_PROGRAMS: BuiltInPrograms ={ standardDisplayHash: (name) => standardFontProgram(name).hash, lastResortDisplayHash: LAST_RESORT_HASH, }
+BUILT_IN_PROGRAMS [VariableDeclaration] (from packages/core/fonts/src/built-in.ts): BUILT_IN_PROGRAMS: BuiltInPrograms ={ standardDisplayHash: (name) => FACES[name].programHash, lastResortDisplayHash: LAST_RESORT_HASH, }
 LAST_RESORT_HASH [VariableDeclaration] (from packages/core/fonts/src/last-resort.generated.ts): LAST_RESORT_HASH = 'e9d14973462069b4906f8d22a9aaec2d6ec9eb02ac31d697631783316d8b8768'
 LAST_RESORT_METRICS [VariableDeclaration] (from packages/core/fonts/src/last-resort.ts): LAST_RESORT_METRICS ={ advance: 700, ascent: 800, descent: -200} as const
 MountableFontProgram [InterfaceDeclaration] (from packages/core/fonts/src/standard/programs.ts): export interface MountableFontProgram{ readonly hash: string; readonly family: string; readonly weight: number; readonly style: 'normal' | 'italic'; load(): Promise<Uint8Array>; }
