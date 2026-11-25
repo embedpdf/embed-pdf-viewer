@@ -46,6 +46,8 @@ export interface OpenInputLayerBytes {
   /** Optional sharing key for the loaded base. Defaults to the handle's id (no sharing). */
   baseKey?: string;
   baseBytes: Uint8Array | ArrayBuffer;
+  /** A verified SHA-256 (hex) of the base bytes, when the caller has one. */
+  baseSha256?: string;
   layer?: OpenInputLayerSource;
 }
 

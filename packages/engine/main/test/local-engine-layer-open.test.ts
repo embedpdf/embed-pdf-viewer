@@ -127,6 +127,34 @@ describe('LocalEngine layer open', () => {
     await engine.destroy();
   });
 
+  test('forwards a caller-supplied baseSha256 on the layer open message', async () => {
+    const transport = new RecordingTransport();
+    const engine = LocalEngine.fromTransport({ transport });
+    const baseSha256 = 'a'.repeat(64);
+
+    const handle = await engine.open({
+      kind: 'layerBytes',
+      id: 'doc-layer-hash',
+      baseKey: 'shared-base',
+      baseBytes: new Uint8Array([9, 8, 7]),
+      baseSha256,
+    });
+
+    expect(handle.id).toBe('doc-layer-hash');
+    expect(transport.sent).toHaveLength(1);
+    const pack = transport.sent[0]!;
+    expect(pack.payload).toMatchObject({
+      kind: 'open.layerMemBase',
+      effect: 'open',
+      docId: 'doc-layer-hash',
+      baseKey: 'shared-base',
+      baseSha256,
+    });
+
+    await handle.close();
+    await engine.destroy();
+  });
+
   test('opens an existing layer artifact with a small memory-backed artifact', async () => {
     const transport = new RecordingTransport();
     const engine = LocalEngine.fromTransport({ transport });
