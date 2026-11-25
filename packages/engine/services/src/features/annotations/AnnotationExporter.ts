@@ -134,7 +134,7 @@ class ResourceCollector extends BundleResources {
   // A stamp placing a drawing exports the drawing, once however many stamps
   // place it; any other appearance exports as the page shows it.
   private appearanceOf(annotPtr: Ptr): ResourceId | null {
-    const drawing = this.runtime.fn.EPDFAnnot_GetStampDrawing(annotPtr);
+    const drawing = this.runtime.fn.EPDFAnnot_GetDrawing(annotPtr);
     const known = drawing ? this.drawings.get(drawing) : undefined;
     if (known) return known;
     const bytes = appearanceBytesOf(this.runtime, this.session.requireDocPtr(), annotPtr, drawing);

@@ -13,7 +13,7 @@ import { saveDocumentToBuffer } from '../saveDocumentToBuffer';
 
 /**
  * An annotation's appearance as a one-page PDF, or `null` without one.
- * `drawing` is the drawing a stamp places (`EPDFAnnot_GetStampDrawing`), or 0:
+ * `drawing` is the drawing a stamp places (`EPDFAnnot_GetDrawing`), or 0:
  * a drawing exports as it is, however many stamps place it; any other
  * appearance exports as the page shows it.
  */

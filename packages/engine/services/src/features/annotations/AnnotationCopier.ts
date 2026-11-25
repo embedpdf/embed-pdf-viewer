@@ -173,7 +173,7 @@ export class AnnotationCopier {
       try {
         const found: WireAnnotationResources = {};
         if (roles.appearance) {
-          const drawing = fn.EPDFAnnot_GetStampDrawing(annotPtr);
+          const drawing = fn.EPDFAnnot_GetDrawing(annotPtr);
           const read = drawings.get(drawing);
           const bytes =
             read ??
