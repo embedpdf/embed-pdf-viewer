@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { AnnotationRefSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';

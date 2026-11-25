@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import { closed } from '../wire/reading';
 import { PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './kinds/link/values';
@@ -365,12 +365,12 @@ export interface KindDeclaration<
    * an update's value outside it is a read-only value, kept only when
    * unchanged. `null` for an engine field, which no value writes.
    */
-  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny | null>>;
+  readonly readBackWrites: Readonly<Record<string, z.ZodType | null>>;
   /** The zod shapes behind the three page-space schemas, to build variants from. */
   readonly shapes: {
-    readonly read: z.ZodRawShape;
-    readonly create: z.ZodRawShape;
-    readonly update: z.ZodRawShape;
+    readonly read: Readonly<Record<string, z.ZodType>>;
+    readonly create: Readonly<Record<string, z.ZodType>>;
+    readonly update: Readonly<Record<string, z.ZodType>>;
   };
 }
 
@@ -410,7 +410,7 @@ export type UpdateOf<Declaration, C extends Coordinates = PageCoordinates> =
  * the same shape in both spaces.
  */
 const PAGE_SPACE_SCHEMAS: Partial<
-  Record<FieldSpace, { readonly read: z.ZodTypeAny; readonly write: z.ZodTypeAny }>
+  Record<FieldSpace, { readonly read: z.ZodType; readonly write: z.ZodType }>
 > = {
   box: { read: PageBoxSchema, write: PageBoxSchema },
   linkTarget: { read: PdfLinkTargetSchema, write: PdfLinkTargetWritableSchema },
@@ -419,22 +419,22 @@ const PAGE_SPACE_SCHEMAS: Partial<
 };
 
 interface ZodShapes {
-  read: Record<string, z.ZodTypeAny>;
-  create: Record<string, z.ZodTypeAny>;
-  update: Record<string, z.ZodTypeAny>;
-  readBackWrites: Record<string, z.ZodTypeAny | null>;
+  read: Record<string, z.ZodType>;
+  create: Record<string, z.ZodType>;
+  update: Record<string, z.ZodType>;
+  readBackWrites: Record<string, z.ZodType | null>;
 }
 
 /** The zod shapes of a kind's fields, each field's schemas given by `schemasOf`. */
 function shapesOf(
   subtype: string,
   fields: KindFields,
-  schemasOf: (spec: AnyField) => { read: z.ZodTypeAny; write: z.ZodTypeAny },
+  schemasOf: (spec: AnyField) => { read: z.ZodType; write: z.ZodType },
 ): ZodShapes {
-  const read: Record<string, z.ZodTypeAny> = { subtype: closed(z.literal(subtype)) };
-  const create: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
-  const update: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype).optional() };
-  const readBackWrites: Record<string, z.ZodTypeAny | null> = {};
+  const read: Record<string, z.ZodType> = { subtype: closed(z.literal(subtype)) };
+  const create: Record<string, z.ZodType> = { subtype: z.literal(subtype) };
+  const update: Record<string, z.ZodType> = { subtype: z.literal(subtype).optional() };
+  const readBackWrites: Record<string, z.ZodType | null> = {};
   for (const [name, spec] of Object.entries(fields)) {
     const { owner, readNullable, writeNullable, required, readBack } = spec.traits;
     const schemas = schemasOf(spec);

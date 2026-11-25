@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 /**
  * A multipart message carries each file as a part `resource:<key>`, and its

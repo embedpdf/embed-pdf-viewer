@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import type { FormFieldRef } from './FormFieldRef';
 import { closed } from '../wire/reading';

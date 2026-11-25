@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import type { PdfDestination } from '../../../dto/PdfDestination';
 import { PageDestinationSchema, PdfDestinationSchema } from '../../../dto/PdfDestination.schema';

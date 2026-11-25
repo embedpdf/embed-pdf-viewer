@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import type { OutlineItemRef } from './OutlineItemRef';
 import { closed } from '../wire/reading';

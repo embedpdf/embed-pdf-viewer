@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 import type { IsoDateTime } from '../dto/IsoDateTime';
 import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 

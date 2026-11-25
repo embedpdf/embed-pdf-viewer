@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { defineKind, field } from '../../declaration';
 import { annotationBaseFields } from '../shared-fields';

@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { afterAll } from 'vitest';
 import { readingProblems, withUnknownFields } from '@embedpdf/engine-core/conformance';
-import { EngineErrorSchema } from '@embedpdf/engine-core/wire';
+import * as wire from '@embedpdf/engine-core/wire';
 
 /**
  * Every JSON response this suite's client reads is read a second time with
@@ -12,33 +12,51 @@ import { EngineErrorSchema } from '@embedpdf/engine-core/wire';
  * its responses doesn't.
  *
  * A body counts as a response when `Response.json()` returned it, and the
- * schema that reads it is the one a top-level `parse` or `safeParse` hands it
- * to. zod binds those two to each schema, so the hook sits on `_parseSync`,
- * which they call, on the prototype the engine's own schemas inherit it from:
- * the engine's copy of zod.
+ * schema that reads it is the one a `parse` or `safeParse` hands it to. zod
+ * puts those two on the prototype of each kind of schema, so the hook sits on
+ * the prototypes the engine's own schemas have: the engine's copy of zod.
  */
 type Schema = Parameters<typeof readingProblems>[0] & {
-  safeParse(data: unknown): { success: true; data: unknown } | { success: false; error: ZodError };
+  safeParse(data: unknown, ...rest: unknown[]): SafeParsed;
+  parse(data: unknown, ...rest: unknown[]): unknown;
 };
-interface ZodError {
-  issues: Array<{ path: Array<string | number>; message: string }>;
-}
-/** What `_parseSync` is handed: a top-level parse's context has no parent. */
-interface ParseInput {
-  data: unknown;
-  path: unknown[];
-  parent: { parent: unknown } | null;
-}
-type ParseSync = (this: Schema, input: ParseInput) => { status: string; value?: unknown };
+type SafeParsed =
+  | { success: true; data: unknown }
+  | { success: false; error: { issues: Array<{ path: PropertyKey[]; message: string }> } };
 
-/** The prototype that holds `_parseSync` for every schema the engine reads with. */
-function schemaPrototype(): { _parseSync: ParseSync } {
-  let prototype: object | null = Object.getPrototypeOf(EngineErrorSchema);
-  while (prototype && !Object.prototype.hasOwnProperty.call(prototype, '_parseSync')) {
-    prototype = Object.getPrototypeOf(prototype);
+/** The prototypes that hold `safeParse` and `parse` for the schemas the engine reads with. */
+function schemaPrototypes(): Schema[] {
+  const prototypes = new Set<object>();
+  for (const exported of Object.values(wire)) {
+    if (typeof exported !== 'object' || exported === null || !('safeParse' in exported)) continue;
+    let prototype: object | null = Object.getPrototypeOf(exported);
+    while (prototype && !Object.prototype.hasOwnProperty.call(prototype, 'safeParse')) {
+      prototype = Object.getPrototypeOf(prototype);
+    }
+    if (prototype) prototypes.add(prototype);
   }
-  if (!prototype) throw new Error('no _parseSync on the engine schemas to check responses with');
-  return prototype as { _parseSync: ParseSync };
+  if (prototypes.size === 0) {
+    throw new Error('no safeParse on the engine schemas to check responses with');
+  }
+  return [...prototypes] as Schema[];
+}
+
+type Method<Name extends 'safeParse' | 'parse'> = (
+  this: Schema,
+  ...args: Parameters<Schema[Name]>
+) => ReturnType<Schema[Name]>;
+
+/** A prototype's method. zod keeps it behind a getter that binds it to whoever reads it. */
+function methodOf<Name extends 'safeParse' | 'parse'>(prototype: Schema, name: Name): Method<Name> {
+  return Object.getOwnPropertyDescriptor(prototype, name)!.get!.call(undefined) as Method<Name>;
+}
+
+function replaceMethod<Name extends 'safeParse' | 'parse'>(
+  prototype: Schema,
+  name: Name,
+  method: Method<Name>,
+): void {
+  Object.defineProperty(prototype, name, { configurable: true, writable: true, value: method });
 }
 
 interface ReadingCheck {
@@ -61,34 +79,43 @@ function install(): ReadingCheck {
     return body;
   };
 
-  const prototype = schemaPrototype();
-  const parseSync = prototype._parseSync;
-  prototype._parseSync = function (this: Schema, input: ParseInput) {
-    const result = parseSync.call(this, input);
-    const { data } = input;
-    const topLevel = input.parent !== null && input.parent.parent === null;
-    const path = topLevel && typeof data === 'object' && data !== null && check.responses.get(data);
-    if (!path || result.status !== 'valid') return result;
-    check.responses.delete(data as object);
+  /** Reads `data`, which `schema` just read as `value`, once more with unknown fields. */
+  const readAgain = (schema: Schema, data: unknown, value: unknown): void => {
+    const path = typeof data === 'object' && data !== null && check.responses.get(data);
+    if (!path) return;
+    check.responses.delete(data);
 
-    let problems = problemsOf.get(this._def);
+    let problems = problemsOf.get(schema);
     if (!problems) {
-      problems = readingProblems(this, 'response');
-      problemsOf.set(this._def, problems);
+      problems = readingProblems(schema, 'response');
+      problemsOf.set(schema, problems);
     }
     for (const problem of problems) check.problems.add(`${path}: ${problem}`);
 
-    const again = this.safeParse(withUnknownFields(this, data));
+    const again = schema.safeParse(withUnknownFields(schema, data));
     if (!again.success) {
       const issue = again.error.issues[0];
-      check.problems.add(
-        `${path}: fails with an unknown field at ${issue?.path.join('.') || 'the top'}: ${issue?.message}`,
-      );
-    } else if (!isDeepStrictEqual(again.data, result.value)) {
+      const at = issue?.path.map(String).join('.') || 'the top';
+      check.problems.add(`${path}: fails with an unknown field at ${at}: ${issue?.message}`);
+    } else if (!isDeepStrictEqual(again.data, value)) {
       check.problems.add(`${path}: reads differently with an unknown field`);
     }
-    return result;
   };
+
+  for (const prototype of schemaPrototypes()) {
+    const safeParse = methodOf(prototype, 'safeParse');
+    replaceMethod(prototype, 'safeParse', function (data, ...rest) {
+      const result = safeParse.call(this, data, ...rest);
+      if (result.success) readAgain(this, data, result.data);
+      return result;
+    });
+    const parse = methodOf(prototype, 'parse');
+    replaceMethod(prototype, 'parse', function (data, ...rest) {
+      const value = parse.call(this, data, ...rest);
+      readAgain(this, data, value);
+      return value;
+    });
+  }
 
   return check;
 }

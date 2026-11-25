@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { PolylineIntentSchema } from '../../../dto/Measure.schema';
 import { PdfPointSchema } from '../../../geometry/schemas';

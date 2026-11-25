@@ -18,6 +18,14 @@ import type { FastifyReply } from 'fastify';
  * {@link abortSignalOf}.
  */
 
+/** What a schema refused, as zod says it. */
+export interface SchemaIssue {
+  readonly message: string;
+  readonly path?: readonly PropertyKey[];
+  /** What each kind of a union refused, when none of them fits. */
+  readonly errors?: ReadonlyArray<ReadonlyArray<SchemaIssue>>;
+}
+
 /**
  * Minimal structural view of zod's `safeParse` return so we don't need
  * `zod` as a direct dep of @cloudpdf/server. Schemas come through
@@ -28,9 +36,8 @@ export type SafeParseLike<T> =
   | { success: true; data: T }
   | {
       success: false;
-      error: { issues: Array<{ message: string; path?: ReadonlyArray<string | number> }> };
+      error: { issues: ReadonlyArray<SchemaIssue> };
     };
-
 export interface SchemaLike<T> {
   safeParse(raw: unknown): SafeParseLike<T>;
 }
@@ -274,14 +281,30 @@ export function abortSignalOf(reply: {
 export function parseOrInvalidArg<T>(schema: SchemaLike<T>, raw: unknown, where: string): T {
   const result = schema.safeParse(raw);
   if (!result.success) {
-    const field = result.error.issues[0]?.path?.join('.') ?? '';
+    const issues = result.error.issues.flatMap(withinItsKind);
+    const field = issues[0]?.path?.map(String).join('.') ?? '';
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `${where}: ${result.error.issues.map((i) => i.message).join('; ')}`,
-      { details: { ...(field ? { field } : {}), issues: result.error.issues } },
+      `${where}: ${issues.map((i) => i.message).join('; ')}`,
+      { details: { ...(field ? { field } : {}), issues } },
     );
   }
   return result.data;
+}
+
+/**
+ * A union's issue says only that no kind fits. What the kind that came
+ * closest refused says why: one that refuses a field rather than the whole
+ * value, and of those the one that refuses least.
+ */
+function withinItsKind(issue: SchemaIssue): readonly SchemaIssue[] {
+  const [closest] = (issue.errors ?? [])
+    .filter((refused) => refused[0]?.path?.length)
+    .sort((a, b) => a.length - b.length);
+  if (!closest) return [issue];
+  return closest
+    .map((refused) => ({ ...refused, path: [...(issue.path ?? []), ...(refused.path ?? [])] }))
+    .flatMap(withinItsKind);
 }
 
 export function parseTokenOrInvalidArg<T>(

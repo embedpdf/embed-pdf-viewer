@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import type {
   DocumentActionsSnapshot,
@@ -145,7 +145,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
       // (destination). Both non-null cannot come from a correct reader.
       if (snapshot.openAction !== null && snapshot.openDestination !== null) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'openAction and openDestination are mutually exclusive',
           path: ['openDestination'],
         });
@@ -283,4 +283,4 @@ export const PdfActionWireComponents = {
   FieldActionsPatch: FieldActionsPatchSchema,
   PdfActionWrite: PdfActionWriteSchema,
   WidgetActionsPatch: WidgetActionsPatchSchema,
-} as const satisfies Record<string, z.ZodTypeAny>;
+} as const satisfies Record<string, z.ZodType>;

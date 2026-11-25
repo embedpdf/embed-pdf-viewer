@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../zod';
 
 import { DateInputSchema, IsoDateTimeSchema } from '../../dto/IsoDateTime.schema';
 import type { PdfForeignMeasure, PdfMeasure } from '../../dto/Measure';

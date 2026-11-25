@@ -46,7 +46,7 @@ export const KeyPrefixTemplateSchema = z
   .min(1)
   .superRefine((template, ctx) => {
     const refuse = (message: string): void => {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      ctx.addIssue({ code: 'custom', message });
     };
     const first = template.indexOf(TENANT_PLACEHOLDER);
     if (first === -1) {
@@ -140,7 +140,7 @@ export const ImportConnectionSchema = z
   .superRefine((conn, ctx) => {
     if (conn.credentials.includes('tenant-jwt') && conn.scope.kind === 'whole-bucket') {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `connection ${conn.id}: tenant-jwt credentials require a key-prefix scope; whole-bucket access is api-token only`,
       });
     }
@@ -149,7 +149,7 @@ export const ImportConnectionSchema = z
     // structurally operator-only — not a default, an invariant.
     if (conn.kind === 'fs' && conn.credentials.includes('tenant-jwt')) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `connection ${conn.id}: filesystem connections are api-token only`,
       });
     }

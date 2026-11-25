@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { AttachmentFileInfoSchema } from '../../../dto/Attachment.schema';
 import { defineKind, field } from '../../declaration';
