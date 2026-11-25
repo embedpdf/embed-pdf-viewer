@@ -59,7 +59,7 @@ export function preflightStampPatch(
  *   1. take the `appearance` resource that came with the write
  *   2. find or make its drawing ({@link drawingFor}): a stamp with the same
  *      artwork already in the document shares it
- *   3. `EPDFAnnot_SetStampDrawing` gives the stamp a wrapper of its own that
+ *   3. `EPDFAnnot_SetDrawing` gives the stamp a wrapper of its own that
  *      fits the drawing into the box, honouring its `fit` and any
  *      `/EMBD_Metadata` rotation.
  * The mutator's `EPDFAnnot_GenerateAppearance` pass afterwards is a no-op
@@ -279,8 +279,8 @@ function setStampContent(
   // nothing of it stays reachable in the saved file, and a drawing other
   // stamps place is never changed.
   const drawing = drawingFor(fn, mem, target.docPtr, target.drawings, bytes, meta);
-  if (!fn.EPDFAnnot_SetStampDrawing(annotPtr, drawing, APPEARANCE_FIT_CODE[fit])) {
-    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampDrawing returned false');
+  if (!fn.EPDFAnnot_SetDrawing(annotPtr, drawing, APPEARANCE_FIT_CODE[fit])) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetDrawing returned false');
   }
 }
 

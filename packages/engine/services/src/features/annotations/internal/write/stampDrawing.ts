@@ -81,8 +81,9 @@ export function drawingFor(
 }
 
 /**
- * Content id → drawing for the drawings the document's stamps place, built
- * on first use: each is exported and hashed once.
+ * Content id → drawing for the drawings the document's annotations show (a
+ * stamp's, a mark's in a widget, a push button's icons), built on first use:
+ * each is exported and hashed once.
  */
 function contentIndex(
   fn: PdfFunctions,
@@ -92,11 +93,11 @@ function contentIndex(
 ): Map<string, number> {
   if (index.byContent) return index.byContent;
   const byContent = new Map<string, number>();
-  const count = fn.EPDFDoc_GetStampDrawings(docPtr, NULL_PTR, 0);
+  const count = fn.EPDFDoc_GetDrawings(docPtr, NULL_PTR, 0);
   const drawings =
     count > 0
       ? withScratch(mem, 4 * count, (buffer) => {
-          fn.EPDFDoc_GetStampDrawings(docPtr, buffer, count);
+          fn.EPDFDoc_GetDrawings(docPtr, buffer, count);
           return Array.from(
             { length: count },
             (_, i) => Number(mem.peek(buffer, 'i32', 4 * i)) >>> 0,

@@ -83,6 +83,7 @@ export interface PdfFunctions {
   EPDFAnnot_ClearEmbedMetadata: (arg0: Ptr) => boolean;
   EPDFAnnot_ClearEmbedMetadataKey: (arg0: Ptr, arg1: string) => boolean;
   EPDFAnnot_ClearMKColor: (arg0: Ptr, arg1: number) => boolean;
+  EPDFAnnot_ClearMKIcon: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_ClearRectangleDifferences: (arg0: Ptr) => boolean;
   EPDFAnnot_ExportAppearance: (arg0: Ptr, arg1: number, arg2: Ptr) => Ptr;
   EPDFAnnot_GenerateAppearance: (arg0: Ptr) => boolean;
@@ -107,6 +108,7 @@ export interface PdfFunctions {
   EPDFAnnot_GetDefaultAppearance: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: Ptr, arg4: Ptr, arg5: Ptr) => boolean;
   EPDFAnnot_GetDefaultAppearanceFontFace: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: Ptr, arg4: Ptr) => number;
   EPDFAnnot_GetDefaultAppearanceFontPostScriptName: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
+  EPDFAnnot_GetDrawing: (arg0: Ptr) => number;
   EPDFAnnot_GetDrawingRect: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_GetEmbedMetadataBoolean: (arg0: Ptr, arg1: string, arg2: Ptr) => boolean;
   EPDFAnnot_GetEmbedMetadataJSON: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
@@ -120,6 +122,7 @@ export interface PdfFunctions {
   EPDFAnnot_GetLineLeader: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: Ptr) => boolean;
   EPDFAnnot_GetMeasure: (arg0: Ptr) => Ptr;
   EPDFAnnot_GetMKColor: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: Ptr, arg4: Ptr) => boolean;
+  EPDFAnnot_GetMKIcon: (arg0: Ptr, arg1: number) => number;
   EPDFAnnot_GetMKRotation: (arg0: Ptr) => number;
   EPDFAnnot_GetMKText: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFAnnot_GetMKTextPosition: (arg0: Ptr) => number;
@@ -135,11 +138,11 @@ export interface PdfFunctions {
   EPDFAnnot_GetRichTextJSON: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFAnnot_GetRotate: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_GetShapeCaption: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: Ptr) => boolean;
-  EPDFAnnot_GetStampDrawing: (arg0: Ptr) => number;
   EPDFAnnot_GetStructurePosition: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFAnnot_GetTextAlignment: (arg0: Ptr) => number;
   EPDFAnnot_HasAppearanceStream: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_HasEmbedMetadata: (arg0: Ptr) => boolean;
+  EPDFAnnot_HasMKIcon: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_IsValid: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveAction: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveDest: (arg0: Ptr) => boolean;
@@ -157,6 +160,7 @@ export interface PdfFunctions {
   EPDFAnnot_SetDefaultAppearance: (arg0: Ptr, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number) => boolean;
   EPDFAnnot_SetDefaultAppearanceDocumentFont: (arg0: Ptr, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number) => boolean;
   EPDFAnnot_SetDefaultAppearanceRegisteredFont: (arg0: Ptr, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number) => boolean;
+  EPDFAnnot_SetDrawing: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFAnnot_SetEmbedMetadataBoolean: (arg0: Ptr, arg1: string, arg2: boolean) => boolean;
   EPDFAnnot_SetEmbedMetadataJSON: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetEmbedMetadataNumber: (arg0: Ptr, arg1: string, arg2: number) => boolean;
@@ -170,6 +174,7 @@ export interface PdfFunctions {
   EPDFAnnot_SetLineLeader: (arg0: Ptr, arg1: number, arg2: number, arg3: number) => boolean;
   EPDFAnnot_SetLinkedAnnot: (arg0: Ptr, arg1: string, arg2: Ptr) => boolean;
   EPDFAnnot_SetMKColor: (arg0: Ptr, arg1: number, arg2: number, arg3: number, arg4: number) => boolean;
+  EPDFAnnot_SetMKIcon: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFAnnot_SetMKRotation: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetMKText: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_SetMKTextPosition: (arg0: Ptr, arg1: number) => boolean;
@@ -185,7 +190,6 @@ export interface PdfFunctions {
   EPDFAnnot_SetRichTextXHTML: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetRotate: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetShapeCaption: (arg0: Ptr, arg1: boolean, arg2: Ptr) => boolean;
-  EPDFAnnot_SetStampDrawing: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFAnnot_SetStampOpacity: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFAnnot_SetSubtype: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetTextAlignment: (arg0: Ptr, arg1: number) => boolean;
@@ -229,6 +233,7 @@ export interface PdfFunctions {
   EPDFDoc_GetAttachmentIndexByKey: (arg0: Ptr, arg1: Ptr) => number;
   EPDFDoc_GetAttachmentKey: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFDoc_GetBaseBytesSize: (arg0: Ptr) => bigint;
+  EPDFDoc_GetDrawings: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFDoc_GetFontDisplayProgramCoverage: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: number) => number;
   EPDFDoc_GetFontDisplayProgramData: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: number) => number;
   EPDFDoc_GetFontEmbeddingPolicy: (arg0: Ptr) => number;
@@ -275,7 +280,6 @@ export interface PdfFunctions {
   EPDFDoc_GetPieceInfoValueType: (arg0: Ptr, arg1: string, arg2: string) => number;
   EPDFDoc_GetRevision: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: Ptr) => boolean;
   EPDFDoc_GetRevisionCount: (arg0: Ptr) => number;
-  EPDFDoc_GetStampDrawings: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFDoc_GetStructureObjectNumbers: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: Ptr) => boolean;
   EPDFDoc_GetTypographicFeatures: (arg0: Ptr) => boolean;
   EPDFDoc_HasPagePieceInfoEntry: (arg0: Ptr, arg1: number, arg2: string) => boolean;
@@ -590,6 +594,7 @@ export interface PdfFunctions {
   EPDFSig_WriteContents: (arg0: Ptr, arg1: bigint, arg2: bigint, arg3: bigint, arg4: Ptr, arg5: number) => boolean;
   EPDFText_GetCharGeometry: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFText_GetCharToTextMap: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
+  EPDFText_GetPageGeometry: (arg0: Ptr, arg1: number, arg2: number, arg3: Ptr) => number;
   EPDFText_GetTextFull: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFText_RedactInQuads: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: boolean, arg4: boolean) => boolean;
   EPDFText_RedactInRect: (arg0: Ptr, arg1: Ptr, arg2: boolean, arg3: boolean) => boolean;
@@ -1182,6 +1187,7 @@ EPDFAnnot_ClearColor 0 1 3
 EPDFAnnot_ClearEmbedMetadata 0 1
 EPDFAnnot_ClearEmbedMetadataKey 0 1 2
 EPDFAnnot_ClearMKColor 0 1 3
+EPDFAnnot_ClearMKIcon 0 1 3
 EPDFAnnot_ClearRectangleDifferences 0 1
 EPDFAnnot_ExportAppearance 1 1 5 1
 EPDFAnnot_GenerateAppearance 0 1
@@ -1206,6 +1212,7 @@ EPDFAnnot_GetColor 0 1 3 1 1 1
 EPDFAnnot_GetDefaultAppearance 0 1 1 1 1 1 1
 EPDFAnnot_GetDefaultAppearanceFontFace 3 1 6 3 1 1
 EPDFAnnot_GetDefaultAppearanceFontPostScriptName 3 1 4 3
+EPDFAnnot_GetDrawing 3 1
 EPDFAnnot_GetDrawingRect 0 1 3 1
 EPDFAnnot_GetEmbedMetadataBoolean 0 1 2 1
 EPDFAnnot_GetEmbedMetadataJSON 3 1 6 3
@@ -1219,6 +1226,7 @@ EPDFAnnot_GetLineEndings 0 1 1 1
 EPDFAnnot_GetLineLeader 0 1 1 1 1
 EPDFAnnot_GetMeasure 1 1
 EPDFAnnot_GetMKColor 0 1 3 1 1 1
+EPDFAnnot_GetMKIcon 3 1 3
 EPDFAnnot_GetMKRotation 3 1
 EPDFAnnot_GetMKText 3 1 3 6 3
 EPDFAnnot_GetMKTextPosition 3 1
@@ -1234,11 +1242,11 @@ EPDFAnnot_GetRichContent 3 1 6 3
 EPDFAnnot_GetRichTextJSON 3 1 4 3
 EPDFAnnot_GetRotate 0 1 1
 EPDFAnnot_GetShapeCaption 0 1 1 1 1
-EPDFAnnot_GetStampDrawing 3 1
 EPDFAnnot_GetStructurePosition 3 1 1 3
 EPDFAnnot_GetTextAlignment 3 1
 EPDFAnnot_HasAppearanceStream 0 1 3
 EPDFAnnot_HasEmbedMetadata 0 1
+EPDFAnnot_HasMKIcon 0 1 3
 EPDFAnnot_IsValid 0 1
 EPDFAnnot_RemoveAction 0 1
 EPDFAnnot_RemoveDest 0 1
@@ -1256,6 +1264,7 @@ EPDFAnnot_SetColor 0 1 3 3 3 3
 EPDFAnnot_SetDefaultAppearance 0 1 3 5 3 3 3
 EPDFAnnot_SetDefaultAppearanceDocumentFont 0 1 3 5 3 3 3
 EPDFAnnot_SetDefaultAppearanceRegisteredFont 0 1 3 5 3 3 3
+EPDFAnnot_SetDrawing 0 1 3 3
 EPDFAnnot_SetEmbedMetadataBoolean 0 1 2 0
 EPDFAnnot_SetEmbedMetadataJSON 0 1 1
 EPDFAnnot_SetEmbedMetadataNumber 0 1 2 5
@@ -1269,6 +1278,7 @@ EPDFAnnot_SetLineEndings 0 1 3 3
 EPDFAnnot_SetLineLeader 0 1 5 5 5
 EPDFAnnot_SetLinkedAnnot 0 1 2 1
 EPDFAnnot_SetMKColor 0 1 3 3 3 3
+EPDFAnnot_SetMKIcon 0 1 3 3
 EPDFAnnot_SetMKRotation 0 1 3
 EPDFAnnot_SetMKText 0 1 3 1
 EPDFAnnot_SetMKTextPosition 0 1 3
@@ -1284,7 +1294,6 @@ EPDFAnnot_SetRichTextJSON 0 1 2
 EPDFAnnot_SetRichTextXHTML 0 1 1
 EPDFAnnot_SetRotate 0 1 5
 EPDFAnnot_SetShapeCaption 0 1 0 1
-EPDFAnnot_SetStampDrawing 0 1 3 3
 EPDFAnnot_SetStampOpacity 0 1 3 5
 EPDFAnnot_SetSubtype 0 1 3
 EPDFAnnot_SetTextAlignment 0 1 3
@@ -1328,6 +1337,7 @@ EPDFDoc_GetAdditionalActionModel 1 1 3
 EPDFDoc_GetAttachmentIndexByKey 3 1 1
 EPDFDoc_GetAttachmentKey 3 1 3 6 3
 EPDFDoc_GetBaseBytesSize 7 1
+EPDFDoc_GetDrawings 3 1 1 3
 EPDFDoc_GetFontDisplayProgramCoverage 3 1 4 1 3
 EPDFDoc_GetFontDisplayProgramData 3 1 4 1 3
 EPDFDoc_GetFontEmbeddingPolicy 3 1
@@ -1374,7 +1384,6 @@ EPDFDoc_GetPieceInfoStringArrayCount 3 1 2 2
 EPDFDoc_GetPieceInfoValueType 3 1 2 2
 EPDFDoc_GetRevision 0 1 3 1 1
 EPDFDoc_GetRevisionCount 3 1
-EPDFDoc_GetStampDrawings 3 1 1 3
 EPDFDoc_GetStructureObjectNumbers 0 1 1 1 1
 EPDFDoc_GetTypographicFeatures 0 1
 EPDFDoc_HasPagePieceInfoEntry 0 1 3 2
@@ -1689,6 +1698,7 @@ EPDFSig_SetFieldLock 0 1 3 3 6 3 3
 EPDFSig_WriteContents 0 4 7 7 7 4 3
 EPDFText_GetCharGeometry 0 1 3 1
 EPDFText_GetCharToTextMap 3 1 1 3
+EPDFText_GetPageGeometry 3 1 3 3 1
 EPDFText_GetTextFull 3 1 1 3
 EPDFText_RedactInQuads 0 1 1 3 0 0
 EPDFText_RedactInRect 0 1 1 0 0

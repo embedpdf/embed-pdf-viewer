@@ -1,4 +1,5 @@
 export {
+  appendGlyphRecords,
   buildRunsFromRawGlyphs,
   PageGeometryReader,
   type RawGeometryGlyphRecord,

@@ -479,6 +479,29 @@ export function runAnnotationResourceConformance(
       });
     });
 
+    test("a stamp of the picture a signature field's mark shows places the mark's drawing", async () => {
+      await onPage('authoring', async (page, doc) => {
+        const { field } = await doc.forms.create({
+          kind: 'signature',
+          name: 'marked',
+          widgets: [{ page: page.ref, box: { x: 20, y: 120, width: 150, height: 50 } }],
+        });
+        await doc.forms.setSignatureAppearance(field.ref, BANDS_PNG);
+        const { annotation: stamp } = await page.annotations.create(
+          { subtype: 'stamp', box: { x: 20, y: 20, width: 150, height: 50 } },
+          { resources: { appearance: BANDS_PNG } },
+        );
+        expect(images(await rewrite(doc))).toBe(1);
+
+        // Taking the mark out leaves the stamp what they shared.
+        const shown = await rasterOf(page, stamp.ref);
+        expect(maxAlpha(shown) > 200).toBe(true);
+        await doc.forms.setSignatureAppearance(field.ref, null);
+        expectSameDrawing(await rasterOf(page, stamp.ref), shown);
+        expect(images(await rewrite(doc))).toBe(1);
+      });
+    });
+
     test('new artwork for one stamp leaves a stamp sharing the old alone', async () => {
       await onPage('authoring', async (page, doc) => {
         const place = async (x: number) =>

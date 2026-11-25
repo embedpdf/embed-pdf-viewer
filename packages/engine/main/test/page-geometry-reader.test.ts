@@ -2,8 +2,10 @@ import { describe, expect, test } from 'vitest';
 import type { PdfQuad, PdfRect } from '@embedpdf/engine-core/runtime';
 import { createPdfTextLayout, isRotatedGeometryRun } from '@embedpdf/engine-core/runtime';
 import {
+  appendGlyphRecords,
   buildRunsFromRawGlyphs,
   EPDF_CHAR_GEOMETRY_LAYOUT,
+  EPDF_PAGE_CHAR_GEOMETRY_LAYOUT,
   type RawGeometryGlyphRecord,
 } from '@embedpdf/engine-services';
 
@@ -214,6 +216,177 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(isRotatedGeometryRun(run)).toBe(false);
     if (isRotatedGeometryRun(run)) return; // narrows: only upright glyphs carry a box
     expect(run.glyphs[0].loose).toEqual(box(10, 10, 30, 22));
+  });
+});
+
+/** One `EPDF_PAGE_CHAR_GEOMETRY` as the native call writes it. */
+interface NativeGlyph {
+  objectRun: number;
+  fontSize: number;
+  flags: number;
+  /** `FS_RECTF` order: left, top, right, bottom. */
+  looseBox?: [number, number, number, number];
+  tightBox?: [number, number, number, number];
+  /** `FS_QUADPOINTSF` order: upper start, upper end, lower start, lower end. */
+  looseQuad?: number[];
+  tightQuad?: number[];
+  /** `FS_MATRIX` order: a, b, c, d, e, f. */
+  matrix?: number[];
+}
+
+const BITS = EPDF_CHAR_GEOMETRY_LAYOUT.flags;
+
+function nativeBytes(glyphs: NativeGlyph[]): Uint8Array {
+  const { bytes, offsets: record } = EPDF_PAGE_CHAR_GEOMETRY_LAYOUT;
+  const { offsets } = EPDF_CHAR_GEOMETRY_LAYOUT;
+  const out = new Uint8Array(glyphs.length * bytes);
+  const view = new DataView(out.buffer);
+  const floats = (at: number, values: number[] = []) =>
+    values.forEach((value, i) => view.setFloat32(at + i * 4, value, true));
+  glyphs.forEach((glyph, i) => {
+    const at = i * bytes + record.geometry;
+    floats(at + offsets.looseBox, glyph.looseBox);
+    floats(at + offsets.tightBox, glyph.tightBox);
+    floats(at + offsets.looseQuad, glyph.looseQuad);
+    floats(at + offsets.tightQuad, glyph.tightQuad);
+    floats(at + offsets.matrix, glyph.matrix);
+    view.setUint32(at + offsets.flags, glyph.flags, true);
+    view.setUint32(i * bytes + record.objectRun, glyph.objectRun, true);
+    view.setFloat32(i * bytes + record.fontSize, glyph.fontSize, true);
+  });
+  return out;
+}
+
+describe('appendGlyphRecords', () => {
+  test('an upright glyph reads its boxes, and leaves the cells the native layer offers', () => {
+    const records: RawGeometryGlyphRecord[] = [];
+    appendGlyphRecords(
+      records,
+      nativeBytes([
+        {
+          objectRun: 0,
+          fontSize: 12,
+          flags: BITS.upright | BITS.hasTightBox | BITS.hasLooseQuad | BITS.hasTightQuad,
+          looseBox: [10, 22, 20, 10],
+          tightBox: [11, 20, 19, 12],
+          looseQuad: [10, 22, 20, 22, 10, 10, 20, 10],
+          tightQuad: [11, 20, 19, 20, 11, 12, 19, 12],
+          matrix: [1, 0, 0, 1, 10, 10],
+        },
+      ]),
+    );
+    expect(records).toEqual([
+      {
+        objectKey: 0,
+        fontSize: 12,
+        flags: 0,
+        looseBox: box(10, 10, 20, 22),
+        tightBox: box(11, 12, 19, 20),
+        upright: true,
+        baselineAngle: 0,
+        ascentFlip: false,
+      },
+    ]);
+  });
+
+  test('a box written with its edges swapped is read in order', () => {
+    const records: RawGeometryGlyphRecord[] = [];
+    appendGlyphRecords(
+      records,
+      nativeBytes([
+        { objectRun: 0, fontSize: 12, flags: BITS.upright, looseBox: [20, 10, 10, 22] },
+      ]),
+    );
+    expect(records[0].looseBox).toEqual(box(10, 10, 20, 22));
+  });
+
+  test('a turned glyph reads its cells, its baseline angle and its ascent side', () => {
+    const cell = rotatedQuad(50, 100, 10, 14);
+    const records: RawGeometryGlyphRecord[] = [];
+    appendGlyphRecords(
+      records,
+      nativeBytes([
+        {
+          objectRun: 0,
+          fontSize: 10,
+          flags: BITS.hasLooseQuad,
+          looseBox: [50, 110, 64, 100],
+          // A quarter turn counter-clockwise: the baseline runs up the page.
+          looseQuad: [64, 100, 64, 110, 50, 100, 50, 110],
+          matrix: [0, 1, -1, 0, 64, 100],
+        },
+        {
+          objectRun: 0,
+          fontSize: 10,
+          flags: BITS.hasLooseQuad,
+          looseBox: [50, 110, 64, 100],
+          looseQuad: [64, 100, 64, 110, 50, 100, 50, 110],
+          // The same turn, mirrored: the ascent points the other way.
+          matrix: [0, 1, 1, 0, 50, 100],
+        },
+      ]),
+    );
+    expect(records[0].upright).toBe(false);
+    expect(records[0].looseQuad).toEqual(cell);
+    expect(records[0].tightQuad).toBeUndefined();
+    expect(records[0].baselineAngle).toBeCloseTo(Math.PI / 2, 6);
+    expect(records[0].ascentFlip).toBe(false);
+    expect(records[1].ascentFlip).toBe(true);
+  });
+
+  test('a glyph with no box is the zeroed glyph, and a space says so', () => {
+    const records: RawGeometryGlyphRecord[] = [];
+    appendGlyphRecords(
+      records,
+      nativeBytes([
+        { objectRun: 0, fontSize: 1, flags: BITS.empty | BITS.space, looseBox: [5, 5, 5, 5] },
+        { objectRun: 0, fontSize: 1, flags: BITS.upright | BITS.space, looseBox: [0, 12, 4, 0] },
+      ]),
+    );
+    expect(records[0]).toEqual({
+      objectKey: 0,
+      fontSize: 1,
+      flags: 2,
+      looseBox: box(0, 0, 0, 0),
+      upright: true,
+      baselineAngle: 0,
+      ascentFlip: false,
+    });
+    expect(records[1].flags).toBe(1);
+  });
+
+  test('a glyph gets a font size where its text object changes, across two reads too', () => {
+    const glyph = (objectRun: number, fontSize: number): NativeGlyph => ({
+      objectRun,
+      fontSize,
+      flags: BITS.upright,
+      looseBox: [0, 12, 10, 0],
+    });
+    const records: RawGeometryGlyphRecord[] = [];
+    appendGlyphRecords(records, nativeBytes([glyph(0, 12), glyph(0, 12), glyph(1, 9)]));
+    // The page's next glyphs: the first continues the run the last read ended in.
+    appendGlyphRecords(records, nativeBytes([glyph(1, 9), glyph(2, 16)]));
+
+    expect(records.map((record) => record.objectKey)).toEqual([0, 0, 1, 1, 2]);
+    expect(records.map((record) => record.fontSize)).toEqual([12, undefined, 9, undefined, 16]);
+    expect(buildRunsFromRawGlyphs(records).map((run) => [run.start, run.fontSize])).toEqual([
+      [0, 12],
+      [2, 9],
+      [4, 16],
+    ]);
+  });
+});
+
+describe('EPDF_PAGE_CHAR_GEOMETRY ABI layout', () => {
+  test('mirrors the native static_asserts (fpdfsdk/fpdf_text.cpp)', () => {
+    expect(EPDF_PAGE_CHAR_GEOMETRY_LAYOUT).toEqual({
+      bytes: 132,
+      offsets: {
+        geometry: 0,
+        objectRun: 124,
+        fontSize: 128,
+      },
+    });
   });
 });
 

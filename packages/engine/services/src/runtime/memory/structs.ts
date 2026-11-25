@@ -37,6 +37,20 @@ export const EPDF_CHAR_GEOMETRY_LAYOUT = {
   },
 } as const;
 
+/**
+ * Generated from `EPDF_PAGE_CHAR_GEOMETRY`, one glyph of
+ * `EPDFText_GetPageGeometry`; pinned by native static_asserts. `geometry` is an
+ * `EPDF_CHAR_GEOMETRY`, read with {@link EPDF_CHAR_GEOMETRY_LAYOUT}.
+ */
+export const EPDF_PAGE_CHAR_GEOMETRY_LAYOUT = {
+  bytes: 132,
+  offsets: {
+    geometry: 0,
+    objectRun: 124,
+    fontSize: 128,
+  },
+} as const;
+
 export interface RectF {
   left: number;
   top: number;

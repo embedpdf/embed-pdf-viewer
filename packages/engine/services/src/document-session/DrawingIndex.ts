@@ -13,7 +13,7 @@ export class DrawingIndex {
   /**
    * Content id (the SHA-256, in hex, of a drawing's canonical bytes) → the
    * drawing's object number. `null` until the first lookup builds it from
-   * the drawings the document's stamps place.
+   * the drawings the document's annotations show (`EPDFDoc_GetDrawings`).
    */
   byContent: Map<string, number> | null = null;
 
