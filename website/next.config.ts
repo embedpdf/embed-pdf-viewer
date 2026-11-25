@@ -113,6 +113,9 @@ const nextConfig: NextConfig = {
     '/api/search': ['./public/search-index.bin'],
     '/\\[...mdxPath\\]': [`./${CODE_PANELS_DIR}/**/*.json`],
   },
+  // Compiles in a process of its own, which gives its memory back before the type check and the
+  // lint start. A config with a `webpack` function compiles in the build's own process otherwise.
+  experimental: { webpackBuildWorker: true },
   webpack(config) {
     // See openCodePanels above: docs code panels depend on files webpack
     // doesn't track, so their hash versions the persistent cache.
