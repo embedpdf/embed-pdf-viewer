@@ -14,14 +14,12 @@ import {
   normalizePdfRect,
   pdfQuadBounds,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeMemory, PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import {
   EPDF_CHAR_GEOMETRY_LAYOUT,
-  readF32,
-  readI32,
-  readRectF,
+  EPDF_PAGE_CHAR_GEOMETRY_LAYOUT,
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { SliceTimer, type Slices } from '../../shared/slices';
@@ -38,12 +36,22 @@ const FLAG_SPACE = 1;
 const FLAG_EMPTY = 2;
 
 /**
- * One glyph as read from `EPDFText_GetCharGeometry`, plus the run-grouping
+ * How many glyphs one `EPDFText_GetPageGeometry` call reads. Most pages take
+ * one call; a page with more glyphs is read in several, so the buffer stays
+ * small and an abort stops the read between two of them.
+ */
+const GLYPHS_PER_CALL = 4096;
+
+/**
+ * One glyph as read from `EPDFText_GetPageGeometry`, plus the run-grouping
  * context sampled alongside it. Pure data — no native handles — so the
  * grouping stage below is a pure function the tests can drive directly.
  */
 export interface RawGeometryGlyphRecord {
-  /** Grouping key: the glyph's text object handle (opaque identity). */
+  /**
+   * Grouping key: consecutive glyphs of one text object share it, and it
+   * changes where the text object does.
+   */
   objectKey: number | bigint;
   /** Sampled at each text object's first glyph (run splits inherit it). */
   fontSize?: number;
@@ -56,7 +64,10 @@ export interface RawGeometryGlyphRecord {
   /** Page-space AABB (zeroed when empty). */
   looseBox: PdfRect;
   tightBox?: PdfRect;
-  /** Oriented cells — real glyphs with a usable (non-singular) matrix only. */
+  /**
+   * Oriented cells — real glyphs that aren't upright and have a usable
+   * (non-singular) matrix only. An upright glyph's cells are its boxes.
+   */
   looseQuad?: PdfQuad;
   tightQuad?: PdfQuad;
   /** Native uprightness of the char matrix (empty glyphs: true, inert). */
@@ -77,11 +88,11 @@ type RunClass = { upright: true } | { upright: false; baselineAngle: number; asc
  * geometry. The viewer converts to content/view space via the page geometry
  * matrix; this reader applies no Y-flip or device transform.
  *
- * One `EPDFText_GetCharGeometry` call per glyph supplies boxes, oriented
- * cells, and flags together; `buildRunsFromRawGlyphs` then groups glyphs
- * into the upright/rotated run union. Upright runs are byte-identical to the
- * pre-orientation reader (quads the native layer offers are deliberately
- * dropped — the dominant case never pays for orientation).
+ * One `EPDFText_GetPageGeometry` call supplies the boxes, oriented cells and
+ * flags of up to {@link GLYPHS_PER_CALL} glyphs; `buildRunsFromRawGlyphs` then
+ * groups glyphs into the upright/rotated run union. Upright runs are
+ * byte-identical to the pre-orientation reader (quads the native layer offers
+ * are deliberately dropped — the dominant case never pays for orientation).
  */
 export class PageGeometryReader {
   constructor(
@@ -91,8 +102,8 @@ export class PageGeometryReader {
 
   /**
    * A page's text geometry. The page loads in slices when it isn't parsed, and
-   * the glyph loop pauses once a slice's budget is spent, so an abort stops the
-   * read at either.
+   * the read pauses between two calls once a slice's budget is spent, so an
+   * abort stops it at either.
    */
   async read(
     pageObjectNumber: PageObjectNumber,
@@ -116,27 +127,30 @@ export class PageGeometryReader {
       try {
         throwIfAborted(signal);
         const glyphCount = Math.max(fn.FPDFText_CountChars(textPagePtr), 0);
-        const records: RawGeometryGlyphRecord[] = [];
-        const geometryPtr = mem.alloc(EPDF_CHAR_GEOMETRY_LAYOUT.bytes);
+        if (glyphCount === 0) return { runs: [] };
 
+        const records: RawGeometryGlyphRecord[] = [];
+        const capacity = Math.min(glyphCount, GLYPHS_PER_CALL);
+        const bufferPtr = mem.alloc(capacity * EPDF_PAGE_CHAR_GEOMETRY_LAYOUT.bytes);
         try {
           const timer = new SliceTimer(slices, signal);
-          let prevObjectKey: number | bigint | null = null;
-          for (let i = 0; i < glyphCount; i++) {
+          for (let start = 0; start < glyphCount; start += capacity) {
             if (timer.due) await timer.pause();
-            const objectKey = fn.FPDFText_GetTextObject(textPagePtr, i);
-            const record: RawGeometryGlyphRecord = {
-              objectKey,
-              ...this.readGlyphRaw(textPagePtr, i, geometryPtr),
-            };
-            if (objectKey !== prevObjectKey) {
-              record.fontSize = fn.FPDFText_GetFontSize(textPagePtr, i);
-              prevObjectKey = objectKey;
+            const expected = Math.min(capacity, glyphCount - start);
+            const written = fn.EPDFText_GetPageGeometry(textPagePtr, start, capacity, bufferPtr);
+            if (written !== expected) {
+              throw new EngineError(
+                EngineErrorCode.RuntimeUnavailable,
+                `EPDFText_GetPageGeometry read ${written} of ${expected} glyphs from ${start} for page object ${pageObjectNumber}`,
+              );
             }
-            records.push(record);
+            appendGlyphRecords(
+              records,
+              mem.readBytes(bufferPtr, written * EPDF_PAGE_CHAR_GEOMETRY_LAYOUT.bytes),
+            );
           }
         } finally {
-          mem.free(geometryPtr);
+          mem.free(bufferPtr);
         }
 
         return { runs: buildRunsFromRawGlyphs(records) };
@@ -147,19 +161,43 @@ export class PageGeometryReader {
       pool.release(pageObjectNumber);
     }
   }
+}
 
-  private readGlyphRaw(
-    textPagePtr: Ptr,
-    charIndex: number,
-    geometryPtr: Ptr,
-  ): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> {
-    const { fn, mem } = this.runtime;
-    if (!fn.EPDFText_GetCharGeometry(textPagePtr, charIndex, geometryPtr)) {
-      return emptyRawGlyph();
+/**
+ * Decode `EPDF_PAGE_CHAR_GEOMETRY` records, as `EPDFText_GetPageGeometry`
+ * writes them, onto the end of `records`. Pure — exported for tests.
+ *
+ * `bytes` continues the page where `records` stops: a glyph gets a `fontSize`
+ * where its text object differs from the glyph before it, across the two.
+ */
+export function appendGlyphRecords(records: RawGeometryGlyphRecord[], bytes: Uint8Array): void {
+  const { bytes: recordBytes, offsets: record } = EPDF_PAGE_CHAR_GEOMETRY_LAYOUT;
+  const { offsets, flags: bits } = EPDF_CHAR_GEOMETRY_LAYOUT;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const f32 = (at: number) => view.getFloat32(at, true);
+  const rectAt = (at: number): PdfRect =>
+    normalizePdfRect({ left: f32(at), top: f32(at + 4), right: f32(at + 8), bottom: f32(at + 12) });
+  const quadAt = (at: number): PdfQuad => ({
+    upperLeft: { x: f32(at), y: f32(at + 4) },
+    upperRight: { x: f32(at + 8), y: f32(at + 12) },
+    lowerLeft: { x: f32(at + 16), y: f32(at + 20) },
+    lowerRight: { x: f32(at + 24), y: f32(at + 28) },
+  });
+
+  let prevObjectKey = records.length > 0 ? records[records.length - 1].objectKey : null;
+  for (let at = 0; at + recordBytes <= bytes.byteLength; at += recordBytes) {
+    const geometry = at + record.geometry;
+    const objectKey = view.getUint32(at + record.objectRun, true);
+    const glyph: RawGeometryGlyphRecord = { objectKey, ...glyphAt(geometry) };
+    if (objectKey !== prevObjectKey) {
+      glyph.fontSize = f32(at + record.fontSize);
+      prevObjectKey = objectKey;
     }
+    records.push(glyph);
+  }
 
-    const { offsets, flags: bits } = EPDF_CHAR_GEOMETRY_LAYOUT;
-    const native = readI32(mem, geometryPtr, offsets.flags) >>> 0;
+  function glyphAt(geometry: number): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> {
+    const native = view.getUint32(geometry + offsets.flags, true);
     // Degenerate geometry keeps the legacy zeroed-glyph convention so
     // upright snapshots stay bit-identical to the pre-orientation reader.
     if (native & bits.empty) {
@@ -169,27 +207,26 @@ export class PageGeometryReader {
     const upright = Boolean(native & bits.upright);
     const raw: Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> = {
       flags: native & bits.space ? FLAG_SPACE : 0,
-      looseBox: normalizePdfRect(readRectF(mem, geometryPtr, offsets.looseBox)),
+      looseBox: rectAt(geometry + offsets.looseBox),
       upright,
       baselineAngle: 0,
       ascentFlip: false,
     };
     if (native & bits.hasTightBox) {
-      raw.tightBox = normalizePdfRect(readRectF(mem, geometryPtr, offsets.tightBox));
+      raw.tightBox = rectAt(geometry + offsets.tightBox);
     }
-    if (native & bits.hasLooseQuad) {
-      raw.looseQuad = readQuad(mem, geometryPtr, offsets.looseQuad);
+    // An upright glyph's run carries its boxes, so its cells go unread.
+    if (native & bits.hasLooseQuad && !upright) {
+      raw.looseQuad = quadAt(geometry + offsets.looseQuad);
       if (native & bits.hasTightQuad) {
-        raw.tightQuad = readQuad(mem, geometryPtr, offsets.tightQuad);
+        raw.tightQuad = quadAt(geometry + offsets.tightQuad);
       }
-      if (!upright) {
-        const a = readF32(mem, geometryPtr, offsets.matrix);
-        const b = readF32(mem, geometryPtr, offsets.matrix + 4);
-        const c = readF32(mem, geometryPtr, offsets.matrix + 8);
-        const d = readF32(mem, geometryPtr, offsets.matrix + 12);
-        raw.baselineAngle = Math.atan2(b, a);
-        raw.ascentFlip = a * d - b * c < 0;
-      }
+      const a = f32(geometry + offsets.matrix);
+      const b = f32(geometry + offsets.matrix + 4);
+      const c = f32(geometry + offsets.matrix + 8);
+      const d = f32(geometry + offsets.matrix + 12);
+      raw.baselineAngle = Math.atan2(b, a);
+      raw.ascentFlip = a * d - b * c < 0;
     }
     return raw;
   }
@@ -361,15 +398,5 @@ function emptyRawGlyph(): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'>
     upright: true,
     baselineAngle: 0,
     ascentFlip: false,
-  };
-}
-
-function readQuad(mem: PdfRuntimeMemory, ptr: Ptr, byteOffset: number): PdfQuad {
-  const f = (offset: number) => readF32(mem, ptr, byteOffset + offset);
-  return {
-    upperLeft: { x: f(0), y: f(4) },
-    upperRight: { x: f(8), y: f(12) },
-    lowerLeft: { x: f(16), y: f(20) },
-    lowerRight: { x: f(24), y: f(28) },
   };
 }

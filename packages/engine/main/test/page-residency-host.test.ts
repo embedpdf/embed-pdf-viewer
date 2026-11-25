@@ -36,7 +36,7 @@ const COUNTED = {
   EPDFPage_ContinueLoad: 'continues',
   FPDF_ClosePage: 'closes',
   EPDF_RenderPageBitmapWithMatrix_Start: 'renders',
-  FPDFText_GetTextObject: 'glyphs',
+  EPDFText_GetPageGeometry: 'glyphReads',
 } as const;
 type Counted = (typeof COUNTED)[keyof typeof COUNTED];
 
@@ -49,7 +49,7 @@ function counting(runtime: PdfRuntimeModule) {
     continues: 0,
     closes: 0,
     renders: 0,
-    glyphs: 0,
+    glyphReads: 0,
   };
   const fn = new Proxy(runtime.fn, {
     get(target, name, receiver) {
@@ -216,18 +216,46 @@ describe('parsed pages kept across jobs (wasm engine)', () => {
     expect(sliced.counts.closes).toBe(0);
   }, 120_000);
 
-  test("a page's glyphs are read in slices: an abort stops the loop part way, and the page stays parsed", async () => {
-    const host = await openHost({ sliceMs: 0 }, textPdf(200));
+  test("a page's glyphs are read in slices: an abort stops the read part way, and the page stays parsed", async () => {
+    // Tens of thousands of glyphs: a dozen reads of some thousands each.
+    const host = await openHost({ sliceMs: 0 }, textPdf(1000));
     const job = host.send({ kind: 'pages.geometry', effect: 'read', page: toPageRef(3) });
-    while (host.counts.glyphs < 20) await turn();
+    while (host.counts.glyphReads < 1) await turn();
     host.send({ kind: 'abort', jobId: job });
     const aborted = await host.settled(job);
     expect(aborted.kind).toBe('reject');
     if (aborted.kind === 'reject') expect(aborted.error.code).toBe('Aborted');
-    // Stopped within a glyph or two of the abort, of the page's thousands.
-    expect(host.counts.glyphs).toBeLessThan(100);
+    // Stopped within a read or two of the abort, of the dozen the page takes.
+    expect(host.counts.glyphReads).toBeLessThan(4);
     expect(parses(host)).toBe(1);
     expect(host.counts.closes).toBe(0);
+  }, 120_000);
+
+  test('a page with more glyphs than one read takes is read in several, and each line comes out whole', async () => {
+    const host = await openHost({}, textPdf(400));
+    const { result } = await host.ok({
+      kind: 'pages.geometry',
+      effect: 'read',
+      page: toPageRef(3),
+    });
+    if (result.tag !== 'pages.geometry') throw new Error(`answered ${result.tag}`);
+    const { runs } = result.snapshot;
+    const glyphs = runs.reduce((sum, run) => sum + run.glyphs.length, 0);
+    expect(host.counts.glyphReads).toBe(Math.ceil(glyphs / 4096));
+    expect(host.counts.glyphReads).toBeGreaterThan(3);
+
+    // Every line is a text object of its own with the same words in it: the
+    // same cells across the page, in the lines a read ends in too.
+    const lines = runs.filter((run) => run.fontSize === 2);
+    expect(lines).toHaveLength(400);
+    const words = 'The quick brown fox jumps over the lazy dog'.length;
+    const across = (line: (typeof lines)[number]) =>
+      line.glyphs.slice(0, words).map(({ loose }) => {
+        if (!('width' in loose)) throw new Error('a turned glyph in upright text');
+        return [loose.x, loose.width];
+      });
+    expect(across(lines[0]!)).toHaveLength(words);
+    for (const line of lines) expect(across(line)).toEqual(across(lines[0]!));
   }, 120_000);
 
   test('pages that fit together both stay; pages that do not replace each other', async () => {
