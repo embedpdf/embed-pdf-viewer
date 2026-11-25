@@ -52,8 +52,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@embedpdf/engine-core": "workspace:*",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.24.6"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "latest",

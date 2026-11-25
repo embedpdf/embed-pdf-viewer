@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../zod';
 
 import { PageBoxSchema } from '../geometry/schemas';
 import { validNumberFormat } from '../measure/format';

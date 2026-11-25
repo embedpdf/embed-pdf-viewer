@@ -37,6 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   CHILD_PROCESS_FRAMEWORKS,
+  childCompilersAtOnce,
   compile,
   contentRoot,
   FRAMEWORK_LABELS,
@@ -609,21 +610,25 @@ const verdicts = (results, integrations) =>
 
 /**
  * Run groups of compile jobs (`{ framework, run }`) side by side, and return each group's results
- * by framework. The child-process compilers (`CHILD_PROCESS_FRAMEWORKS`) start first and work
- * while the others compile here, one after another.
+ * by framework. The child-process compilers (`CHILD_PROCESS_FRAMEWORKS`) start first, as many as
+ * the memory allows, and work while the others compile here, one after another.
  */
-async function compileSideBySide(groups) {
+export async function compileSideBySide(groups, childrenAtOnce = childCompilersAtOnce()) {
   const jobs = groups.flat();
-  const running = new Map();
-  for (const job of jobs) {
-    if (CHILD_PROCESS_FRAMEWORKS.has(job.framework)) running.set(job, job.run());
-  }
-  for (const job of jobs) {
-    if (!running.has(job)) running.set(job, job.run());
-  }
-  const results = new Map(
-    await Promise.all([...running].map(async ([job, result]) => [job, await result])),
-  );
+  const results = new Map();
+  const inChildren = jobs.filter((job) => CHILD_PROCESS_FRAMEWORKS.has(job.framework));
+  const here = jobs.filter((job) => !inChildren.includes(job));
+  const workThrough = async (queue) => {
+    for (let job = queue.shift(); job; job = queue.shift()) {
+      results.set(job, await job.run());
+      // A compiler in this process holds up everything else: let the next child start before it.
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+  await Promise.all([
+    ...Array.from({ length: childrenAtOnce }, () => workThrough(inChildren)),
+    workThrough(here),
+  ]);
   return groups.map((group) =>
     Object.fromEntries(group.map((job) => [job.framework, results.get(job)])),
   );

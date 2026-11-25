@@ -3,7 +3,7 @@
  * (never from `shared.ts`/`runtime`) so the zod-free runtime stays zod-free.
  */
 
-import { z } from 'zod';
+import * as z from '../zod';
 
 import type { PageBox, PagePoint, PageQuad } from './pageSpace';
 import type {

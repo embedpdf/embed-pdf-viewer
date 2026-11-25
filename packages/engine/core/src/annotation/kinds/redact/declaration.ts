@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { PdfQuadSchema, PdfRectSchema } from '../../../geometry/schemas';
 import { ColorSchema, TextAlignmentSchema } from '../../base.schema';

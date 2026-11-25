@@ -9,7 +9,7 @@
  * the same way in `packages/engine/main/test/entry-graph.test.ts`, which runs after this
  * package is built.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,7 +59,7 @@ function chainTo(entry: string, target: string): string[] | null {
         }
         return chain;
       }
-      if (!specifier.startsWith('.')) continue;
+      if (!specifier.startsWith('.') || specifier.endsWith('.json')) continue;
       const next = resolveModule(file, specifier);
       if (previous.has(next)) continue;
       previous.set(next, file);
@@ -79,5 +79,18 @@ describe("the page's entries", () => {
 describe('the entries behind the engine and the HTTP wire', () => {
   it.each(['validation.ts', 'wire.ts'])('%s holds the schemas, built with zod', (entry) => {
     expect(chainTo(entry, 'zod')).not.toBeNull();
+  });
+});
+
+/**
+ * `src/zod.ts` sets zod up for a page under a strict Content Security Policy before any schema is
+ * made, and names the parts of zod that are used, so a module that imports zod past it undoes both.
+ */
+describe('zod', () => {
+  it('is imported by src/zod.ts alone', () => {
+    const importers = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts'))
+      .filter((file) => /from 'zod(\/[^']*)?'/.test(readFileSync(join(src, file), 'utf8')));
+    expect(importers).toEqual(['zod.ts']);
   });
 });

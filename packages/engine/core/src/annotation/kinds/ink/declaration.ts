@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from '../../../zod';
 
 import { InkListSchema, PdfPointSchema } from '../../../geometry/schemas';
 import { InkIntentSchema } from '../../base.schema';

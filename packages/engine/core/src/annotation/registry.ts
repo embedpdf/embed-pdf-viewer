@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type * as z from '../zod';
 
 import type { AnnotationBase } from './base';
 import type { AnnotationSubtype } from './subtype';
@@ -30,7 +30,7 @@ export interface AnnotationKindModule<
    * The write schema of each field an update may send back as read
    * (`readBack()`); `null` for a field the engine works out.
    */
-  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny | null>>;
+  readonly readBackWrites: Readonly<Record<string, z.ZodType | null>>;
 }
 
 /**

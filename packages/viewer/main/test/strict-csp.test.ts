@@ -47,10 +47,12 @@ const STRICT_POLICY: Record<string, string[]> = {
   'trusted-types': ['embedpdf'],
 };
 
-const policyText = (policy: Record<string, string[]>) =>
-  Object.entries(policy)
+/** The headers that enforce `policy`, with its violations reported to the page's server. */
+const enforcing = (policy: Record<string, string[]>) => (origin: string) => ({
+  'content-security-policy': Object.entries({ ...policy, 'report-uri': [origin + REPORT_PATH] })
     .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
-    .join('; ');
+    .join('; '),
+});
 
 const TYPES: Record<string, string> = {
   '.js': 'text/javascript',
@@ -82,28 +84,50 @@ function filesOf(root: string, prefix: string): Map<string, Asset> {
   return assets;
 }
 
-/** A static server for in-memory assets: request URLs only select an entry, never a file. */
+/** Where a page's policy has the browser report what violated it. */
+const REPORT_PATH = '/csp-report';
+
+interface Site {
+  server: Server;
+  origin: string;
+  /** What the browser reported, a violation inside a worker included: no page hears those. */
+  reports: string[];
+}
+
+/**
+ * A static server for in-memory assets: request URLs only select an entry, never a file. Its
+ * headers are told the origin it got.
+ */
 function serve(
   assets: Map<string, Asset>,
-  headers: Record<string, string>,
-): Promise<{ server: Server; origin: string }> {
+  headersFor: (origin: string) => Record<string, string>,
+): Promise<Site> {
+  const reports: string[] = [];
+  let origin = '';
   const server = createServer((request, response) => {
     const pathname = (request.url ?? '/').split('?')[0];
+    if (pathname === REPORT_PATH) {
+      let report = '';
+      request.on('data', (chunk) => (report += chunk));
+      request.on('end', () => {
+        reports.push(report);
+        response.writeHead(204).end();
+      });
+      return;
+    }
     const asset = assets.get(pathname === '/' ? '/index.html' : pathname);
     if (!asset) {
       response.writeHead(404).end();
       return;
     }
-    response.writeHead(200, { 'content-type': asset.contentType, ...headers });
+    response.writeHead(200, { 'content-type': asset.contentType, ...headersFor(origin) });
     response.end(asset.body);
   });
   return new Promise((ok) => {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
-      ok({
-        server,
-        origin: `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`,
-      });
+      origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+      ok({ server, origin, reports });
     });
   });
 }
@@ -261,7 +285,7 @@ async function openViewer<Acted = undefined>(
     });
   });
   page.on('console', (message) => {
-    // The browser also logs each violation, including ones inside a worker.
+    // The browser also logs each violation.
     if (/Content Security Policy|Trusted ?Type/i.test(message.text()))
       violations.push(message.text());
     if (message.type() === 'error') errors.push(message.text());
@@ -344,7 +368,7 @@ describe('the viewer under the strict policy', () => {
     const assets = pageAssets('/embedpdf/embedpdf.js');
     for (const [path, asset] of filesOf(dist, '/embedpdf')) assets.set(path, asset);
     const policy = { ...STRICT_POLICY, ...change };
-    const site = await serve(assets, { 'content-security-policy': policyText(policy) });
+    const site = await serve(assets, enforcing(policy));
     servers.push(site.server);
 
     const result = await openViewer(browser, `${site.origin}/`, 'violation');
@@ -352,15 +376,29 @@ describe('the viewer under the strict policy', () => {
     expect(result.violations.join('\n')).toMatch(directive);
   });
 
+  it('hears a violation inside the worker, even one the worker catches', async () => {
+    const assets = pageAssets('/embedpdf/embedpdf.js');
+    for (const [path, asset] of filesOf(dist, '/embedpdf')) assets.set(path, asset);
+    const worker = assets.get('/embedpdf/embedpdf-worker.js')!;
+    const body = Buffer.concat([worker.body, Buffer.from("\n;try{new Function('')}catch{}")]);
+    assets.set('/embedpdf/embedpdf-worker.js', { ...worker, body });
+    const site = await serve(assets, enforcing(STRICT_POLICY));
+    servers.push(site.server);
+
+    await openViewer(browser, `${site.origin}/`);
+
+    expect(site.reports.join('\n')).toMatch(/require-trusted-types-for/);
+  });
+
   it("renders from the page's own origin with worker-src 'self', types a signature in each default font, and nothing violates the policy", async () => {
     const assets = pageAssets('/embedpdf/embedpdf.js');
     for (const [path, asset] of filesOf(dist, '/embedpdf')) assets.set(path, asset);
-    const site = await serve(assets, { 'content-security-policy': policyText(STRICT_POLICY) });
+    const site = await serve(assets, enforcing(STRICT_POLICY));
     servers.push(site.server);
 
     const result = await openViewer(browser, `${site.origin}/`, 'rendered', typeSignatures);
 
-    expect(result.violations).toEqual([]);
+    expect([...result.violations, ...site.reports]).toEqual([]);
     expect(result.acted).toEqual({ Allura: true, 'Great Vibes': true, Caveat: true });
     expect(
       result.requests.filter((request) => /\/chunks\/(allura|great-vibes|caveat)-/.test(request)),
@@ -380,7 +418,7 @@ describe('the viewer under the strict policy', () => {
 
   it('renders from a CDN with the CDN variant (worker-src blob:), types a signature in each default font, and nothing violates the policy', async () => {
     // What a public CDN sends: the folder, with CORS, and no policy of its own.
-    const cdn = await serve(filesOf(dist, ''), { 'access-control-allow-origin': '*' });
+    const cdn = await serve(filesOf(dist, ''), () => ({ 'access-control-allow-origin': '*' }));
     servers.push(cdn.server);
     const policy = {
       ...STRICT_POLICY,
@@ -388,14 +426,12 @@ describe('the viewer under the strict policy', () => {
       'worker-src': ['blob:'],
       'connect-src': ["'self'", cdn.origin],
     };
-    const site = await serve(pageAssets(`${cdn.origin}/embedpdf.js`), {
-      'content-security-policy': policyText(policy),
-    });
+    const site = await serve(pageAssets(`${cdn.origin}/embedpdf.js`), enforcing(policy));
     servers.push(site.server);
 
     const result = await openViewer(browser, `${site.origin}/`, 'rendered', typeSignatures);
 
-    expect(result.violations).toEqual([]);
+    expect([...result.violations, ...site.reports]).toEqual([]);
     expect(result.acted).toEqual({ Allura: true, 'Great Vibes': true, Caveat: true });
     expect(
       result.requests.filter((request) =>
