@@ -21,14 +21,11 @@ on:
       - 'tooling/**'
       - '.changeset/**'
       - 'pnpm-lock.yaml'
+  # With no input, a run by hand publishes what a failed run left unpublished.
   workflow_dispatch:
     inputs:
-      release_pr_number:
-        description: 'Merged Changesets PR to reuse for release notes on a publish retry'
-        required: false
-        type: string
       recover_server_run_id:
-        description: 'Recover images/chart after npm succeeded: original Release run ID (leave release_pr_number empty)'
+        description: 'Recover images/chart after npm succeeded: original Release run ID'
         required: false
         type: string
 
@@ -65,12 +62,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           RECOVER_SERVER_RUN_ID: ${{ inputs.recover_server_run_id }}
-          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
         with:
           script: |
-            if (process.env.RELEASE_PR_NUMBER) {
-              throw new Error('Use either recover_server_run_id or release_pr_number, not both.');
-            }
             const { resolveServerRecovery } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/resolve-server-recovery.mjs`);
             const recovery = await resolveServerRecovery({
               github, repository: context.repo, runId: process.env.RECOVER_SERVER_RUN_ID,
@@ -173,34 +166,6 @@ jobs:
             exit 1
           fi
 
-      # A failed publish leaves the Changesets PR merged even though no GitHub
-      # release was created. A manual retry can point back to that merged PR so
-      # its original Changesets summary is preserved verbatim.
-      - name: Load retry release PR
-        if: inputs.release_pr_number != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
-        run: |
-          if ! [[ "$RELEASE_PR_NUMBER" =~ ^[0-9]+$ ]]; then
-            echo "::error::release_pr_number must be a positive PR number"
-            exit 1
-          fi
-          gh pr view "$RELEASE_PR_NUMBER" \
-            --repo "$GITHUB_REPOSITORY" \
-            --json body,state \
-            > "$RUNNER_TEMP/release-pr.json"
-          if [ "$(jq -r '.state' "$RUNNER_TEMP/release-pr.json")" != "MERGED" ]; then
-            echo "::error::PR #$RELEASE_PR_NUMBER is not merged"
-            exit 1
-          fi
-          jq -r '.body // ""' "$RUNNER_TEMP/release-pr.json" > "$RUNNER_TEMP/release-pr-body.md"
-          if ! grep -qx '# Releases' "$RUNNER_TEMP/release-pr-body.md"; then
-            echo "::error::PR #$RELEASE_PR_NUMBER has no Changesets # Releases summary"
-            exit 1
-          fi
-          echo "Using release notes from merged PR #$RELEASE_PR_NUMBER"
-
       - name: Version / Publish via Changesets
         id: changesets
         uses: changesets/action@v1
@@ -210,6 +175,21 @@ jobs:
           version: pnpm ci:version
           publish: pnpm ci:publish
           createGithubReleases: false
+
+      # The action leaves every note out of the version PR once its body is over
+      # 60,000 characters, so the body is written again from the changelogs.
+      - name: Write the version PR's notes
+        if: steps.changesets.outputs.pullRequestNumber != ''
+        uses: actions/github-script@v7
+        env:
+          PULL_REQUEST_NUMBER: ${{ steps.changesets.outputs.pullRequestNumber }}
+        with:
+          retries: 3
+          script: |
+            const { writePullRequestNotes } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release-notes.mjs`);
+            await writePullRequestNotes({
+              github, repository: context.repo, number: Number(process.env.PULL_REQUEST_NUMBER),
+            });
 
       - name: Detect publish summary
         id: published
@@ -227,36 +207,31 @@ jobs:
             echo "did_publish=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get merged PR info
-        if: steps.published.outputs.did_publish == 'true' && inputs.release_pr_number == ''
-        id: merged_pr
-        uses: actions-ecosystem/action-get-merged-pull-request@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
+      # npm has the packages by now, and a rerun finds nothing left to publish. Without
+      # notes the release lists its packages, so the images and the chart still go out.
       - name: Prepare release notes
         if: steps.published.outputs.did_publish == 'true'
+        uses: actions/github-script@v7
         env:
-          PR_BODY: ${{ steps.merged_pr.outputs.body }}
-          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
-        run: |
-          if [ -n "$RELEASE_PR_NUMBER" ]; then
-            notes_source="$RUNNER_TEMP/release-pr-body.md"
-          else
-            notes_source="$RUNNER_TEMP/merged-pr-body.md"
-            printf '%s\n' "$PR_BODY" > "$notes_source"
-          fi
-          sed -n '/# Releases/,$p' "$notes_source" | tail -n +2 > release-notes.md || true
-
-          if [ ! -s release-notes.md ]; then
-            echo "Automated release." > release-notes.md
-            echo "" >> release-notes.md
-            echo "Packages published:" >> release-notes.md
-            echo "${{ steps.published.outputs.published }}" >> release-notes.md
-          fi
-
-          echo "Release notes:"
-          cat release-notes.md
+          VERSION: ${{ steps.published.outputs.version }}
+          PUBLISHED_JSON: ${{ steps.published.outputs.published }}
+        with:
+          retries: 3
+          script: |
+            const { writeFileSync } = require('node:fs');
+            let notes;
+            try {
+              const { releaseNotes } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release-notes.mjs`);
+              notes = await releaseNotes({ github, repository: context.repo, tag: `v${process.env.VERSION}` });
+            } catch (error) {
+              core.warning(`The release has no notes: ${error.stack}`);
+            }
+            if (!notes) {
+              const published = JSON.parse(process.env.PUBLISHED_JSON);
+              notes = ['Packages published:', '', ...published.map(({ name, version }) => `- ${name}@${version}`)].join('\n');
+            }
+            writeFileSync('release-notes.md', notes);
+            core.info(notes);
 
       - name: Package published dists
         if: steps.published.outputs.did_publish == 'true'

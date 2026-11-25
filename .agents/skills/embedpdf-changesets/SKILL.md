@@ -48,6 +48,8 @@ Add a user-facing description of the released behavior.
   releases under the repository's prerelease policy.
 - Describe shipped behavior for package users. Do not mention internal plans,
   workstreams, phases, or tracking codes.
+- Make the first sentence say what changed on its own. Over GitHub's size limit,
+  a release's notes keep only that sentence of their longest entries.
 
 ## Verify coverage
 
