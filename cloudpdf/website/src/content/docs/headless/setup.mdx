@@ -316,7 +316,9 @@ and plain esbuild.
 ## Fonts
 
 Text the engine draws, such as a text box or a filled form field, needs a font with its characters.
-For languages the built-in fonts don't cover, give the engine a fallback font:
+So does a page whose PDF names a font without embedding it, as many Chinese invoices do: without
+one, that text is blank. For languages the built-in fonts don't cover, give the engine a fallback
+font:
 
 ```ts
 export const engine = localEngine({
