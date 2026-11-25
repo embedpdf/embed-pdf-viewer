@@ -605,7 +605,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
     },
-    ...(opts.trustProxy !== undefined ? { trustProxy: opts.trustProxy } : {}),
+    ...(opts.trustProxy !== undefined ? { trustProxy: trustedProxies(opts.trustProxy) } : {}),
     bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024,
     // Use Fastify's default (`fast-querystring`) which yields a flat
     // Record<string, string> — `?viewport.kind=width` parses as
@@ -1808,6 +1808,17 @@ function decodeBase64Header(value: string | string[]): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * `trustProxy` as Fastify takes it. A hop count goes in as the check it stands
+ * for: Fastify reads a bare number as no proxy to trust.
+ */
+function trustedProxies(
+  trustProxy: NonNullable<BuildAppOptions['trustProxy']>,
+): boolean | string | string[] | ((address: string, hop: number) => boolean) {
+  if (typeof trustProxy !== 'number') return trustProxy;
+  return (_address, hop) => hop < trustProxy;
 }
 
 function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {

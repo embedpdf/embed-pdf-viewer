@@ -1,8 +1,8 @@
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import type { PageNetworkRenderFormat, PageRaster } from '@embedpdf/engine-core/runtime';
 
 export interface EncodedPageImage {
-  stream: sharp.Sharp;
+  stream: Sharp;
   mimeType: `image/${PageNetworkRenderFormat}`;
 }
 
