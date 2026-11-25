@@ -62,13 +62,17 @@ describe('auth failure throttling through the app', () => {
   const SECRET = 'auth-limiter-integration-secret';
   const LIMITER_API_TOKEN = 'auth-limiter-api-token';
 
-  async function makeApp(authFailureLimit?: { maxFailures: number; windowMs?: number } | false) {
+  async function makeApp(
+    authFailureLimit?: { maxFailures: number; windowMs?: number } | false,
+    trustProxy?: number,
+  ) {
     return buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
       apiAuthTokens: [LIMITER_API_TOKEN],
       workerEntry: null,
       ...(authFailureLimit !== undefined ? { authFailureLimit } : {}),
+      ...(trustProxy !== undefined ? { trustProxy } : {}),
     });
   }
 
@@ -124,12 +128,41 @@ describe('auth failure throttling through the app', () => {
     }
   });
 
+  test("behind a counted number of proxies, the limit is the client's own", async () => {
+    const bundle = await makeApp({ maxFailures: 1, windowMs: 60_000 }, 2);
+    try {
+      // The request came through two proxies: the peer, and the one it names last.
+      const statusFor = async (forwarded: string) => {
+        const res = await bundle.app.inject({
+          method: 'GET',
+          url: '/v1/deployment/license/status',
+          headers: { authorization: 'Bearer not-a-jwt', 'x-forwarded-for': forwarded },
+          remoteAddress: '10.0.0.1',
+        });
+        return res.statusCode;
+      };
+      expect(await statusFor('198.51.100.7, 10.0.0.2')).toBe(401);
+      expect(await statusFor('198.51.100.7, 10.0.0.2')).toBe(429);
+      expect(await statusFor('198.51.100.8, 10.0.0.2')).toBe(401);
+      // What a client writes before its own address names nobody.
+      expect(await statusFor('203.0.113.1, 198.51.100.7, 10.0.0.2')).toBe(429);
+    } finally {
+      await bundle.shutdown();
+    }
+  });
+
   test('missing bearer tokens also consume the failure budget', async () => {
     const bundle = await makeApp({ maxFailures: 1, windowMs: 60_000 });
     try {
-      const first = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
+      const first = await bundle.app.inject({
+        method: 'GET',
+        url: '/v1/deployment/license/status',
+      });
       expect(first.statusCode).toBe(401);
-      const second = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
+      const second = await bundle.app.inject({
+        method: 'GET',
+        url: '/v1/deployment/license/status',
+      });
       expect(second.statusCode).toBe(429);
     } finally {
       await bundle.shutdown();
@@ -144,7 +177,10 @@ describe('auth failure throttling through the app', () => {
         expect(res.statusCode).toBe(200);
       }
       // Budget untouched: an authed request still gets 401, not 429.
-      const after = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
+      const after = await bundle.app.inject({
+        method: 'GET',
+        url: '/v1/deployment/license/status',
+      });
       expect(after.statusCode).toBe(401);
     } finally {
       await bundle.shutdown();
