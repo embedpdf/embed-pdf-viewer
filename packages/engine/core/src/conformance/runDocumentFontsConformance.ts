@@ -1,4 +1,5 @@
-import { pdfWithFontDictionaries } from './documentFontFixtures';
+import { decodePng } from './appearanceRasters';
+import { pdfNamingFont, pdfWithFontDictionaries } from './documentFontFixtures';
 import { drawnTextOf } from './drawnText';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { Font } from '../dto/DocumentFonts';
@@ -101,6 +102,8 @@ const HEX_SHA256 = /^[0-9a-f]{64}$/;
  * - A document font is everything the PDF draws under one name, however the
  *   editors that wrote it described it: no two share a name, and a box reads
  *   back the name of the font it is drawn in.
+ * - A page's own text in a font the PDF only names is drawn in the fallback
+ *   font that has it, each character in the width the PDF gives it.
  */
 export function runDocumentFontsConformance(
   runner: ConformanceTestRunner,
@@ -194,6 +197,38 @@ export function runDocumentFontsConformance(
       expect(answer.missingCharacters).toEqual(['中']);
       await doc.close();
     });
+
+    for (const [script, text] of [
+      ['Hebrew', 'שלום'],
+      ['Arabic', 'سلام'],
+    ] as const) {
+      for (const kind of ['simple', 'composite'] as const) {
+        test(`a page draws ${script} in a ${kind} font it only names in the fallback that has it`, async () => {
+          const doc = await open(pdfNamingFont(kind, text));
+          try {
+            const image = await doc.page(await firstPage(doc)).render.image({ format: 'png' });
+            const raster = await decodePng(
+              new Uint8Array(await (await image.blob()).arrayBuffer()),
+            );
+            // Each character, in its own place.
+            const drawn = [...text].map((_, index) => {
+              let pixels = 0;
+              const from = Math.round(20 + index * 28.8);
+              for (let x = from; x < from + 28; x++) {
+                for (let y = 0; y < raster.height; y++) {
+                  const at = (y * raster.width + x) * 4;
+                  if (raster.rgba[at + 3]! > 127 && raster.rgba[at]! < 128) pixels += 1;
+                }
+              }
+              return pixels > 20;
+            });
+            expect(drawn).toEqual([...text].map(() => true));
+          } finally {
+            await doc.close();
+          }
+        });
+      }
+    }
 
     test('a write that draws a character no font has says so, as resolve for its box does', async () => {
       const doc = await open(fixtures.page);

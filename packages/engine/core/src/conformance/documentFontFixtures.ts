@@ -73,3 +73,56 @@ export function pdfWithFontDictionaries(
     `/Resources << /Font << ${resources()} >> >> /Contents 4 0 R >>`;
   return pdfOfParts(objects);
 }
+
+/**
+ * One page that writes `text` at 48 points from (20, 30), each character 600
+ * thousandths wide, in a font the document names but does not embed: a simple
+ * TrueType font, or a composite (Type 0) one.
+ */
+export function pdfNamingFont(kind: 'simple' | 'composite', text: string): Uint8Array {
+  const characters = [...text];
+  const hex = (value: number, digits: number) =>
+    value.toString(16).toUpperCase().padStart(digits, '0');
+  const unicode = characters.map((character) => hex(character.codePointAt(0)!, 4));
+  const code = (index: number) => (kind === 'simple' ? hex(65 + index, 2) : hex(1 + index, 4));
+  const stream = (content: string): PdfStreamObject => ({
+    dictionary: '',
+    data: new TextEncoder().encode(content),
+  });
+  const objects: (string | PdfStreamObject)[] = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] ' +
+      '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    stream(`BT /F1 48 Tf 20 30 Td <${characters.map((_, index) => code(index)).join('')}> Tj ET`),
+  ];
+  const descriptor =
+    '<< /Type /FontDescriptor /FontName /David /Flags 32 /FontBBox [0 -300 1000 900] ' +
+    '/ItalicAngle 0 /Ascent 900 /Descent -300 /CapHeight 700 /StemV 80 >>';
+  if (kind === 'simple') {
+    objects.push(
+      '<< /Type /Font /Subtype /TrueType /BaseFont /David /FirstChar 65 ' +
+        `/LastChar ${64 + characters.length} /Widths [${characters.map(() => 600).join(' ')}] ` +
+        '/FontDescriptor 6 0 R /Encoding << /Type /Encoding ' +
+        `/Differences [65 ${unicode.map((value) => `/uni${value}`).join(' ')}] >> >>`,
+      descriptor,
+    );
+  } else {
+    objects.push(
+      '<< /Type /Font /Subtype /Type0 /BaseFont /David /Encoding /Identity-H ' +
+        '/DescendantFonts [6 0 R] /ToUnicode 8 0 R >>',
+      '<< /Type /Font /Subtype /CIDFontType2 /BaseFont /David /DW 600 /CIDToGIDMap /Identity ' +
+        '/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> ' +
+        '/FontDescriptor 7 0 R >>',
+      descriptor,
+      stream(
+        '/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /ToUnicode def ' +
+          '/CMapType 2 def 1 begincodespacerange <0000> <FFFF> endcodespacerange\n' +
+          `${characters.length} beginbfchar\n` +
+          unicode.map((value, index) => `<${code(index)}> <${value}>\n`).join('') +
+          'endbfchar endcmap end end',
+      ),
+    );
+  }
+  return pdfOfParts(objects);
+}
