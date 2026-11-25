@@ -112,6 +112,12 @@ Latin always shows: a font without it, such as Noto Sans Hebrew, keeps its Latin
 the same weight. A character no font has shows as a box, both while typing and in the PDF, so no
 text is lost without a trace.
 
+## PDFs without their fonts
+
+A PDF can name a font without embedding it, as many Chinese invoices name SimSun. The same fallback
+fonts then draw the page's own text. Hebrew and Arabic show with no setup; Chinese, Japanese and
+Korean are blank on the page until you give a fallback font that has them.
+
 ## Typed signatures
 
 A signature typed in the signature maker is written in a handwriting font. Pick the fonts it offers

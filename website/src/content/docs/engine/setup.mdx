@@ -77,8 +77,9 @@ or musl) and for Windows (x64 and ARM64).
 ## Fonts
 
 Text the engine draws (a free text annotation, a filled form field) needs a font that has its
-characters. The engine covers Latin, Hebrew and Arabic text on its own. For other languages, give
-the engine a fallback font when you create it:
+characters. So does a page whose PDF names a font without embedding it, as many Chinese invoices do:
+without one, that text is blank. The engine covers Latin, Hebrew and Arabic text on its own. For
+other languages, give the engine a fallback font when you create it:
 
 ```ts
 const engine = localEngine({
@@ -91,7 +92,8 @@ The font is loaded while the engine starts, so it's ready before the first docum
 
 Hebrew and Arabic come from Noto Sans Hebrew and Noto Naskh Arabic, which the engine loads while it
 starts too (about 320 KB, as chunks of your build), and tries after your fallback fonts. If your
-users don't write Hebrew or Arabic, leave them out:
+users don't write Hebrew or Arabic, and don't open PDFs that name such a font without embedding it,
+leave them out:
 
 ```ts
 const engine = localEngine({ defaultFallbackFonts: false });

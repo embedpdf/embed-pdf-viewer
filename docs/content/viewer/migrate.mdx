@@ -322,7 +322,7 @@ point it there:
 | 2.x fetched | 3.0 |
 | :-- | :-- |
 | `pdfium.wasm`, from jsDelivr | `embedpdf.wasm`, a file of your build |
-| Fallback fonts, from jsDelivr | None, unless you give `engine.fallbackFonts` |
+| Fallback fonts, from jsDelivr | None, unless you give `engine.fallbackFonts`. A PDF that doesn't embed its Chinese, Japanese or Korean fonts needs one: see [Fonts](features/fonts#pdfs-without-their-fonts) |
 | The UI font and the signature fonts, from Google Fonts | The system font. The signature fonts are lazy chunks of your build. |
 | The standard stamps, from jsDelivr | A lazy chunk of your build |
 

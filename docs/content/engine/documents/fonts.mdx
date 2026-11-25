@@ -268,6 +268,33 @@ same family from the engine's fonts if it has it, then the whole font in the doc
 standard font closest to it. [`resolve()`](#show-typed-text-in-a-browser) tells you before the
 write.
 
+## Fonts the document only names
+
+A PDF can name a font without embedding it, as many Chinese invoices name SimSun. The engine draws
+such text with a font that stands in for it, and takes the characters that font lacks from the
+[fallback fonts](#text-in-any-language), each in the width the PDF gives it. Latin, Hebrew and
+Arabic show with no setup. For any other script, add a fallback font: without one, those characters
+are blank on the page.
+
+<Engine local>
+
+```ts
+const engine = localEngine({
+  fallbackFonts: [{ key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf' }],
+});
+```
+
+In a browser, the stand-in is one of the engine's own fonts. In Node, the native build looks for one
+among the fonts installed on the computer first.
+
+</Engine>
+
+<Engine cloud>
+
+Give your server a fallback font; see [Fonts](/docs/server/configuration/fonts).
+
+</Engine>
+
 ## Show typed text in a browser
 
 The viewer shows text being typed in the font the engine will write it in, and so do the headless
