@@ -1,5 +1,21 @@
 # @cloudpdf/server
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – A form field's `purpose` and `format`: a create (`POST .../form/fields`), an update (`PATCH .../form/fields/{field}`) and the `forms.create` and `forms.update` ops of a change take both, and every field a response carries has `purpose`, and `format` on a text field and a dropdown. Both need `doc.forms.modify`; a date or a time format needs no `doc.forms.script`.
+
+  The form's and the form export's engine values are raised, so answers with the new fields get new URLs.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – A signature field's mark may be a PNG or a JPEG, beside a one-page PDF: the visual fill (`POST .../form/fields/{field}/signature-appearance`), a signing's `appearance` (`POST .../signatures/prepare`) and the change op `forms.setSignatureAppearance` refused an image part with `the appearance resource must be a PDF`. The visual fill and the change op also take `resources: { appearance: null }`, which takes a drawn mark out of the field.
+
+### Patch Changes
+
+- [#1153](https://github.com/embedpdf/embed-pdf-viewer/pull/1153) by [@bobsingor](https://github.com/bobsingor) – Update dependencies: Fastify 5.12, its multipart parser, sharp 0.35 and the cloud provider clients. A hop count in `CLOUDPDF_TRUST_PROXY` still names how many proxies stand in front of the server.
+
+- [#1151](https://github.com/embedpdf/embed-pdf-viewer/pull/1151) by [@bobsingor](https://github.com/bobsingor) – Requests are checked with zod 4 (`^4.6.6`). A value no kind of a union accepts is refused naming the field and what is wrong with it, in `details.field` and the message, and `details.issues` lists only that. The wording of a refused value's message is zod 4's.
+
 ## 3.3.0
 
 ### Minor Changes

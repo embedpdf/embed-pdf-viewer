@@ -1,5 +1,7 @@
 # @embedpdf/plugin-interaction
 
+## 3.4.0
+
 ## 3.3.0
 
 ### Minor Changes

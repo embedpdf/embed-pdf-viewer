@@ -1,5 +1,17 @@
 # @embedpdf/plugin-signature
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – A mark whose `source` is a PNG or a JPEG works in a signature field. `fillField()`, `sign()`, `prepareSignature()` and `placeMark()` on a field failed with `the appearance PDF could not be opened` for an image, although a mark's `source` is a PNG, a JPEG or a one-page PDF; only a free placement took one. The `appearance` of `sign()` and `prepareSignature()`, given instead of the mark, takes a PNG or a JPEG as well, beside a one-page PDF.
+
+  `clearField()` now empties the field. It used to draw a blank page in, so the field kept reading as having a mark, showed nothing at all, and refused a change of its style. A cleared field shows its own box again, and undo brings the mark back.
+
+### Patch Changes
+
+- [#1102](https://github.com/embedpdf/embed-pdf-viewer/pull/1102) by [@bobsingor](https://github.com/bobsingor) – `canFill()`, `fillField()` and `clearField()` now ask for the right the engine has always asked for: the right to sign the field (`doc.sign`, or `fields:sign` for its group), not the right to fill fields in. A mark in a signature field is its signer's to place. Before, a session that could only fill fields in was told `canFill()` and then refused by the engine, and a session that could only sign was refused by the plugin although the engine allowed it.
+
 ## 3.3.0
 
 ### Minor Changes

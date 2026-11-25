@@ -1,5 +1,27 @@
 # @embedpdf/react
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1138](https://github.com/embedpdf/embed-pdf-viewer/pull/1138) by [@bobsingor](https://github.com/bobsingor) – Draw a form field with your own component, and attach UI to a field.
+  - `<FormLayer controls>` takes a list of `FieldControl`, `{ for, component }`: the first one whose `for` matches a box draws it, and a box none matches is drawn as before. The component gets `widget` (the box, as `listWidgets()` gives it), `frame` (the box to draw into: the layer places, turns and scales it like the field), `native` (the layer's own control with the field's picture, to keep and add to), `setValue` (fills the field in, as typing does) and `focused`. Tab, `focus()` and `focusNext()` put the cursor in the first element inside your control that takes focus, and a click runs the field's own action after the value you wrote. Without `controls` the layer draws what it drew.
+  - `useFormWidgetAnchor(widget)` gives the anchor of one box of a field for `<Anchored>`, and follows the box while the field is moved in design mode: a tag pinned to a field, or a card next to it. `null` for `null`, or a box that isn't there.
+
+- [#1141](https://github.com/embedpdf/embed-pdf-viewer/pull/1141) by [@bobsingor](https://github.com/bobsingor) – `<FormLayer>` shows the fields a user may fill in in their group's color, and `<AnnotationLayer>` shows every field in its group's color in design mode. Name a document's groups with `form.setGroups()`. `useFormState()` gains `groups`, `designGroup` and `selectedFields`, and `useFormEvent()` takes `onGroupsChanged` and `onDesignGroupChanged`. A document whose fields are in no group draws as before; set the form's `fields.tint` to `0` to show no group's color.
+
+### Patch Changes
+
+- [#1144](https://github.com/embedpdf/embed-pdf-viewer/pull/1144) by [@bobsingor](https://github.com/bobsingor) – `<Scrollbar>` binds its track with `attachScrollbar` from `@embedpdf/web`, the one call every framework's bar makes. The bar behaves as before.
+
+- [#1135](https://github.com/embedpdf/embed-pdf-viewer/pull/1135) by [@bobsingor](https://github.com/bobsingor) – Keep the focus on a form dropdown after you pick a value. `<FormLayer>` replaced the dropdown's control on every change, so the focus fell to the page and the focus ring stayed on the dropdown after you moved to another field. The dropdown is now one control for as long as its field shows: the focus stays on it, and its ring goes when you leave it.
+
+- [#1136](https://github.com/embedpdf/embed-pdf-viewer/pull/1136) by [@bobsingor](https://github.com/bobsingor) – Announce each radio button of `<FormLayer>` by its own option. Every button of a group was announced by the group's name alone ("Plan, radio button"), so a screen reader user couldn't tell them apart. Each button now has its option in its name ("Plan: monthly") and says where it comes in its group ("1 of 2") with `aria-posinset` and `aria-setsize`, since a group's buttons stand apart on the page with no group element around them.
+
+- [#1144](https://github.com/embedpdf/embed-pdf-viewer/pull/1144) by [@bobsingor](https://github.com/bobsingor) – Stop a press on `<Scrollbar>` from also panning the page. The Stage listens for presses on an ancestor of the bar, and React ran the bar's own handler after the Stage had already seen the press, so a thumb drag moved the page the other way too: the view scrolled a little less than the thumb asked for, and went backwards once the thumb reached the end of its track. The bar now takes its presses on the track itself, so the Stage never sees them.
+
+- [#1146](https://github.com/embedpdf/embed-pdf-viewer/pull/1146) by [@bobsingor](https://github.com/bobsingor) – Let Tab get past a signature field in `<FormLayer>` when the signature plugin isn't registered. The field is only its picture then, with nothing to focus, but Tab still went for it: the press was taken, the cursor stayed in the field before it, and the fields after it could not be reached with the keyboard. Tab and Shift+Tab now pass over it, and so do `focus()` and `focusNext()`. The same holds for a box drawn by a control of your own that has no element Tab stops at. With the signature plugin the field is a stop, as before.
+
 ## 3.3.0
 
 ### Minor Changes

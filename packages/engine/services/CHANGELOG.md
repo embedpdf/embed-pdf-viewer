@@ -1,5 +1,38 @@
 # @embedpdf/engine-services
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1157](https://github.com/embedpdf/embed-pdf-viewer/pull/1157) by [@bobsingor](https://github.com/bobsingor) – Read a page's text positions in batches. `PageGeometryReader` asks the runtime for up to 4,096 characters in one call with `EPDFText_GetPageGeometry`, where it made two calls and read 25 values for every character, and it no longer reads the cells of upright characters, which a run never carries. A page's geometry stays the same, and reading it takes about half the time on a page of text. The read of a very large page still stops at an abort, between two calls. Adds `appendGlyphRecords`, which decodes the runtime's records, and `EPDF_PAGE_CHAR_GEOMETRY_LAYOUT`.
+
+  A stamp of the picture a signature field's mark shows places the drawing the document already has for that mark, where it added a second copy.
+
+- [#1140](https://github.com/embedpdf/embed-pdf-viewer/pull/1140) by [@bobsingor](https://github.com/bobsingor) – Write a form field's group by one rule on the local and the cloud engine: a new field is in no group unless its draft names one, and `groupId: null` takes a field out of its group.
+
+  **This changes what a create does.** A field created without a `groupId` used to go in the session's own group (`identity.groupId`). It is now in no group. Only a session whose identity has a group, and that creates a field without naming one, sees a difference. To keep the old result, name the group in the draft. Copies follow the same rule: `forms.copy`, and an import with `attribution: 'stamp'`, leave a field that was in no group in none, where it used to go in the caller's own group.
+  - `groupId: null` in `forms.update` takes the field out of its group. It takes `doc.forms.modify` and no `fields:set-group` permission. Before, the local engine removed the group only for a session with `fields:set-group:all` and refused the others with `fields:set-group:group=null`, and the cloud engine refused the request.
+  - Undo of an update puts a removed group back and takes an assigned one away. When the field was changed in between, undoing an assignment used to leave the field in the group.
+  - An update's `expect: { groupId: null }` matches a field in no group.
+  - The local engine refuses a `groupId` that is empty or longer than 256 characters with `InvalidArg`, as the cloud engine does. It used to write an empty one, which read back as no group.
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – Read and write a form field's `purpose` and `format`, by one rule on the local and the cloud engine.
+  - **`purpose`** is kept as `/Purpose` in the field's `/EMBD_Metadata`, beside its group. A create and an update write it, `null` in an update removes it, and an entry that is no purpose a write takes reads as none.
+  - **`format`** on a text field and a dropdown is read from the field's format script (`/AA /F`), as Acrobat decides it: a date, a time, `other`, or `null` without a script. A create and an update write a date or a time as the two scripts Acrobat writes, `AFDate_FormatEx("pattern");` and `AFDate_KeystrokeEx("pattern");` for a date, `AFTime_FormatEx("pattern");` and `AFTime_Keystroke(n);` for a time, in place of the format and keystroke scripts the field had. `null` removes both; on a field with no format script it changes nothing, so a keystroke script on its own stays. The format a field already has changes nothing.
+  - Both take `doc.forms.modify` alone. A pattern or a purpose that is none, a `format` on another kind of field, and a `format` beside `actions.format` or `actions.keystroke` are refused with `InvalidArg` before anything is written.
+  - Undo puts both back, and an update's `expect` can name them. The undo of a format is the undo of the two scripts it wrote: after a later change to the field it puts back the scripts the field had, a number format's too, and it leaves the field as it is when someone wrote one of those scripts since.
+  - The undo of a script write, a format's included, no longer puts back half of it. When the field was changed since and one of the scripts replaced actions no script write can make (a script that goes on to a GoTo), the scripts stay as the write left them and the item reports them skipped. It used to put the other scripts back, leave that one, and report an update. A copy and an import keep both; without `doc.forms.script` a date or a time format is written again from its pattern instead of being left out.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – Draw a PNG or a JPEG into a signature field, and take a mark out again. A mark was read as a PDF only, so an image failed with `the appearance PDF could not be opened`, for `forms.setSignatureAppearance` and for a signing's `appearance`. An image passed as its bytes is now drawn at its own size and fitted whole into the field's box, as a PDF mark is, upright in a turned field. It becomes a page the same way a stamp's image does. A mark passed as `{ pdf }` is read as a PDF only, as before.
+
+  `forms.setSignatureAppearance` with no mark (`null`) takes out a mark that was drawn in without signing: the widget reads `hasMark: false` again, draws the field's box in its style, and its style can change. Undo brings the mark back. A widget with no mark is left as it is, and a signed field is refused as before.
+
+### Patch Changes
+
+- [#1102](https://github.com/embedpdf/embed-pdf-viewer/pull/1102) by [@bobsingor](https://github.com/bobsingor) – Let a signer whose signing is limited to a group add a document timestamp when they hold `doc.sign`. A document timestamp names no field, so it is the document's to sign, but it was checked as a field in no group: with any `fields:sign` permission in the scope it failed with `permission denied (target): doc.sign`, also when the scope had `doc.sign`. The validation data was stored and the timestamp after it was refused. Signing fields stays as narrow as before: `doc.sign` beside a `fields:sign` permission signs no field in another group or in none.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Keep the mark in a signature field fitted when the field changes. A mark, a signature's or one drawn in with `forms.setSignatureAppearance()`, is a drawing fitted into the field's box. Until now a resize stretched it to the new size and a new turn left it as it was. It is now fitted again whenever the widget's box or its turn (`rotation`) changes, the way a stamp's drawing is: by the fit it records, and a signature's by `contain`. A move alone still writes nothing but where the widget stands.
+
 ## 3.3.0
 
 ### Minor Changes

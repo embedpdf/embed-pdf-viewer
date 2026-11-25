@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-search",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": false,
   "description": "Text search for EmbedPDF: finds text across a document and shows every match.",
   "type": "module",

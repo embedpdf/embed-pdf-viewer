@@ -1,5 +1,11 @@
 # @embedpdf/core-signature
 
+## 3.4.0
+
+### Patch Changes
+
+- [#1103](https://github.com/embedpdf/embed-pdf-viewer/pull/1103) by [@bobsingor](https://github.com/bobsingor) – `createTestCertificateAuthority({ now })` dates its certificates by the clock you give it, as it dates its answers. Before, the certificates were dated by the real clock, so with a clock more than a day in the past an OCSP answer came from before the responder's certificate and read as no answer at all (`wrong-signer`).
+
 ## 3.3.0
 
 ### Minor Changes

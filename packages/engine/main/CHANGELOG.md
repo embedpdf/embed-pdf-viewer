@@ -1,5 +1,32 @@
 # @embedpdf/engine
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – A form field has a `purpose` (what its value means, such as `'email'`), and a text field or a dropdown a `format`: `doc.forms.create()` and `doc.forms.update()` take both, and every read returns them.
+
+  ```ts
+  await doc.forms.create({
+    kind: 'text',
+    name: 'signed_on',
+    purpose: 'date-signed',
+    format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+  });
+  ```
+
+  A date or a time format is written as the scripts Acrobat writes for one, so Acrobat offers its date picker on the field, and a date field made in Acrobat reads as `{ kind: 'date', pattern }` here. It needs `doc.forms.modify` and no `doc.forms.script`. `isDatePattern()` and `isTimePattern()` say whether a string is a pattern a date or a time format is written with, and `STANDARD_DATE_PATTERNS` and `STANDARD_TIME_PATTERNS` are Acrobat's own lists of them.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.setSignatureAppearance()` and `doc.signatures.prepare()` take a PNG or a JPEG as the mark, as a `Uint8Array` or a `Blob`, beside a one-page PDF: pass the bytes themselves. `doc.forms.setSignatureAppearance(field, null)` takes a drawn mark out, so the field shows its own box again and its style can change. `{ pdf }` works as before, for a one-page PDF only.
+
+### Patch Changes
+
+- [#1150](https://github.com/embedpdf/embed-pdf-viewer/pull/1150) by [@draarivpatel-ui](https://github.com/draarivpatel-ui) – `engine.open({ kind: 'layerBytes', baseSha256 })` forwards the hash to the worker the way `layerFile` always has, so a caller that already verified the base's SHA-256 saves the runtime a full pass over the file on the first layer mutation.
+
+- [#1152](https://github.com/embedpdf/embed-pdf-viewer/pull/1152) by [@bobsingor](https://github.com/bobsingor) – The engine worker is less than half the download it was: `embedpdf-worker.js` takes 243 KB gzipped instead of 523 KB. It held the files of the 14 standard fonts, which it never reads: PDFium draws with its own copies. The inline worker and the build that runs without a worker shrink by as much. No API change.
+
+- [#1155](https://github.com/embedpdf/embed-pdf-viewer/pull/1155) by [@bobsingor](https://github.com/bobsingor) – The engine worker is about 12 KB smaller to download, 5% of its gzipped size: the worker, the inline worker and the build that runs without a worker are minified with swc. No API change.
+
 ## 3.3.0
 
 ### Minor Changes
