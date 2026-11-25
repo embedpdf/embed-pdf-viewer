@@ -207,8 +207,12 @@ function workerBoot(
           : wasmOptions.wasmLoader
             ? await resolveWasmSourceAsync(wasmOptions)
             : resolveWasmSource(wasmOptions);
+      // Fetch and compile the wasm in a small worker of its own while the
+      // engine worker's script loads and evaluates (see compileWasmOffThread).
+      const compile = compileWasmOffThread(wasm);
       const spawned = await createEngineWorker(delivery, configuredUrl);
-      postWorkerInit(spawned.worker, wasm);
+      postWorkerInit(spawned.worker, wasm, compile?.port);
+      compile?.onFailure(() => spawned.worker.postMessage({ kind: 'wasm-module', module: null }));
       try {
         const transport = await BrowserWorkerTransport.spawn(spawned.worker);
         spawned.destroy();
@@ -242,10 +246,100 @@ function workerBoot(
   };
 }
 
-function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
+/**
+ * The compile worker's whole script: fetch and compile `embedpdf.wasm`
+ * streaming, post the `WebAssembly.Module` (or null when that fails) on the
+ * port it was given, which leads to the engine worker, tell the page it is
+ * done (so it can revoke the script's blob: URL), and close.
+ */
+const COMPILE_WORKER_SOURCE =
+  'onmessage=function(e){var d=e.data,p=d.port;' +
+  'function done(m){try{p.postMessage({module:m})}catch(_){p.postMessage({module:null})}postMessage(0);close()}' +
+  'try{WebAssembly.compileStreaming(fetch(d.url,{credentials:"same-origin"})).then(done,function(){done(null)})}' +
+  'catch(_){done(null)}}';
+
+interface OffThreadCompile {
+  /** The port the engine worker receives `{ module }` on. */
+  port: MessagePort;
+  /** Runs `notify` once if the compile worker could not run at all (then nothing comes on the port). */
+  onFailure(notify: () => void): void;
+}
+
+/**
+ * Fetch and compile `embedpdf.wasm` in a small worker of its own while the
+ * engine worker's script (a multi-megabyte bundle) loads and evaluates, and
+ * hand the compiled `WebAssembly.Module` straight to the engine worker over a
+ * `MessageChannel`, which then only instantiates it.
+ *
+ * Not on this thread: a streaming compile is fed by the thread that started
+ * it, and a page's main thread is busy parsing and starting the app just when
+ * the wasm downloads, which held the compile back by hundreds of
+ * milliseconds. Not in the engine worker: it can't start before its own
+ * script has been parsed and run. The compile worker's script is a few
+ * hundred bytes, so it starts at once, and it closes itself when done.
+ *
+ * Null where it can't start (no wasm URL, bytes already in hand, no
+ * `WebAssembly.compileStreaming`, `MessageChannel` or `Blob`): the engine
+ * worker then fetches and compiles from the URL itself. A compile that fails
+ * (a wrong MIME type, a CSP without `wasm-unsafe-eval`, a failed fetch), and
+ * a compile worker the page's CSP refuses (`worker-src` without `blob:`), end
+ * the same way.
+ */
+function compileWasmOffThread(wasm: ResolvedWasmSource): OffThreadCompile | null {
+  if (wasm.wasmBinary || !wasm.wasmUrl) return null;
+  if (
+    typeof WebAssembly === 'undefined' ||
+    typeof WebAssembly.compileStreaming !== 'function' ||
+    typeof MessageChannel !== 'function' ||
+    typeof Blob !== 'function' ||
+    typeof URL.createObjectURL !== 'function'
+  ) {
+    return null;
+  }
+  let failed = false;
+  let notify: (() => void) | null = null;
+  const fail = () => {
+    if (failed) return;
+    failed = true;
+    notify?.();
+  };
+  const channel = new MessageChannel();
+  const blob = createWorkerBlobUrl(COMPILE_WORKER_SOURCE);
+  try {
+    const worker = startWorker(blob.url);
+    worker.onmessage = () => blob.revoke();
+    worker.onerror = (event) => {
+      event.preventDefault();
+      blob.revoke();
+      fail();
+    };
+    worker.postMessage({ url: toAbsoluteUrl(wasm.wasmUrl), port: channel.port1 }, [
+      channel.port1,
+    ]);
+  } catch {
+    blob.revoke();
+    channel.port1.close();
+    channel.port2.close();
+    return null;
+  }
+  return {
+    port: channel.port2,
+    onFailure(callback) {
+      notify = callback;
+      if (failed) callback();
+    },
+  };
+}
+
+function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource, wasmPort?: MessagePort): void {
   const init: EngineWorkerInit = { kind: 'init', wasmUrl: wasm.wasmUrl };
-  if (wasm.wasmBinary) init.wasmBinary = wasm.wasmBinary;
-  worker.postMessage(init, wasm.wasmBinary ? [wasm.wasmBinary] : []);
+  if (wasm.wasmBinary) {
+    worker.postMessage({ ...init, wasmBinary: wasm.wasmBinary }, [wasm.wasmBinary]);
+  } else if (wasmPort) {
+    worker.postMessage({ ...init, wasmPort }, [wasmPort]);
+  } else {
+    worker.postMessage(init);
+  }
 }
 
 interface CreatedWorker {

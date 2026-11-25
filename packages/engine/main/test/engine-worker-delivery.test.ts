@@ -40,7 +40,14 @@ const DEV_WASM = vi.hoisted(() => new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 
 class FakeWorker {
   static started: FakeWorker[] = [];
   static failToStart = false;
-  init: { kind: string; wasmUrl?: string; wasmBinary?: ArrayBuffer } | null = null;
+  init: {
+    kind: string;
+    wasmUrl?: string;
+    wasmBinary?: ArrayBuffer;
+    wasmPort?: MessagePort;
+  } | null = null;
+  /** What a wasm compile worker was asked to compile (it gets `{ url, port }`, never an init). */
+  compile: { url: string; port: MessagePort } | null = null;
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>();
 
   constructor(
@@ -61,8 +68,15 @@ class FakeWorker {
     kind: string;
     wasmUrl?: string;
     wasmBinary?: ArrayBuffer;
+    wasmPort?: MessagePort;
     jobId?: unknown;
+    url?: string;
+    port?: MessagePort;
   }): void {
+    if (message.port !== undefined) {
+      this.compile = { url: message.url!, port: message.port };
+      return;
+    }
     if (message.jobId !== undefined) {
       // A job (the boot registers the default fallback fonts): done.
       const answer = { kind: 'resolve', jobId: message.jobId, result: { tag: message.kind } };
@@ -86,9 +100,18 @@ class FakeWorker {
 /** Boots the engine and returns the worker it started. */
 async function bootedWorker(engine: ReturnType<typeof localEngine>): Promise<FakeWorker> {
   engine.warmup();
-  await vi.waitFor(() => expect(FakeWorker.started).toHaveLength(1));
-  await vi.waitFor(() => expect(FakeWorker.started[0].init).not.toBeNull());
-  return FakeWorker.started[0];
+  await vi.waitFor(() => expect(engineWorkers()).toHaveLength(1));
+  await vi.waitFor(() => expect(engineWorkers()[0].init).not.toBeNull());
+  return engineWorkers()[0];
+}
+
+/** The workers started, less the wasm compile worker. */
+function engineWorkers(): FakeWorker[] {
+  return FakeWorker.started.filter((worker) => worker.compile === null);
+}
+
+function compileWorkers(): FakeWorker[] {
+  return FakeWorker.started.filter((worker) => worker.compile !== null);
 }
 
 beforeEach(() => {
@@ -100,6 +123,13 @@ beforeEach(() => {
   files.prebundled = false;
   vi.stubGlobal('Worker', FakeWorker);
   vi.stubGlobal('location', { origin: 'https://app.test', href: 'https://app.test/viewer' });
+  // No network here: the page-side wasm compile fails, so the worker gets the URL.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('offline');
+    }),
+  );
 });
 
 afterEach(() => {
@@ -205,6 +235,54 @@ describe("localEngine()'s worker", () => {
 
     expect(String(worker.url).startsWith('blob:')).toBe(true);
     expect(worker.init?.wasmUrl).toBe('https://app.test/embedpdf.wasm');
+    await engine.destroy();
+  });
+});
+
+describe('the wasm compile', () => {
+  it('runs in a worker of its own while the engine worker loads; the module goes to it over a port', async () => {
+    const engine = localEngine();
+    const worker = await bootedWorker(engine);
+
+    expect(compileWorkers()).toHaveLength(1);
+    const compiler = compileWorkers()[0];
+    expect(String(compiler.url).startsWith('blob:')).toBe(true);
+    expect(compiler.compile?.url).toBe('https://app.test/assets/embedpdf-abc.wasm');
+    expect(worker.init?.wasmPort).toBeDefined();
+    expect(worker.init?.wasmUrl).toBe('https://app.test/assets/embedpdf-abc.wasm');
+    await engine.destroy();
+  });
+
+  it('is left to the engine worker, from the URL, when the compile worker cannot start', async () => {
+    const Original = FakeWorker;
+    vi.stubGlobal(
+      'Worker',
+      class extends Original {
+        constructor(url: unknown, options?: WorkerOptions) {
+          if (String(url).startsWith('blob:')) throw new Error('worker-src');
+          super(url, options);
+        }
+      },
+    );
+    const engine = localEngine();
+    const worker = await bootedWorker(engine);
+
+    expect(compileWorkers()).toHaveLength(0);
+    expect(worker.init?.wasmPort).toBeUndefined();
+    expect(worker.init?.wasmUrl).toBe('https://app.test/assets/embedpdf-abc.wasm');
+    await engine.destroy();
+  });
+
+  it('is not started for caller-supplied bytes', async () => {
+    const compileStreaming = vi.fn();
+    vi.stubGlobal('WebAssembly', { ...WebAssembly, compileStreaming });
+    const engine = localEngine({ wasmBinary: new Uint8Array(DEV_WASM) });
+    const worker = await bootedWorker(engine);
+
+    expect(compileStreaming).not.toHaveBeenCalled();
+    expect(compileWorkers()).toHaveLength(0);
+    expect(worker.init?.wasmPort).toBeUndefined();
+    expect(worker.init?.wasmBinary).toBeInstanceOf(ArrayBuffer);
     await engine.destroy();
   });
 });
