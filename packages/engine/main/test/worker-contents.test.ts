@@ -19,7 +19,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * what came in with the change (esbuild's metafile lists every module's share), and raise the
  * limit only for code the engine runs.
  */
-const GZIP_LIMIT_BYTES = 290_000;
+const GZIP_LIMIT_BYTES = 275_000;
 
 describe.each(['embedpdf-worker.js', 'inline-transport.js'])('workers/%s', (file) => {
   const code = readFileSync(resolve(root, 'workers', file), 'utf8');
