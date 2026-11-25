@@ -162,6 +162,8 @@ jobs:
           cache: pnpm
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      - name: Test the release scripts
+        run: node --test scripts/*.test.mjs
       - name: Test the boundary checker
         run: pnpm --filter @embedpdf/tooling-build test
       - name: Plugin boundaries
