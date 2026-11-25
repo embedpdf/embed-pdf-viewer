@@ -59,7 +59,7 @@ export class LayersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -153,7 +153,7 @@ export class LayersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3" }),
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

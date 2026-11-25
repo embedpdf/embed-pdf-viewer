@@ -1,5 +1,41 @@
 # @embedpdf/plugin-form
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1140](https://github.com/embedpdf/embed-pdf-viewer/pull/1140) by [@bobsingor](https://github.com/bobsingor) – A field placed, created or copied without a group shows in no group at once, where the engine now leaves it: a new field is in no group unless its draft names one, whatever the session's own group is (`identity.groupId`). An app whose session has a group, and that relied on new fields landing in it, names the group in the draft: `form.create({ kind: 'text', name: 'note', groupId: 'legal', widgets })`. A field an update takes out of its group (`groupId: null`) shows in none at once too.
+
+- [#1138](https://github.com/embedpdf/embed-pdf-viewer/pull/1138) by [@bobsingor](https://github.com/bobsingor) – Say more about each field box, and attach UI to one.
+  - Each entry of `listWidgets()` gains `ref` (the box's own address, what `getWidget()` takes, beside `annotationRef`), `groupId` (the field's group, or `null`), `canFill` (whether the session may fill it in, or sign it for a signature field: its permissions alone, where `disabled` also counts read-only fields and the `fillable` setting), `required`, and `empty` (it holds nothing yet, by the rule `validate()` checks a required field with). The values it had are unchanged.
+  - The host lens gains `getWidgetAnchor(widget)`, the page and box that UI attaches to for one box of a field, following the box while it is moved in design mode, and `isWidgetFocused(widget)`. The framework packages build `useFormWidgetAnchor()` and a control's `focused` on them. `FormWidgetAnchor` is the anchor's type.
+  - The plugin lists the Stage among the plugins it may use. `focus()`, `focusNext()` and Tab between fields threw in a development build ("resolved capability stage without declaring it"), because the cursor asks the Stage to bring a field into view.
+
+- [#1141](https://github.com/embedpdf/embed-pdf-viewer/pull/1141) by [@bobsingor](https://github.com/bobsingor) – Say who a document's groups are, place fields for each of them, and give existing fields to them.
+  - `setGroups([{ id, label, color }])` names the groups of the open document: the whole list, and an empty one clears it. A group is an id in the PDF; its label and its color stay in the app, and each open document has its own list. `color` is a CSS color, so it can be `var(--yours)`. Fires `onGroupsChanged`; the same list again changes nothing.
+  - Every group a document's fields are in shows in a color, named or not: the app's, else one of eight by the group's place in the list, so the first eight never share one. `fields.tint` (default `0.16`, CSS `--epdf-form-field-tint`) is how strongly it shows, and `0` turns the colors off. A document whose fields are in no group looks as it did. A document whose fields are in groups now shows them in color: set `formPlugin({ fields: { tint: 0 } })` to keep the old look.
+  - `listGroups()` gives every named group, then every other group the form's fields are in, as `{ id, label, color }`. The form's state has them as `groups`.
+  - Who new fields are placed for is state: `setDesignGroup(groupId)`, `getDesignGroup()`, `designGroup` in the form's state, and the event `onDesignGroupChanged`. A field placed with a form tool goes into that group; with `null`, where it starts, it is in no group.
+  - `moveToGroup(fields, groupId)` puts several fields in a group, or with `null` takes them out of theirs, as one step to undo, and `listSelectedFields()` (the state's `selectedFields`) gives every field with a selected widget in design mode.
+  - `canSetGroup(groupId)` says whether the user may put a field in a group: `doc.forms.modify`, and the group is their own or one a `fields:set-group` permission names. `setDesignGroup()`, `moveToGroup()`, and `create()` and `update()` with a `groupId`, refuse such a group before anything is shown, with `permission-denied`; the engine refused it before, after the field had shown. Taking a field out of its group (`groupId: null`) needs `doc.forms.modify` alone.
+  - `getFieldSettings()` describes a field's group while the document has groups: a `choice` with the key `groupId`, whose options are the ids of the groups the user may put the field in; none of them (`null`) takes the field out of its group.
+  - Each entry of `listWidgets()` gains `accent`: `{ color, strength }`, its group's color and the tint, while the user may fill the field in and it still takes a value, else `null`. Its `label` ends with the group's label when the group has one (`Signature, Dana Smith`), after a radio button's option (`Plan: monthly, Dana Smith`).
+  - In design mode each field lent to the annotation plugin carries the same `accent`, so the annotation layer shows whose field it is. No color is written into the PDF.
+
+- [#1136](https://github.com/embedpdf/embed-pdf-viewer/pull/1136) by [@bobsingor](https://github.com/bobsingor) – Name each radio button by its own option. `listWidgets(page)` gave every button of a radio group the same `label`, the group's tooltip, so a screen reader announced all of a group's buttons alike. A radio button's `label` now adds the option it stands for, its export value, the way screen readers read a radio button in Acrobat: `Plan: monthly`. A radio item also carries `inGroup`, `{ position, size }`: where the button comes among its group's buttons, in the order the arrow keys go round, for `aria-posinset` and `aria-setsize`. Checkboxes keep the field's label.
+
+- [#1146](https://github.com/embedpdf/embed-pdf-viewer/pull/1146) by [@bobsingor](https://github.com/bobsingor) – Let Tab get past a signature field that nothing can sign. Without the signature plugin a signature field is only its picture, but `focusNext()` and Tab still counted it as a stop: Tab was taken and the cursor stayed where it was, so the fields after it could not be reached with the keyboard. A box on screen whose control takes no cursor is now passed over by Tab, `focusNext()` and `focus()`, which returns `false` for it; one that comes into view with nothing to focus hands the cursor on to the next field, round to the first with `wrap`. A focus target that a form layer lends through the host contract can say so with `takesCursor()`, and its `focus()` can answer `false` when nothing took the cursor after all; a target that does neither takes the cursor, as before.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Place form fields upright on turned pages, and fill in fields that are turned.
+  - The form tools place a field the way its author sees the page: on a page shown turned, a click makes the tool's size as seen and the field is turned a quarter so that what's typed reads upright there. The placement states the field's `box` and `rotation`; the ghost and the placed field agree at every quarter turn. Nothing changes on a page that isn't turned.
+  - Each entry of `listWidgets()` and the result of `getWidgetAt()` now say where a field is with `box`, `rotation` and `rect`: the frame its contents are laid out in, its quarter turn, and where it stands on the page. `box` was the rect. For a field that isn't turned they are the same, so only turned fields change, and those were drawn with their controls the wrong way; this is a fix.
+  - `getWidgetAt()` finds a turned field where it stands.
+  - `addWidget()` without a place lines the new box up with where the field's boxes stand, for turned boxes too.
+
+### Patch Changes
+
+- [#1149](https://github.com/embedpdf/embed-pdf-viewer/pull/1149) by [@bobsingor](https://github.com/bobsingor) – Fix Tab and Shift+Tab around a radio group that has another field between its buttons in the page's tab order. A radio group is one stop, where its first button comes, and its checked button takes the cursor. When the checked button came after another field, `focusNext()` and Tab went on from the button instead of from the group: Tab skipped the field between, and Shift+Tab went back and forth between that field and the group and never left. The cursor now goes on from the group's place, so each field is reached once in either direction, with `empty` and `wrap` too. A form whose radio buttons follow one another in the tab order behaves as before.
+
 ## 3.3.0
 
 ### Patch Changes

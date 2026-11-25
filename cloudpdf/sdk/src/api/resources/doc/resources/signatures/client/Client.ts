@@ -57,7 +57,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
@@ -138,7 +138,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
@@ -228,7 +228,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
@@ -339,7 +339,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
@@ -439,7 +439,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": request["X-Document-Password"],
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
                 ..._maybeEncodedRequest.headers,
             }),
             requestOptions?.headers,
@@ -538,7 +538,7 @@ export class SignaturesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );
@@ -632,7 +632,7 @@ export class SignaturesClient {
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
                 "Idempotency-Key": idempotencyKey,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.3",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
             }),
             requestOptions?.headers,
         );

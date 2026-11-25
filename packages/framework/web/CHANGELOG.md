@@ -1,5 +1,28 @@
 # @embedpdf/web
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1144](https://github.com/embedpdf/embed-pdf-viewer/pull/1144) by [@bobsingor](https://github.com/bobsingor) – New `attachScrollbar(element, { bar, onDragging })`: it binds a Stage scrollbar's track element, with the thumb inside it, in one call. It takes the bar's presses on a listener of its own on the track, so a press on the bar never reaches the Stage below it in any framework. It sends each press to the thumb's drag or the track's paging, follows the moves and ends at the release. `createScrollbarPresses` stays for a bar that wires its own listeners.
+
+- [#1138](https://github.com/embedpdf/embed-pdf-viewer/pull/1138) by [@bobsingor](https://github.com/bobsingor) – Add what every framework's `<FormLayer>` shares to draw a form field with a control of the app's own: `fieldControlFor()` picks the first control that matches a box, `fieldControlPlaceOf()` gives the frame the control draws into (the field's size at 100%, its turn on screen, the zoom) and where the layer's own drawing goes inside it, `createFieldControlPress()` runs the field's action after a value the control wrote, and `runsActionOnClick()`, `claimClick()` and `isClickClaimed()` decide which click runs it. `bindFieldFocus()` takes `custom: true` for a box that holds such a control: the cursor goes to the first element inside it that Tab stops at. Without that option it does what it did.
+
+- [#1141](https://github.com/embedpdf/embed-pdf-viewer/pull/1141) by [@bobsingor](https://github.com/bobsingor) – Show a form field in its group's color.
+  - `EPDF_VARIABLES` gains `form-field-tint` (`--epdf-form-field-tint`, the setting `form.fields.tint`).
+  - `widgetBoxStyleOf()` and `listBoxStyleOf()` take a widget's `accent`, `{ color, strength }`, and add its fill and its edge. A widget without one is styled as before.
+  - New: `fieldTintOf(accent)`, the fill and the edge of a group's color, `recordAccentStyleOf(accent)`, the style of a lent record's accent in the annotation layer, and the type `FieldAccent`.
+
+- [#1146](https://github.com/embedpdf/embed-pdf-viewer/pull/1146) by [@bobsingor](https://github.com/bobsingor) – `bindFieldFocus()` tells the form whether a field's box takes the cursor, so Tab passes over one that holds nothing to focus instead of stopping there for good. A control of an app's own with no element that Tab stops at takes none, and `focusable: false` says the same for a box that is only the field's picture, as a signature field is without the signature plugin. In such a control an element that is hidden, disabled (also by a `<fieldset>`), inert or not drawn is no stop: the cursor goes to the first element that can take it, and the target's `focus()` answers whether it went in. The layer's own controls behave as before.
+
+### Patch Changes
+
+- [#1101](https://github.com/embedpdf/embed-pdf-viewer/pull/1101) by [@bobsingor](https://github.com/bobsingor) – Keep a form field's control square when the page rounds its own inputs. The form layer draws in your page, so a rule such as `input:focus-visible { border-radius: 8px }` rounded a focused text field and its focus ring, while the field in the PDF is square. Every native control the layer draws now sets its own corners: the text box, the dropdown, the list and the buttons.
+
+- [#1144](https://github.com/embedpdf/embed-pdf-viewer/pull/1144) by [@bobsingor](https://github.com/bobsingor) – Keep a press on a scrollbar's track from the page below it. `createScrollbarPresses` stopped a press on the thumb but let a press on the track reach the Stage, which began a gesture of its own with it while the bar paged or jumped.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Turn a form field's control with the field. `widgetBoxStyleOf()` places the box at the field's frame and turns it by the field's `rotation` about its middle, so the text box, checkbox, list or button over a turned field reads the way the field does, in every framework's `<FormLayer>`. A control over a turned field used to be laid out unturned across the field. Nothing changes for a field that isn't turned.
+
 ## 3.3.0
 
 ## 3.2.0

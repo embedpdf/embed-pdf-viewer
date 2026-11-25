@@ -1,5 +1,40 @@
 # @embedpdf/engine-core
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1140](https://github.com/embedpdf/embed-pdf-viewer/pull/1140) by [@bobsingor](https://github.com/bobsingor) – A new form field is in no group unless its draft names one, and `groupId: null` takes a field out of its group. Both engines follow the same rule.
+
+  **This changes what a create does.** Until now a field created without a `groupId` went in the session's own group (`identity.groupId`). It is now in no group. Only a session whose identity has a group, and that creates a field without naming one, sees a difference. To keep the old result, name the group in the draft: `doc.forms.create({ kind: 'text', name: 'note', groupId: 'legal', widgets })`. Naming your own group still takes no `fields:set-group` permission. Documents that already exist don't change, and annotations keep their rules: a new annotation still goes in its creator's group, and its group can't be removed.
+  - `FormFieldDraft.groupId` and `FormFieldPatch.groupId` are `string | null`. In a draft, `null` means the same as leaving it out. In a patch, `null` takes the field out of its group. That takes form design (`doc.forms.modify`) and no `fields:set-group` permission. A field's group used to be documented as "changed, never removed".
+  - `FormFieldDraftSchema` and `FormFieldPatchSchema` take `groupId: null`, so a request to the cloud engine does too.
+  - `authorizeFieldGroup()` takes `null`, which needs no right.
+  - `formFieldOfDraft()` gives a field in no group for a draft that names none. `FieldDraftContext.groupId` is deprecated and no longer read. It goes in 4.0.
+  - `runFieldGroupsConformance` checks the default, `null` in a draft and in a patch, the right each one takes, and undo.
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – A form field has two more facts: its `purpose` (what its value means) and, on a text field and a dropdown, its `format` (the shape its value has).
+  - **`purpose: string | null`** on every `FormField`, and in `FormFieldDraft` and `FormFieldPatch`, where `null` means none. The engine keeps it with the field and reads nothing into it. A purpose is 1 to 256 characters with no space at its start or end and no NUL character (`isFieldPurpose()`); anything else is refused with `InvalidArg`.
+  - **`format: FormFieldFormat | null`** on `TextField` and `ComboBoxField`: `{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`, `{ kind: 'other' }` for a format script the engine doesn't recognise, or `null` without one. It is read from the field's format script, as Acrobat decides it (`formatOfActions()`): `AFDate_FormatEx("pattern")`, the older `AFDate_Format(n)`, and the same two calls for a time. A keystroke script on its own is no format.
+  - **A draft and a patch take `format: FormFieldFormatWritable | null`**, a date or a time. The engine writes the field's format script and keystroke script from the pattern, as Acrobat writes them, so it takes `doc.forms.modify` and no `doc.forms.script`. `null` removes both scripts. An `other` format is read, never written.
+  - **Patterns, per kind:** `isDatePattern()` and `isTimePattern()` say whether a string is a pattern a date or a time format is written with, and `STANDARD_DATE_PATTERNS` and `STANDARD_TIME_PATTERNS` are the patterns Acrobat's older calls name by number. A pattern is one a field can show and read back. A date's has at least one date group, the year, the month and the day each once at most, may carry one time written with colons (`m/d/yy HH:MM`), and has no two numbers touching. A time's is a time and nothing else (`HH:MM`, `h:MM:ss tt`). So `yyyymmdd`, `yyyy/mm/mm/dd`, `HH.MM`, a time alone as a date and a date as a time are refused in a write, and a format script that uses one reads as `other`.
+  - `formFieldOfDraft()` and `formFieldAfter()` work out both facts, and the two scripts a format write leaves in `actions`. `fieldDraftOf()` keeps both in a copy and an import; a date or a time format comes along without `doc.forms.script`.
+  - `FormFieldDTOSchema` reads a field from a server older than both facts: no purpose, and the format its scripts give. `FormFieldFormatSchema` reads a kind it doesn't know as `other`. `withCatchAll()` takes a fourth argument that fills in what an older server leaves out. `FIELD_PURPOSE_AND_FORMAT_SINCE` is the version both arrived in on the wire.
+  - A form bundle written before both facts reads whole too: `FormTransfer.parse()` gives each of its fields `purpose: null` and the format its scripts give, and `completeFormBundle()` does the same for a bundle that came another way.
+  - `runFieldPurposeFormatConformance` checks both facts on an engine: reads, writes, refusals, undo, copies, imports and the permission each takes.
+
+  A field you build by hand as a `FormField` (in a test, say) now needs `purpose`, and a text field or a dropdown `format`.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – A signature field's mark is a PNG, a JPEG or a one-page PDF, and it can be taken out again. `doc.forms.setSignatureAppearance(field, appearance)` and the `appearance` of `doc.signatures.prepare()` take the picture's bytes themselves, a `Uint8Array` or a `Blob`, in the formats a stamp's `appearance` resource takes; `SignatureAppearance` is their type. `setSignatureAppearance(field, null)` takes the mark out, and the change op `forms.setSignatureAppearance` takes `appearance: null` the same way. Bytes that are no PNG, JPEG or PDF are refused with `InvalidArg` before anything is sent. `{ pdf }` works as before and takes a one-page PDF only: an image under it is still refused.
+
+  On the wire, an image travels in the `appearance` part a PDF travels in, and the op's `resources.appearance` may be `null` for no mark (`FieldAppearanceResourceKeysSchema`). Both arrived in 3.4 (`MARK_IMAGE_OR_NONE_SINCE`). A `forms.setSignatureAppearance` worker request carries a mark passed as its bytes as `appearance`, and one passed as `{ pdf }` as `pdf`.
+
+- [#1151](https://github.com/embedpdf/embed-pdf-viewer/pull/1151) by [@bobsingor](https://github.com/bobsingor) – The schemas are built with zod 4 (`^4.6.6`), so installing EmbedPDF no longer brings in a zod that npm reports for GHSA-mrhx-c7xc-m3w5. What they accept and refuse is the same; the wording of a refused value's message is zod 4's. Code that combines an exported schema with its own needs zod 4 too.
+
+### Patch Changes
+
+- [#1150](https://github.com/embedpdf/embed-pdf-viewer/pull/1150) by [@draarivpatel-ui](https://github.com/draarivpatel-ui) – `OpenInputLayerBytes` accepts `baseSha256`, the verified SHA-256 of the base bytes the worker's `open.layerMemBase` message already reads.
+
 ## 3.3.0
 
 ### Minor Changes

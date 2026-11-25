@@ -1,5 +1,25 @@
 # @cloudpdf/contract
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1140](https://github.com/embedpdf/embed-pdf-viewer/pull/1140) by [@bobsingor](https://github.com/bobsingor) – `groupId` in a form field's draft and patch takes `null`: `FormFieldDraft` and `FormFieldPatch`, as the `forms.create` and `forms.update` ops of `doc.changes` carry them. In a draft, `null` means the same as leaving it out. In a patch, it takes the field out of its group, which needs `doc.forms.modify` and no `fields:set-group` permission.
+
+  A field created without a `groupId` is now in no group. It used to go in the token's own group (`identity.groupId`), so only a token whose identity has a group sees a difference. To keep the old result, name the group in the draft.
+
+  The new default comes with the server, not with the client: a server of this release gives it to every client, also one that says it speaks 3.0 to 3.3. A server older than this release refuses `groupId: null` with `InvalidArg`.
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – A form field's `purpose` and `format`.
+  - `FormField` has `purpose` (a string, or `null`), and its text and combobox kinds have `format`: `FormFieldFormat` (`{ kind: 'date', pattern }`, `{ kind: 'time', pattern }` or `{ kind: 'other' }`), or `null`. A newer server can add kinds of format: read one your client doesn't know as `other`.
+  - `FormFieldDraft` and `FormFieldPatch` take `purpose` (1 to 256 characters with no NUL, or `null` for none) and, for a text field and a dropdown, `format`: `FormFieldFormatWritable` (a date or a time with its pattern), or `null` for none. The `forms.create` and `forms.update` ops of `doc.changes` carry them the same way.
+
+  Both arrive in 3.4. A server older than that refuses a draft or a patch that names either with `InvalidArg`, so a client sends them only to a server that has them.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – The change op `forms.setSignatureAppearance` takes `resources: { appearance: null }`, which takes a drawn mark out of the signature field. Its part may be a PNG or a JPEG, beside a one-page PDF. Both need a server of version 3.4.
+
+- [#1151](https://github.com/embedpdf/embed-pdf-viewer/pull/1151) by [@bobsingor](https://github.com/bobsingor) – The operation schemas are built with zod 4 (`^4.6.6`). The OpenAPI document is unchanged.
+
 ## 3.3.0
 
 ### Minor Changes

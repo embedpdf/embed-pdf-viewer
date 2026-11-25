@@ -1,5 +1,17 @@
 # @embedpdf/viewer-chrome
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1141](https://github.com/embedpdf/embed-pdf-viewer/pull/1141) by [@bobsingor](https://github.com/bobsingor) – The form designer's sidebar shows who fills a field in, as a choice among the document's groups, while the document has groups. Its label, `form.settings.group`, is translated in all fifteen languages.
+
+- [#1118](https://github.com/embedpdf/embed-pdf-viewer/pull/1118) by [@bobsingor](https://github.com/bobsingor) – Turn form fields in the form designer. Two new commands, `annotation:rotate-clockwise` and `annotation:rotate-counterclockwise`, turn the selected fields a quarter turn. A selected field's menu shows the clockwise one, and the other is there for your own menu or shortcut. The Style sidebar has an Orientation control, which turns what's in the field and leaves its box where it stands. A field placed on a page that is shown turned reads upright there. The new labels are translated in all fifteen languages.
+
+### Patch Changes
+
+- [#1102](https://github.com/embedpdf/embed-pdf-viewer/pull/1102) by [@bobsingor](https://github.com/bobsingor) – Tell the signer when a signature is sealed without the verification information the settings ask for because the session may not add it. Storing it takes `doc.sign`, which the right to sign a group's fields doesn't give; the viewer then said nothing. It now shows the same notice as when adding it fails.
+
 ## 3.3.0
 
 ### Minor Changes

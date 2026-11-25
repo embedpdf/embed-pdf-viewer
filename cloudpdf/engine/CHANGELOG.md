@@ -1,5 +1,17 @@
 # @cloudpdf/engine
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1147](https://github.com/embedpdf/embed-pdf-viewer/pull/1147) by [@bobsingor](https://github.com/bobsingor) – A form field has a `purpose` (what its value means, such as `'email'`), and a text field or a dropdown a `format` (`{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`): `doc.forms.create()` and `doc.forms.update()` take both, and every read returns them. `isDatePattern()` and `isTimePattern()` say whether a string is a pattern a date or a time format is written with, and `STANDARD_DATE_PATTERNS` and `STANDARD_TIME_PATTERNS` are Acrobat's own lists of them.
+
+  Writing either needs a server of version 3.4. An older one is never sent them: a create, an update or a change that names a `purpose` or a `format` fails with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update. An import (`doc.forms.import()`) of a bundle in which a field has a purpose fails the same way, since such a server would make the field without it and report nothing left out. Reading works against an older server: `format` is read from the field's scripts, and `purpose` reads `null`, in the fields of an exported bundle too.
+
+- [#1145](https://github.com/embedpdf/embed-pdf-viewer/pull/1145) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.setSignatureAppearance()` and `doc.signatures.prepare()` take a PNG or a JPEG as the mark, as a `Uint8Array` or a `Blob`, beside a one-page PDF: pass the bytes themselves. `doc.forms.setSignatureAppearance(field, null)` takes a drawn mark out. `{ pdf }` works as before, for a one-page PDF only: an image under it is refused before anything is sent.
+
+  An image and `null` need a server of version 3.4. An older one is never sent them: the call fails with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update. A one-page PDF works against it.
+
 ## 3.3.0
 
 ### Minor Changes

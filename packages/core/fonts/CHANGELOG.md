@@ -1,5 +1,11 @@
 # @embedpdf/core-fonts
 
+## 3.4.0
+
+### Patch Changes
+
+- [#1152](https://github.com/embedpdf/embed-pdf-viewer/pull/1152) by [@bobsingor](https://github.com/bobsingor) – `BUILT_IN_PROGRAMS` names the standard fonts' programs without the code that loads them, so a bundle that only reads their hashes no longer holds the 14 font files. No API change.
+
 ## 3.3.0
 
 ## 3.2.0

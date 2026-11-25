@@ -1,5 +1,23 @@
 # @embedpdf/angular
 
+## 3.4.0
+
+### Minor Changes
+
+- [#1138](https://github.com/embedpdf/embed-pdf-viewer/pull/1138) by [@bobsingor](https://github.com/bobsingor) – Draw a form field with your own template, and attach UI to a field.
+  - `<epdf-form-layer>` takes controls as templates: `<ng-template [epdfFieldControl]="match" let-widget>` draws the boxes `match` says yes to, the first template that matches wins, and a box none matches is drawn as before. The template gets `widget` (the box, as `listWidgets()` gives it), `frame` (the box to draw into: the layer places, turns and scales it like the field), `native` (the layer's own control with the field's picture, to keep and add to, drawn with `[ngTemplateOutlet]="native"`), `setValue` (fills the field in, as typing does) and `focused`. Tab, `focus()` and `focusNext()` put the cursor in the first element inside your control that takes focus, and a click runs the field's own action after the value you wrote. Without a control template the layer draws what it drew.
+  - `EpdfForm.widgetAnchorOf(widget)` gives the anchor of one box of a field for `<epdf-anchored>`, as a signal, and follows the box while the field is moved in design mode: a tag pinned to a field, or a card next to it. `widget` may be a function. `null` for `null`, or a box that isn't there.
+
+- [#1141](https://github.com/embedpdf/embed-pdf-viewer/pull/1141) by [@bobsingor](https://github.com/bobsingor) – `<epdf-form-layer>` shows the fields a user may fill in in their group's color, and `<epdf-annotation-layer>` shows every field in its group's color in design mode. `EpdfForm` gains `setGroups()`, `listGroups()`, `getDesignGroup()`, `setDesignGroup()`, `moveToGroup()`, `listSelectedFields()`, `canSetGroup()`, the signals `groups()`, `designGroup()` and `selectedFields()`, and the streams `groupsChanged$` and `designGroupChanged$`. A document whose fields are in no group draws as before; set the form's `fields.tint` to `0` to show no group's color.
+
+### Patch Changes
+
+- [#1144](https://github.com/embedpdf/embed-pdf-viewer/pull/1144) by [@bobsingor](https://github.com/bobsingor) – `<epdf-scrollbar>` binds its track with `attachScrollbar` from `@embedpdf/web`, the one call every framework's bar makes. A press on the bar with any button now stays on the bar; a press with a button other than the main one used to reach the Stage below it.
+
+- [#1136](https://github.com/embedpdf/embed-pdf-viewer/pull/1136) by [@bobsingor](https://github.com/bobsingor) – Announce each radio button of `<epdf-form-layer>` by its own option. Every button of a group was announced by the group's name alone ("Plan, radio button"), so a screen reader user couldn't tell them apart. Each button now has its option in its name ("Plan: monthly") and says where it comes in its group ("1 of 2") with `aria-posinset` and `aria-setsize`, since a group's buttons stand apart on the page with no group element around them.
+
+- [#1146](https://github.com/embedpdf/embed-pdf-viewer/pull/1146) by [@bobsingor](https://github.com/bobsingor) – Let Tab get past a signature field in `<epdf-form-layer>` when the signature plugin isn't registered. The field is only its picture then, with nothing to focus, but Tab still went for it: the press was taken, the cursor stayed in the field before it, and the fields after it could not be reached with the keyboard. Tab and Shift+Tab now pass over it, and so do `focus()` and `focusNext()`. The same holds for a box drawn by a control of your own that has no element Tab stops at. With the signature plugin the field is a stop, as before.
+
 ## 3.3.0
 
 ### Minor Changes
