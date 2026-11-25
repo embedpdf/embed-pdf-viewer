@@ -557,6 +557,21 @@ function runTool(entry, args, cwd) {
  */
 export const CHILD_PROCESS_FRAMEWORKS = new Set(['vue', 'svelte']);
 
+/** What a compiler takes: it holds every package's types, and up to 1.4 GB of them. */
+const COMPILER_BYTES = 1.5 * 1024 ** 3;
+
+/** The memory this machine gives: a container's limit, where there is one. */
+const machineBytes = () => Math.min(os.totalmem(), process.constrainedMemory() || Infinity);
+
+/**
+ * How many compilers run in child processes at once: what half the memory holds, and always one.
+ * The other half is for the compiler in this process and the build around it. A site builds on
+ * 8 GB, where two run; four and the one here take more than 6 GB, and the build is killed.
+ */
+export function childCompilersAtOnce(bytes = machineBytes()) {
+  return Math.max(1, Math.floor(bytes / 2 / COMPILER_BYTES));
+}
+
 /** The first line of a tool's output that says something, for a reason it failed. */
 const firstLine = (run) =>
   `${run.error?.message ?? ''}\n${run.stderr ?? ''}\n${run.stdout ?? ''}`
