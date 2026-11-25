@@ -14,12 +14,15 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { LAST_RESORT_HASH, LAST_RESORT_METRICS, lastResortFontProgram } from './last-resort';
+import { FACES } from './standard/faces.generated';
 import { standardFontMetrics } from './standard/metrics';
 import { standardFontProgram } from './standard/programs';
 
 /** The built-in programs' display hashes, as `fontListOf` names them. */
 export const BUILT_IN_PROGRAMS: BuiltInPrograms = {
-  standardDisplayHash: (name) => standardFontProgram(name).hash,
+  // Not `standardFontProgram(name).hash`, which can also load the font's file: the engine's worker
+  // is one file that can't load a part of itself later, so it would hold all 14 to name them.
+  standardDisplayHash: (name) => FACES[name].programHash,
   lastResortDisplayHash: LAST_RESORT_HASH,
 };
 
@@ -30,7 +33,7 @@ const LAST_RESORT_COVERS: CodePointRange[] = [
 ];
 
 const standardFontOfHash = (hash: string): StandardFont | undefined =>
-  STANDARD_FONTS.find((name) => standardFontProgram(name).hash === hash);
+  STANDARD_FONTS.find((name) => FACES[name].programHash === hash);
 
 /** Code points, in order, as ranges. */
 function rangesOf(codePoints: readonly number[]): CodePointRange[] {
