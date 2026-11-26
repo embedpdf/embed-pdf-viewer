@@ -1,6 +1,6 @@
 # Signature compatibility corpus
 
-Ninety-one synthetic PDFs for investigating how validators classify changes after a
+One hundred and two synthetic PDFs for investigating how validators classify changes after a
 signature. Every PDF was created from scratch. No customer PDF, extracted page,
 metadata, certificate, font, signature, or object body was copied into this pack.
 
@@ -19,6 +19,11 @@ observed in the same Acrobat environment on 2026-09-14. Use `acrobat-results-tem
 or its CSV companion to record a new run. See [FINDINGS-V3.md](FINDINGS-V3.md)
 for the new observations and their limits.
 
+The `role-probes-v4` batch adds **11 PDFs (92-102), one signature each**: a new
+appearance on a signature field nobody signed, saved after the signature. All 11
+were observed in Acrobat Pro on 2026-11-26; see [v4: a new appearance on an
+unsigned signature field](#v4-a-new-appearance-on-an-unsigned-signature-field).
+
 ## Weak annotation follow-up (2026-09-23)
 
 The separate [weak annotation investigation](weak-annotations/README.md) preserves
@@ -27,7 +32,7 @@ reports and reproduction tools. It tests direct annotation dictionaries, lazy
 `/NM` naming, identical rewrites and explicit DocMDP P=3. The direct P3 baseline
 was already invalid before editing; the report keeps this separate from failures
 caused by subsequent mutations. These diagnostics are not promoted policy
-expectations and do not change the 91-case v1/v2/v3 corpus above.
+expectations and do not change the v1-v4 corpus above.
 
 ## Tagged documents (2026-10-25)
 
@@ -201,17 +206,52 @@ Run the dedicated structural and independent CMS verifier for v3:
 ```
 
 `engine-baseline-role-probes-v3.json` records the current engine's results for
-these 39 inputs. All 91 case reports agree between WASM and native `layerFile`.
+these 39 inputs. All 91 v1-v3 case reports agree between WASM and native `layerFile`.
 The report is diagnostic evidence, not a policy oracle. No promoted policy
 expectations were added with v3.
+
+## v4: a new appearance on an unsigned signature field
+
+`generate_v4.py` builds on the v3 document: `SignatureOne` is signed, `SignatureTwo` is
+not. Each probe writes one revision in which `SignatureTwo`'s field (or its widget)
+changes `/AP` and nothing else, and the drawing is all new objects. Two drawings: the
+wrapper EmbedPDF writes for a picture drawn into a signature field
+(`forms.setSignatureAppearance()`: a form placing the `/EPDFWRAP` form, which paints an
+image), and a plain form with a vector stroke. `verify_v4.py` checks the structure and
+every CMS.
+
+| Case | After the signature | Acrobat Pro 26.002 | Expected |
+| ---- | ------------------- | ------------------ | -------- |
+| 92 | Approval control (byte-identical to v3/53) | Valid, not modified | `unchanged` |
+| 93 | `SignatureTwo` gets the wrapper drawing | Valid, **not modified** | `permitted` |
+| 94 | `SignatureTwo` gets the plain drawing | Valid, **not modified** | `permitted` |
+| 95 | The signed `SignatureOne` gets the wrapper drawing | Valid, **not modified**, also after Validate Signature | `forbidden` |
+| 96 | Approval control; `SignatureTwo` has no `/AP` | Valid, not modified | `unchanged` |
+| 97 | `SignatureTwo` gets its first `/AP`, the wrapper drawing | Valid, **not modified** | `permitted` |
+| 98 | Approval control; `SignatureTwo` has a widget of its own | Valid, not modified | `unchanged` |
+| 99 | That widget gets the wrapper drawing; the field is untouched | Valid, **not modified** | `permitted` |
+| 100 | P2 control (byte-identical to v3/63) | Valid, not modified | `unchanged` |
+| 101 | P2; `SignatureTwo` gets the wrapper drawing | Valid, changes "permitted by the Certifying party" | `permitted` |
+| 102 | P2; `SignatureTwo` gets the plain drawing | Valid, changes "permitted by the Certifying party" | `permitted` |
+
+After an approval signature Acrobat does not count a new appearance as a change at all,
+whether the field is signed or not; under P2 it reports a permitted change. The engine
+permits it on a field nobody signed (rule `signature-appearance`, policy version 6). On
+the signed field (95) it stays forbidden on purpose: the drawing replaces the look the
+signature was made with, as v3/75 does for a locked field. Acrobat drew none of the
+drawings in the unsigned `SignatureTwo`, only its field highlight; in 95 it drew the
+picture over the signature.
+
+The generator is byte-deterministic: a second run reproduces all 11 files, which is why
+92 and 100 equal v3/53 and v3/63. They are kept as v4's own controls.
 
 ## Automated checks and policy decisions
 
 Keep three layers separate:
 
-1. `v1/manifest.json`, `v2/manifest.json`, and `v3/manifest.json`: immutable input facts, including hashes, revision counts,
+1. `v1/manifest.json` to `v4/manifest.json`: immutable input facts, including hashes, revision counts,
    signature fields, ByteRanges and expected digest integrity.
-2. `observations.json`: raw Acrobat runs. Separate completed runs cover v1, v2 and v3.
+2. `observations.json`: raw Acrobat runs. Separate completed runs cover v1, v2, v3 and v4.
    Append future runs after reviewing the filled template; preserve actual
    wording and environment. Generation-time `acrobat.status` fields in the frozen
    manifest describe its initial state; this file owns later observations.
@@ -257,7 +297,7 @@ cloud transport, signing publication, storage, or server memory use.
 
 Set `EPDF_SIGNATURE_CORPUS_REPORT=/absolute/path/report.json` to capture current
 engine verdicts and findings. These reports are diagnostics, not Acrobat
-observations. Each run has 91 fixture tests plus one evidence-provenance test.
+observations. Each run has 102 fixture tests plus one evidence-provenance test.
 
 For an independent check using Python and OpenSSL:
 
@@ -268,10 +308,11 @@ python3 -m venv /tmp/epdf-signature-fixtures
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/verify.py packages/engine/main/test/fixtures/signature-compat/v2
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/verify_v2.py
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/verify_v3.py
+/tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/verify_v4.py
 ```
 
-OpenSSL checks all 103 detached signatures against their exact ByteRange
-content across the three corpora; only case 29 must fail. Its `-noverify` flag skips certificate-chain
+OpenSSL checks all 114 detached signatures against their exact ByteRange
+content across the four corpora; only case 29 must fail. Its `-noverify` flag skips certificate-chain
 trust, not the cryptographic signature/content verification.
 
 ## Extend without losing evidence
@@ -288,13 +329,14 @@ EmbedPDF's writer. It refuses to overwrite a nonempty output directory:
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/generate.py --out /tmp/epdf-signature-candidate
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/generate_v2.py --out /tmp/epdf-signature-candidate-v2
 /tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/generate_v3.py --out /tmp/epdf-signature-candidate-v3
+/tmp/epdf-signature-fixtures/bin/python packages/engine/main/test/fixtures/signature-compat/generate_v4.py --out /tmp/epdf-signature-candidate-v4
 ```
 
 Generation is not byte-deterministic: pyHanko normally mints a random `/ID[1]`
 for each incremental write, and AES encryption uses random IVs. Re-running a
 generator therefore cannot reproduce the frozen bytes. The v3 writer explicitly
 preserves `/ID[1]` except in its dedicated ID probes, but that does not change the
-immutability rule. Keep all observed `v1`, `v2`, and `v3` bytes frozen. A new
+immutability rule. Keep all observed `v1` to `v4` bytes frozen. A new
 generation needs a new corpus version, reviewed manifest and fresh observations;
 never carry an old observation over to a different hash.
 

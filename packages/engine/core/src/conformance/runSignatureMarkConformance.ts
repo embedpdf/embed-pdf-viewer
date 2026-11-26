@@ -5,7 +5,7 @@ import {
   quarterTurned,
   type Raster,
 } from './appearanceRasters';
-import { pdfOf } from './pdfOf';
+import { pdfOf, sealedPdfOf, SIGNATURE_SLOT, withRevision } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_JPEG, BANDS_PDF, BANDS_PNG, TWO_PAGE_PDF } from './stampFixtures';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
@@ -25,7 +25,9 @@ import { toPageRef } from '../identity/PageRef';
  * upright in a turned field; other bytes are refused before anything is
  * written; `{ pdf }` takes a PDF only; and `null` takes the mark out, so the
  * field shows its own box again, its style can change, and the undo brings
- * the mark back.
+ * the mark back. A new drawing saved into such a field after another field
+ * was signed keeps that signature, as Acrobat reads it; the same drawing
+ * over the signed field does not.
  */
 
 export interface SignatureMarkConformanceOptions {
@@ -56,6 +58,37 @@ const BANDS_BOX: PageBox = { x: 30, y: 30, width: 150, height: 50 };
 
 /** A DER `SEQUENCE`: what a completion takes as a CMS, without judging it. */
 const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
+
+/**
+ * Two signature fields on one page: `signed` (object 4), whose signature
+ * (6) seals the file, and `open` (5), which nobody signed and which has no
+ * appearance. `certify` makes the signature a certification that allows
+ * form filling (permission 2).
+ */
+const signedAndOpenObjects = (certify: boolean) => [
+  '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 5 0 R] /SigFlags 3 >>' +
+    (certify ? ' /Perms << /DocMDP 6 0 R >> >>' : ' >>'),
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 8 0 R /Resources << >> ' +
+    '/Annots [4 0 R 5 0 R] >>',
+  '<< /Type /Annot /Subtype /Widget /FT /Sig /T (signed) /Rect [30 200 180 250] /F 4 /P 3 0 R ' +
+    '/V 6 0 R /AP << /N 7 0 R >> >>',
+  '<< /Type /Annot /Subtype /Widget /FT /Sig /T (open) /Rect [30 30 180 80] /F 4 /P 3 0 R >>',
+  '<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /ETSI.CAdES.detached ' +
+    (certify
+      ? '/Reference [<< /Type /SigRef /TransformMethod /DocMDP ' +
+        '/TransformParams << /Type /TransformParams /P 2 /V /1.2 >> >>] '
+      : '') +
+    `${SIGNATURE_SLOT} >>`,
+  '<< /Type /XObject /Subtype /Form /BBox [0 0 150 50] /Length 0 >>\nstream\n\nendstream',
+  '<< /Length 0 >>\nstream\n\nendstream',
+];
+
+/** A new drawing for a box of either field: a stroke, as a form of its own (object 9). */
+const STROKE = '0 0 1 RG 2 w 10 10 m 140 40 l S';
+const STROKE_FORM =
+  `<< /Type /XObject /Subtype /Form /BBox [0 0 150 50] /Resources << >> ` +
+  `/Length ${STROKE.length} >>\nstream\n${STROKE}\nendstream`;
 
 type Rgb = readonly [number, number, number];
 const RED: Rgb = [255, 0, 0];
@@ -478,6 +511,52 @@ export function runSignatureMarkConformance(
         }
         expect(showsBands(await drawn(doc, await rowOf(doc, 'signed')))).toBe(true);
       });
+    });
+
+    test("a drawing saved into a field that isn't signed keeps an earlier signature; over the signed field it does not", async () => {
+      // The revision after the signature writes one field again with an /AP
+      // to the new drawing, and nothing else.
+      const redrawn = (field: 4 | 5, certify = false) => {
+        const objects = signedAndOpenObjects(certify);
+        return withRevision(sealedPdfOf(objects, PLACEHOLDER_CMS), {
+          [field]: objects[field - 1]!.replace(
+            field === 4 ? '/AP << /N 7 0 R >> >>' : '/P 3 0 R >>',
+            field === 4 ? '/AP << /N 9 0 R >> >>' : '/P 3 0 R /AP << /N 9 0 R >> >>',
+          ),
+          9: STROKE_FORM,
+        });
+      };
+      const analysisOf = async (bytes: Uint8Array) => {
+        const doc = await options.open(engine, bytes);
+        try {
+          if (!doc.signatures) return null;
+          return await doc.signatures.analyze({ since: { signatureIndex: 0 } });
+        } finally {
+          await doc.close();
+        }
+      };
+
+      // After an approval signature, and after a certification that allows form filling.
+      for (const [certify, level] of [
+        [false, 'annotate'],
+        [true, 'fill'],
+      ] as const) {
+        const open = await analysisOf(redrawn(5, certify));
+        if (!open) return;
+        expect(open.verdict).toBe('permitted');
+        const [step] = open.steps;
+        expect(step!.levelInForce).toBe(level);
+        expect(step!.findings.filter((f) => f.verdict === 'forbidden')).toEqual([]);
+        expect(
+          step!.findings.some(
+            (f) => f.rule === 'signature-appearance' && f.verdict === 'permitted',
+          ),
+        ).toBe(true);
+      }
+
+      const sealed = await analysisOf(redrawn(4));
+      expect(sealed!.verdict).toBe('forbidden');
+      expect(sealed!.steps[0]!.findings.some((f) => f.rule === 'signature-appearance')).toBe(false);
     });
 
     test('a signing refuses bytes that are no PNG, JPEG or PDF', async () => {

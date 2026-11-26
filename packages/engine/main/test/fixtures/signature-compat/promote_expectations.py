@@ -15,6 +15,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 POLICY_VERSION = 4  # the engine policy the review was made against
+# Cases reviewed later, against a later policy: id -> that policy's version.
+REVIEWED_AGAINST = {**{cid: 6 for cid in map(str, range(92, 103))}}
 
 MATCHES = 'matches-observed-behavior'
 STRICTER = 'intentional-stricter-policy'
@@ -104,12 +106,25 @@ REVIEW = {
     '79': (['forbidden'], STRICTER, 'Acrobat accepts a fill whose changed glyph also draws a locked field\'s appearance; the locked field\'s use of the resource denies the change.'),
     '49': (['forbidden'], STRICTER, 'Acrobat accepts moving a field covered by the signature\'s own FieldMDP lock; a locked field that can move is not the guarantee the lock promises.'),
     '75': (['forbidden'], STRICTER, 'Acrobat accepts a locked field\'s appearance stream rewritten with the same drawing; an appearance change on a locked field can misrepresent its value and the drawing is not verified.'),
+    # ---- v4: a new appearance on a signature field that is not signed -------------
+    **{cid: (['unchanged'], MATCHES, 'Unchanged control: the signature seals the last revision.')
+       for cid in ['92', '96', '98', '100']},
+    **{cid: (['permitted'], ENGINE,
+             'A new appearance on the unsigned SignatureTwo, the field (or its widget) changing /AP alone and the drawing all '
+             'new objects: Acrobat "not modified"; we report a permitted change.')
+       for cid in ['93', '94', '97', '99']},
+    **{cid: (['permitted'], MATCHES,
+             'The same new appearance under a P=2 certification: Acrobat "changes ... permitted by the Certifying party".')
+       for cid in ['101', '102']},
+    '95': (['forbidden'], STRICTER,
+           'Acrobat reports the signed field\'s own appearance replaced after signing as "not modified" (also after an explicit '
+           'revalidation); it replaces the look the signature was made with, so it stays forbidden.'),
 }
 
 
 def main() -> None:
     fixtures = {}
-    for directory in ('v1', 'v2', 'v3'):
+    for directory in ('v1', 'v2', 'v3', 'v4'):
         for case in json.loads((HERE / directory / 'manifest.json').read_text())['cases']:
             fixtures[case['id']] = case
     observations = json.loads((HERE / 'observations.json').read_text())
@@ -133,7 +148,7 @@ def main() -> None:
             'id': cid,
             'sha256': fixture['facts']['sha256'],
             'observationRunId': run_id,
-            'policyVersion': POLICY_VERSION,
+            'policyVersion': REVIEWED_AGAINST.get(cid, POLICY_VERSION),
             'relationship': relationship,
             'modifications': modifications,
             'rationale': rationale,

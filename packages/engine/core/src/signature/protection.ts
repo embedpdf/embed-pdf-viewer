@@ -13,7 +13,7 @@ import type {
  * Bumped whenever the derivation below (or a judgement rule) changes meaning.
  * Rides every protection and every analysis. On the cloud it is a rule of the
  * `analysis` engine value, so raising it gives every cached analysis a new URL
- * and refuses no client. The current policy is calibrated on the 91 Acrobat
+ * and refuses no client. The current policy is calibrated on the 102 Acrobat
  * observations in `packages/engine/main/test/fixtures/signature-compat`:
  * each signature is judged on the net state of the document against the
  * revision it sealed; an object written again with the sealed value is not
@@ -26,8 +26,14 @@ import type {
  * data and document timestamps included; a document timestamp added after one
  * is still judged on its own; and a page's /Annots may move into an object of
  * its own when a signature field is added.
+ *
+ * Version 6 adds the Acrobat observations in `fixtures/signature-compat/v4/`:
+ * a new appearance on a signature field that is not signed, with nothing else
+ * on the field changed and all of the drawing new, keeps an earlier approval
+ * signature (Acrobat: "not modified") and a certification that allows form
+ * filling (Acrobat: "permitted by the Certifying party").
  */
-export const SIGNATURE_POLICY_VERSION = 5;
+export const SIGNATURE_POLICY_VERSION = 6;
 
 /**
  * How a validator reads an approval signature. ISO 32000 defines permitted

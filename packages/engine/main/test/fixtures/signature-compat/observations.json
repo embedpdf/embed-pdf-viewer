@@ -2526,6 +2526,329 @@
         "permissionMessage": "Literal UI wording. The word certifier also appears for approval signatures; actual DocMDP and FieldMDP transforms were checked independently.",
         "trust": "The imported test identity was valid in all properties dialogs. Acrobat reports that revocation checking is not performed for directly trusted certificates."
       }
+    },
+    {
+      "id": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "corpusVersion": "role-probes-v4",
+      "observedAt": "2026-11-26",
+      "observer": {
+        "application": "Adobe Acrobat Pro",
+        "applicationBundleVersion": "26.002.22031",
+        "applicationBundleVersionSource": "installed application Info.plist CFBundleShortVersionString",
+        "architecture": "arm64",
+        "processor": "Apple M1 Max",
+        "osVersion": "macOS 27.2.1",
+        "osBuild": "26B131",
+        "osVersionSource": "sw_vers"
+      },
+      "settings": {
+        "certificateTrust": {
+          "subject": "EmbedPDF PUBLIC TEST KEY ONLY",
+          "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+          "store": "Acrobat manually imported trusted identity, already present before this run"
+        },
+        "verifyOnOpen": true
+      },
+      "settingsSource": "Not changed during this run. Acrobat reported the test identity as a manually imported trusted identity in every dialog; the other verification preferences were not opened.",
+      "method": {
+        "source": "direct-acrobat-ui",
+        "description": "Each file was opened as a copy outside the repository (byte-identical to v4/, checked with cmp) in the background through computer use, and its Signatures panel entry was expanded and read. For 93, 95, 101 and 102 the Signature Validation Status dialog was read too, and for 93, 95 and 101 the Signature Properties dialog. 95 was revalidated with Validate Signature. Every file was closed without saving.",
+        "fixtureEditsOrSaves": false,
+        "screenshots": "Cropped screenshots of the panel and the dialogs are kept with the run outside the repository; none is committed.",
+        "integrityMessage": "Left null: no separate digest result is displayed. All 11 CMS signatures independently verify with OpenSSL (verify_v4.py).",
+        "changeCategories": "Empty: the panel listed no change category for any file.",
+        "permissionMessage": "The Signature Properties wording where that dialog was read; otherwise the panel line, or null for approval files read in the panel only.",
+        "trust": "The imported test identity was valid in every panel entry and dialog."
+      },
+      "cases": [
+        {
+          "id": "92",
+          "file": "92-approval-control.pdf",
+          "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+          "question": "Unchanged approval signature; SignatureTwo is unsigned and keeps its empty appearance.",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "93",
+          "file": "93-approval-unsigned-wrapper-appearance.pdf",
+          "sha256": "86b4ff6acd975f04861cc29d76cc78cad01adb3c8e087b68e27704cb026c5427",
+          "question": "Is EmbedPDF's wrapper drawing as a new appearance on the unsigned SignatureTwo accepted?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+              "integrityMessage": null,
+              "modificationMessage": "The document has not been modified since this signature was applied.",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+              "validationTimeMessage": "Signature was validated as of the signing time:\n2026/09/13 14:00:00 +02'00'",
+              "pathValidationMessage": "Path validation checks were successful.",
+              "revocationMessage": "Revocation checking is not performed for Certificates that you have directly trusted."
+            }
+          ],
+          "notes": "Acrobat drew no picture in the unsigned SignatureTwo, only its blue field highlight.",
+          "evidenceSource": "Signature Validation Status and Signature Properties dialogs; Signatures panel, expanded entry"
+        },
+        {
+          "id": "94",
+          "file": "94-approval-unsigned-plain-appearance.pdf",
+          "sha256": "9031ac4df794a3b705165e6858825f060be372fccdc3611a589f7b45d46b771d",
+          "question": "Is a plain vector drawing as a new appearance on the unsigned SignatureTwo accepted?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": "Acrobat drew no drawing in the unsigned SignatureTwo, only its blue field highlight.",
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "95",
+          "file": "95-approval-signed-field-wrapper-appearance.pdf",
+          "sha256": "33dbba4d8fc9f6a320207f8048bc66002c138365ff1a883106d6763d104266d6",
+          "question": "Negative control: is the same new appearance on the signed SignatureOne rejected?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+              "integrityMessage": null,
+              "modificationMessage": "The document has not been modified since this signature was applied.",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+              "validationTimeMessage": "Signature was validated as of the signing time:\n2026/09/13 14:00:00 +02'00'",
+              "pathValidationMessage": "Path validation checks were successful.",
+              "revocationMessage": "Revocation checking is not performed for Certificates that you have directly trusted.",
+              "explicitRevalidation": true
+            }
+          ],
+          "notes": "Acrobat draws the new picture in the signed SignatureOne and still reports the document as not modified, also after Validate Signature.",
+          "evidenceSource": "Signature Validation Status and Signature Properties dialogs; Signatures panel, expanded entry; revalidated with Validate Signature"
+        },
+        {
+          "id": "96",
+          "file": "96-approval-no-appearance-control.pdf",
+          "sha256": "a4283915585120ec8db71a5471ed07df1f692ffb9fa634d30795ca0f62afbb95",
+          "question": "Unchanged approval signature; SignatureTwo is unsigned and has no /AP at all.",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "97",
+          "file": "97-approval-unsigned-appearance-added.pdf",
+          "sha256": "d162b8b9550f8975286cfcd632563d26a82dd5b0a544077b757e7f634449de68",
+          "question": "Is a first appearance (/AP added where there was none) on the unsigned SignatureTwo accepted?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "98",
+          "file": "98-approval-separate-widget-control.pdf",
+          "sha256": "3cf2fb78235bff992cf5afa693616a6308883e1617c6a36392e756ed97e098a8",
+          "question": "Unchanged approval signature; the unsigned SignatureTwo has a separate /Kids widget.",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "99",
+          "file": "99-approval-unsigned-separate-widget-appearance.pdf",
+          "sha256": "2a5f88f6122929ccf6eebe7f2041b891fa2d6abf67268dd8a3475ef0085a2043",
+          "question": "Is a new appearance on the separate widget of the unsigned SignatureTwo accepted (field untouched)?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Signature is valid",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since this signature was applied",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": null,
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "100",
+          "file": "100-p2-control.pdf",
+          "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+          "question": "Unchanged P2 certification; SignatureTwo is unsigned.",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Valid certified document",
+              "integrityMessage": null,
+              "modificationMessage": "Document has not been modified since it was certified",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": "Only form fill-in, signing and page adding actions are allowed",
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signatures panel, expanded entry"
+        },
+        {
+          "id": "101",
+          "file": "101-p2-unsigned-wrapper-appearance.pdf",
+          "sha256": "0ccaf0841f98b2f3f6ed2c46e08d73cefd8163320498a1b1e1105baedd55e986",
+          "question": "Under P2, is the wrapper drawing as a new appearance on the unsigned SignatureTwo accepted?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Document certification is valid, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+              "integrityMessage": null,
+              "modificationMessage": "The changes that have been made to this document since it was certified are permitted by the Certifying party and do not invalidate the signature.",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": "The certifier has specified that Form Fill-in and Signing is allowed for this document. No other changes are permitted.",
+              "validationTimeMessage": "Signature was validated as of the signing time:\n2026/09/13 14:00:00 +02'00'",
+              "pathValidationMessage": "Path validation checks were successful.",
+              "revocationMessage": "Revocation checking is not performed for Certificates that you have directly trusted."
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signature Validation Status and Signature Properties dialogs; Signatures panel, expanded entry"
+        },
+        {
+          "id": "102",
+          "file": "102-p2-unsigned-plain-appearance.pdf",
+          "sha256": "5907445e3072735cc6f02c80560008386b729343363f613e66b41ac7b9ee7bdc",
+          "question": "Under P2, is a plain drawing as a new appearance on the unsigned SignatureTwo accepted?",
+          "status": "observed",
+          "signatures": [
+            {
+              "field": "SignatureOne",
+              "signatureIndex": 0,
+              "overallStatus": "Document certification is valid, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+              "integrityMessage": null,
+              "modificationMessage": "The changes that have been made to this document since it was certified are permitted by the Certifying party and do not invalidate the signature.",
+              "changeCategories": [],
+              "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. Signer's identity is valid",
+              "lockMessage": null,
+              "screenshot": null,
+              "permissionMessage": "Only form fill-in, signing and page adding actions are allowed",
+              "validationTimeMessage": null,
+              "pathValidationMessage": null,
+              "revocationMessage": null
+            }
+          ],
+          "notes": null,
+          "evidenceSource": "Signature Validation Status dialog; Signatures panel, expanded entry"
+        }
+      ]
     }
   ]
 }

@@ -695,6 +695,10 @@ The field is empty again: its widgets read `hasMark: false` and show the field's
 style, which can change again. Undo brings the mark back. A field that has no mark is left as
 it is.
 
+A mark keeps the signatures made before it valid: after an approval signature, and after a
+certification that allows form filling, Acrobat reports no change it objects to, and
+[`analyze()`](#what-changed-since-a-signature) reads the mark as `'permitted'`.
+
 Once a field is signed, its look is part of what the signature seals, so
 `setSignatureAppearance()` fails with `ProtectedDocument`, for a mark and for `null`. To sign
 with a mark, pass `appearance` to `sign()` or `prepare()`.
@@ -1011,6 +1015,11 @@ console.log(analysis.verdict);
 With `'forbidden'`, the signature itself still checks out, but PDF apps such as Acrobat report
 that the document was changed after signing. For what `since` and `until` take, see
 [Analyzing in detail](#analyzing-in-detail).
+
+A signature field that nobody signed may get a new look, such as a
+[mark](#signature-fields-and-their-look): when only its appearance changes, the verdict is
+`'permitted'`. A signed field's look is part of what its signature sealed, so a new look there
+is `'forbidden'`, even though Acrobat doesn't report it.
 
 ## Events
 
