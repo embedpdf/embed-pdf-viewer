@@ -80,27 +80,24 @@ A text field's or a dropdown's `format` is the shape its value has: a date
 (`{ kind: 'date', pattern: 'dd/mm/yyyy' }`), a time, another format (`{ kind: 'other' }`), or
 `null` for none. See [Dates and times](/docs/engine/forms/authoring#dates-and-times).
 
-### Who created and filled it in
+### Who created it
 
-A field records who created it and who last filled it in, from the identity the document was opened
-with:
+A field records who created it, from the identity the document was opened with:
 
 ```ts
 field.createdBy; // 'user-17': who created the field, or null
-field.filledBy; // 'user-42': whose fill last changed the value
-field.filledByName; // 'Ann de Vries'
-field.filledAt; // '2026-10-08T10:42:00Z'
+field.createdAt; // '2026-10-08T10:42:00Z'
 ```
 
-| Field                                  | What it is                                                                                                                                                                            |
-| :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `createdBy`, `createdAt`               | Who created the field, and when. `null` for a field another app made.                                                                                                                 |
-| `filledBy`, `filledByName`, `filledAt` | The user whose fill last changed the value, their name, and when. A calculated value counts as filled in by whoever's fill calculated it. `null` after a reset, or an anonymous fill. |
-| `importedBy`                           | Who imported the field with its attribution kept.                                                                                                                                     |
+| Field                                  | What it is                                                                                 |
+| :------------------------------------- | :----------------------------------------------------------------------------------------- |
+| `createdBy`, `createdAt`               | Who created the field, and when. `null` for a field another app made.                      |
+| `importedBy`                           | Who imported the field with its attribution kept.                                          |
+| `filledBy`, `filledByName`, `filledAt` | Deprecated: always `null`, whatever an older version wrote into the field. They go in 4.0. |
 
-The engine stamps these; a write can't set them. A fill that leaves the value as it was changes
-none of them, and undoing a fill puts the previous ones back. A widget has no attribution of its own:
-its field's is the one.
+The engine stamps these when a field is created or imported; a write can't set them. A widget has no
+attribution of its own: its field's is the one. A fill records nobody: see
+[Fill in a field](#fill-in-a-field).
 
 ### Widgets
 
@@ -169,6 +166,12 @@ const { field } = await doc.forms.setValue(name.ref, { value: 'Ada' });
 
 The engine redraws the field's widgets, so the page shows the new value in every PDF app. Render
 the page again to see it.
+
+The value and its drawing are all a fill writes, as in every PDF app. So filling in a field that a
+signature didn't [lock](/docs/engine/forms/signatures#lock-fields) leaves that signature valid,
+whoever fills it in. Who signed which version is in the
+[signatures](/docs/engine/forms/signatures#read-the-signatures); anything more about who filled
+what in, your app keeps.
 
 ### What the engine checks
 

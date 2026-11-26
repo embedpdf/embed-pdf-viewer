@@ -86,7 +86,7 @@ export function createPlannedFields(
       writeFlags(runtime, session, widget, planned.flags[index]!),
     );
     session.invalidateDerived();
-    if (planned.value) forms.setValue(field.ref, planned.value, write.signal, write.actor);
+    if (planned.value) forms.setValue(field.ref, planned.value, write.signal);
     const made = objectNumberOf(field.ref);
     write.made?.(made, at);
     return made;

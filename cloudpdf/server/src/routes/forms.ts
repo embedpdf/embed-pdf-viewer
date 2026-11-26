@@ -105,8 +105,8 @@ interface FormRouteDeps {
  *   - `doc.forms.modify` — field lifecycle (create/update/delete),
  *                          widget adoption (attach/detach), design import,
  *                          repair
- *   - `doc.forms.import` — beside either import, to restore who made and
- *                          filled the fields
+ *   - `doc.forms.import` — beside the design import, to restore who made
+ *                          the fields
  */
 export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDeps): Promise<void> {
   const { documentService, layerService, imageEncoder, derivedRenders } = deps;
@@ -599,18 +599,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     });
     const attribution = body.options.attribution ?? 'restore';
     // A field the token may not fill is left out (`fill-not-allowed`), checked in the write.
+    // A fill records nobody, so restoring takes no `doc.forms.import`.
     const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', permissionFlags, protection);
-    // Restoring writes attribution that isn't the caller's.
-    if (attribution === 'restore') {
-      requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.forms.import',
-        permissionFlags,
-        protection,
-      );
-    }
     setNoStore(reply);
     return layerService.importFormValues(
       ctx,

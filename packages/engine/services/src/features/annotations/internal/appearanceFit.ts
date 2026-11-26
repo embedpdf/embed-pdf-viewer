@@ -5,9 +5,10 @@ import { readEmbedMetadataString } from './read/readEmbedMetadata';
 import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './write/writeEmbedMetadata';
 
 /**
- * `/EMBD_Metadata/AppearanceFit`: how a drawing placed in an annotation fills
- * its box. A stamp's drawing records it, and so does a mark drawn into a
- * signature field's widget.
+ * `/EMBD_Metadata/AppearanceFit`: how a stamp's drawing fills its box, so a
+ * new box fits it the same way. A mark in a signature field's widget records
+ * none: it is always fitted with `contain`, and a widget keeps nothing of
+ * ours (an older version wrote one beside a mark; nothing reads it).
  */
 export const KEY_APPEARANCE_FIT = 'AppearanceFit';
 

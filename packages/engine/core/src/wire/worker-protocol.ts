@@ -742,10 +742,7 @@ export interface FormsSetValueWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   value: FormFieldValue;
   artifactPath?: string;
-  /**
-   * Who the write acts for (stamped as its filler or creator) and their
-   * grants, checked field by field inside the write.
-   */
+  /** Who the write acts for and their grants, checked field by field inside the write. */
   authority: ChangeAuthority;
 }
 
@@ -758,10 +755,7 @@ export interface FormsResetWorkerRequest extends WriteJobFields {
   /** The fields to reset; absent resets the whole form. */
   refs?: FormFieldRef[];
   artifactPath?: string;
-  /**
-   * Who the write acts for (stamped as its filler or creator) and their
-   * grants, checked field by field inside the write.
-   */
+  /** Who the write acts for and their grants, checked field by field inside the write. */
   authority: ChangeAuthority;
 }
 
@@ -790,9 +784,9 @@ export interface FormsImportWorkerRequest extends WriteJobFields {
   attribution: 'restore' | 'stamp';
   values: boolean;
   /**
-   * Who imports and their grants: whom `'stamp'` makes the creator and
-   * filler, whose user `'restore'` records as `importedBy`, and who may put
-   * the fields in which groups.
+   * Who imports and their grants: whom `'stamp'` makes the creator, whose
+   * user `'restore'` records as `importedBy`, and who may put the fields in
+   * which groups.
    */
   authority: ChangeAuthority;
   limits?: BundleLimits;
@@ -809,11 +803,9 @@ export interface FormsImportValuesWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   bundle: WireFormBundle;
+  /** Unused: a fill records nobody (see `FormValuesImportOptions.attribution`). */
   attribution: 'restore' | 'stamp';
-  /**
-   * Who imports and their grants: whom `'stamp'` makes the filler, whose
-   * user `'restore'` records as `importedBy`, and which fields they may fill.
-   */
+  /** Who imports and their grants: which fields they may fill. */
   authority: ChangeAuthority;
   limits?: BundleLimits;
   artifactPath?: string;

@@ -171,6 +171,10 @@ export function readFieldAt(
     groupId: readFieldGroup(runtime, model, fieldIndex),
     purpose: readFieldPurpose(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
+    // Deprecated: a fill records nobody (see fieldAttribution.ts).
+    filledBy: null,
+    filledByName: null,
+    filledAt: null,
     widgets: [],
   };
   const scalarValue = entryScalar(valueEntry);
