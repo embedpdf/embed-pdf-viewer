@@ -234,8 +234,9 @@ export class LocalDocumentFormsService implements Omit<DocumentFormsService, For
     bundle: FormBundle,
     options: FormValuesImportOptions = {},
   ): AbortablePromise<FormValuesImportResult> {
+    // A fill records nobody, so restoring takes no `doc.forms.import`.
     const attribution = options.attribution ?? 'restore';
-    const write = this.beginImport(this.beginFieldWrite('fill', options), attribution);
+    const write = this.beginFieldWrite('fill', options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const resources = transferableResources(bundle.resources);
@@ -608,8 +609,8 @@ export class LocalDocumentFormsService implements Omit<DocumentFormsService, For
   }
 
   /**
-   * An import: its write's checks (`write`), and `doc.forms.import` too when
-   * it restores attribution that isn't the session's (`'restore'`).
+   * A design import: its write's checks (`write`), and `doc.forms.import`
+   * too when it restores who created the fields (`'restore'`).
    */
   private beginImport(
     write: ReturnType<LocalDocumentFormsService['beginWrite']>,

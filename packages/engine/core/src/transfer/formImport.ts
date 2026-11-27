@@ -22,10 +22,9 @@ export interface FormImportOptions extends WriteOptions {
   /** Default `'same'`. A page a widget is on or points at that maps nowhere refuses the import. */
   readonly pages?: BundleImportPages;
   /**
-   * `'restore'` (the default) writes who created and filled each field as
-   * the bundle has them, and the session as `importedBy`; it needs
-   * `doc.forms.import`. `'stamp'` makes the fields the session's, as
-   * `create` does.
+   * `'restore'` (the default) writes who created each field as the bundle
+   * has it, and the session as `importedBy`; it needs `doc.forms.import`.
+   * `'stamp'` makes the fields the session's, as `create` does.
    */
   readonly attribution?: 'restore' | 'stamp';
   /** Whether each field gets the value the bundle holds. Default `true`. */
@@ -38,9 +37,9 @@ export interface FormImportOptions extends WriteOptions {
  */
 export interface FormValuesImportOptions extends WriteOptions {
   /**
-   * `'restore'` (the default) writes who filled each field as the bundle
-   * has it, and needs `doc.forms.import`; `'stamp'` makes the session the
-   * filler, as `setValue` does.
+   * @deprecated No effect: a fill records nobody, so a values import has no
+   * filler to restore or stamp, and needs no `doc.forms.import`. Goes in
+   * 4.0.
    */
   readonly attribution?: 'restore' | 'stamp';
 }

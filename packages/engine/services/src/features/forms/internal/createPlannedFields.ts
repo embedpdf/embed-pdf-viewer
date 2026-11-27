@@ -49,8 +49,9 @@ export interface CreatedFields extends FormWidgetRows<PdfCoordinates> {
 /**
  * The fields of a plan, written through the form's own `createField` and
  * `setValue`: each with its widgets on their pages and their flags, in the
- * group `groupOf` gives it, with its value when it has one; then the
- * calculation order among them, appended to the form's in the order given.
+ * group `groupOf` gives it and for anyone when `forAnyoneOf` says so, with its
+ * value when it has one; then the calculation order among them, appended to
+ * the form's in the order given.
  * `made` runs after each field is written, for what only its caller knows
  * (who made and filled an imported field).
  */
@@ -64,6 +65,8 @@ export function createPlannedFields(
     readonly actor: AnnotationActor;
     /** The group a field goes in, given the one its source had (`null` for none). */
     readonly groupOf: (groupId: string | null) => string | null;
+    /** Whether a field is one anyone fills in, given whether its source was; left out, as it was. */
+    readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
     readonly signal: AbortSignal;
     readonly made?: (objectNumber: number, at: number) => void;
   },
@@ -73,11 +76,18 @@ export function createPlannedFields(
   const boxOf = visibleBoxReader(runtime, session);
   const forms = new FormMutator(runtime, session, fonts);
   const created = creates.map((planned, at) => {
-    const { groupId: sourceGroup, ...draft } = pdfFormFieldDraftOf(planned.draft, boxOf);
+    const {
+      groupId: sourceGroup,
+      forAnyone: sourceForAnyone,
+      ...draft
+    } = pdfFormFieldDraftOf(planned.draft, boxOf);
     const groupId = write.groupOf(sourceGroup ?? null);
+    const forAnyone = write.forAnyoneOf
+      ? write.forAnyoneOf(sourceForAnyone === true)
+      : sourceForAnyone === true;
     const [objectNumber, ...widgetObjectNumbers] = planned.objectNumbers ?? [];
     const { field } = forms.createField(
-      { ...draft, groupId },
+      { ...draft, groupId, ...(forAnyone ? { forAnyone } : {}) },
       write.signal,
       write.actor,
       objectNumber === undefined ? {} : { objectNumber, widgetObjectNumbers },
@@ -86,7 +96,7 @@ export function createPlannedFields(
       writeFlags(runtime, session, widget, planned.flags[index]!),
     );
     session.invalidateDerived();
-    if (planned.value) forms.setValue(field.ref, planned.value, write.signal, write.actor);
+    if (planned.value) forms.setValue(field.ref, planned.value, write.signal);
     const made = objectNumberOf(field.ref);
     write.made?.(made, at);
     return made;

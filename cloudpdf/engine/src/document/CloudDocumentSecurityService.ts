@@ -19,6 +19,7 @@ import {
   EngineError,
   EngineErrorCode,
   expandRawScope,
+  type FieldAssignment,
   type FieldRights,
   fieldRightsOf,
   type Identity,
@@ -203,16 +204,16 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   }
 
   /** Per-field form authorization mirrors: the checks the server's writes run, over the same inputs. */
-  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'fill' | 'sign', field: FieldAssignment): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
-  allowsField(action: 'fill' | 'sign' | 'set-group', target: { groupId: string | null }): boolean {
+  allowsField(action: 'fill' | 'sign' | 'set-group', target: FieldAssignment): boolean {
     if (action === 'set-group') {
       const groupId = target.groupId ?? '';
       return checkSetGroup('fields', groupId, this.identity?.groupId, this.rawScope());
     }
     return checkFieldAction(
       action,
-      target.groupId,
+      target,
       this.rawScope(),
       this.permissionFlags(),
       this.protection,

@@ -51,6 +51,7 @@ function textField(
     mappingName: null,
     valueEntry: { kind: 'scalar', value: `${name} value` },
     defaultValueEntry: { kind: 'none' },
+    forAnyone: false,
     purpose: null,
     createdBy: 'alice',
     createdAt: '2026-10-08T10:42:00Z',
@@ -338,6 +339,24 @@ describe('a form bundle through the file', () => {
     // A file of this version comes back as it is, its purpose kept.
     const same = await FormTransfer.parse(FormTransfer.stringify(now));
     expect(same.fields[0]!.data.purpose).toBe('date-signed');
+  });
+
+  test('a file from before fields anyone fills in reads forAnyone: false, and one is kept', async () => {
+    const now = bundleOf(
+      [textField('ref', 10, [20], { forAnyone: true }), textField('plain', 11, [21])],
+      [10, 11].map((field, at) => widgetRow(20 + at, refOf(field))),
+    );
+    const older = JSON.parse(FormTransfer.stringify(now)) as {
+      fields: { data: Record<string, unknown> }[];
+    };
+    for (const row of older.fields) delete row.data.forAnyone;
+    const read = await FormTransfer.parse(JSON.stringify(older));
+    expect(read.fields.map(({ data }) => [data.name, data.forAnyone])).toEqual([
+      ['ref', false],
+      ['plain', false],
+    ]);
+    const same = await FormTransfer.parse(FormTransfer.stringify(now));
+    expect(same.fields.map(({ data }) => data.forAnyone)).toEqual([true, false]);
   });
 
   test("refuses another family's file, and one past a limit", async () => {

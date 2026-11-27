@@ -655,10 +655,22 @@ await sign(doc, {
 covers the fields in its group: `'invoice'` locks `invoice.total` too. Once signed, writing a
 locked field fails with `ProtectedDocument`, and an import skips it.
 
-A signature field in a group (`groupId`, see [Signers and groups](/docs/engine/forms/groups))
-locks the rest of its group when you name no `lock`: the group's other fields as they are when you
-sign, but not its signature fields, which their signers still sign. Name a `lock` to choose
-yourself.
+When you name no `lock`, a signing locks two kinds of field (see
+[Signers and groups](/docs/engine/forms/groups)):
+
+- **The rest of its group,** when the signature field is in one (`groupId`): the group's other
+  fields as they are when you sign, but not its signature fields, which their signers still sign.
+- **Every field anyone fills in (`forAnyone: true`) that holds a value,** whether the signature
+  field is in a group or not: text that isn't empty, a box or a radio button that is on, an
+  option that is chosen. One still empty stays open for the next signer, and the first signing
+  after it is filled in locks it.
+
+With neither, it locks nothing. A document timestamp is no signer's, so it adds no field anyone
+fills in. Name a `lock` to choose yourself: the signing locks exactly that.
+
+A signature field can carry a lock of its own, set by whoever made the PDF (its `/Lock`, which a
+signature reads as `lock`). Signing it locks exactly that: the engine adds no field to it, and a
+`lock` you name must be the same, or the signing fails with `SignatureRefused`.
 
 ## Signature fields and their look
 
@@ -684,6 +696,10 @@ The mark is a PNG, a JPEG or a one-page PDF, as [`appearance`](#options) is when
 `{ pdf: bytes }` still works here too. It takes the place of the field's box: from then on its
 widgets read `hasMark: true`, and their style can't change (see
 [Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
+
+The mark is a drawing and nothing more: the engine writes nothing else into the field, and reads
+`hasMark` from the drawing itself. So signing the field later, with this mark or another, leaves
+every signature made before it as it was.
 
 To take the mark out again, pass `null`:
 
@@ -1015,6 +1031,9 @@ console.log(analysis.verdict);
 With `'forbidden'`, the signature itself still checks out, but PDF apps such as Acrobat report
 that the document was changed after signing. For what `since` and `until` take, see
 [Analyzing in detail](#analyzing-in-detail).
+
+A fill writes only the field's value and its drawing, so filling in a field that a signature
+didn't [lock](#lock-fields) reads `'permitted'` for that signature, whoever fills it in.
 
 A signature field that nobody signed may get a new look, such as a
 [mark](#signature-fields-and-their-look): when only its appearance changes, the verdict is

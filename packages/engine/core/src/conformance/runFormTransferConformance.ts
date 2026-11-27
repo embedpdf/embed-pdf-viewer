@@ -21,8 +21,9 @@ import type { FormBundle } from '../transfer/FormBundle';
  * both engines. A design import copies whole fields, with their widgets,
  * values, scripts, actions and calculation order, so the copy exports as
  * its source, apart from refs, object numbers and the attribution its mode
- * writes. A values import fills fields of the same name and reports what it
- * leaves out. Both are one change each: undone and redone with
+ * writes (who created each field; a fill records nobody). A values import
+ * fills fields of the same name and reports what it leaves out, and needs
+ * no `doc.forms.import`. Both are one change each: undone and redone with
  * `doc.apply({ undoOf })`, answered again on a retry, refused before
  * anything is written.
  *
@@ -68,7 +69,7 @@ const EVERYTHING = [
 ] as const;
 /** A design import without `doc.forms.script`, stamped. */
 const DESIGN = [...BASE, 'doc.forms.fill', 'doc.forms.modify'] as const;
-/** A values import, stamped. */
+/** A values import. */
 const FILL = [...BASE, 'doc.forms.fill'] as const;
 
 const ALICE: Identity = { userId: 'alice', displayName: 'Alice Author' };
@@ -306,42 +307,45 @@ export function runFormTransferConformance(
       });
     });
 
-    test("restore writes the source's attribution and the importer; stamp makes the fields the session's", async () => {
+    test("restore writes who created the source's fields and the importer; stamp makes the fields the session's", async () => {
       await using(async (opened) => {
         const bundle = await sourceBundle(opened);
+        const source = bundle.fields.find(({ data }) => data.name === 'customer.name')!.data;
+        // A fill records nobody, so a bundle names no filler either.
+        expect([source.filledBy, source.filledByName, source.filledAt]).toEqual([null, null, null]);
 
         const restored = await opened(open(BOB));
         await restored.forms.import(bundle);
         const copied = await fieldOf(restored, 'customer.name');
         expect(copied).toMatchObject({
           createdBy: 'alice',
-          filledBy: 'alice',
-          filledByName: 'Alice Author',
+          filledBy: null,
+          filledByName: null,
+          filledAt: null,
           importedBy: 'bob',
         });
-        const source = bundle.fields.find(({ data }) => data.name === 'customer.name')!.data;
         expect(copied.createdAt).toBe(source.createdAt);
-        expect(copied.filledAt).toBe(source.filledAt);
         expect(await fieldOf(restored, 'go')).toMatchObject({ createdBy: 'alice', filledBy: null });
 
         const stamped = await opened(open(BOB));
         await stamped.forms.import(bundle, { attribution: 'stamp' });
         expect(await fieldOf(stamped, 'customer.name')).toMatchObject({
           createdBy: 'bob',
-          filledBy: 'bob',
-          filledByName: 'Bob Builder',
+          filledBy: null,
           importedBy: null,
         });
       });
     });
 
-    test('restoring needs doc.forms.import; stamping needs only what a create needs', async () => {
+    test('restoring a design needs doc.forms.import; stamping needs only what a create needs, and a values import what a fill needs', async () => {
       await using(async (opened) => {
         const bundle = await sourceBundle(opened);
         const target = await opened(open(BOB, [...DESIGN, 'doc.forms.script']));
         expect(isPermissionRefusal(await refusalOf(target.forms.import(bundle)))).toBe(true);
-        expect(isPermissionRefusal(await refusalOf(target.forms.importValues(bundle)))).toBe(true);
         expect(await namesOf(target)).toEqual([]);
+        // A fill records nobody, so restoring values writes nothing in anyone's name.
+        const values = await target.forms.importValues(bundle);
+        expect(values.fields).toEqual([]);
 
         const stamped = await target.forms.import(bundle, { attribution: 'stamp' });
         expect(stamped.fields).toHaveLength(SOURCE_FIELDS.length);
@@ -461,7 +465,7 @@ export function runFormTransferConformance(
         const bundle = await sourceBundle(opened);
         const sign = bundle.fields.find(({ data }) => data.name === 'sign')!.data;
         expect(sign.valueEntry).toEqual({ kind: 'none' });
-        // A field the form doesn't export goes without its value or its filler.
+        // A field the form doesn't export goes without its value.
         const source = await opened(open(ALICE));
         await build(source);
         await source.forms.update(fqn('customer.name'), { noExport: true });
@@ -508,8 +512,8 @@ export function runFormTransferConformance(
         ]);
         expect(await fieldOf(target, 'customer.name')).toMatchObject({
           value: 'Ada',
-          filledBy: 'alice',
-          importedBy: 'bob',
+          filledBy: null,
+          importedBy: null,
         });
         expect(await fieldOf(target, 'tags')).toMatchObject({ selectedValues: ['a', 'c'] });
         expect(await fieldOf(target, 'country')).toMatchObject({ value: '' });
@@ -543,7 +547,7 @@ export function runFormTransferConformance(
       });
     });
 
-    test('a values import is undone and redone: values and who filled them back', async () => {
+    test('a values import is undone and redone: the values back', async () => {
       await using(async (opened) => {
         const bundle = await sourceBundle(opened);
         const target = await opened(open(BOB));
@@ -552,23 +556,16 @@ export function runFormTransferConformance(
 
         const filled = await target.forms.importValues(bundle);
         expect(filled.meta.undoable).toBe(true);
-        expect(await fieldOf(target, 'customer.name')).toMatchObject({
-          value: 'Ada',
-          filledBy: 'alice',
-        });
+        expect(await fieldOf(target, 'customer.name')).toMatchObject({ value: 'Ada' });
 
         const undo = await target.apply({ undoOf: filled.meta.opId });
-        expect(await fieldOf(target, 'customer.name')).toMatchObject({
-          value: 'Bob',
-          filledBy: 'bob',
-        });
+        expect(await fieldOf(target, 'customer.name')).toMatchObject({ value: 'Bob' });
         expect((await fieldOf(target, 'agree')).valueEntry).toEqual({ kind: 'none' });
 
         await target.apply({ undoOf: undo.meta.opId });
         expect(await fieldOf(target, 'customer.name')).toMatchObject({
           value: 'Ada',
-          filledBy: 'alice',
-          importedBy: 'bob',
+          filledBy: null,
         });
         expect(await fieldOf(target, 'agree')).toMatchObject({ checked: true });
       });

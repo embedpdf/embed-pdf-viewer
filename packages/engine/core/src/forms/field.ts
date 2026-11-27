@@ -111,6 +111,13 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
    */
   groupId: string | null;
   /**
+   * Every signer may fill the field in: a user who may fill in some field
+   * fills in this one, whatever group their permission names. Such a field
+   * is in no group and is never a signature field. A signing that names no
+   * lock locks it once it holds a value.
+   */
+  forAnyone: boolean;
+  /**
    * What the field's value means: `email`, `date-signed`, or a name an app
    * made up. The engine keeps it and reads nothing into it. `null` for a
    * field with none.
@@ -125,15 +132,14 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** When the field was created; `null` when nobody recorded it. */
   createdAt: IsoDateTime | null;
   /**
-   * The user whose write last changed the value: a fill, or the script that
-   * fill ran (a calculated total counts as filled by whoever's fill
-   * calculated it). `null` after a reset, or when an anonymous session
-   * filled it last.
+   * @deprecated Always `null`, whatever an older version wrote into the
+   * field: a fill records nobody, so it never changes what an earlier
+   * signature sealed. Goes in 4.0.
    */
   filledBy: string | null;
-  /** That user's display name, as their session gave it. */
+  /** @deprecated Always `null`, as {@link filledBy}. Goes in 4.0. */
   filledByName: string | null;
-  /** When the value last changed by a fill; `null` with `filledBy`. */
+  /** @deprecated Always `null`, as {@link filledBy}. Goes in 4.0. */
   filledAt: IsoDateTime | null;
   /** The session that restored this field's attribution in an import. */
   importedBy: string | null;

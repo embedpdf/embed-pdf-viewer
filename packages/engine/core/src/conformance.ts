@@ -240,6 +240,14 @@ export {
   type FieldGroupsConformanceOptions,
 } from './conformance/runFieldGroupsConformance';
 export {
+  ANYONE_FIELD_TOKENS,
+  ANYONE_FIELDS_PDF,
+  runAnyoneFieldsConformance,
+  type AnyoneFieldToken,
+  type AnyoneFieldsConformanceOptions,
+  type AnyoneFieldsSigning,
+} from './conformance/runAnyoneFieldsConformance';
+export {
   FIELD_PURPOSE_FORMAT_PDF,
   FIELD_PURPOSE_FORMAT_TOKENS,
   runFieldPurposeFormatConformance,

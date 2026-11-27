@@ -483,6 +483,7 @@ export {
   type TokenPin,
 } from './wire/cachedReads';
 export {
+  ANYONE_FIELDS_SINCE,
   API_VERSION,
   FIELD_PURPOSE_AND_FORMAT_SINCE,
   MARK_IMAGE_OR_NONE_SINCE,

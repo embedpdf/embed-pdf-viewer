@@ -17,6 +17,7 @@ import {
   EngineError,
   EngineErrorCode,
   expandRawScope,
+  type FieldAssignment,
   type FieldRights,
   fieldRightsOf,
   type FieldWriteAction,
@@ -171,9 +172,9 @@ export class ScopeGuard {
     );
   }
 
-  /** Whether the handle may `action` (fill in, or sign) the field in `groupId`. */
-  canFieldWrite(groupId: string | null, action: FieldWriteAction): boolean {
-    return allowsFieldWrite(this.changeAuthority(), groupId, action);
+  /** Whether the handle may `action` (fill in, or sign) `field`: its group, and whether anyone fills it in. */
+  canFieldWrite(field: FieldAssignment, action: FieldWriteAction): boolean {
+    return allowsFieldWrite(this.changeAuthority(), field, action);
   }
 
   /**

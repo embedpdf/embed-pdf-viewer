@@ -8,8 +8,7 @@ description: Take form fields out of a document as one bundle, then copy them in
 # Import & export
 
 Export takes form fields out of a document as one **bundle**: each field whole, with its widgets,
-its value, its scripts and actions, and who made and filled it in. A bundle goes back in two
-ways:
+its value, its scripts and actions, and who made it. A bundle goes back in two ways:
 
 ```ts
 const bundle = await source.forms.export();
@@ -44,7 +43,7 @@ page the document doesn't have refuses the export with `NotFound`.
 Two things never travel:
 
 - a signature: a signed signature field is exported unsigned;
-- the value of a field marked `noExport`, and who filled it in.
+- the value of a field marked `noExport`.
 
 ## Store it as a file
 
@@ -65,7 +64,8 @@ else is refused with `InvalidArg`.
 A file kept from an earlier version reads as today's bundle. A field written before fields had a
 [`purpose`](/docs/engine/forms/authoring#purpose) and a
 [`format`](/docs/engine/forms/authoring#dates-and-times) gets both: `purpose: null`, and the
-format its scripts give.
+format its scripts give. One written before
+[`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in) reads `forAnyone: false`.
 
 ## Copy the design
 
@@ -81,7 +81,7 @@ result.calculationOrder; // the form's whole calculation order, when the import 
 | Option        | What it is                                                                  | Default     |
 | :------------ | :-------------------------------------------------------------------------- | :---------- |
 | `pages`       | Which page each bundle page goes to.                                        | `'same'`    |
-| `attribution` | `'restore'` keeps who made and filled each field; `'stamp'` makes it yours. | `'restore'` |
+| `attribution` | `'restore'` keeps who made each field; `'stamp'` makes it yours.            | `'restore'` |
 | `values`      | Whether each field gets the value the bundle holds.                         | `true`      |
 | `opId`        | A name for this import: its events carry it, and it names its undo.         | a new id    |
 
@@ -100,19 +100,24 @@ with the same ref, and `pages` takes `'by-position'` or a list of `{ from, to }`
 widget is on, or an action goes to, that maps nowhere fails the import with `InvalidArg`. See
 [Pages](/docs/engine/annotations/import-export#pages).
 
-### Who made and filled it
+### Who made it
 
-With `attribution: 'restore'`, the default, each field keeps who created it and when, and who
-last filled it in and when (`createdBy`, `createdAt`, `filledBy`, `filledByName`, `filledAt`).
-The user who imports is recorded in `importedBy`. That writes fields in other people's names, so
-it needs `doc.forms.import` beside `doc.forms.modify`.
+With `attribution: 'restore'`, the default, each field keeps who created it and when
+(`createdBy`, `createdAt`). The user who imports is recorded in `importedBy`. That writes fields
+in other people's names, so it needs `doc.forms.import` beside `doc.forms.modify`.
 
 With `attribution: 'stamp'`, each field is made as `create()` makes it: the user who imports
-created it, and filled it in when it gets a value.
+created it.
+
+Who filled a field in travels nowhere: a fill records nobody (see
+[Fill in a field](/docs/engine/forms#fill-in-a-field)). A bundle an older version exported may
+still name someone in `filledBy`; the import leaves it out.
 
 A field keeps its group (`groupId`) with `'restore'`. With `'stamp'`, it goes in the group it had,
 when the user may put fields there (their own, or one they have `fields:set-group` for), and
-stays in no group when it had none. A group they may not set refuses the import.
+stays in no group when it had none. A group they may not set refuses the import. A `forAnyone`
+field stays `forAnyone` the same way: always with `'restore'`, and with `'stamp'` when the user has
+`fields:set-group:all`.
 
 ### Scripts and actions
 
@@ -160,8 +165,8 @@ result.dropped; // what was left out, and why
 
 | Option        | What it is                                                          | Default     |
 | :------------ | :------------------------------------------------------------------ | :---------- |
-| `attribution` | `'restore'` keeps who filled each field in; `'stamp'` makes it you. | `'restore'` |
 | `opId`        | A name for this import: its events carry it, and it names its undo. | a new id    |
+| `attribution` | Deprecated: no effect, since a fill records nobody. Goes in 4.0.    | `'restore'` |
 
 Each field the bundle holds a value for fills the document's field of the same full name, as
 `setValue()` would. A field that already holds that value is left as it is, and isn't in
@@ -198,8 +203,7 @@ await doc.apply({ undoOf: undo.meta.opId }); // back again
 
 - The undo of `import()` deletes each field it made, with its widgets and its place in the
   calculation order. The redo brings back the same fields, with the same refs.
-- The undo of `importValues()` puts back each field's value and who filled it in, as the undo of a
-  `setValue()` does.
+- The undo of `importValues()` puts back each field's value, as the undo of a `setValue()` does.
 
 A field that was changed since stays, and its item is `skipped`; the rest of the import goes. As
 for every change, only the user who imported may undo it, and a final write ends undo for the
@@ -239,6 +243,10 @@ await doc.forms.import(plain);
 
 A date or a time format needs no such step: an older server reads it from the field's scripts.
 
+A server older than version 3.5 has no [`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in)
+fields: an import of a bundle with one fails the same way, before it is sent. A bundle whose
+fields all read `forAnyone: false` goes out.
+
 </Engine>
 
 ## Permissions
@@ -248,8 +256,7 @@ A date or a time format needs no such step: an older server reads it from the fi
 | `export()`                                       | `doc.forms.read` and `doc.download`                                           |
 | `import(bundle, { attribution: 'stamp' })`       | `doc.forms.modify`; `doc.forms.script` to keep scripts                        |
 | `import(bundle)`                                 | `doc.forms.modify` and `doc.forms.import`; `doc.forms.script` to keep scripts |
-| `importValues(bundle, { attribution: 'stamp' })` | `doc.forms.fill`, or `fields:fill` for a group                                |
-| `importValues(bundle)`                           | that, and `doc.forms.import`                                                  |
+| `importValues(bundle)`                           | `doc.forms.fill`, or `fields:fill` for a group                                |
 
 A values import leaves out the fields the user may not fill in (`fill-not-allowed`). Undoing an
 import takes what the import took. See [Permissions](/docs/engine/concepts/permissions).
@@ -272,11 +279,11 @@ order. A widget is drawn from its data, so a form bundle carries no bytes yet.
 
 Export a form, import the bundle into a copy of its pages, and export that: when nothing was
 dropped, you get the same bundle. Only the refs change, and the attribution: `importedBy` with
-`'restore'`, who created and filled each field with `'stamp'`. The same document also exports to
-the same bundle on the local and the cloud engine.
+`'restore'`, who created each field with `'stamp'`. The same document also exports to the same
+bundle on the local and the cloud engine.
 
 ### Not FDF or XFDF
 
 FDF and XFDF carry a form's values. A bundle carries what the engine reads: every setting of a
-field and its widgets, their scripts and actions, and who made and filled each field. Its values
-fill a form in through `importValues()`.
+field and its widgets, their scripts and actions, and who made each field. Its values fill a
+form in through `importValues()`.

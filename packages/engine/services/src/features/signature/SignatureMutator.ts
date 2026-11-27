@@ -43,7 +43,7 @@ import { withScratch } from '../../runtime/memory/scratch';
 import { bytesEqual } from '../../shared/bytesEqual';
 import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
-import { groupLockFields, groupOfField } from '../forms/internal/fieldGroups';
+import { filledAnyoneFields, groupLockFields, groupOfField } from '../forms/internal/fieldGroups';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../../runtime/memory/wideStringArray';
 import { DocumentSaver } from '../save/DocumentSaver';
@@ -140,9 +140,10 @@ export class SignatureMutator {
 
   /**
    * Prepare a signing of `input.field`, which `authority` must be allowed to
-   * sign (its group, `fields:sign`). A field in a group, signed without a
-   * `lock`, locks the rest of its group: nobody changes the buyer's fields
-   * once the buyer signed.
+   * sign (its group, `fields:sign`). A signature without a `lock` of its own
+   * locks what its signer has seen ({@link defaultLock}): the rest of its
+   * group, and the fields anyone fills in that hold a value; a field that
+   * carries its own `/Lock` signs with that lock alone.
    *
    * A document timestamp may name no field: one is made for it on the
    * candidate, so it joins the document with the timestamp, in one revision.
@@ -174,12 +175,7 @@ export class SignatureMutator {
     else authorizeCapability(authority, 'doc.sign');
     const lock: FieldLockSpec | undefined =
       input.lock ??
-      (groupId !== null
-        ? {
-            action: 'include',
-            fields: groupLockFields(this.runtime, this.session, groupId),
-          }
-        : undefined);
+      this.defaultLock(groupId, (input.kind ?? 'signature') === 'signature', field?.lock ?? null);
     if (field?.signed) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
@@ -254,9 +250,7 @@ export class SignatureMutator {
       }
       const mark = signatureAppearanceBytes(input.appearance ?? null);
       if (mark && field?.widget) {
-        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark, {
-          recordFit: false,
-        });
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark);
       }
 
       const store = this.storeFor();
@@ -406,6 +400,31 @@ export class SignatureMutator {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * What a signing that names no lock locks: nobody changes what its signer
+   * has seen. A field in a group locks the rest of its group (the buyer's
+   * fields once the buyer signed), and a signature locks every field anyone
+   * fills in that holds a value now, whoever filled it in; one still empty
+   * stays open for the next signer. A document timestamp is no signer's, so
+   * it adds none of those. `undefined` when there is nothing to lock.
+   *
+   * A signature field that carries a lock of its own (`ownLock`, its `/Lock`)
+   * adds nothing: the PDF's author decided what its signature locks, the
+   * signature's lock is derived from it (ISO 32000-2, 12.7.5.5), and the
+   * runtime refuses a signing that asks for another.
+   */
+  private defaultLock(
+    groupId: string | null,
+    signature: boolean,
+    ownLock: FieldLockSpec | null,
+  ): FieldLockSpec | undefined {
+    if (ownLock) return undefined;
+    const forAnyone = signature ? filledAnyoneFields(this.runtime, this.session) : [];
+    if (groupId === null && forAnyone.length === 0) return undefined;
+    const group = groupId === null ? [] : groupLockFields(this.runtime, this.session, groupId);
+    return { action: 'include', fields: [...group, ...forAnyone] };
+  }
 
   private callPrepare(
     docPtr: Ptr,

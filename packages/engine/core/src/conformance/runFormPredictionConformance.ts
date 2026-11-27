@@ -132,6 +132,8 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
       }),
     },
     { name: 'text in a comb', draft: text({ maxLength: 6, comb: true }) },
+    { name: 'text anyone fills in', draft: text({ forAnyone: true }) },
+    { name: 'text not for anyone by name', draft: text({ forAnyone: false, groupId: 'buyer' }) },
     { name: 'text with a purpose', draft: text({ purpose: 'email' }) },
     { name: 'text with no purpose by name', draft: text({ purpose: null }) },
     {
@@ -409,6 +411,26 @@ const CASES: readonly PredictionCase[] = [
     op: { type: 'update', patch: { groupId: 'buyer' } },
   },
   {
+    name: 'update: for anyone',
+    draft: text(),
+    op: { type: 'update', patch: { forAnyone: true } },
+  },
+  {
+    name: 'update: from a group to anyone',
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { groupId: null, forAnyone: true } },
+  },
+  {
+    name: 'update: from anyone to a group',
+    draft: text({ forAnyone: true }),
+    op: { type: 'update', patch: { groupId: 'buyer', forAnyone: false } },
+  },
+  {
+    name: 'update: forAnyone, and something else',
+    draft: text({ forAnyone: true }),
+    op: { type: 'update', patch: { required: true } },
+  },
+  {
     name: 'update: a purpose',
     draft: text(),
     op: { type: 'update', patch: { purpose: 'organization-title' } },
@@ -594,6 +616,21 @@ const REFUSALS: readonly PredictionCase[] = [
     name: 'a purpose with space around it',
     draft: text(),
     op: { type: 'update', patch: { purpose: ' email ' } },
+  },
+  {
+    name: 'forAnyone on a field in a group',
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { forAnyone: true } },
+  },
+  {
+    name: 'a group for a field anyone fills in',
+    draft: text({ forAnyone: true }),
+    op: { type: 'update', patch: { groupId: 'buyer' } },
+  },
+  {
+    name: 'a signature field for anyone',
+    draft: (page, name) => ({ kind: 'signature', name, widgets: [{ page, rect: box(72) }] }),
+    op: { type: 'update', patch: { forAnyone: true } },
   },
   {
     name: 'a pattern with a letter group of its own',
