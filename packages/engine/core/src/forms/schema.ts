@@ -10,6 +10,7 @@ import type { FormWidget } from '../identity/FormFieldRef';
 import { isDatePattern, isTimePattern } from './datePattern';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import { withForAnyone } from './anyone';
+import { withButtonImage } from './buttonImage';
 import { withPurposeAndFormat, type FormFieldFormat, type FormFieldFormatWritable } from './format';
 import type { FormFieldPatch } from './patch';
 import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
@@ -195,6 +196,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
     z.object({
       ...FormFieldBaseShape,
       kind: z.literal('pushbutton'),
+      hasImage: z.boolean(),
     }),
     z.object({
       ...FormFieldBaseShape,
@@ -208,7 +210,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
-  (field) => withForAnyone(withPurposeAndFormat(field)),
+  (field) => withForAnyone(withButtonImage(withPurposeAndFormat(field))),
 ).describe(
   'A form field, by its `family`. A newer server can add families: read one your client ' +
     "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +

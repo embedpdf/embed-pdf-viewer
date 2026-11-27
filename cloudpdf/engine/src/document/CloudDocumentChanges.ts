@@ -28,12 +28,17 @@ import {
 } from '@embedpdf/engine-core/wire';
 
 import { buildMutationForm } from './buildMutationForm';
-import { assertServerTakesMark, markPart } from './signatureMark';
+import { assertServerTakesMark, exactBuffer, markPart } from './signatureMark';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { ChangeSender, CloudWrites, SentChange } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 import { forAnyoneTheServerLacks, type ForAnyoneWrite } from './anyoneFields';
-import { fieldFactsTheServerLacks, type FieldWrite } from './fieldFacts';
+import {
+  fieldFactsTheServerLacks,
+  widgetLayoutTheServerLacks,
+  type FieldWrite,
+  type WidgetWrite,
+} from './fieldFacts';
 import { opsTheServerLacks } from '../transport/serverVersion';
 
 /** How many `opId`s a handle remembers having published: far more than any retry spans. */
@@ -85,8 +90,8 @@ export class CloudDocumentChanges {
       });
     }
     // A kind of op the server doesn't have yet is refused here, alone, and so
-    // is a field's purpose, format or `forAnyone` on its way to a server older
-    // than them.
+    // is a field's purpose, format or `forAnyone`, or a widget's layout, on its
+    // way to a server older than them.
     const lacking = isUndoChange(change)
       ? null
       : (opsTheServerLacks(
@@ -94,7 +99,8 @@ export class CloudDocumentChanges {
           change.ops.map((op) => op.type),
         ) ??
         fieldFactsTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
-        forAnyoneTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)));
+        forAnyoneTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
+        widgetLayoutTheServerLacks(this.serverVersion(), ...change.ops.flatMap(widgetWritesOf)));
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<ChangeResult>(async (signal) => {
       // In line now, so it keeps its place among this document's writes while
@@ -230,6 +236,13 @@ function changeRequestOf(changes: readonly SentChange[]): {
         const mark = markPart(appearance);
         return { ...rest, resources: { appearance: mark && part(mark) } };
       }
+      case 'forms.setButtonImage': {
+        const { image, ...rest } = op;
+        // `null`, no image, travels as it is: no part. The bytes were read
+        // and checked (`resolveChangeResources`).
+        const bytes = image && exactBuffer(image as Uint8Array);
+        return { ...rest, resources: { image: bytes && part(bytes) } };
+      }
       case 'pages.insert': {
         const { source, ...rest } = op;
         return { ...rest, resources: { source: part(source.slice().buffer as ArrayBuffer) } };
@@ -272,14 +285,37 @@ function fieldWritesOf(
 }
 
 /**
+ * What an op writes of a widget, or expects of one: a create's placements,
+ * an added widget's, an updated widget's patch and what it expects, and an
+ * annotation write of a widget. They are what can name a layout.
+ */
+function widgetWritesOf(op: Extract<Change, { ops: unknown }>['ops'][number]): WidgetWrite[] {
+  switch (op.type) {
+    case 'forms.create':
+      return [...(op.draft.widgets ?? [])];
+    case 'forms.addWidget':
+      return [op.placement];
+    case 'forms.updateWidget':
+      return [op.patch, op.expect];
+    case 'annotations.create':
+      return op.data.subtype === 'widget' ? [op.data] : [];
+    case 'annotations.update':
+      return op.patch.subtype === 'widget' || 'layout' in op.patch ? [op.patch as WidgetWrite] : [];
+    default:
+      return [];
+  }
+}
+
+/**
  * Whether a change carries bytes: a drawing, an attached file, a signature's
- * artwork, a PDF whose pages come in.
+ * artwork, a push button's image, a PDF whose pages come in.
  */
 function carriesBytes(change: Change): boolean {
   if (isUndoChange(change)) return false;
   return change.ops.some(
     (op) =>
       (op.type === 'forms.setSignatureAppearance' && op.appearance !== null) ||
+      (op.type === 'forms.setButtonImage' && op.image !== null) ||
       op.type === 'pages.insert' ||
       op.type === 'attachments.create' ||
       ((op.type === 'annotations.create' || op.type === 'annotations.update') &&

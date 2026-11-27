@@ -68,6 +68,7 @@ error. The document is as it was before the call.
 | `forms.reorderWidgets`         | `page`, `widgets`, `position`                             | `doc.forms.reorderWidgets(widgets, position)`                                   |
 | `forms.reorderCalculations`    | `fields`, `position`                                      | `doc.forms.reorderCalculations(fields, position)`                               |
 | `forms.setSignatureAppearance` | `field`, `appearance`                                     | `doc.forms.setSignatureAppearance(field, appearance)`                           |
+| `forms.setButtonImage`         | `field`, `image`                                          | `doc.forms.setButtonImage(field, image)`                                        |
 | `forms.setDisplay`             | `field`, `display`                                        | Shows or hides a field's widgets, as a form script does                         |
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
 | `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
@@ -89,11 +90,9 @@ error. The document is as it was before the call.
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
 
-`pages.setScale` arrived in 3.1, and `annotations.copy` and `forms.copy` in 3.2. Every other op
-is as old as 3.0.
-
 `forms.setSignatureAppearance` takes its `appearance` as the call does: a PNG, a JPEG or a
-one-page PDF, or `null` to take the mark out. An image and `null` arrived in 3.4.
+one-page PDF, or `null` to take the mark out.
+`forms.setButtonImage` takes a push button's `image` the same way, `null` taking it out.
 
 ### What comes back
 
@@ -367,11 +366,6 @@ A request lost on the network goes again with the same `opId`s, so nothing is ap
 
 A change holds at most 512 ops; more fails with `PayloadTooLarge`. Split a bigger job into
 several changes.
-
-A server can be older than your app. A change with an op the server doesn't have yet fails on its
-own, before anything is sent, with `NotImplemented`. Its `details` name the op (`kind`), the
-version that has it (`needs`) and the server's (`serverVersion`). The changes around it still go
-out.
 
 </Engine>
 

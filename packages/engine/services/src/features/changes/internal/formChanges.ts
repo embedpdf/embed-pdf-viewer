@@ -105,6 +105,7 @@ const FILLS: ReadonlySet<ChangeItemType> = new Set([
   'forms.setAppearanceText',
   'forms.reset',
   'forms.setSignatureAppearance',
+  'forms.setButtonImage',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -529,6 +530,34 @@ export function setSignatureAppearance(
       signatureAppearanceBytes(op.appearance),
       ctx.signal,
     ),
+  );
+}
+
+/**
+ * `forms.setButtonImage`: a push button's image put in, or taken out
+ * (`null`). It is filling the field in, so it takes the fill right for the
+ * field's group. Its reverse puts the widgets back as they were: their icons
+ * and their looks.
+ */
+export function setButtonImage(ctx: ChangeContext, op: Op<'forms.setButtonImage'>): Done {
+  const before = readField(ctx, op.field);
+  authorizeFieldWrite(ctx.authority, before.field, 'fill');
+  return recordRevert(ctx, before, 'forms.setButtonImage', () =>
+    new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setButtonImage(
+      op.field,
+      imageBytesOf(op.image),
+      ctx.signal,
+    ),
+  );
+}
+
+/** A push button's image where it is written: its bytes, or `null` for none. */
+function imageBytesOf(image: Op<'forms.setButtonImage'>['image']): Uint8Array | null {
+  if (image === null) return null;
+  if (ArrayBuffer.isView(image)) return image;
+  throw new EngineError(
+    EngineErrorCode.InvalidArg,
+    "a push button's image reaches a write as bytes, never as a Blob",
   );
 }
 

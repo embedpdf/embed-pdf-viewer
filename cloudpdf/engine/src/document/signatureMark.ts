@@ -61,7 +61,7 @@ export function assertServerTakesMark(
 }
 
 /** The buffer holding exactly `bytes`: its own when it spans it, else a copy. */
-function exactBuffer(bytes: Uint8Array): ArrayBuffer {
+export function exactBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
     ? (bytes.buffer as ArrayBuffer)
     : (bytes.slice().buffer as ArrayBuffer);

@@ -33,7 +33,8 @@ export function resolveWidgetFieldObjectNumber(
 /**
  * Stamp the field ref and family onto every widget DTO in a freshly read
  * list. `/MK /CA` is a push button's caption, and a checkbox's or radio
- * button's symbol (`checkStyle`); another widget's reads as neither. A
+ * button's symbol (`checkStyle`); another widget's reads as neither.
+ * `/MK /TP` is a push button's layout, and no other widget's. A
  * signature field's widget has a mark in it when the field is signed (it
  * has a value) or a mark was drawn into it (the read found its fit); no
  * other widget has one.
@@ -47,6 +48,7 @@ export function joinWidgetFieldNumbers(
     if (annotation.subtype !== 'widget') continue;
     if (annotation.ref.kind !== 'objectNumber') {
       annotation.caption = null;
+      annotation.layout = null;
       annotation.hasMark = false;
       continue;
     }
@@ -62,6 +64,7 @@ export function joinWidgetFieldNumbers(
       annotation.field = null;
       annotation.fieldKind = 'unknown';
       annotation.caption = null;
+      annotation.layout = null;
       annotation.hasMark = false;
       continue;
     }
@@ -71,7 +74,10 @@ export function joinWidgetFieldNumbers(
     if (annotation.fieldKind === 'checkbox' || annotation.fieldKind === 'radio') {
       annotation.checkStyle = checkStyleOfCaption(annotation.caption ?? null);
     }
-    if (annotation.fieldKind !== 'pushbutton') annotation.caption = null;
+    if (annotation.fieldKind !== 'pushbutton') {
+      annotation.caption = null;
+      annotation.layout = null;
+    }
     annotation.hasMark =
       annotation.fieldKind === 'signature' &&
       (annotation.hasMark ||

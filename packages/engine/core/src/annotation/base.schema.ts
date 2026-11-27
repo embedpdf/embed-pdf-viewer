@@ -16,6 +16,7 @@ import type {
   VerticalAlignment,
   WidgetBorderStyle,
   WidgetCheckStyle,
+  WidgetLayout,
 } from './primitives';
 import { STANDARD_FONTS } from './primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -36,6 +37,19 @@ export const WidgetBorderStyleSchema: z.ZodType<WidgetBorderStyle> = closed(
 
 export const WidgetCheckStyleSchema: z.ZodType<WidgetCheckStyle> = closed(
   z.enum(['check', 'cross', 'star', 'circle', 'square', 'diamond']),
+);
+
+/** The seven layouts of ISO 32000-2 Table 192: a closed set, in the order of their numbers. */
+export const WidgetLayoutSchema: z.ZodType<WidgetLayout> = closed(
+  z.enum([
+    'caption',
+    'image',
+    'caption-below',
+    'caption-above',
+    'caption-right',
+    'caption-left',
+    'caption-over',
+  ]),
 );
 
 /** What a write takes for a border that isn't a widget's. */

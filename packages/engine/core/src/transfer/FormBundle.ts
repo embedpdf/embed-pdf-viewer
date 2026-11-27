@@ -18,7 +18,9 @@ import {
 } from './bundleLimits';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormField } from '../forms/field';
+import { withWidgetLayout } from '../annotation/kinds/widget/layout';
 import { withForAnyone } from '../forms/anyone';
+import { withButtonImage } from '../forms/buttonImage';
 import { withPurposeAndFormat } from '../forms/format';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { encodePageKey } from '../identity/PageRef';
@@ -57,7 +59,7 @@ export interface FormBundleField<C extends Coordinates = PageCoordinates> {
 
 export interface FormBundleWidget<C extends Coordinates = PageCoordinates> {
   readonly data: WidgetAnnotation<C>;
-  /** None yet: a widget is drawn from its data. A push button's icon will be one. */
+  /** A widget is drawn from its data; only a push button's widget names a resource, its `image`. */
   readonly resources: Readonly<Record<string, ResourceId>>;
 }
 
@@ -82,32 +84,50 @@ export const FORM_BUNDLE_KEYS = [
   'calculationOrder',
 ] as const;
 
-/** The resource roles a widget names: none yet. */
-const WIDGET_RESOURCE_ROLES: readonly string[] = [];
+/** The resource roles a widget names: a push button's `image`, as a one-page PDF. */
+const WIDGET_RESOURCE_ROLES: readonly string[] = ['image'];
 
 const BUNDLE_FIELDS = [...FORM_BUNDLE_KEYS, 'resources'] as const;
 const FIELD_ROW_FIELDS = ['data'] as const;
 const WIDGET_ROW_FIELDS = ['data', 'resources'] as const;
 
 /**
- * `bundle` with every field whole. A bundle written before a field had a
+ * `bundle` with every row whole. A bundle written before a field had a
  * `purpose` and a `format` (a file kept from an earlier version, an export
  * from an older server) holds fields without them: each gets both, as a
  * read gives them (`withPurposeAndFormat`), and `forAnyone: false` when it is
- * older than that too (`withForAnyone`). A bundle that has them all comes back
- * as it is.
+ * older than that too (`withForAnyone`). One written before a push button
+ * had `hasImage` and a widget its `layout` gets those as such a read gives
+ * them too (`withButtonImage`, `withWidgetLayout`). A bundle that has them
+ * all comes back as it is.
  */
 export function completeFormBundle<
-  Bundle extends { readonly fields: readonly { readonly data: object }[] },
+  Bundle extends {
+    readonly fields: readonly { readonly data: object }[];
+    readonly widgets?: readonly { readonly data: object }[];
+  },
 >(bundle: Bundle): Bundle {
+  const fields = completedRows(bundle.fields, (data) =>
+    withForAnyone(withButtonImage(withPurposeAndFormat(data))),
+  );
+  const widgets = bundle.widgets && completedRows(bundle.widgets, withWidgetLayout);
+  if (fields === bundle.fields && widgets === bundle.widgets) return bundle;
+  return { ...bundle, fields, ...(widgets ? { widgets } : {}) };
+}
+
+/** `rows` with each row's data made whole by `complete`; `rows` itself when none changed. */
+function completedRows<Row extends { readonly data: object }>(
+  rows: readonly Row[],
+  complete: (data: Record<string, unknown>) => Record<string, unknown>,
+): readonly Row[] {
   let completed = false;
-  const fields = bundle.fields.map((row) => {
-    const data = withForAnyone(withPurposeAndFormat(row.data as Record<string, unknown>));
+  const whole = rows.map((row) => {
+    const data = complete(row.data as Record<string, unknown>);
     if (data === row.data) return row;
     completed = true;
     return { ...row, data };
   });
-  return completed ? { ...bundle, fields } : bundle;
+  return completed ? whole : rows;
 }
 
 /**

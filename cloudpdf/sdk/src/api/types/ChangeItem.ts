@@ -20,6 +20,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.FormsDelete
     | CloudPDF.ChangeItem.FormsRestore
     | CloudPDF.ChangeItem.FormsSetSignatureAppearance
+    | CloudPDF.ChangeItem.FormsSetButtonImage
     | CloudPDF.ChangeItem.FormsAddWidget
     | CloudPDF.ChangeItem.FormsRemoveWidget
     | CloudPDF.ChangeItem.FormsDeleteWidget
@@ -75,6 +76,7 @@ export namespace ChangeItem {
             FormsReorderWidgets: "forms.reorderWidgets",
             FormsUpdateWidget: "forms.updateWidget",
             FormsSetSignatureAppearance: "forms.setSignatureAppearance",
+            FormsSetButtonImage: "forms.setButtonImage",
             MetadataUpdate: "metadata.update",
             MetadataUpdateCustom: "metadata.updateCustom",
             OutlineCreate: "outline.create",
@@ -304,6 +306,14 @@ export namespace ChangeItem {
 
     export interface FormsSetSignatureAppearance {
         type: "forms.setSignatureAppearance";
+        field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsSetButtonImage {
+        type: "forms.setButtonImage";
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
         calculationOrder?: CloudPDF.FormFieldRef[] | undefined;

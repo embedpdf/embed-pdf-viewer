@@ -179,7 +179,9 @@ export interface SignatureFieldDraft<
 
 /**
  * A push button: no value, only widgets, each with its `caption` and
- * usually an `activate` action (reset the form, go to a page, submit).
+ * usually an `activate` action (reset the form, go to a page, submit). A
+ * widget whose `layout` shows an image makes it an image field, whose
+ * image `setButtonImage()` puts in.
  */
 export interface PushButtonFieldDraft<
   C extends Coordinates = PageCoordinates,

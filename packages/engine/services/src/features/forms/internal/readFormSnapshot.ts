@@ -18,6 +18,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
+import { PageIndexLookup, readButtonHasImage } from './buttonImage';
 import {
   readFieldForAnyone,
   readFieldAttribution,
@@ -141,6 +142,7 @@ export function readFieldAt(
   fieldIndex: number,
   docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
+  pages = new PageIndexLookup(runtime, docPtr),
 ): FormField<PdfCoordinates> {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
@@ -250,7 +252,15 @@ export function readFieldAt(
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }
-    case 'pushbutton':
+    case 'pushbutton': {
+      const widgets = readPlainWidgets(runtime, model, fieldIndex);
+      return {
+        ...base,
+        kind: 'pushbutton',
+        hasImage: readButtonHasImage(runtime, docPtr, widgets, pages),
+        widgets,
+      };
+    }
     case 'signature': {
       return { ...base, kind: family, widgets: readPlainWidgets(runtime, model, fieldIndex) };
     }
@@ -280,8 +290,9 @@ export function readFormFields(
   const count = fn.EPDFForm_CountFields(model);
   const fields: FormField<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
+  const pages = new PageIndexLookup(runtime, docPtr);
   for (let i = 0; i < count; i++) {
-    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));
+    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget, pages));
   }
   const calculationOrder: FormSnapshot<PdfCoordinates>['calculationOrder'] = [];
   const calculationCount = fn.EPDFForm_CountCalculationOrder(model);
@@ -302,16 +313,26 @@ export function readFormFields(
 /**
  * Whether field `fieldIndex` holds a value, as a read of it says: text that
  * isn't empty (a text field, a dropdown), a checkbox or radio button that is
- * on, an option that is selected (a list). A push button, a signature field
- * and a field of a kind the engine doesn't model hold none.
+ * on, an option that is selected (a list), a push button that holds a
+ * picture (`hasImage`). A signature field and a field of a kind the engine
+ * doesn't model hold none.
  */
 export function fieldHoldsValue(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
+  docPtr: Ptr,
+  pages = new PageIndexLookup(runtime, docPtr),
 ): boolean {
   const { fn } = runtime;
   switch (FAMILY_BY_CODE[fn.EPDFForm_GetFieldFamily(model, fieldIndex)]) {
+    case 'pushbutton':
+      return readButtonHasImage(
+        runtime,
+        docPtr,
+        readPlainWidgets(runtime, model, fieldIndex),
+        pages,
+      );
     case 'text':
     case 'combobox':
       return entryScalar(readValueEntry(runtime, model, fieldIndex, false)) !== '';

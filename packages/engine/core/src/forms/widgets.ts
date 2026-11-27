@@ -4,7 +4,7 @@
  */
 import type { FormFieldKind } from './field';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
-import type { WidgetCheckStyle } from '../annotation/primitives';
+import type { WidgetCheckStyle, WidgetLayout } from '../annotation/primitives';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageBox } from '../geometry/pageSpace';
@@ -14,21 +14,35 @@ import { applyAnnotationPatch } from '../pageSpace/helpers';
 /**
  * A widget placement or patch as a `kind` widget takes it. `/MK /CA` is a
  * push button's caption and a checkbox's or radio button's symbol
- * (`checkStyle`), so each goes on its own kind's widgets only: on another
- * widget, a `null` (as its row reads) is dropped, and a value is refused.
+ * (`checkStyle`), and `/MK /TP` a push button's layout, so each goes on its
+ * own kind's widgets only: on another widget, a `null` (as its row reads) is
+ * dropped, and a value is refused.
  */
 export function fitWidgetToFamily<
-  T extends { readonly caption?: string | null; readonly checkStyle?: WidgetCheckStyle | null },
+  T extends {
+    readonly caption?: string | null;
+    readonly checkStyle?: WidgetCheckStyle | null;
+    readonly layout?: WidgetLayout | null;
+  },
 >(family: FormFieldKind, value: T): T {
   const toggle = family === 'checkbox' || family === 'radio';
-  const fitted = fitToKind(family, value, 'caption', family === 'pushbutton', "a push button's");
-  return fitToKind(family, fitted, 'checkStyle', toggle, "a checkbox's or radio button's");
+  const button = family === 'pushbutton';
+  const captioned = fitToKind(family, value, 'caption', button, "a push button's");
+  if (button && value.layout === null) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a push button's widget always has a layout: 'caption' shows its caption alone",
+      { details: { field: 'layout' } },
+    );
+  }
+  const laidOut = fitToKind(family, captioned, 'layout', button, "a push button's");
+  return fitToKind(family, laidOut, 'checkStyle', toggle, "a checkbox's or radio button's");
 }
 
 function fitToKind<T extends Record<string, unknown>>(
   kind: FormFieldKind,
   value: T,
-  key: 'caption' | 'checkStyle',
+  key: 'caption' | 'checkStyle' | 'layout',
   takes: boolean,
   whose: string,
 ): T {

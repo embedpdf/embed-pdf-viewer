@@ -50,6 +50,7 @@ import {
   restoreCalculationOrder,
   revertForm,
   setAppearanceText,
+  setButtonImage,
   setDisplay,
   setSignatureAppearance,
   setValue,
@@ -273,6 +274,8 @@ function runOp(
       return reorderCalculations(ctx, op);
     case 'forms.setSignatureAppearance':
       return setSignatureAppearance(ctx, op);
+    case 'forms.setButtonImage':
+      return setButtonImage(ctx, op);
     case 'forms.import':
       return importForm(ctx, op);
     case 'forms.importValues':

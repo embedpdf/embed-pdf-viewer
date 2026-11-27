@@ -254,6 +254,13 @@ export {
   type FieldPurposeFormatConformanceOptions,
   type FieldPurposeFormatToken,
 } from './conformance/runFieldPurposeFormatConformance';
+export {
+  PICTURE_BUTTON_PDF,
+  PICTURE_BUTTON_TOKENS,
+  runPictureButtonConformance,
+  type PictureButtonConformanceOptions,
+  type PictureButtonToken,
+} from './conformance/runPictureButtonConformance';
 export { runMixedScriptConformance } from './conformance/runMixedScriptConformance';
 export {
   runDocumentFontsConformance,

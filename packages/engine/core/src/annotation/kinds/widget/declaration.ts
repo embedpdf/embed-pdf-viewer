@@ -6,6 +6,7 @@ import {
   TextAlignmentSchema,
   WidgetBorderStyleSchema,
   WidgetCheckStyleSchema,
+  WidgetLayoutSchema,
 } from '../../base.schema';
 import {
   FileAnnotationActionsSchema,
@@ -57,6 +58,13 @@ export const WidgetDeclaration = defineKind('widget', {
    * to another widget is refused.
    */
   checkStyle: field.data(WidgetCheckStyleSchema).nullable().optional(),
+  /**
+   * Where a push button's widget shows its caption and its image
+   * (`/MK /TP`): `caption` (the default), `image`, or both, the caption
+   * `below`, `above`, `right` or `left` of the image or `over` it. `null`
+   * for every other widget, and one written to another widget is refused.
+   */
+  layout: field.data(WidgetLayoutSchema).nullable().optional(),
   /**
    * `/A` and `/AA`: what the widget does when clicked, entered, focused and
    * so on. A write sets an event's action, `null` removes it, an event left

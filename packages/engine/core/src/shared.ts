@@ -300,6 +300,7 @@ export type {
   DrawnBorderStyle,
   WidgetBorderStyle,
   WidgetCheckStyle,
+  WidgetLayout,
   StandardFont,
   FontName,
   TextAlignment,

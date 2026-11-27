@@ -15,7 +15,8 @@ import { planFormCopy } from '@embedpdf/engine-core/validation';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormReader } from './FormReader';
-import { createPlannedFields } from './internal/createPlannedFields';
+import { readWidgetIcon } from './internal/buttonImage';
+import { createPlannedFields, type PlannedImage } from './internal/createPlannedFields';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -60,7 +61,8 @@ export interface FormCopyRequest {
  * leave out, and they are written as a design import's fields are
  * (`createPlannedFields`). So everything that is left out is decided before
  * the first write. A widget is drawn from its data: nothing is read from a
- * source but what `list()` returns.
+ * source but what `list()` returns, and a push button's image, which a
+ * copy with values places again (the same drawing).
  *
  * `fields` names at most `limits.items` fields; more is refused with
  * `PayloadTooLarge` before the form is read. A widget carries no bytes, so
@@ -114,7 +116,20 @@ export class FormCopier {
         const count = 1 + create.widgets.length;
         const numbers = objectNumbers?.slice(taken, taken + count);
         taken += count;
-        return { ...create, ...(numbers ? { objectNumbers: numbers } : {}) };
+        // A push button's image is its value: each copied widget places the
+        // drawing its source shows.
+        const images =
+          request.values && create.draft.kind === 'pushbutton'
+            ? create.widgets.map((widget): PlannedImage | null => {
+                const drawing = readWidgetIcon(this.runtime, this.session, widget);
+                return drawing === 0 ? null : { drawing };
+              })
+            : undefined;
+        return {
+          ...create,
+          ...(numbers ? { objectNumbers: numbers } : {}),
+          ...(images ? { images } : {}),
+        };
       }),
       plan.calculationOrder,
       {

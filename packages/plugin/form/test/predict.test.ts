@@ -86,6 +86,7 @@ const send: FormField = {
   ref: { kind: 'objectNumber', objectNumber: 30 },
   name: 'send',
   kind: 'pushbutton',
+  hasImage: false,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(31, PAGE)],

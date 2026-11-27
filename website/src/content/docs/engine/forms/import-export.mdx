@@ -43,7 +43,7 @@ page the document doesn't have refuses the export with `NotFound`.
 Two things never travel:
 
 - a signature: a signed signature field is exported unsigned;
-- the value of a field marked `noExport`.
+- the value of a field marked `noExport`, a button's image included.
 
 ## Store it as a file
 
@@ -225,28 +225,6 @@ second request with the same `opId` returns what the first one did and writes no
 
 An export is cached until the document's form or pages change, so exporting again is cheap.
 
-A server older than version 3.4 keeps no [purpose](/docs/engine/forms/authoring#purpose). An
-import of a bundle in which a field has one fails with `NotImplemented` before the bundle is sent,
-and `details.needs` and `details.serverVersion` say which side to update. To import without the
-purposes, clear them first:
-
-```ts
-const plain = {
-  ...bundle,
-  fields: bundle.fields.map((row) => ({
-    ...row,
-    data: { ...row.data, purpose: null },
-  })),
-};
-await doc.forms.import(plain);
-```
-
-A date or a time format needs no such step: an older server reads it from the field's scripts.
-
-A server older than version 3.5 has no [`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in)
-fields: an import of a bundle with one fails the same way, before it is sent. A bundle whose
-fields all read `forAnyone: false` goes out.
-
 </Engine>
 
 ## Permissions
@@ -267,13 +245,16 @@ import takes what the import took. See [Permissions](/docs/engine/concepts/permi
 
 ```ts
 bundle.fields; // [{ data }, …]: each field as a read returns it
-bundle.widgets; // [{ data, resources: {} }, …]: each widget as the form's rows read it
+bundle.widgets; // [{ data, resources }, …]: each widget as the form's rows read it
 bundle.calculationOrder; // the calculation order among the fields
 bundle.pages; // [{ page, position, size }, …]
 ```
 
 A bundle is plain data: the fields in the form's order, then their widgets in their fields'
-order. A widget is drawn from its data, so a form bundle carries no bytes yet.
+order. A widget is drawn from its data, so its `resources` are empty, but for a push button's
+image: such a widget names it as `{ image }`, a one-page PDF in `bundle.resources`. An
+image several widgets show is in the bundle once, and an import places it once in the
+document. It is the button's value: `values: false` leaves it out.
 
 ### The round trip
 

@@ -11,6 +11,7 @@ export const WIDGET_STYLE_NAMES = [
   'textAlign',
   'caption',
   'checkStyle',
+  'layout',
 ] as const;
 
 export type WidgetStyleName = (typeof WIDGET_STYLE_NAMES)[number];

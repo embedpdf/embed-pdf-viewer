@@ -270,6 +270,7 @@ export namespace FormField {
         filledAt: string | null;
         importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
+        hasImage: boolean;
     }
 
     export namespace FormFieldPushbutton {

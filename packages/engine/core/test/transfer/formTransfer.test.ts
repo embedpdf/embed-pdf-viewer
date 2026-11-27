@@ -92,6 +92,7 @@ function widgetRow(
     fontSize: 12,
     fontColor: '#000000',
     caption: null,
+    layout: null,
     actions: null,
     invisible: false,
     hidden: false,
@@ -275,6 +276,26 @@ describe('formExportRowsOf', () => {
       createdBy: 'alice',
     });
     expect(calculationOrder).toEqual([signed.ref, quiet.ref]);
+  });
+
+  test('a push button the form does not export goes without its picture', () => {
+    const button = (name: string, number: number, noExport: boolean) =>
+      ({
+        ...textField(name, number, [], { noExport }),
+        kind: 'pushbutton',
+        hasImage: true,
+      }) as unknown as FormField;
+    const { fields } = formExportRowsOf(
+      snapshotOf([button('photo', 10, true), button('logo', 20, false)], []),
+      {},
+      [page],
+    );
+    expect(
+      fields.map((field) => [field.name, field.kind === 'pushbutton' && field.hasImage]),
+    ).toEqual([
+      ['photo', false],
+      ['logo', true],
+    ]);
   });
 
   test('refuses a field or a page the document does not have', () => {

@@ -343,6 +343,7 @@ export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: Visible
     case 'forms.setDisplay':
     case 'forms.setAppearanceText':
     case 'forms.setSignatureAppearance':
+    case 'forms.setButtonImage':
     case 'forms.create':
     case 'forms.update':
     case 'forms.restore':

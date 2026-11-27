@@ -48,6 +48,7 @@ export interface WidgetPatch {
     textAlign?: WidgetPatch.TextAlign | undefined;
     caption?: (string | null) | undefined;
     checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
+    layout?: (WidgetPatch.Layout | null) | undefined;
     field?: unknown | undefined;
     fieldKind?: unknown | undefined;
     hasMark?: unknown | undefined;
@@ -131,4 +132,14 @@ export namespace WidgetPatch {
         Diamond: "diamond",
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
+    export const Layout = {
+        Caption: "caption",
+        Image: "image",
+        CaptionBelow: "caption-below",
+        CaptionAbove: "caption-above",
+        CaptionRight: "caption-right",
+        CaptionLeft: "caption-left",
+        CaptionOver: "caption-over",
+    } as const;
+    export type Layout = (typeof Layout)[keyof typeof Layout];
 }

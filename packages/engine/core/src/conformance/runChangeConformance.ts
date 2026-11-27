@@ -93,6 +93,16 @@ const SIGNATURE_FIELD: ChangeOp = {
     widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
   },
 };
+const PICTURE_BUTTON: ChangeOp = {
+  type: 'forms.create',
+  draft: {
+    kind: 'pushbutton',
+    name: 'initials',
+    widgets: [
+      { page: EMPTY_PAGE, rect: { x: 160, y: 100, width: 60, height: 40 }, layout: 'image' },
+    ],
+  },
+};
 const at = (objectNumber: number, page = PAGE): AnnotationRef => ({
   kind: 'objectNumber',
   page,
@@ -220,6 +230,17 @@ const MORE_ROUND_TRIPS: readonly (RoundTrip & { type: ChangeOp['type']; does: st
         field: { kind: 'fqn', name: 'signature' },
         appearance: null,
       },
+    ],
+  },
+  {
+    type: 'forms.setButtonImage',
+    does: 'no picture, which takes the picture out',
+    setup: () => [
+      PICTURE_BUTTON,
+      { type: 'forms.setButtonImage', field: { kind: 'fqn', name: 'initials' }, image: BANDS_PNG },
+    ],
+    ops: () => [
+      { type: 'forms.setButtonImage', field: { kind: 'fqn', name: 'initials' }, image: null },
     ],
   },
 ];
@@ -423,6 +444,12 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
         field: { kind: 'fqn', name: 'signature' },
         appearance: BANDS_PNG,
       },
+    ],
+  },
+  'forms.setButtonImage': {
+    setup: () => [PICTURE_BUTTON],
+    ops: () => [
+      { type: 'forms.setButtonImage', field: { kind: 'fqn', name: 'initials' }, image: BANDS_PNG },
     ],
   },
   'metadata.update': {

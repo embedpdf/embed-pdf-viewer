@@ -71,11 +71,15 @@ if (field.kind === 'listbox') console.log(field.selectedValues); // string[]
 | `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                                                |
 | `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`, `format`                                  |
 | `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values), `topIndex` (the option in its top row) |
-| `pushbutton` | none: a button only runs an action                                 | Each widget's `caption`, on its row in `widgets`                                                 |
+| `pushbutton` | none: a button runs an action, or shows an image                   | `hasImage`; each widget's `caption` and `layout`, on its row in `widgets`                        |
 | `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                                  |
 
 Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the
 user sees; `value` is what the form stores, and what you pass when you fill the field in.
+
+A push button's `hasImage` is `true` when it holds an image, and each of its widgets' `layout`
+says where it shows its caption and its image; see
+[A button with an image](/docs/engine/forms/authoring#a-button-with-an-image).
 
 A text field's or a dropdown's `format` is the shape its value has: a date
 (`{ kind: 'date', pattern: 'dd/mm/yyyy' }`), a time, another format (`{ kind: 'other' }`), or

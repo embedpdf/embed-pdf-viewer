@@ -897,6 +897,7 @@ export const ANNOTATION_KIND_FACTS: Readonly<Record<AnnotationSubtype, KindFacts
       textAlign: 'data',
       caption: 'data',
       checkStyle: 'data',
+      layout: 'data',
       field: 'engine',
       fieldKind: 'engine',
       hasMark: 'engine',

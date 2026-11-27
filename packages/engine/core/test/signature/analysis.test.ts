@@ -1718,3 +1718,201 @@ describe('restrictionsFor: a document timestamp after a certification that allow
     expect(restrictionsFor(after(2, timestamp), timestamp).level).toBe('fill');
   });
 });
+
+describe("evaluateStep: a push button's image is filling in", () => {
+  // A push button 70 with its widget 71 apart, and one whose field and widget
+  // are one object, 80. The signature field 30 is signed.
+  const buttons = (extra: Partial<Signature> = {}) =>
+    structure({
+      fields: [
+        { objectNumber: 20, name: 'name', kind: 'text', widgets: [21] },
+        { objectNumber: 30, name: 'sig0', kind: 'signature', widgets: [30] },
+        { objectNumber: 70, name: 'initials', kind: 'pushbutton', widgets: [71] },
+        { objectNumber: 80, name: 'image_field', kind: 'pushbutton', widgets: [80] },
+        { objectNumber: 85, name: 'agree', kind: 'checkbox', widgets: [85] },
+      ],
+      signatures: [signature(0, 30, extra)],
+    });
+  const approval = buttons();
+  const fillOnly = buttons({ docMdp: 2, catalogCertification: true });
+
+  /** The drawing a new image is, its appearance drawing it, and the image it holds. */
+  const drawn = (owner: number, appearance: number, drawing: number) => [
+    change(
+      appearance,
+      {
+        old: null,
+        new: `stream(20,cc)<</Resources <</XObject <</FRM ${drawing} 0 R>>>>/Subtype /Form>>`,
+      },
+      { new: [edge(owner, 'AP/N')] },
+    ),
+    change(
+      drawing,
+      {
+        old: null,
+        new: `stream(30,dd)<</Resources <</XObject <</Im1 ${drawing + 1} 0 R>>>>/Subtype /Form>>`,
+      },
+      { new: [edge(owner, 'MK/I'), edge(appearance, 'Resources/XObject/FRM')] },
+    ),
+    change(
+      drawing + 1,
+      { old: null, new: 'stream(100,ee)<</Subtype /Image>>' },
+      { new: [edge(drawing, 'Resources/XObject/Im1')] },
+    ),
+  ];
+  const trailer = change(
+    0,
+    { old: '<</Root 1 0 R/Size 72>>', new: '<</Prev 1234/Root 1 0 R/Size 95>>' },
+    {},
+  );
+
+  /** Widget 71's `/MK` and `/AP /N` before and after, its old appearance 72 replaced by 90. */
+  const widget = (mkBefore: string, mkAfter: string) => [
+    change(
+      71,
+      {
+        old: `<</AP <</N 72 0 R>>/MK ${mkBefore}/Parent 70 0 R/Subtype /Widget>>`,
+        new: `<</AP <</N 90 0 R>>/MK ${mkAfter}/Parent 70 0 R/Subtype /Widget>>`,
+      },
+      {
+        old: [edge(3, 'Annots/[3]'), edge(70, 'Kids/[0]')],
+        new: [edge(3, 'Annots/[3]'), edge(70, 'Kids/[0]')],
+      },
+    ),
+    change(72, { old: 'stream(10,aa)<</Subtype /Form>>', new: null }, { old: [edge(71, 'AP/N')] }),
+  ];
+  const imageInWidget = [
+    ...widget('<</CA (Initials)/TP 1>>', '<</CA (Initials)/I 91 0 R/TP 1>>'),
+    ...drawn(71, 90, 91),
+    trailer,
+  ];
+
+  const judge = (changes: ObjectChange[], before: RevisionStructure) =>
+    evaluateStep({ older: 1, newer: 2, changes, before, after: before });
+  const notPermitted = (step: ReturnType<typeof evaluateStep>) =>
+    step.findings
+      .filter((f) => f.verdict !== 'permitted')
+      .map((f) => `${f.rule} ${f.objectNumber}${f.edge ? ` ${f.edge}` : ''}`);
+
+  test('an image put in a widget is permitted after an approval signature and a certification for form filling', () => {
+    for (const before of [approval, fillOnly]) {
+      const step = judge(imageInWidget, before);
+      expect(notPermitted(step)).toEqual([]);
+      // Nothing unexplained: the drawing (91) and the image it holds (92) are
+      // claimed through /MK /I and the appearance that draws them.
+      expect(step.verdict).toBe('permitted');
+    }
+    expect(judge(imageInWidget, fillOnly).findings.find((f) => f.objectNumber === 71)?.detail).toBe(
+      'widget of "initials" image',
+    );
+  });
+
+  test('an image taken out is permitted as well', () => {
+    const out = [
+      ...widget('<</CA (Initials)/I 91 0 R/TP 1>>', '<</CA (Initials)/TP 1>>'),
+      change(
+        90,
+        { old: null, new: 'stream(20,cc)<</Subtype /Form>>' },
+        { new: [edge(71, 'AP/N')] },
+      ),
+      change(
+        91,
+        { old: 'stream(30,dd)<</Subtype /Form>>', new: null },
+        { old: [edge(71, 'MK/I')] },
+      ),
+      trailer,
+    ];
+    expect(judge(out, fillOnly).verdict).toBe('permitted');
+  });
+
+  test('a field and widget in one object: its /MK gains the image and stays permitted at P=2', () => {
+    const merged = [
+      change(
+        80,
+        {
+          old: '<</AP <</N 81 0 R>>/FT /Btn/Ff 65536/MK <</TP 1>>/Subtype /Widget/T (image_field)>>',
+          new: '<</AP <</N 90 0 R>>/FT /Btn/Ff 65536/MK <</I 91 0 R/TP 1>>/Subtype /Widget/T (image_field)>>',
+        },
+        {
+          old: [edge(10, 'Fields/[3]'), edge(3, 'Annots/[4]')],
+          new: [edge(10, 'Fields/[3]'), edge(3, 'Annots/[4]')],
+        },
+      ),
+      change(
+        81,
+        { old: 'stream(10,aa)<</Subtype /Form>>', new: null },
+        { old: [edge(80, 'AP/N')] },
+      ),
+      ...drawn(80, 90, 91),
+      trailer,
+    ];
+    const step = judge(merged, fillOnly);
+    expect(notPermitted(step)).toEqual([]);
+    expect(step.findings.find((f) => f.objectNumber === 80)?.detail).toBe(
+      'push button "image_field" image changed',
+    );
+  });
+
+  test('a caption, a layout, or both with the image, changed under P=2 stay design: forbidden', () => {
+    for (const [before, after] of [
+      ['<</CA (Initials)/TP 1>>', '<</CA (Sign here)/TP 1>>'],
+      ['<</CA (Initials)/TP 1>>', '<</CA (Initials)/TP 2>>'],
+      ['<</CA (Initials)/TP 1>>', '<</CA (Sign here)/I 91 0 R/TP 1>>'],
+    ] as const) {
+      const changes = [...widget(before, after), ...drawn(71, 90, 91), trailer];
+      const step = judge(changes, fillOnly);
+      expect(step.verdict).toBe('forbidden');
+      expect(step.findings.find((f) => f.objectNumber === 71)).toMatchObject({
+        verdict: 'forbidden',
+        rule: 'form-fill',
+        detail: 'widget of "initials" keys changed: MK',
+      });
+      // After an approval signature the key table allows /MK as a whole.
+      expect(judge(changes, approval).verdict).toBe('permitted');
+    }
+  });
+
+  test('a push button a signature locked stays frozen: an image put in is forbidden at every level', () => {
+    for (const lock of [
+      { fieldMdp: { action: 'include' as const, fields: ['initials'] } },
+      {
+        fieldMdp: { action: 'include' as const, fields: ['initials'] },
+        docMdp: 2 as const,
+        catalogCertification: true,
+      },
+    ]) {
+      const step = judge(imageInWidget, buttons(lock));
+      expect(step.verdict).toBe('forbidden');
+      expect(step.findings.find((f) => f.objectNumber === 71)).toMatchObject({
+        verdict: 'forbidden',
+        rule: 'field-lock',
+      });
+    }
+  });
+
+  test("another kind's /MK /I is not a push button's image: it stays unexplained", () => {
+    const checkbox = [
+      change(
+        85,
+        {
+          old: '<</AP <</N 86 0 R>>/FT /Btn/MK <</CA (4)>>/Subtype /Widget/T (agree)>>',
+          new: '<</AP <</N 90 0 R>>/FT /Btn/MK <</CA (4)/I 91 0 R>>/Subtype /Widget/T (agree)>>',
+        },
+        {
+          old: [edge(10, 'Fields/[4]'), edge(3, 'Annots/[5]')],
+          new: [edge(10, 'Fields/[4]'), edge(3, 'Annots/[5]')],
+        },
+      ),
+      change(
+        86,
+        { old: 'stream(10,aa)<</Subtype /Form>>', new: null },
+        { old: [edge(85, 'AP/N')] },
+      ),
+      ...drawn(85, 90, 91),
+      trailer,
+    ];
+    const step = judge(checkbox, approval);
+    expect(step.verdict).toBe('forbidden');
+    expect(notPermitted(step)).toContain('unexplained 91 85:MK/I');
+  });
+});

@@ -55,6 +55,18 @@ export const MARK_IMAGE_OR_NONE_SINCE = '3.4';
 export const FIELD_PURPOSE_AND_FORMAT_SINCE = '3.4';
 
 /**
+ * The version a push button's image and a widget's `layout` arrived in on
+ * the wire: the change op `forms.setButtonImage`, a `layout` in a widget's
+ * placement or patch (a create's draft, `addWidget`, `updateWidget`, as a
+ * route's body and as a change op), and a form bundle whose widget shows an
+ * image or names one. A client sends none of them to an older server,
+ * whose request schemas refuse a member they don't know. Reading needs no
+ * such check: an older server's rows are read without them
+ * (`WidgetDTOSchema`, `FormFieldDTOSchema`).
+ */
+export const BUTTON_IMAGE_AND_LAYOUT_SINCE = '3.5';
+
+/**
  * The version a form field anyone fills in (`forAnyone`) arrived in on the
  * wire: in the draft of a create, the patch of an update and what it
  * expects, as a route's body and as a change op. A client never sends it to

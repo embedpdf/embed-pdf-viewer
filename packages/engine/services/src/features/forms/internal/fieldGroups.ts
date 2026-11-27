@@ -1,5 +1,6 @@
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
+import { PageIndexLookup } from './buttonImage';
 import { readFieldForAnyone, readFieldGroup } from './fieldAttribution';
 import { acquireFormModel } from './formModelCache';
 import { FAMILY_BY_CODE, fieldHoldsValue } from './readFormSnapshot';
@@ -52,11 +53,13 @@ export function groupLockFields(
 export function filledAnyoneFields(runtime: PdfRuntimeModule, session: DocumentSession): string[] {
   const { fn, mem } = runtime;
   const model = acquireFormModel(runtime, session);
+  const docPtr = session.requireDocPtr();
+  const pages = new PageIndexLookup(runtime, docPtr);
   const names: string[] = [];
   const count = fn.EPDFForm_CountFields(model);
   for (let index = 0; index < count; index++) {
     if (!readFieldForAnyone(runtime, model, index)) continue;
-    if (!fieldHoldsValue(runtime, model, index)) continue;
+    if (!fieldHoldsValue(runtime, model, index, docPtr, pages)) continue;
     const name = readUtf16String(mem, (buf, cap) =>
       fn.EPDFForm_GetFieldName(model, index, buf, cap),
     );

@@ -662,8 +662,8 @@ When you name no `lock`, a signing locks two kinds of field (see
   fields as they are when you sign, but not its signature fields, which their signers still sign.
 - **Every field anyone fills in (`forAnyone: true`) that holds a value,** whether the signature
   field is in a group or not: text that isn't empty, a box or a radio button that is on, an
-  option that is chosen. One still empty stays open for the next signer, and the first signing
-  after it is filled in locks it.
+  option that is chosen, a button that holds an image. One still empty stays open for the next
+  signer, and the first signing after it is filled in locks it.
 
 With neither, it locks nothing. A document timestamp is no signer's, so it adds no field anyone
 fills in. Name a `lock` to choose yourself: the signing locks exactly that.
@@ -711,6 +711,10 @@ The field is empty again: its widgets read `hasMark: false` and show the field's
 style, which can change again. Undo brings the mark back. A field that has no mark is left as
 it is.
 
+A mark is stored once in the file, however many places show it: the same picture in ten
+signature fields, as a stamp and as a [push button's image](/docs/engine/forms/authoring#a-button-with-an-image)
+is one picture, as it is for stamps. A mark that is signed is stored the same way.
+
 A mark keeps the signatures made before it valid: after an approval signature, and after a
 certification that allows form filling, Acrobat reports no change it objects to, and
 [`analyze()`](#what-changed-since-a-signature) reads the mark as `'permitted'`.
@@ -742,15 +746,6 @@ with a mark, pass `appearance` to `sign()` or `prepare()`.
   the local engine, and the server stores what it is given after the same check. So
   `addValidationInfo()` from `@embedpdf/core-signature` works here as it is.
 - **A document timestamp needs no field** here either: the server makes it.
-- **An image as a mark, and taking a mark out, need a server of version 3.4.** An older one is
-  never sent them: `setSignatureAppearance()` with a PNG, a JPEG or `null`, and `sign()` or
-  `prepare()` with a PNG or a JPEG as `appearance`, fail with `NotImplemented`, and
-  `details.needs` and `details.serverVersion` say which side to update. A one-page PDF works
-  against it.
-- **These need a server of version 3.3.** An older one is never sent them:
-  `getValidationInfo()`, `addValidationInfo()` and a document timestamp with no `field` fail
-  with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to
-  update. Checking signatures still works against it.
 
 </Engine>
 
@@ -1150,6 +1145,13 @@ signatures), and `downloadRevision(index)` returns the file exactly as it was at
   even when a later revision hides it.
 - Missing evidence is never a pass: a value the engine can't read makes the verdict
   `'indeterminate'`.
+- A push button's [image](/docs/engine/forms/authoring#a-button-with-an-image) counts as filling
+  in, as Acrobat counts it: putting one in or taking it out (`setButtonImage()`) is permitted
+  wherever filling in is, after an approval signature and after a certification for form filling.
+  A field a signature locked stays forbidden, and so does a change to the button's caption,
+  colors or `layout`, which is design.
+- A mark drawn into an unsigned signature field (`setSignatureAppearance()`) is permitted at the
+  same levels: see [Signature fields and their look](#signature-fields-and-their-look).
 - The rules follow what Acrobat reports.
 - `exploratoryLevel` asks what a level would allow; the answer (`mode: 'exploratory'`) isn't a
   verdict.

@@ -156,6 +156,21 @@ export type WidgetBorderStyle = AnnotationBorderStyle | 'underline';
  */
 export type WidgetCheckStyle = 'check' | 'cross' | 'star' | 'circle' | 'square' | 'diamond';
 
+/**
+ * Where a push button's widget shows its caption and its image (`/MK /TP`,
+ * ISO 32000-2 Table 192): its caption alone, its image alone (an image
+ * field, as Acrobat makes one), or both, the caption below, above, to the
+ * right of, to the left of or over the image.
+ */
+export type WidgetLayout =
+  | 'caption'
+  | 'image'
+  | 'caption-below'
+  | 'caption-above'
+  | 'caption-right'
+  | 'caption-left'
+  | 'caption-over';
+
 /** The border styles an annotation other than a widget draws: `beveled` and `inset` are read, not written. */
 export type DrawnBorderStyle = Extract<AnnotationBorderStyle, 'solid' | 'dashed'>;
 
