@@ -21,6 +21,7 @@ import { createFocus } from './write/focus';
 import { createGroupWrites } from './write/groups';
 import { createInterchange } from './write/interchange';
 import { createWidgetLender } from './write/lending';
+import { createPrefill } from './write/prefill';
 import { createResetWrites } from './write/reset';
 import { createScriptEffects } from './write/script-effects';
 import { createTyping } from './write/typing';
@@ -38,6 +39,7 @@ export function createFormController(ctx: FormContext) {
   const fills = createFill(ctx, services);
   const values = createValueWrites(ctx, services, fills);
   const typing = createTyping(ctx, services, values.setText);
+  const prefill = createPrefill(ctx, services, values.fillPlain);
   const resets = createResetWrites(ctx, services, fills);
   const design = createFieldWrites(ctx, services);
   const groups = createGroupWrites(ctx, services);
@@ -56,6 +58,7 @@ export function createFormController(ctx: FormContext) {
     settingsReads.api,
     values.api,
     typing.api,
+    prefill.api,
     resets.api,
     design.api,
     groups.api,
@@ -70,6 +73,7 @@ export function createFormController(ctx: FormContext) {
         return field !== null && rights.mayFill(field);
       },
       canDesign: () => ctx.allows('doc.forms.modify'),
+      listPurposes: services.purposes.list,
       canRestoreAttribution: () => ctx.allows('doc.forms.import'),
       canWriteScripts: () => ctx.allows('doc.forms.script'),
       onValueChanged: events.valueChanged.on,
@@ -85,6 +89,7 @@ export function createFormController(ctx: FormContext) {
 
   return {
     api,
-    connect: () => connectForm(ctx, api, createWidgetLender(ctx, services, design.copyOps)),
+    connect: () =>
+      connectForm(ctx, api, createWidgetLender(ctx, services, design.copyOps), services.tools),
   };
 }

@@ -1,8 +1,11 @@
 /**
  * The form plugin's events. Fact events fire from the fields mirror; see `sync/fields.ts`. The
- * design group's event is derived here, from each committed state change, and the groups' the
- * same way where the groups are worked out (`services/groups.ts`).
+ * design group's event (who placed fields are for: a group, anyone or nobody) is derived here, from
+ * each committed state change, and the groups' the same way where the groups are worked out
+ * (`services/groups.ts`).
  */
+import { groupIdOfAssignment } from '@embedpdf/engine-core/runtime';
+
 import type {
   FormDesignGroupChangedEvent,
   FormFieldCreatedEvent,
@@ -30,8 +33,11 @@ export function createEvents(ctx: FormContext) {
   };
 
   ctx.state.onChange(({ previous, next }) => {
-    if (previous.designGroup !== next.designGroup) {
-      events.designGroupChanged.emit({ groupId: next.designGroup });
+    if (previous.designAssignment !== next.designAssignment) {
+      events.designGroupChanged.emit({
+        groupId: groupIdOfAssignment(next.designAssignment),
+        assignment: next.designAssignment,
+      });
     }
   });
 

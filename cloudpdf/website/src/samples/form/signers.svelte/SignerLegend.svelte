@@ -1,7 +1,7 @@
 <!-- A signer sees whose field is whose: theirs stand out, and the others take no input. -->
 <script lang="ts">
   import { useFormState } from '@embedpdf/svelte/form';
-  import { people, type Person } from './people';
+  import { ANYONE, people, type Person } from './people';
 
   let { person }: { person: Person } = $props();
 
@@ -16,5 +16,11 @@
       {group.label ?? group.id}: {count}
     </span>
   {/each}
-  <output class="readout">{people[person].name} fills in the fields in their color</output>
+  <span class="legend">
+    <i class="swatch" style:background={ANYONE}></i>
+    Anyone: {formState.fields.filter((field) => field.assignment.kind === 'anyone').length}
+  </span>
+  <output class="readout">
+    {people[person].name} fills in the fields in their color, and anyone's
+  </output>
 </div>

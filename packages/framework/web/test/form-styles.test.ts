@@ -39,6 +39,13 @@ describe('widgetBoxStyleOf', () => {
     });
   });
 
+  it('leaves a box that isn’t the user’s as the PDF has it: no edge', () => {
+    expect(widgetBoxStyleOf({ look, yours: false }, frame, colors)).not.toHaveProperty('boxShadow');
+    expect(widgetBoxStyleOf({ look, yours: true }, frame, colors)).toMatchObject({
+      boxShadow: 'inset 0 0 0 1px B',
+    });
+  });
+
   it('turns a turned widget’s box about its middle, and leaves an unturned one as it was', () => {
     // The frame of a widget turned a quarter: its box before the turn, which stands 40 × 200.
     expect(widgetBoxStyleOf({ look, rotation: 270 }, frame, colors)).toEqual({

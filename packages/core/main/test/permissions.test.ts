@@ -155,3 +155,52 @@ describe('an engine refusal', () => {
     });
   });
 });
+
+describe('ctx.allowsField', () => {
+  /** A document whose session answers per field, and writes down what it was asked about. */
+  function documentAsked(asked: unknown[]): DocumentHandle {
+    return Object.assign(makeHandle('d'), {
+      security: {
+        allows: () => true,
+        allowsAnnotation: () => true,
+        // Dana's key: her group's fields, and every field anyone fills in.
+        allowsField: (
+          _action: string,
+          field: { groupId: string | null; assignment?: { kind: string } },
+        ) => {
+          asked.push(field);
+          return field.assignment?.kind === 'anyone' || field.groupId === 'dana';
+        },
+      },
+    }) as DocumentHandle;
+  }
+
+  it('hands the engine the field, which it reads by its assignment, else its group', async () => {
+    const asked: unknown[] = [];
+    const { kernel, ctx } = await openedWith(documentAsked(asked));
+    // A plugin passes a whole field, or only its group as a released plugin does.
+    const anyone = { groupId: null, assignment: { kind: 'anyone' }, name: 'return_by' } as const;
+    expect(ctx.allowsField('fill', anyone)).toBe(true);
+    expect(ctx.allowsField('fill', { groupId: 'ada' })).toBe(false);
+    expect(ctx.allowsField('fill', { groupId: 'dana' })).toBe(true);
+    expect(ctx.allowsField('fill', { groupId: null })).toBe(false);
+    expect(asked).toEqual([anyone, { groupId: 'ada' }, { groupId: 'dana' }, { groupId: null }]);
+    await kernel.destroy();
+  });
+
+  it('refuses a field the session may not fill in, naming the permission it would take', async () => {
+    const { kernel, ctx } = await openedWith(documentAsked([]));
+    const refusal = (field: Parameters<typeof ctx.assertAllowedField>[1]) => {
+      try {
+        ctx.assertAllowedField('fill', field, 'probe.fill');
+        return null;
+      } catch (error) {
+        return (error as PluginError).permission;
+      }
+    };
+    expect(refusal({ groupId: 'ada' })).toBe('fields:fill:group=ada');
+    expect(refusal({ groupId: null })).toBe('doc.forms.fill');
+    expect(refusal({ groupId: null, assignment: { kind: 'anyone' } })).toBeNull();
+    await kernel.destroy();
+  });
+});

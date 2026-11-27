@@ -61,6 +61,7 @@
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/plugin-fonts": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*"
   },
   "devDependencies": {

@@ -1,13 +1,13 @@
 ---
 title: Your own form controls
-description: Attach your own UI to a form field, such as a tag on the fields still to fill in, and draw a field's control with your own component.
+description: Attach your own UI to a form field, such as a calendar next to a date field or a tag on the fields still to fill in, and draw a field's control with your own component.
 ---
 
 # Your own form controls
 
 The form layer draws each field as an HTML control: a text box, a checkbox, a list. You can put your
-own UI on a field, or draw its control yourself: a tag on the fields still to fill in, a hint next
-to a field, a switch instead of a checkbox.
+own UI on a field, or draw its control yourself: a calendar next to a date field, a tag on the
+fields still to fill in, a switch instead of a checkbox.
 
 This changes the screen only. What people enter is still the field's value in the PDF, so other PDF
 apps, printing and downloads show the field as the PDF describes it.
@@ -18,19 +18,48 @@ Ask whether it should zoom and turn with the PDF:
 
 | You want | Use | It |
 | :-- | :-- | :-- |
-| A hint, a menu or a picker next to a field | [Anchored UI](../ui/anchored#attach-to-a-form-field) | Floats over the pages, and moves to stay in view |
+| A calendar, a hint or a menu next to a field | [Anchored UI](#show-a-calendar-next-to-a-date-field) | Floats over the pages, and moves to stay in view |
 | A tag that stays on a field: "Required", a signer's name, a ✓ | [Pinned anchored UI](#pin-a-tag-to-a-field) | Floats over the pages, upright and the same size at every zoom, exactly where you put it |
 | A different control: a switch for a checkbox, a button inside a text box | A [control](#draw-a-control-your-way) | Is part of the page: it zooms and turns with the field |
 
 It's the same choice as for [an annotation](../annotations/custom-rendering#its-look-or-ui-on-it).
 Most of what an app adds to a form is the first two, and they need nothing from the form layer.
 
+## Show a calendar next to a date field
+
+`useFormWidgetAnchor(widget)` gives you the anchor of one box of a field, and follows it when the
+field is moved. A date picker is a card next to the date field the cursor is in:
+
+<Snippet name="forms/controls/date-picker" />
+
+<Fw only="react">Mount it in the Stage's `overlay`</Fw><Fw only="vue">Mount it in the Stage's `#overlay`
+slot</Fw><Fw only="svelte">Mount it in the Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside
+`<epdf-stage>`</Fw>, like a [menu](../ui/anchored). Three things make it work:
+
+1. <Fw only={['react', 'vue', 'svelte']}>`onFocusChanged`</Fw><Fw only="angular">`focusChanged$`</Fw> carries the field the cursor moved into, and the box it's in.
+2. `field.format` says what shape the field's value has. For a date it is
+   `{ kind: 'date', pattern: 'dd/mm/yyyy' }`, read from the PDF, so a date field made in Acrobat
+   has it too. See [Dates](../forms#dates).
+3. `formatDate()` writes the picked day the way the field's pattern asks, and `setValue()` fills
+   the field in with the form's own checks, as typing does.
+
+<Example name="form/date-picker" />
+
+> **Try it:** click the order form's date box: a calendar opens under it. Pick a day, and the
+> field shows it as day/month/year. Typing still works: type `5/3/26` and press Tab, and it shows
+> as `05/03/2026`; type `soon`, and the field refuses it.
+
+Typing a date still works, with the picker open or without one. The calendar is your own
+component: the example draws a small one, and a date library's fits the same way. A press on the
+card leaves the cursor in the field, so the card stays open while someone turns the months. A
+pick takes the cursor out of the field first: a text box writes what was typed when the cursor
+leaves it, so the picked day goes in after that and nothing types over it.
+
 ## Pin a tag to a field
 
 A tag on each field that still has to be filled in, a signer's name on each of their fields, a ✓ on
-a field that's done: UI that belongs to one field and stays on it. `useFormWidgetAnchor(widget)`
-gives you the anchor of one box of a field, and follows it when the field is moved. `pinned` keeps
-the tag exactly where you put it:
+a field that's done: UI that belongs to one field and stays on it. The same anchor holds it, and
+`pinned` keeps the tag exactly where you put it:
 
 <Snippet name="forms/controls/field-tag" />
 
@@ -127,7 +156,7 @@ put your own parts next to it, such as a button at the end of a text box that em
 > button.
 
 What you draw in the frame zooms with the page. Open a menu or a picker from it as a card, with
-[anchored UI](../ui/anchored#attach-to-a-form-field) or your own popover.
+[anchored UI](#show-a-calendar-next-to-a-date-field) or your own popover.
 
 ### The cursor and Tab
 
@@ -150,13 +179,18 @@ a page, and a control gets its box as `widget`:
 | `control`     | Which control it is: `'text'`, `'toggle'`, `'choice'`, `'button'` or `'signature'`                 |
 | `fieldRef`    | The field it belongs to: what `setValue()` and `get()` take                                         |
 | `ref`         | The box's own ref: what `useFormWidgetAnchor()` and `getWidget()` take                              |
-| `label`       | Its name for screen readers: the field's tooltip, else its name, then whose field it is when its [group](../forms#fields-for-several-people) has a label |
+| `label`       | Its name for screen readers: the field's tooltip, else its name, then whose field it is when its [group](../forms#fields-for-several-people) has a label, or "Anyone" for a field [anyone fills in](../forms#fields-anyone-fills-in) |
 | `groupId`     | The [group](/docs/engine/forms/groups) the field is in, or `null`                                  |
 | `canFill`     | Whether this user may fill it in, or sign it for a signature field: their permissions alone        |
-| `accent`      | What the layer shows it in, `{ color, strength }`, or `null`: its [group's](../forms#fields-for-several-people) color and the `fields.tint` setting, while this user may fill it in and it still takes a value |
+| `yours`       | Whether it's this user's to fill in: they may fill it in, the box takes input (`fillable` lets people, so it isn't `disabled`), and it still takes a value, so it isn't read-only, locked by a signature nor a signed signature. The layer paints only such a box: its tint, its edge and its placeholder. See [A field's look and its tint](../forms#a-fields-look-and-its-tint) |
+| `accent`      | Its tint, `{ color, strength }`, or `null`: its [group's](../forms#fields-for-several-people) color, else `fields.anyoneTintColor` for a field [anyone fills in](../forms#fields-anyone-fills-in), else `fields.tintColor`, as strong as `fields.tint`, while it's `yours` |
 | `disabled`    | Draw it, take no input: a read-only field, one this user may not fill in, one [`fillable`](../forms#settings) leaves out, or a value on its way |
 | `required`    | The form asks for a value                                                                          |
 | `empty`       | It holds nothing yet: no text, nothing ticked or picked, no signature. What [`validate()`](../forms#check-required-fields) counts as missing |
+| `purpose`     | What the field is for, such as `'name'`, `'email'` or `'date-signed'`, or `null`. See [What a field is for](building#what-a-field-is-for) |
+| `format`      | The shape of its value: `{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`, `{ kind: 'other' }` for a format only the PDF's script knows, or `null`. Always `null` for a box that isn't a text box or a dropdown. See [Dates](../forms#dates) |
+| `placeholder` | What it shows while it's empty and `yours`, or `null`: its purpose's label, such as "Email", in the viewer's language. A text box, a dropdown and a signature field have one; a signature box with a mark drawn in it has none |
+| `hint`        | A sentence about it, for its tooltip and screen readers (`aria-description`), or `null`. The date of signing says "Filled in when you sign" to the person whose date it is |
 | `box`, `rotation`, `rect` | Where it is; see [Turned fields](../forms#turned-fields)                               |
 
 Then each control has its value: a text box its `value`, a checkbox or radio button `checked` and
@@ -170,13 +204,24 @@ Controls fill forms in. They show while the active tool fills forms, as the laye
 [design mode](building#design-mode) fields are boxes people select and move, drawn by the
 annotation layer, and your controls stand down with the layer's own.
 
-### A group's color
+### A field's tint
 
-A field in a [group](../forms#fields-for-several-people) shows in its group's color while its
-user may fill it in. That color is part of the layer's own control, so a control that keeps
-`native` shows it, and one that draws the box alone doesn't. `widget.accent` is what the layer
-would show, `{ color, strength }`, or `null`, for a look of your own. A lent field has the same
-`accent` on the annotation layer in design mode.
+A field shows its [tint](../forms#a-fields-look-and-its-tint) while it's `yours`, and an edge in
+`fields.border` when it has no border of its own and no tint. Both are part of the layer's own
+control, so a control that keeps `native` shows them, and one that draws the box alone doesn't.
+`widget.accent` is the tint the layer would show, `{ color, strength }`, or `null`, for a look of
+your own. A lent field has the same `accent` on the annotation layer in design mode.
+
+### Placeholders
+
+An empty field with a [purpose](building#what-a-field-is-for) shows what it's for while it's
+`yours`: a text box, a dropdown and a signature field do, since a checkbox, a radio button and a
+list have no room for it. Another person's field and a read-only one show none. A signature box with a mark drawn in it shows the mark alone, before it is signed too. The
+placeholder is part of the layer's own control, so a control that keeps `native` shows it, and one
+that draws the box alone reads `widget.placeholder` and draws its own. The
+layer's text box also carries the browser's `autocomplete` for the purposes the web knows; your
+own control reads `widget.purpose` for that. In design mode the placeholder shows on the field
+too, so whoever builds the form sees what each field is for.
 
 ### Signature fields
 

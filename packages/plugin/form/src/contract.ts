@@ -11,16 +11,19 @@ import type {
   EventOrigin,
   HistoryOptions,
   OperationOptions,
+  PluginErrorInfo,
   ResourceStatus,
   SettingsApi,
 } from '@embedpdf/core';
 import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
+  FieldAssignment,
   FieldPosition,
   FormBundle,
   FormFieldDraft,
   FormField,
+  FormFieldFormatWritable,
   FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
@@ -34,6 +37,7 @@ import type {
   FormWidget,
   PageRef,
   WidgetAnnotation,
+  WidgetAppearance,
   WidgetPatch,
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
@@ -44,15 +48,26 @@ import type { FormWidgetItem } from './read/fill-items';
 import type { FormGroup } from './services/groups';
 
 export { FormToken } from './token';
-export { toFieldRef } from '@embedpdf/engine-core/runtime';
+export {
+  isDatePattern,
+  isTimePattern,
+  STANDARD_DATE_PATTERNS,
+  STANDARD_TIME_PATTERNS,
+  toFieldRef,
+} from '@embedpdf/engine-core/runtime';
 export { FormTransfer } from '@embedpdf/engine-core/public';
+export { formatDate, parseDate } from '@embedpdf/core-acrojs';
+export type { DateParts, DatePartsInput } from '@embedpdf/core-acrojs';
 export type { FormWidgetItem, FormWidgetLook, GroupPosition } from './read/fill-items';
 export type { FormGroup } from './services/groups';
 export type { Box, WidgetHit, WidgetPlace } from './model';
 export type {
+  FieldAssignment,
   FormBundle,
   FormFieldDraft,
   FormField,
+  FormFieldFormat,
+  FormFieldFormatWritable,
   FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
@@ -76,13 +91,17 @@ export type {
  * fields (a field's own colors are in the PDF); each can also come from CSS
  * (`--epdf-form-focus`, `--epdf-form-field-border`,
  * `--epdf-form-field-background`, `--epdf-form-field-color`,
- * `--epdf-form-field-tint`), which wins.
+ * `--epdf-form-field-tint`, `--epdf-form-field-tint-color`,
+ * `--epdf-form-field-anyone-tint-color`, `--epdf-form-field-placeholder`), which wins.
+ * `tools` is read when a document opens.
  */
 export interface FormSettings {
   /**
    * Run the form's own checks, the keystroke, validate, calculate and format
    * scripts, when a value is written (`'scripts'`, which needs JavaScript on
    * in `actionsPlugin({ javascript })`), or accept every value (`'none'`).
+   * Without JavaScript, `'scripts'` still checks a date or a time against its
+   * field's `format` and shows it the way the format says.
    */
   readonly validation: 'scripts' | 'none';
   readonly focus: {
@@ -90,17 +109,35 @@ export interface FormSettings {
     readonly color: string | null;
   };
   readonly fields: {
-    /** The edge of a field that has no border of its own: a CSS color, or `null` for the accent at 55%. */
+    /**
+     * The edge of a field that has no border of its own and no tint, on a field the user fills
+     * in and on every field in design mode: a CSS color, or `null` for the accent at 55%.
+     */
     readonly border: string | null;
     /** Inside a field that has no background of its own, while it's being filled in. */
     readonly background: string;
     /** The text of a field that has no color of its own. */
     readonly color: string;
     /**
-     * How strongly a field shows its group's color ({@link FormCapability.listGroups}): from
-     * `0`, not at all, to `1`.
+     * How strongly a field shows its tint, its group's color ({@link FormCapability.listGroups}),
+     * `anyoneTintColor` or `tintColor`: from `0`, not at all, to `1`.
      */
     readonly tint: number;
+    /**
+     * The tint of a field in no group, a CSS color: on a field the user fills in, and on every
+     * field that takes a value in design mode. `null` leaves such a field untinted.
+     */
+    readonly tintColor: string | null;
+    /**
+     * The tint of a field anyone fills in (`assignment` `{ kind: 'anyone' }`), a CSS color: on such a field the user
+     * fills in, and on every one in design mode. `null` gives it `tintColor`.
+     */
+    readonly anyoneTintColor: string | null;
+    /**
+     * What an empty field shows for its purpose ({@link FormWidgetItem} `placeholder`): the
+     * color of that text, a CSS color.
+     */
+    readonly placeholder: string;
   };
   /**
    * Which fields people may fill in by hand: `true`, every one; `false`,
@@ -110,6 +147,67 @@ export interface FormSettings {
    * fills it in (`setValue()`, `importValues()`), and `canFill()` doesn't change.
    */
   readonly fillable: FillableFields;
+  /**
+   * Change the built-in field tools or add your own, entry by entry in order. An entry with a
+   * tool's id changes only that tool, a new id with `extends` adds a tool that starts from a
+   * copy of a field tool listed before it.
+   */
+  readonly tools: readonly FormToolInput[];
+}
+
+/**
+ * The purposes the form plugin knows: the four values the session's identity has, the day of
+ * signing, and the two marks. The first four are the web's own names for these values (the
+ * HTML `autocomplete` tokens).
+ */
+export const WELL_KNOWN_PURPOSES = Object.freeze([
+  'name',
+  'email',
+  'organization',
+  'organization-title',
+  'date-signed',
+  'signature',
+  'initials',
+] as const);
+
+/** One of the purposes the form plugin knows. */
+export type WellKnownPurpose = (typeof WELL_KNOWN_PURPOSES)[number];
+
+/** A purpose, as `listPurposes()` gives it. */
+export interface FormPurpose {
+  /** The purpose: the word a field carries as its `purpose`. */
+  readonly id: string;
+  /**
+   * What it is called, for people, in the viewer's language: what an empty field of this
+   * purpose shows, and what a settings panel lists it as.
+   */
+  readonly label: string;
+}
+
+/**
+ * What every field a tool places starts with: any setting `create()` takes, but its kind, its
+ * name, its widgets and who fills it in. The kind is the tool's, the name is the next free one,
+ * the widget is where the tool is used, and who fills it in is the design assignment
+ * (`setDesignAssignment()`).
+ */
+export type FormToolField = FormFieldDraft extends infer Draft
+  ? Draft extends unknown
+    ? Partial<Omit<Draft, 'kind' | 'name' | 'widgets' | 'groupId' | 'assignment'>>
+    : never
+  : never;
+
+/** One entry of the `tools` setting: a change to a field tool, or a new one. */
+export interface FormToolInput {
+  /** The tool's id: an existing field tool's to change it, or a new one, with `extends`. */
+  readonly id: string;
+  /** The field tool a new tool starts from: one listed before it. */
+  readonly extends?: string;
+  /** What every field the tool places starts with, over the tool's it extends. */
+  readonly field?: FormToolField;
+  /** How the placed field's widget looks, over the tool's it extends. */
+  readonly defaults?: WidgetAppearance;
+  /** The size a click makes, in page points. */
+  readonly clickCreate?: { readonly width: number; readonly height: number };
 }
 
 /** One of a document's groups, as the app names it with `setGroups()`. */
@@ -133,8 +231,17 @@ export type FillableFields = boolean | readonly FormFieldKind[];
 export const FORM_DEFAULTS: FormSettings = {
   validation: 'scripts',
   focus: { color: null },
-  fields: { border: null, background: 'rgb(255 255 255 / 0.92)', color: '#1f2a44', tint: 0.16 },
+  fields: {
+    border: null,
+    background: 'rgb(255 255 255 / 0.92)',
+    color: '#1f2a44',
+    tint: 0.16,
+    tintColor: null,
+    anyoneTintColor: '#0891b2',
+    placeholder: 'rgb(31 42 68 / 0.55)',
+  },
   fillable: true,
+  tools: [],
 };
 
 /** What `formPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -180,6 +287,27 @@ export interface FormValidation {
   readonly missing: readonly FormField[];
 }
 
+/**
+ * Why `prefill()` left a field: `'filled'`, it has a value; `'no-value'`, the app has nothing
+ * for its purpose (an identity without an email address); `'for-anyone'`, anyone fills it in
+ * (its `assignment` is `{ kind: 'anyone' }`), and a name, an address or a day of signing is one
+ * signer's.
+ */
+export type FormPrefillSkipReason = 'filled' | 'no-value' | 'for-anyone';
+
+/**
+ * What `prefill()` resolves, in the shape `setValues()` resolves: the fields it wrote, the ones
+ * it left with the reason, and the ones whose write failed.
+ */
+export interface FormPrefillResult {
+  readonly applied: readonly FormFieldRef[];
+  readonly skipped: readonly {
+    readonly ref: FormFieldRef;
+    readonly reason: FormPrefillSkipReason;
+  }[];
+  readonly failed: readonly { readonly ref: FormFieldRef; readonly error: PluginErrorInfo }[];
+}
+
 /** What `reset()` resolves: the fields it changed, as they are now. */
 export interface FormResetResult {
   readonly fields: readonly FormField[];
@@ -208,7 +336,19 @@ export type FormFieldFlagSetting =
  * document's words, shown as they are. The `groupId` setting's are the ids of
  * the groups the user may put the field in: show each with its group's label
  * (`listGroups()`), and none of them (`null`) takes the field out of its
- * group. A field has it only while the document has groups.
+ * group. A field has it only while the document has groups. `assignment`
+ * says who fills the field in, whole: its `options` are the assignments the
+ * user may give it (`canAssign()`), the field's own among them, and never
+ * `{ kind: 'anyone' }` on a signature field. Its value is the field's
+ * `assignment`, and `update({ assignment })` writes it. A panel that draws
+ * `assignment` leaves `groupId` out: `groupId` stays for a panel that knows
+ * only groups. The `purpose`
+ * setting's are the ids of the purposes the plugin knows, and the field's own
+ * when it is another word: show each with its label (`listPurposes()`), and
+ * none of them (`null`) takes the purpose away. `format`: the shape of a text field's or a
+ * dropdown's value, `{ kind, pattern }` or none (`null`), as `update()` takes
+ * it; `kinds` are the ones to offer and `patterns` the ones Acrobat offers for
+ * each.
  *
  * `label` is the English name and `labelKey` its translation key
  * (`form.settings.tooltip`): a panel shows `t(setting.labelKey, { fallback:
@@ -257,6 +397,29 @@ export type FormFieldSetting =
       readonly free: false;
     }
   | {
+      readonly key: 'assignment';
+      readonly control: 'assignment';
+      readonly label: string;
+      readonly labelKey: string;
+      readonly options: readonly FieldAssignment[];
+    }
+  | {
+      readonly key: 'purpose';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly labelKey: string;
+      readonly options: readonly string[];
+      readonly free: false;
+    }
+  | {
+      readonly key: 'format';
+      readonly control: 'format';
+      readonly label: string;
+      readonly labelKey: string;
+      readonly kinds: readonly FormFieldFormatWritable['kind'][];
+      readonly patterns: Readonly<Record<FormFieldFormatWritable['kind'], readonly string[]>>;
+    }
+  | {
       readonly key: 'defaultValue';
       readonly control: 'choices';
       readonly label: string;
@@ -280,7 +443,7 @@ export interface FormFieldSettings {
   readonly values: Readonly<Record<string, unknown>>;
 }
 
-/** What `moveToGroup()` resolves: the fields as they are now, in the order given. */
+/** What `assign()` and `moveToGroup()` resolve: the fields as they are now, in the order given. */
 export interface FormGroupMoveResult {
   readonly fields: readonly FormField[];
 }
@@ -431,9 +594,14 @@ export interface FormFocusChangedEvent {
   /** The box the cursor is in. */
   readonly widget: AnnotationRef | null;
 }
-/** The group that fields placed with a tool go in changed (`groupId` is `null` when it names none). */
+/**
+ * Who fields placed with a tool are for changed: `assignment`, a group, anyone or nobody, and
+ * `groupId`, the group's id, or `null` for anyone and for nobody.
+ */
 export interface FormDesignGroupChangedEvent {
   readonly groupId: string | null;
+  /** Who fields placed with a tool are for. */
+  readonly assignment: FieldAssignment;
 }
 /** `setGroups()` changed who the document's groups are: the groups as `listGroups()` gives them now. */
 export interface FormGroupsChangedEvent {
@@ -513,9 +681,20 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   listGroups(): readonly FormGroup[];
   /**
    * The group that fields placed with a tool go in (in design mode), or
-   * `null`, where it starts, when it names none.
+   * `null`, where it starts, when it names none: also while they are for
+   * anyone (`getDesignAssignment()`).
    */
   getDesignGroup(): string | null;
+  /**
+   * Who fields placed with a tool are for (in design mode): a group, anyone,
+   * or nobody, `{ kind: 'unassigned' }`, where it starts.
+   */
+  getDesignAssignment(): FieldAssignment;
+  /**
+   * Every purpose the plugin knows ({@link WELL_KNOWN_PURPOSES}), each with its label in the
+   * viewer's language. The same array while nothing changes.
+   */
+  listPurposes(): readonly FormPurpose[];
   /**
    * A field's settings, described for a settings panel, which writes them
    * with `update()`; `null` for a field the form doesn't have. Every setting
@@ -574,6 +753,17 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     values: Readonly<Record<string, FormPlainValue>>,
     options?: OperationOptions,
   ): Promise<BatchResult<FormFieldRef, string>>;
+  /**
+   * Fill in the session's own empty fields whose purpose the app has a value for, as one change
+   * and one step to undo: a name, an email address, an organization and a job title from the
+   * session's identity, and for `date-signed` today's date (`ctx.clock`'s day, in the field's
+   * date pattern, else `yyyy-mm-dd`), into a text field or a dropdown. A field the session may
+   * not fill in is left out, one that has a value is skipped (`'filled'`), so is one whose
+   * purpose has no value now (`'no-value'`), and so is one anyone fills in (`'for-anyone'`):
+   * those values are one signer's. A read-only field is filled in: the flag stops people, not
+   * code. Fires `onValueChanged` per field.
+   */
+  prefill(options?: OperationOptions): Promise<FormPrefillResult>;
   /**
    * Put back each field's default, for the fields you pass, or every field
    * you may fill in, then run the form's calculations. Fires
@@ -673,24 +863,51 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   setGroups(groups: readonly FormGroupInput[]): void;
   /**
    * Say who the next fields are for: a field placed with a tool goes into
-   * this group. With `null` it names none, and the field is in no group.
-   * Fires `onDesignGroupChanged`. Throws
-   * `permission-denied` for a group the user may not put a field in
+   * this group. With `null` it names none, and the field is in no group. The
+   * same as `setDesignAssignment()` with `{ kind: 'group', groupId }`, or
+   * with `{ kind: 'unassigned' }` for `null`. Fires `onDesignGroupChanged`.
+   * Throws `permission-denied` for a group the user may not put a field in
    * (`canSetGroup`).
    */
   setDesignGroup(groupId: string | null): void;
   /**
+   * Say who the next fields are for: a field placed with a tool gets this
+   * assignment, a group (`{ kind: 'group', groupId }`), anyone
+   * (`{ kind: 'anyone' }`: every signer may fill it in), or nobody
+   * (`{ kind: 'unassigned' }`). The signature tool places nothing while it
+   * is anyone: one signer signs a signature field. Fires
+   * `onDesignGroupChanged`. Throws `permission-denied` for an assignment the
+   * user may not give (`canAssign`).
+   */
+  setDesignAssignment(assignment: FieldAssignment): void;
+  /**
    * Put fields in a group, or with `null` take them out of theirs, in one
-   * step to undo: each field not already there gets it as its `groupId`.
-   * Fires `onFieldUpdated` for each, and resolves the fields as they are
-   * now, in the order given. Rejects `permission-denied` without
-   * `doc.forms.modify` or for a group the user may not put a field in
-   * (`canSetGroup`; taking a field out of its group needs no more than
-   * `doc.forms.modify`), `not-found` for a field the form doesn't have.
+   * step to undo: the same as `assign()` with `{ kind: 'group', groupId }`,
+   * or `{ kind: 'unassigned' }` for `null`, so one anyone fills in is no
+   * longer such a field. Fires `onFieldUpdated` for each field it changes,
+   * and resolves the fields as they are now, in the order given. Rejects
+   * `permission-denied` without `doc.forms.modify` or for a group the user
+   * may not put a field in (`canSetGroup`; taking a field out of its group
+   * needs no more than `doc.forms.modify`), `not-found` for a field the form
+   * doesn't have.
    */
   moveToGroup(
     fields: readonly FormFieldRef[],
     groupId: string | null,
+    options?: OperationOptions,
+  ): Promise<FormGroupMoveResult>;
+  /**
+   * Say who fields are for, in one step to undo: each field that isn't
+   * already gets `assignment`, a group, anyone or nobody. Fires
+   * `onFieldUpdated` for each, and resolves the fields as they are now, in
+   * the order given. Rejects `permission-denied` for an assignment the user
+   * may not give (`canAssign`), `invalid-input` for anyone on a signature
+   * field, which one signer signs, `not-found` for a field the form doesn't
+   * have. Nothing changes when it rejects.
+   */
+  assign(
+    fields: readonly FormFieldRef[],
+    assignment: FieldAssignment,
     options?: OperationOptions,
   ): Promise<FormGroupMoveResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
@@ -757,8 +974,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   canRead(): boolean;
   /**
    * Whether filling in this field is allowed: `doc.forms.fill`, or a
-   * `fields:fill` permission for the field's group. `false` for a field the
-   * form doesn't have.
+   * `fields:fill` permission for the field's group; any of them for a field
+   * anyone fills in. `false` for a field the form doesn't have.
    */
   canFill(field: FormFieldRef): boolean;
   /** Whether adding, changing and removing fields is allowed: `doc.forms.modify`. */
@@ -769,6 +986,14 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * own or one a `fields:set-group` permission names.
    */
   canSetGroup(groupId: string): boolean;
+  /**
+   * Whether the user may give a field this assignment, with `create()`,
+   * `update()`, `assign()` or a tool: a group as `canSetGroup()` says;
+   * anyone with `doc.forms.modify` and the right to put a field in every
+   * group (`fields:set-group:all`), since every group's signers then fill it
+   * in; nobody with `doc.forms.modify`.
+   */
+  canAssign(assignment: FieldAssignment): boolean;
   /**
    * Whether an import may restore who created and filled in the fields it
    * brings, instead of naming the importing user: `doc.forms.import`.
@@ -795,7 +1020,7 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   readonly onResynced: EventHook<FormResyncedEvent>;
   /** The cursor moved into a field, to another one, or out of the fields. */
   readonly onFocusChanged: EventHook<FormFocusChangedEvent>;
-  /** The group that fields placed with a tool go in changed. */
+  /** Who fields placed with a tool are for changed: a group, anyone or nobody. */
   readonly onDesignGroupChanged: EventHook<FormDesignGroupChangedEvent>;
   /** `setGroups()` changed who the document's groups are. */
   readonly onGroupsChanged: EventHook<FormGroupsChangedEvent>;

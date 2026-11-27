@@ -25,6 +25,9 @@ import {
 } from '@embedpdf/angular/form';
 import { kernelOf, mount, viewerHost } from './fixtures';
 
+/** The buyer's group, as an assignment. */
+const BUYER_ASSIGNMENT = { kind: 'group', groupId: 'buyer' } as const;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const blank = resolve(here, '../../../engine/main/test/fixtures/hello_world.pdf');
 const wasm = resolve(here, '../../../engine/runtime/npm/wasm32/lib/embedpdf.wasm');
@@ -190,7 +193,19 @@ describe('fields for several people', () => {
       ]);
       form.setDesignGroup('buyer');
       expect(form.designGroup()).toBe('buyer');
-      expect(changes).toEqual([{ groupId: 'buyer' }]);
+      expect(form.designAssignment()).toEqual(BUYER_ASSIGNMENT);
+      // For anyone: in no group. Naming a group again is that group's.
+      form.setDesignAssignment({ kind: 'anyone' });
+      expect(form.designGroup()).toBeNull();
+      expect(form.designAssignment()).toEqual({ kind: 'anyone' });
+      expect(form.getDesignAssignment()).toEqual({ kind: 'anyone' });
+      form.setDesignGroup('buyer');
+      expect(form.designAssignment()).toEqual(BUYER_ASSIGNMENT);
+      expect(changes).toEqual([
+        { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+        { groupId: null, assignment: { kind: 'anyone' } },
+        { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+      ]);
 
       // Design mode: the fields are lent to the annotation layer, which shows the buyer's
       // field in the buyer's color, above its drawing, and the other field with none.

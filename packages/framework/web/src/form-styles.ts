@@ -61,8 +61,8 @@ export type WidgetBoxStyle = {
   /** Always the widget's event surface: the control inside gates the edits. */
   pointerEvents: 'auto';
   /**
-   * The edge of a field without a border of its own, so people see where to fill in; for a
-   * field that shows its group's color, an edge of that color.
+   * The edge of a field of the user's without a border of its own, so people see where to fill
+   * in; for a field that shows its tint, an edge of that color.
    */
   boxShadow?: string;
   /** A fill of the field's group's color, over the field's picture. */
@@ -75,16 +75,20 @@ export type WidgetBoxStyle = {
  * turns with it, about its middle (`rotation`, a quarter turn clockwise), so
  * whatever control sits in it reads the way the field does, and the turned
  * box covers the rect the widget stands in. A widget with an `accent` (its
- * group's color, while its user fills it in) shows it: a fill, as strong as
- * the accent says, and an edge. `edge: false` leaves the edge and the group's
- * color out, for a control that draws its own (a list box, a control of the
- * app's) or never has one (a button).
+ * tint, while its user fills it in) shows it: a fill, as strong as the accent
+ * says, and an edge. One of the user's (`yours`) without a border of its own
+ * and without a tint shows an edge in `fields.border`; any other looks as the
+ * PDF has it. `edge: false` leaves the edge and the tint out, for a control
+ * that draws its own (a list box, a control of the app's) or never has one (a
+ * button).
  */
 export function widgetBoxStyleOf(
   widget: {
     look: Pick<FieldLook, 'border'>;
     rotation?: number | null;
     accent?: FieldAccent | null;
+    /** The form plugin's `yours`: left out, the box counts as the user's. */
+    yours?: boolean;
   },
   frame: PixelRect,
   colors: FormColors,
@@ -101,7 +105,7 @@ export function widgetBoxStyleOf(
     pointerEvents: 'auto',
     ...(tint
       ? { boxShadow: `inset 0 0 0 1px ${tint.edge}`, background: tint.fill }
-      : edge && widget.look.border === null
+      : edge && widget.yours !== false && widget.look.border === null
         ? { boxShadow: `inset 0 0 0 1px ${colors.border}` }
         : {}),
   };

@@ -8,7 +8,7 @@
  * imports.
  */
 import type { PixelRect } from './page-pixels';
-import { mixAccent, paint } from './theme';
+import { EPDF_VARIABLES, mixAccent, paint } from './theme';
 
 // ── colors and looks ─────────────────────────────────────────────────────────
 
@@ -48,14 +48,19 @@ export function formColorsOf(settings: FormColorSettings, accent: string): FormC
 }
 
 /**
- * What a field shows its group in: the group's color, any CSS color (a
- * `var()` of the app's included), and how strongly it shows, from 0 to 1. The
- * structural twin of the form plugin's `accent` on a box and the annotation
- * plugin's on a lent record.
+ * A field's tint: its group's color, any CSS color (a `var()` of the app's
+ * included), the form's `fields.anyoneTintColor` for a field anyone fills in
+ * (`anyone`), or its `fields.tintColor` for a field in no group (`base`), and
+ * how strongly it shows, from 0 to 1. The structural twin of the form plugin's
+ * `accent` on a box and the annotation plugin's on a lent record.
  */
 export interface FieldAccent {
   readonly color: string;
   readonly strength: number;
+  /** The color is `fields.tintColor`, which `--epdf-form-field-tint-color` wins over. */
+  readonly base?: boolean;
+  /** The color is `fields.anyoneTintColor`, which `--epdf-form-field-anyone-tint-color` wins over. */
+  readonly anyone?: boolean;
 }
 
 /** A group's color as a field shows it: what fills its box, and its edge. */
@@ -67,17 +72,23 @@ export type FieldTint = {
 };
 
 /**
- * A group's color as a field shows it: a fill of the accent's color, as
- * strong as it says, and an edge of the color itself.
- * `--epdf-form-field-tint` wins over the strength of the fill. No field has
- * an accent while the form's `fields.tint` setting is 0, which is what turns
- * the colors off.
+ * A field's tint as it shows: a fill of the accent's color, as strong as it
+ * says, and an edge of the color itself. `--epdf-form-field-tint` wins over
+ * the strength of the fill, `--epdf-form-field-anyone-tint-color` over the
+ * color of a field anyone fills in (`anyone`), and `--epdf-form-field-tint-color`
+ * over the color of a field in no group (`base`). No field has an accent while
+ * the form's `fields.tint` setting is 0, which is what turns the colors off.
  */
 export function fieldTintOf(accent: FieldAccent): FieldTint {
   const strength = paint('form-field-tint', accent.strength);
+  const color = accent.anyone
+    ? paint('form-field-anyone-tint-color', accent.color)
+    : accent.base
+      ? paint('form-field-tint-color', accent.color)
+      : accent.color;
   return {
-    fill: `color-mix(in srgb, ${accent.color} calc(${strength} * 100%), transparent)`,
-    edge: accent.color,
+    fill: `color-mix(in srgb, ${color} calc(${strength} * 100%), transparent)`,
+    edge: color,
   };
 }
 
@@ -95,6 +106,40 @@ export type RecordAccentStyle = {
   boxShadow: string;
   pointerEvents: 'none';
 };
+
+/**
+ * The edge a lent record shows when it has no border of its own and no accent (the annotation
+ * plugin's `RenderItem.outline`: a form field in design mode), so a field with no look shows: a
+ * CSS color, or `null` for the form's own edge, the accent at 55%. The structural twin of the
+ * annotation plugin's on a lent record.
+ */
+export interface FieldOutline {
+  readonly color: string | null;
+}
+
+/** The style of a lent record's outline: an edge around its frame, out of the pointer's way. */
+export type RecordOutlineStyle = {
+  position: 'absolute';
+  inset: '0';
+  boxSizing: 'border-box';
+  boxShadow: string;
+  pointerEvents: 'none';
+};
+
+/**
+ * {@link RecordOutlineStyle} for an outline: the edge a field without a border of its own shows
+ * while it's filled in (`fields.border`, `--epdf-form-field-border`), with `accent` the viewer's.
+ */
+export function recordOutlineStyleOf(outline: FieldOutline, accent: string): RecordOutlineStyle {
+  const color = paint('form-field-border', outline.color ?? mixAccent('form-field-border', accent));
+  return {
+    position: 'absolute',
+    inset: '0',
+    boxSizing: 'border-box',
+    boxShadow: `inset 0 0 0 1px ${color}`,
+    pointerEvents: 'none',
+  };
+}
 
 /** {@link RecordAccentStyle} for an accent. */
 export function recordAccentStyleOf(accent: FieldAccent): RecordAccentStyle {
@@ -238,6 +283,165 @@ export function listBoxStyleOf(
     borderStyle: field.look.borderStyle === 'dashed' ? 'dashed' : 'solid',
     borderColor: tint ? tint.edge : (field.look.border ?? colors.border),
   };
+}
+
+// ── what an empty field shows, and what the browser may offer ────────────────
+
+/**
+ * What a lent field shows while it is empty: the words, and their color, a CSS color (the form's
+ * `fields.placeholder` setting). The structural twin of the annotation plugin's on a lent record.
+ */
+export interface FieldPlaceholder {
+  readonly text: string;
+  readonly color: string;
+}
+
+/**
+ * A control's `aria-description` for a field's hint (the form plugin's `hint`): what a screen
+ * reader hears about it besides its name. Nothing for a field without one. An attribute object,
+ * since not every framework's element types list it yet.
+ */
+export function ariaDescriptionOf(hint: string | null): { 'aria-description'?: string } {
+  return hint === null ? {} : { 'aria-description': hint };
+}
+
+/** A placeholder as a box shows it: a line of text over the field's picture, out of the pointer's way. */
+export type FieldPlaceholderStyle = {
+  position: 'absolute';
+  inset: '0';
+  boxSizing: 'border-box';
+  display: 'flex';
+  /** One line sits in the middle of its box; a box for several lines starts at the top. */
+  alignItems: 'center' | 'flex-start';
+  justifyContent: 'flex-start' | 'center' | 'flex-end';
+  /** In pixels, with its unit. */
+  padding: string;
+  overflow: 'hidden';
+  whiteSpace: 'nowrap';
+  color: string;
+  /** In pixels, with its unit. */
+  fontSize: string;
+  // The layer draws in the page, so the page's own text rules are pinned where they would show.
+  lineHeight: '1.2';
+  fontStyle: 'normal';
+  fontWeight: '400';
+  letterSpacing: 'normal';
+  textTransform: 'none';
+  pointerEvents: 'none';
+  userSelect: 'none';
+};
+
+/** {@link FieldPlaceholderStyle} for text of `fontSize` points in a frame `height` pixels tall. */
+function placeholderStyle(
+  text: {
+    readonly fontSize: number | null;
+    readonly textAlign: 'left' | 'center' | 'right';
+    readonly multiline: boolean;
+  },
+  height: number,
+  scale: number,
+  color: string | undefined,
+): FieldPlaceholderStyle {
+  // The field's own size, 12 pt for one that fits its box, never taller than the box has room for.
+  const size = Math.min((text.fontSize || 12) * scale, height * 0.7);
+  return {
+    position: 'absolute',
+    inset: '0',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: text.multiline ? 'flex-start' : 'center',
+    justifyContent:
+      text.textAlign === 'center'
+        ? 'center'
+        : text.textAlign === 'right'
+          ? 'flex-end'
+          : 'flex-start',
+    padding: text.multiline ? `${2 * scale}px` : `0 ${2 * scale}px`,
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    color: paint(
+      'form-field-placeholder',
+      color ?? EPDF_VARIABLES['form-field-placeholder'].default,
+    ),
+    fontSize: `${size}px`,
+    lineHeight: '1.2',
+    fontStyle: 'normal',
+    fontWeight: '400',
+    letterSpacing: 'normal',
+    textTransform: 'none',
+    pointerEvents: 'none',
+    userSelect: 'none',
+  };
+}
+
+/**
+ * The style of what an empty field shows for its purpose, filling the widget's box at `frame`:
+ * in the field's own text size and alignment, at the top of a box for several lines. `color` is
+ * the form's `fields.placeholder` setting; `--epdf-form-field-placeholder` wins over it, and
+ * left out it is the built-in color. The words are the layer's paint, not the field's value:
+ * they take no pointer and no selection.
+ */
+export function fieldPlaceholderStyleOf(
+  field: { box: { width: number }; look: FieldLook; multiline?: boolean },
+  frame: PixelRect,
+  color?: string,
+): FieldPlaceholderStyle {
+  return placeholderStyle(
+    {
+      fontSize: field.look.fontSize,
+      textAlign: field.look.textAlign,
+      multiline: field.multiline ?? false,
+    },
+    frame.height,
+    scaleOf(field, frame),
+    color,
+  );
+}
+
+/**
+ * {@link fieldPlaceholderStyleOf} for a lent field's placeholder, in the record's own text size
+ * and alignment and the placeholder's own color. `box` is the record's frame in page points and
+ * `frame` the same frame in pixels (`frameInPixels`): the words are as large as the form layer
+ * writes them on the same field.
+ */
+export function recordPlaceholderStyleOf(
+  placeholder: FieldPlaceholder,
+  record: { readonly fontSize?: number | null; readonly textAlign?: string | null } | null,
+  box: { readonly width: number },
+  frame: { readonly width: number; readonly height: number },
+): FieldPlaceholderStyle {
+  const align = record?.textAlign;
+  return placeholderStyle(
+    {
+      fontSize: record?.fontSize ?? null,
+      textAlign: align === 'center' || align === 'right' ? align : 'left',
+      multiline: false,
+    },
+    frame.height,
+    box.width > 0 ? frame.width / box.width : 1,
+    placeholder.color,
+  );
+}
+
+/**
+ * The purposes that are the web's own names for a value: the HTML `autocomplete` tokens a
+ * field's purpose can be.
+ */
+const AUTOCOMPLETE_PURPOSES: ReadonlySet<string> = new Set([
+  'name',
+  'email',
+  'organization',
+  'organization-title',
+]);
+
+/**
+ * What a field's control says in `autocomplete`, from the field's purpose, so the browser can
+ * offer the person's saved value: the purpose itself where it is one of the web's names for a
+ * value (`name`, `email`, `organization`, `organization-title`), `undefined` for any other
+ * purpose and for none, which leaves the attribute out.
+ */
+export function autocompleteOf(purpose: string | null | undefined): string | undefined {
+  return purpose != null && AUTOCOMPLETE_PURPOSES.has(purpose) ? purpose : undefined;
 }
 
 // ── the widget's events ──────────────────────────────────────────────────────

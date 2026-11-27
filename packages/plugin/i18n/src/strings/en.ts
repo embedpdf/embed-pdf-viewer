@@ -54,7 +54,28 @@ export const en = {
       'form-combobox': 'Dropdown',
       'form-listbox': 'List box',
       'form-signature': 'Signature field',
+      'form-name': 'Name field',
+      'form-email': 'Email field',
+      'form-organization': 'Organization field',
+      'form-organization-title': 'Title field',
+      'form-date-signed': 'Date signed field',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Name',
+      email: 'Email',
+      organization: 'Organization',
+      'organization-title': 'Title',
+      'date-signed': 'Date signed',
+      signature: 'Signature',
+      initials: 'Initials',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Filled in when you sign' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'Anyone',
   },
   outline: { untitled: 'Untitled' },
 } as const;

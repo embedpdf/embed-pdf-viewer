@@ -155,6 +155,76 @@ The scripts read the form as the user sees it, values still on their way include
 read from the engine for them. Their engine starts when the first field of a form with scripts takes
 focus, so the first value doesn't wait for it; a form without scripts never starts it.
 
+## Dates
+
+A text field or a dropdown can say what shape its value has: its `format`. A date field is a text
+field with a date format, and a pattern such as `dd/mm/yyyy`:
+
+```ts
+const start = form.get(toFieldRef('start'));
+if (start?.kind === 'text') {
+  start.format; // { kind: 'date', pattern: 'dd/mm/yyyy' }
+}
+```
+
+In the PDF that is Acrobat's own date format. So a date field made in Acrobat is one here, and
+Acrobat shows its date picker on one made here. A format is one of these:
+
+- **`{ kind: 'date', pattern }` or `{ kind: 'time', pattern }`:** a date or a time, written the
+  way the [pattern](/docs/engine/forms/authoring#patterns) says.
+- **`{ kind: 'other' }`:** a format only the PDF's own script knows, such as a number format.
+- **`null`:** none. Any text goes.
+
+What people type into a date or a time field is checked against its pattern, and shown the way
+the pattern writes it: `5/3/26` in a `dd/mm/yyyy` field shows as `05/03/2026`. Text that is no
+date is refused like any value the form refuses: the field keeps its old value, and
+<Fw only={['react', 'vue', 'svelte']}>`onValidationRejected`</Fw><Fw only="angular">`validationRejected$`</Fw> fires.
+
+This works with JavaScript on or off. With it on, the field's own scripts do it. With it off, the
+form plugin checks and writes the date itself, with the same code those scripts run, so the PDF
+holds the same text either way. An `'other'` format needs its script: with JavaScript off, such a
+field takes any text.
+
+For a date picker of your own, `formatDate()` writes a date the way a pattern asks, and
+`parseDate()` reads one back:
+
+```ts
+const today = { year: 2026, month: 11, day: 24 };
+
+formatDate(today, 'dd/mm/yyyy'); // '24/11/2026'
+parseDate('5/3/26', 'dd/mm/yyyy', today);
+// { year: 2026, month: 3, day: 5, hour: 0, … }
+parseDate('soon', 'dd/mm/yyyy', today); // null
+```
+
+Both come from the same import as <Fw only={['react', 'vue', 'svelte']}>`useForm()`</Fw><Fw only="angular">`EpdfForm`</Fw>. A date is its parts as the field shows them, with no
+time zone, and `today` fills in what the text leaves out.
+[Show a calendar next to a date field](forms/controls#show-a-calendar-next-to-a-date-field) puts
+them to work, and a field gets its format when the form is
+[built](forms/building#change-a-fields-settings).
+
+## A field's look and its tint
+
+A field shows in two layers, one over the other.
+
+- **Its look is in the PDF:** its border, its background and the color of its text. Every PDF
+  app shows it, and it prints.
+- **Its tint is the viewer's,** a light fill and an edge over the look, never saved. It says
+  which fields are the user's to fill in. A field's tint is its
+  [group's color](#fields-for-several-people). A field [anyone fills in](#fields-anyone-fills-in)
+  takes `fields.anyoneTintColor`, a cyan at first. A field in no group takes
+  `fields.tintColor` when you give one; it's `null` at first, so such a field has no tint.
+
+While a user fills in the form, the viewer paints only the fields they fill in: the tint, an
+edge in `fields.border` on a field with no border of its own and no tint, and
+[what an empty field is for](forms/controls#placeholders). Every other field looks as the PDF
+has it and takes no input: another person's, a read-only one, a signature field that's signed,
+the date of signing, which the Date signed tool makes read-only, and a field a signature locked,
+whoever signed. So does every field `fillable` leaves out. In
+[design mode](forms/building#place-fields-for-a-signer) every field shows: in its tint, else with
+the `fields.border` edge, so a field with no look of its own shows too. How strongly a tint shows
+is `fields.tint`, and `0` turns tints off.
+
 ## Fields for several people
 
 When a form goes to several people, each fills in their own fields: a field can be in a
@@ -190,7 +260,9 @@ Call it where the document shows, so every document you open gets its own list:
 - **Each open document has its own list.** The same id can be one person in this document and
   another in the next.
 - **A group you don't name shows too,** in one of the eight colors and with no name. A field in no
-  group shows as the PDF has it.
+  group takes `fields.tintColor`, when you give one.
+- **A field anyone fills in is every signer's,** in a color of its own. See
+  [Fields anyone fills in](#fields-anyone-fills-in).
 
 For a legend of your own, <Fw only={['react', 'vue', 'svelte']}>`groups`</Fw><Fw only="angular">`form.groups()`</Fw> in the form's [state](#state) has every group you named, in your order, then
 every other group the form's fields are in, each as `{ id, label, color }`. A group you didn't
@@ -203,6 +275,84 @@ order, give each group its own.
 Names and colors stay in your app, never in the PDF. How strongly the fill shows is
 `fields.tint`, and `0` turns the colors off; see [Settings](#settings).
 [Place fields for a signer](forms/building#place-fields-for-a-signer) has a live example.
+
+### Fields anyone fills in
+
+A field can be for no one signer: a date either party may settle, a note anyone may add. It's
+[for anyone](/docs/engine/forms/groups#fields-anyone-fills-in) (its `assignment` is `{ kind: 'anyone' }`), in no group,
+and every user who may fill in some field fills it in: each signer, and the sender.
+
+- **It's every signer's to fill in,** so it shows on every signer's page in
+  `fields.anyoneTintColor`, a cyan at first. `null` gives it `fields.tintColor`, and
+  `--epdf-form-field-anyone-tint-color` wins over the setting.
+- **Screen readers read "Anyone" after its name,** in the viewer's language, where a group's
+  field reads its group's label: "Return by, Anyone". `listGroups()` and `groups` stay the
+  groups alone; put "Anyone" in your legend yourself.
+- **Once filled in and signed, it's locked.** Signing locks every field anyone fills in that
+  holds a value, so the next signer sees it as the PDF has it. An empty one stays open for the
+  next signer. See [Signing](/docs/engine/forms/groups#signing).
+- **A required one is on every signer's list** of [what's still to fill in](#check-required-fields)
+  until someone fills it in.
+- **`prefill()` leaves it alone:** a name, an address or a date is one signer's.
+
+[Place fields anyone fills in](forms/building#place-fields-anyone-fills-in) shows how to make one.
+
+## Values the app already knows
+
+A field can say what it's for: a name, an email address, the day of signing. That is its
+`purpose`, set when the form is [built](forms/building#what-a-field-is-for). For five purposes
+your app already has the answer, four of them in the user's
+[identity](concepts/permissions#where-the-limits-come-from):
+
+- **`name`** is filled in with the identity's `displayName`.
+- **`email`** with its `email`.
+- **`organization`** with its `organization`.
+- **`organization-title`** with its `title`.
+- **`date-signed`** with today's date, on the person's own device, in the field's date pattern,
+  else `yyyy-mm-dd`.
+
+`prefill()` writes them into the user's empty fields:
+
+```ts
+const { applied, skipped } = await form.prefill();
+```
+
+Call it when the person starts filling in, usually right after the document opens:
+
+<Snippet name="forms/prefill" />
+
+From then on they are values like any other. People see them, and change them unless the field
+is read-only.
+
+- **It is one change:** one request, and one step to undo.
+- **Only the user's own fields.** A field they may not fill in is another person's, and is left
+  for them. So is a field [anyone fills in](#fields-anyone-fills-in): the first signer to open
+  the document would put their name there for everyone.
+- **A field that has a value is left alone,** whoever wrote it. So calling `prefill()` twice
+  writes nothing the second time.
+- **A read-only field is filled in too.** Read-only stops people from typing, not your code: make
+  a name field read-only when the signer shouldn't change the name you know.
+- **The date is written, never asked.** A `date-signed` field is read-only, shows the date as
+  text, and says "Filled in when you sign" as its tooltip. It isn't on the list of
+  [what's still to fill in](#check-required-fields).
+- **A date already written stays,** as any value does: a person who comes back on a later day
+  keeps the date `prefill()` wrote the first time.
+- **Neither is a purpose of your own.** Any word is a purpose, and the field keeps it, but the
+  viewer has no value for a word it doesn't know. Write that field yourself, with `setValue()`.
+
+It resolves `{ applied, skipped, failed }`, as `setValues()` does. `applied` has the fields it
+wrote. `skipped` has the ones it left, each as `{ ref, reason }`: `'filled'` for a field that has
+a value, `'no-value'` when the app has nothing for its purpose, such as an identity without an
+email address, and `'for-anyone'` for a field anyone fills in.
+
+<Example name="form/purposes" />
+
+> **Try it:** as the sender, click the borrower's Name box to place a name field for Dana, then
+> pick **Date signed** and click the Date box under it. Pick **Ada Lovelace** and **Name**, and
+> click the Name box under "Approved by". Each empty field shows what it's for. Open the form as
+> **Dana Smith**: her name and today's date are filled in, and Ada's
+> field is left for Ada. Open it as **Ada Lovelace**: her name is filled in now, and Dana's field
+> holds what Dana left.
 
 ## Reset the form
 
@@ -262,11 +412,13 @@ on [Building forms](forms/building#methods).
 | `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
 | `setValues(entries)`       | Fills in several fields, each `{ ref, value }`, as one change with one recalculation; a field you may not fill in, or a value it can't take, fails on its own. Resolves `{ applied, skipped, failed }`. |
 | `importValues(values)`     | Fills in fields by full name from a plain object, as one change with one recalculation. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `prefill()`                | Fills in the user's empty fields whose purpose the app has a value for, as one change. Resolves `{ applied, skipped, failed }`. [Values the app already knows](#values-the-app-already-knows) |
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
 | `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `import(bundle, options?)` | Adds a bundle's fields, as one change and one step to undo. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
 | `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
 | `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
+| `listPurposes()`           | Every purpose the viewer knows, each as `{ id, label }`, the label in the viewer's language. [What a field is for](forms/building#what-a-field-is-for) |
 | `focus(ref, options?)`     | Brings a field into view and puts the cursor in it; `{ select: true }` selects its text. Returns `false` for a field the user can't fill in. [Move between fields](#move-between-fields) |
 | `focusNext(options?)`      | Moves the cursor to the next field, as Tab does: `{ backward, empty, wrap }`. Returns `false` when there's none. [Move between fields](#move-between-fields) |
 | `getFocusedField()`        | The field the cursor is in, or `null`                                                                                                          |
@@ -291,7 +443,8 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `focusedField`  | The field the cursor is in, or `null`; see [Move between fields](#move-between-fields)            | `getFocusedField()`                                  |
 | `selectedFields` | In design mode, every field with a selected box; see [Building forms](forms/building#give-fields-to-a-signer) | `listSelectedFields()` |
 | `groups`        | Every group you named or the form's fields are in, as `{ id, label, color }`; see [Fields for several people](#fields-for-several-people) | `listGroups()` |
-| `designGroup`   | In design mode, the group that fields placed with a tool go in, or `null` for none; see [Building forms](forms/building#place-fields-for-a-signer) | `getDesignGroup()` |
+| `designGroup`   | In design mode, the group that fields placed with a tool go in, or `null` for none, and while they are for anyone; see [Building forms](forms/building#place-fields-for-a-signer) | `getDesignGroup()` |
+| `designAssignment` | In design mode, who fields placed with a tool are for: a group, anyone or nobody; see [Building forms](forms/building#place-fields-anyone-fills-in) | `getDesignAssignment()` |
 
 For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
 
@@ -305,14 +458,19 @@ Set them when you register the plugin, and change them while the app runs with
 | :------------------ | :------------------------------------------------------------------------- | :--------------------------- | :----------------------------- |
 | `validation`        | Run the form's own checks (`'scripts'`), or accept every value (`'none'`)  | `'scripts'`                  | —                              |
 | `focus.color`       | The ring around the field being filled in                                  | the viewer's accent          | `--epdf-form-focus`            |
-| `fields.border`     | The edge of a field that has no border of its own                          | the viewer's accent at 55%   | `--epdf-form-field-border`     |
+| `fields.border`     | The edge of a field that has no border of its own and no tint: on the fields the user fills in, and on every field in design mode. See [A field's look and its tint](#a-fields-look-and-its-tint) | the viewer's accent at 55%   | `--epdf-form-field-border`     |
 | `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
 | `fillable`          | Which fields people fill in by hand: `true`, `false`, or field kinds       | `true`                       | —                              |
-| `fields.tint`       | How strongly a field shows its [group's color](#fields-for-several-people), from `0`, not at all, to `1` | `0.16`                       | `--epdf-form-field-tint`       |
+| `fields.tint`       | How strongly a field shows its [tint](#a-fields-look-and-its-tint), from `0`, not at all, to `1` | `0.16`                       | `--epdf-form-field-tint`       |
+| `fields.tintColor`  | The tint of a field in no group, a CSS color. `null` leaves such a field untinted. See [A field's look and its tint](#a-fields-look-and-its-tint) | `null`                       | `--epdf-form-field-tint-color` |
+| `fields.anyoneTintColor` | The tint of a field anyone fills in, a CSS color. `null` gives it `fields.tintColor`. See [Fields anyone fills in](#fields-anyone-fills-in) | `'#0891b2'` | `--epdf-form-field-anyone-tint-color` |
+| `fields.placeholder` | What an empty field shows for its [purpose](forms/building#what-a-field-is-for): the color of that text | `'rgb(31 42 68 / 0.55)'`      | `--epdf-form-field-placeholder` |
+| `tools`             | Your own field tools. [Make your own field tool](forms/building#make-your-own-field-tool) | `[]`                         | —                              |
 
-Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too,
-and a form with scripts logs a hint once.
+Scripts need JavaScript on in the actions plugin. Without it, `'scripts'` still checks a
+[date or a time](#dates) against its field's pattern and accepts every other value, and a form
+with scripts logs a hint once. `'none'` checks nothing, dates included.
 
 `fillable` is for the people using your app. A field it leaves out draws as a read-only field
 does, and takes no typing, clicks or picks; your code still fills it in with `setValue()` and
@@ -331,6 +489,8 @@ of the scope (see [Permissions](#permissions)).
 The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
 [Building forms](forms/building)). A CSS variable wins over the setting: see
 [Colors & theming](ui/theming).
+
+`tools` is read when a document opens, so set it when you register the plugin.
 
 <Example name="form/colors" />
 
@@ -360,7 +520,8 @@ Fields that are added, changed or removed have their own events; see
 Without it, the fields show their values but can't be changed. A user with a `fields:fill`
 permission for one group fills in that group's fields only: `form.canFill(ref)` answers per field,
 the other fields can't be changed and Tab skips them, `validate()` leaves them out, and `reset()`
-leaves them as they are. See [Signers and groups](/docs/engine/forms/groups).
+leaves them as they are. A field [anyone fills in](#fields-anyone-fills-in) is theirs too. See
+[Signers and groups](/docs/engine/forms/groups).
 
 ## Good to know
 
@@ -382,7 +543,8 @@ Each control is named by the field's tooltip (its `alternateName`), or by its na
 none. A radio button adds the option it stands for, its export value, the way screen readers read
 one in Acrobat: `Plan: monthly`. It also says where it comes in its group (`1 of 2`, in the order
 the arrow keys go round), since a group's buttons stand apart on the page. A field of a
-[group you named](#fields-for-several-people) says whose it is last: `Plan: monthly, Dana Smith`.
+[group you named](#fields-for-several-people) says whose it is last: `Plan: monthly, Dana Smith`,
+and a field [anyone fills in](#fields-anyone-fills-in) says `Anyone`.
 When you draw the fields
 yourself, each entry of `listWidgets(page)` carries the name as `label`, and a radio button its
 place as `inGroup`, `{ position, size }`, for `aria-posinset` and `aria-setsize`.

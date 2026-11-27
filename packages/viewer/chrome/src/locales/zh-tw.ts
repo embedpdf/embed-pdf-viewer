@@ -471,6 +471,11 @@ export const zhTW: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': '簽署時填入' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: '任何人',
       settings: {
         name: '名稱',
         tooltip: '工具提示',
@@ -478,6 +483,9 @@ export const zhTW: Locale = {
         readOnly: '唯讀',
         noExport: '不匯出',
         group: '填寫人',
+        assignment: '填寫人',
+        purpose: '用途',
+        format: '格式',
         defaultValue: '預設值',
         maxLength: '長度上限',
         multiline: '多行',

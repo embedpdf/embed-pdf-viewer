@@ -42,7 +42,7 @@ export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
 
 import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
-import { instanceClock, timerClock, type Cancel, type HostClock } from './clock';
+import { instanceClock, timerClock, type CalendarDay, type Cancel, type HostClock } from './clock';
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';
@@ -529,10 +529,9 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         throw permissionDenied(id, permission, operation);
       }
     },
-    allowsField: (action, field) =>
-      requireDoc().security.allowsField(action, { groupId: field.groupId }),
+    allowsField: (action, field) => requireDoc().security.allowsField(action, field),
     assertAllowedField: (action, field, operation) => {
-      if (!requireDoc().security.allowsField(action, { groupId: field.groupId })) {
+      if (!requireDoc().security.allowsField(action, field)) {
         throw fieldPermissionDenied(id, action, field, operation);
       }
     },
@@ -579,9 +578,10 @@ export interface ManualClock {
 
 /**
  * Time that moves only when the test moves it. `frames: false` gives a host
- * that never paints, as Node is.
+ * that never paints, as Node is. `today` is the day its calendar says, for a
+ * plugin that writes a date; without it, the device's.
  */
-export function manualClock(options: { frames?: boolean } = {}): ManualClock {
+export function manualClock(options: { frames?: boolean; today?: CalendarDay } = {}): ManualClock {
   let now = 0;
   let order = 0;
   const timers = new Map<number, { due: number; run: () => void }>();
@@ -622,6 +622,7 @@ export function manualClock(options: { frames?: boolean } = {}): ManualClock {
             return () => void frames.delete(id);
           },
         }),
+    ...(options.today ? { today: () => options.today! } : {}),
   };
   return {
     clock,

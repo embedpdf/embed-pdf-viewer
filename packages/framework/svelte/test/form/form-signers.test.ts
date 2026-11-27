@@ -24,6 +24,9 @@ import FormDesignHarness from '../fixtures/FormDesignHarness.svelte';
 import { signal } from '../fixtures/signal.svelte';
 import { latest, viewerWith } from '../fixtures/viewer';
 
+/** The buyer's group, as an assignment. */
+const BUYER_ASSIGNMENT = { kind: 'group', groupId: 'buyer' } as const;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const packages = resolve(here, '..', '..', '..', '..');
 const blank = resolve(packages, 'engine', 'main', 'test', 'fixtures', 'hello_world.pdf');
@@ -54,7 +57,7 @@ describe('fields for several people', () => {
         runtime: { prefer: 'wasm', wasmBinary },
       })) as unknown as Engine;
       const page = signal<PageContextValue | null>(null);
-      const states: Pick<FormState, 'designGroup' | 'groups'>[] = [];
+      const states: Pick<FormState, 'designGroup' | 'designAssignment' | 'groups'>[] = [];
       const changes: FormDesignGroupChangedEvent[] = [];
       const { kernel, view } = await viewerWith(
         [interactionPlugin(), annotationPlugin(), formPlugin()],
@@ -73,6 +76,7 @@ describe('fields for several people', () => {
               // Each field is read on its own: the state is one object whose fields are getters.
               pick: (state: unknown) => ({
                 designGroup: (state as FormState).designGroup,
+                designAssignment: (state as FormState).designAssignment,
                 groups: (state as FormState).groups,
               }),
               seen: states,
@@ -147,7 +151,22 @@ describe('fields for several people', () => {
         form.setDesignGroup('buyer');
         flushSync();
         expect(latest(states).designGroup).toBe('buyer');
-        expect(changes).toEqual([{ groupId: 'buyer' }]);
+        expect(latest(states).designAssignment).toEqual(BUYER_ASSIGNMENT);
+        // For anyone: in no group. Naming a group again is that group's.
+        form.setDesignAssignment({ kind: 'anyone' });
+        flushSync();
+        expect(latest(states)).toMatchObject({
+          designGroup: null,
+          designAssignment: { kind: 'anyone' },
+        });
+        form.setDesignGroup('buyer');
+        flushSync();
+        expect(latest(states).designAssignment).toEqual(BUYER_ASSIGNMENT);
+        expect(changes).toEqual([
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+          { groupId: null, assignment: { kind: 'anyone' } },
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+        ]);
 
         // Design mode: the fields are lent to the annotation layer, which shows the buyer's
         // field in the buyer's color, above its drawing, and the other field with none.

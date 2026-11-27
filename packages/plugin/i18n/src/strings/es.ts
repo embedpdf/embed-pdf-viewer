@@ -58,7 +58,28 @@ export const es: EmbedpdfStrings = {
       'form-combobox': 'Lista desplegable',
       'form-listbox': 'Cuadro de lista',
       'form-signature': 'Campo de firma',
+      'form-name': 'Campo de nombre',
+      'form-email': 'Campo de correo electrónico',
+      'form-organization': 'Campo de organización',
+      'form-organization-title': 'Campo de cargo',
+      'form-date-signed': 'Campo de fecha de firma',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Nombre',
+      email: 'Correo electrónico',
+      organization: 'Organización',
+      'organization-title': 'Cargo',
+      'date-signed': 'Fecha de firma',
+      signature: 'Firma',
+      initials: 'Iniciales',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Se rellena al firmar' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'Cualquiera',
   },
   outline: { untitled: 'Sin título' },
 };

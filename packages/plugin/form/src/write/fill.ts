@@ -10,6 +10,10 @@
  * the view while the engine answers it. A validation refusal cancels the change. A change the
  * engine refuses leaves the view, and the calculations run again against what is left, outside
  * the history: the fills after it were calculated with its values.
+ *
+ * Where the document's scripts don't run (no JavaScript), a date or a time field's value still
+ * goes through the field's own check (write/own-format.ts): refused like a script refuses it,
+ * or written with the text its format shows.
  */
 import {
   PluginError,
@@ -30,8 +34,9 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
+import { ownFormatOf } from './own-format';
 import type { FormCommitResult } from '../contract';
-import { fieldByKey, fieldKeyOf, type FieldIndex } from '../model';
+import { fieldByKey, fieldByRef, fieldKeyOf, type FieldIndex } from '../model';
 import type { FormScriptResult, FormScripts } from '../scripting/controller';
 import { scriptError } from '../scripting/results';
 import type { FormContext, FormServices } from '../services';
@@ -82,6 +87,8 @@ interface Begun {
 /** A fill sent, waiting for the engine. */
 interface Sent {
   readonly script: FormScriptResult | null;
+  /** `false` when `script` is the plugin's own check of a format, and no script ran. */
+  readonly scripted?: boolean;
   /** The changes it was sent as: one, or two when the hold went before the scripts finished. */
   readonly changes: readonly PendingChange[];
   readonly after: FieldIndex;
@@ -209,6 +216,38 @@ export function createFill(
     }
   };
 
+  /**
+   * Steps 2 and 3 for a value whose scripts don't run, though the form's checks are on: the
+   * field's own date or time check stands in for its keystroke and format scripts.
+   */
+  const finishUnscripted = (begun: Begun, plan: FillScripts): Sent => {
+    const { request, hold } = begun;
+    const field =
+      plan.kind === 'commit' && ctx.settings().get().validation === 'scripts'
+        ? fieldByRef(baseOf(begun), plan.field)
+        : null;
+    const own =
+      field && plan.kind === 'commit' ? ownFormatOf(field, plan.value, ctx.clock.today()) : null;
+    if (!field || plan.kind !== 'commit' || !own) return send(begun, request.ops, null);
+    if (own.status === 'accepted') {
+      // The value under the field's own ref, then what it shows: the ops its scripts would make.
+      const value: ChangeOp = { type: 'forms.setValue', field: field.ref, value: plan.value };
+      return send(begun, [value, ...own.ops], null);
+    }
+    const early = sentEarly(begun);
+    hold?.cancel();
+    if (early) takeBack(begun);
+    const script: FormScriptResult = {
+      status: 'rejected',
+      effects: [],
+      bootEffects: [],
+      uiEffects: [{ type: 'alert', message: own.message, icon: 0, phase: 'user' }],
+      diagnostics: [own.diagnostic],
+    };
+    scripting.surface(script, request.origin);
+    return { script, scripted: false, changes: [], after: fields.view() };
+  };
+
   /** Steps 2 and 3, when the fill's turn comes. */
   const finish = async (begun: Begun): Promise<Sent> => {
     const { request, hold } = begun;
@@ -219,7 +258,8 @@ export function createFill(
       : plan.kind === 'activate'
         ? scripting.controller()
         : scripting.scriptsFor(fields.view());
-    if (!plan || !pipeline) return send(begun, request.ops, null);
+    if (!plan) return send(begun, request.ops, null);
+    if (!pipeline) return finishUnscripted(begun, plan);
     if (!fields.view().snapshot) await fields.settled();
     try {
       // The ops are set inside the realm transaction: the next one reads the form with them.
@@ -263,7 +303,7 @@ export function createFill(
   /** What a sent fill did, once the engine answered. */
   const answered = async (begun: Begun, sent: Sent): Promise<FillOutcome> => {
     const { script } = sent;
-    const scripted = script !== null;
+    const scripted = sent.scripted ?? script !== null;
     const reported = {
       scripted,
       uiEffects: script?.uiEffects ?? [],

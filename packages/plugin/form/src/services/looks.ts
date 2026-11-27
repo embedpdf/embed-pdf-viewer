@@ -153,9 +153,18 @@ export function createWidgetLooks({
     rotation: number | null | undefined,
     now = false,
   ): readonly SceneNode[] | null => {
-    const view = fields.view();
-    const field = fieldForWidget(view, numberOf(row.ref));
-    if (!field) return null;
+    const field = fieldForWidget(fields.view(), numberOf(row.ref));
+    return field ? paintIn(row, field, box, rotation, now) : null;
+  };
+
+  /** {@link paint} with the field given: one the view has, or one a tool would place. */
+  const paintIn = (
+    row: WidgetAnnotation,
+    field: FormField,
+    box: Box,
+    rotation: number | null | undefined,
+    now: boolean,
+  ): readonly SceneNode[] | null => {
     const text = formatted.textOf(field);
     const shown: ShownValue = text === null ? {} : { text };
     const painted = paintFontsOf(row, widgetText(row, field, shown));
@@ -204,6 +213,16 @@ export function createWidgetLooks({
     };
   };
 
+  /**
+   * How the painter draws `row` of `field` live, upright in a box (where a gesture has it);
+   * `null` for a field it doesn't draw, or a mark in the box, which only its picture shows.
+   */
+  const painterIn = (
+    row: WidgetAnnotation,
+    field: FormField,
+  ): ((box: Box) => readonly SceneNode[]) | null =>
+    paints(field) && !row.hasMark ? (box) => paintIn(row, field, box, 0, true) ?? [] : null;
+
   return {
     listShownWidgets: (pageObjectNumber: number) => shownOn(pageObjectNumber),
     getWidgetPainting: (ref: AnnotationRef) => sceneOf(numberOf(ref)),
@@ -218,10 +237,10 @@ export function createWidgetLooks({
      */
     painterOf: (row: WidgetAnnotation): ((box: Box) => readonly SceneNode[]) | null => {
       const field = fieldForWidget(fields.view(), numberOf(row.ref));
-      return field && paints(field) && !row.hasMark
-        ? (box) => paint(row, box, 0, true) ?? []
-        : null;
+      return field ? painterIn(row, field) : null;
     },
+    /** How the painter draws a field a tool would place: `row` and `field` as `forms.create` makes them. */
+    painterIn,
     getTextEditorLayout: (ref: AnnotationRef, text: string): TextEditorLayout | null => {
       const view = fields.view();
       const number = numberOf(ref);

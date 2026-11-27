@@ -16,6 +16,7 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
+import { grouped } from './helpers/grouped';
 import {
   FORM_DEFAULTS,
   type FormConfig,
@@ -66,7 +67,7 @@ const text = (
   password: false,
   comb: false,
   format: null,
-  ...over,
+  ...grouped(over),
 });
 
 const signature = (
@@ -80,7 +81,7 @@ const signature = (
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(objectNumber + 100, PAGE)],
-  ...over,
+  ...grouped(over),
 });
 
 const button = (
@@ -95,7 +96,7 @@ const button = (
     valueEntry: { kind: 'none' },
     defaultValueEntry: { kind: 'none' },
     widgets: [formWidget(objectNumber + 100, PAGE)],
-    ...over,
+    ...grouped(over),
   }) as FormField;
 
 /** A radio group with two buttons, `monthly` and `yearly`. */
@@ -128,7 +129,7 @@ const radio = (
     value: 'Off',
     radiosInUnison: false,
     noToggleToOff: true,
-    ...over,
+    ...grouped(over),
   }) as FormField;
 
 /** The form of these fields, each widget a row on page 1. */
@@ -206,6 +207,8 @@ async function boot(fields: readonly FormField[], session: Session = {}, config?
           const allowed = right === 'fill' ? fill : right === 'sign' ? sign : setGroup;
           return allowed === '*' || (allowed as readonly (string | null)[]).includes(groupId);
         },
+        // Every group, or the ones named: what a form designer offers.
+        fieldRights: () => ({ setGroup: setGroup === '*' ? { all: true } : { all: false } }),
       },
     } as never,
   });
@@ -369,7 +372,11 @@ describe('who new fields are placed for', () => {
     form.setDesignGroup('buyer');
     form.setDesignGroup('seller');
     form.setDesignGroup(null);
-    expect(events).toEqual([{ groupId: 'buyer' }, { groupId: 'seller' }, { groupId: null }]);
+    expect(events).toEqual([
+      { groupId: 'buyer', assignment: { kind: 'group', groupId: 'buyer' } },
+      { groupId: 'seller', assignment: { kind: 'group', groupId: 'seller' } },
+      { groupId: null, assignment: { kind: 'unassigned' } },
+    ]);
   });
 
   it('is in the form’s state, beside the groups', async () => {
@@ -622,13 +629,20 @@ describe('a box’s accent', () => {
     expect(accents(form)).toEqual([null, accent('#2563eb')]);
   });
 
-  it('does not follow the `fillable` setting: the field is still the user’s', async () => {
+  it('follows the `fillable` setting: a box that takes no input is not the user’s to fill in', async () => {
     const form = await loaded(
       fields,
       { fill: ['buyer'], groups: BUYER_AND_SELLER },
       { fillable: false },
     );
-    expect(form.listWidgets(PAGE)[0]).toMatchObject({ accent: accent('#2563eb'), disabled: true });
+    expect(form.listWidgets(PAGE)[0]).toMatchObject({
+      canFill: true,
+      yours: false,
+      accent: null,
+      disabled: true,
+    });
+    form.updateSettings({ fillable: true });
+    expect(form.listWidgets(PAGE)[0]).toMatchObject({ yours: true, accent: accent('#2563eb') });
   });
 });
 

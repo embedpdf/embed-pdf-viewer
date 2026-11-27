@@ -202,6 +202,14 @@ describe('a lent form widget', () => {
     const [plain] = pageItems(modelWith([widget()]), PAGE);
     expect(plain).not.toHaveProperty('accent');
   });
+
+  it('carries the placeholder its lender gives it to its render item, and none without one', () => {
+    const placeholder = { text: 'Name', color: 'rgb(31 42 68 / 0.55)' };
+    const [empty] = pageItems(modelWith([widget({ placeholder })]), PAGE);
+    expect(empty!.placeholder).toBe(placeholder);
+    const [plain] = pageItems(modelWith([widget()]), PAGE);
+    expect(plain).not.toHaveProperty('placeholder');
+  });
 });
 
 describe('a new record', () => {

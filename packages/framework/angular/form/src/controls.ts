@@ -17,6 +17,9 @@
  *   signature  with the signature plugin, "sign here" on an empty field, and the signature's
  *              details on a signed one
  *
+ * An empty text box, dropdown or signature field with a purpose shows the purpose's name
+ * (`item.placeholder`), as the layer's paint over the picture.
+ *
  * The text-editing, toggle and list policies, the field looks, the controls' styles and the
  * colors are `@embedpdf/web`'s, the same for every framework.
  */
@@ -33,15 +36,25 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { CapabilityBinding, injectFontMounts, injectKernelHost } from '@embedpdf/angular/runtime';
+import {
+  CapabilityBinding,
+  injectFontMounts,
+  injectKernelHost,
+  injectPage,
+} from '@embedpdf/angular/runtime';
 import { FontsToken } from '@embedpdf/plugin-fonts/contract';
+import type { FormWidgetItem } from '@embedpdf/plugin-form';
+import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  autocompleteOf,
   createTextFieldEditor,
+  fieldPlaceholderStyleOf,
   FORM_CONTROL_FILL,
   formFocusRingStyleOf,
   listBoxControlStyleOf,
   pressToggle,
+  rectInPixels,
   textFieldEditorStyleOf,
   type TextFieldEditorState,
 } from '@embedpdf/web';
@@ -70,13 +83,51 @@ export class FormFocusRing {
   protected readonly ringStyle = computed(() => formFocusRingStyleOf(this.color()));
 }
 
+/**
+ * What an empty field shows for its purpose: the layer's paint over the field's picture, never
+ * the field's value. Mounted only for a box that has a placeholder, so a form without purposes
+ * draws what it drew before. Its color is the form's `fields.placeholder`.
+ */
+@Component({
+  selector: 'span[epdfFormPlaceholder]',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    'aria-hidden': 'true',
+    'data-epdf-placeholder': '',
+    '[style]': 'placeholderStyle()',
+  },
+  template: '{{ item().placeholder }}',
+})
+export class FormFieldPlaceholder {
+  /** The widget whose field is empty: its box, its look and the words. */
+  readonly item = input.required<FormWidgetItem>();
+
+  private readonly page = injectPage('<epdf-form-layer>');
+  /** The form's `fields.placeholder` setting, for the page's own document. */
+  private readonly color = new CapabilityBinding(
+    injectKernelHost('<epdf-form-layer>'),
+    () => FormHostToken,
+    () => this.page.documentId,
+  ).select((form): string | undefined => form.getSettings().fields.placeholder, undefined);
+
+  protected readonly placeholderStyle = computed(() => {
+    const item = this.item();
+    return fieldPlaceholderStyleOf(
+      item,
+      rectInPixels(item.box, this.page.transform()),
+      this.color(),
+    );
+  });
+}
+
 /** A text box: the picture at rest, an editor in the field's own font while focused. */
 @Component({
   selector: 'div[epdfFormText]',
+  imports: [FormFieldPlaceholder],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // A click runs the widget's action too, as in Acrobat: the editor's focus click bubbles
-  // here, and a read-only field's lands here directly.
-  host: { '(click)': 'activate()' },
+  // here, and a read-only field's lands here directly. A field's hint is the box's tooltip.
+  host: { '(click)': 'activate()', '[attr.title]': 'item().hint' },
   template: `
     @if (item().multiline) {
       <textarea
@@ -84,6 +135,9 @@ export class FormFocusRing {
         [value]="state().draft"
         [attr.maxlength]="item().maxLength"
         [attr.aria-label]="item().label"
+        [attr.autocomplete]="autocomplete()"
+        [attr.aria-placeholder]="item().placeholder"
+        [attr.aria-description]="item().hint"
         [disabled]="item().disabled"
         [style]="editorStyle()"
         (focus)="editor()?.focus()"
@@ -98,6 +152,9 @@ export class FormFocusRing {
         [value]="state().draft"
         [attr.maxlength]="item().maxLength"
         [attr.aria-label]="item().label"
+        [attr.autocomplete]="autocomplete()"
+        [attr.aria-placeholder]="item().placeholder"
+        [attr.aria-description]="item().hint"
         [disabled]="item().disabled"
         [style]="editorStyle()"
         (focus)="editor()?.focus()"
@@ -105,6 +162,10 @@ export class FormFocusRing {
         (blur)="editor()?.blur()"
         (keydown)="keyDown($event, field)"
       />
+    }
+    <!-- Above the editor, which is opaque while focused; gone with the first character typed. -->
+    @if (item().placeholder !== null && state().draft === '') {
+      <span epdfFormPlaceholder [item]="item()"></span>
     }
   `,
 })
@@ -123,6 +184,13 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
   });
 
   protected readonly state = signal<TextFieldEditorState>({ focused: false, draft: '' });
+
+  /**
+   * What the field is for, as the web names it, so the browser may offer the person's saved
+   * value; left out for any other purpose. A screen reader hears what an empty box asks for
+   * in `aria-placeholder`.
+   */
+  protected readonly autocomplete = computed(() => autocompleteOf(this.item().purpose));
 
   /** The fonts plugin's epoch: the field's fonts were found, so it's laid out again. */
   private readonly paintFonts = new CapabilityBinding(
@@ -223,13 +291,14 @@ export class FormToggleControl extends FormWidgetBox<WidgetOf<'toggle'>> {
 /** A dropdown: an invisible native select over the field's picture. */
 @Component({
   selector: 'div[epdfFormCombo]',
-  imports: [FormFocusRing],
+  imports: [FormFocusRing, FormFieldPlaceholder],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(click)': 'activate()' },
+  host: { '(click)': 'activate()', '[attr.title]': 'item().hint' },
   template: `
     <select
       #select
       [attr.aria-label]="item().label"
+      [attr.aria-description]="item().hint"
       [disabled]="item().disabled"
       [style]="selectStyle()"
       (focus)="focused.set(true)"
@@ -243,6 +312,9 @@ export class FormToggleControl extends FormWidgetBox<WidgetOf<'toggle'>> {
         <option [value]="option.value">{{ option.label }}</option>
       }
     </select>
+    @if (item().placeholder !== null) {
+      <span epdfFormPlaceholder [item]="item()"></span>
+    }
     @if (focused()) {
       <span epdfFormFocusRing [color]="colors().focus"></span>
     }
@@ -383,6 +455,7 @@ export class FormButtonControl extends FormWidgetBox<WidgetOf<'button'>> {
  */
 @Component({
   selector: 'div[epdfFormSignature]',
+  imports: [FormFieldPlaceholder],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[style.cursor]': "actionable() ? 'pointer' : 'default'" },
   template: `
@@ -394,6 +467,9 @@ export class FormButtonControl extends FormWidgetBox<WidgetOf<'button'>> {
         [style]="buttonStyle"
         (click)="open()"
       ></button>
+    }
+    @if (item().placeholder !== null) {
+      <span epdfFormPlaceholder [item]="item()"></span>
     }
   `,
 })

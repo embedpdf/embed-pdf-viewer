@@ -438,11 +438,16 @@ describe('design through lending', () => {
         'required',
         'readOnly',
         'noExport',
+        // Who fills it in, whole: nobody, or anyone, while the user may make such a field.
+        'assignment',
+        // What the field is for, and the shape of a text field's value: new with the engine's two facts.
+        'purpose',
         'defaultValue',
         'maxLength',
         'multiline',
         'password',
         'comb',
+        'format',
       ]);
       // Each label has its translation key, as a panel reads it.
       for (const setting of settings.properties) {

@@ -53,7 +53,28 @@ export const ja: EmbedpdfStrings = {
       'form-combobox': 'ドロップダウン',
       'form-listbox': 'リストボックス',
       'form-signature': '署名フィールド',
+      'form-name': '氏名フィールド',
+      'form-email': 'メールフィールド',
+      'form-organization': '組織フィールド',
+      'form-organization-title': '役職フィールド',
+      'form-date-signed': '署名日フィールド',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: '氏名',
+      email: 'メールアドレス',
+      organization: '組織',
+      'organization-title': '役職',
+      'date-signed': '署名日',
+      signature: '署名',
+      initials: 'イニシャル',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': '署名時に入力されます' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: '誰でも',
   },
   outline: { untitled: '無題' },
 };

@@ -80,7 +80,10 @@ form.setDesignGroup('buyer'); // fields placed with a tool are Dana's
 
 <Snippet name="forms/signing-flow/sender-toolbar" />
 
-While you design, every field shows in its group's color. A field placed with a tool goes into
+While you design, every field shows: in its group's color, in `fields.tintColor` when it's in
+no group, else with an edge in `fields.border`, so a field with no border or background of its own
+shows too. Before you click, a field tool shows the field it places where it will land,
+see-through: its look, the color of the group you place for, and what it's for. A field placed with a tool goes into
 the group you set, which the form's state has as <Fw only={['react', 'vue', 'svelte']}>`designGroup`</Fw><Fw only="angular">`form.designGroup()`</Fw>. With `null`, where it starts, it names
 no group, and a placed field is in none.
 
@@ -96,9 +99,11 @@ design the form may leave a field in none, or take it out of its group.
 
 > **Try it:** as the sender, click the borrower's Name box to place a text field for Dana, then
 > pick Signature and click her Signature box. Pick Ada and do the same under "Approved by": each
-> field shows in its signer's color. Then open the form as Dana. Her fields stand out, her name
-> box takes her typing, and Ada's show as the PDF has them. Click Dana's signature field, or Tab
-> to it and press Space, draw a signature in the card and press Sign.
+> field shows in its signer's color. Pick **Anyone**: Signature turns off. Place a text field in
+> the "Return by" box; it shows in cyan. Then open the form as Dana. Her fields and the
+> Anyone field stand out, both take her typing, and Ada's show as the PDF has them. Click Dana's
+> signature field, or Tab to it and press Space, draw a signature in the card and press Sign.
+> Open it as Ada: the Anyone field is hers to fill in too.
 
 The signers can sign because the example also has the [signature plugin](signatures): an empty
 signature field is a button, and pressing it makes the field the
@@ -113,6 +118,40 @@ for each person, with theirs.
 
 </Engine>
 
+### Place fields anyone fills in
+
+Some fields are no one signer's: a date either party may settle, a note anyone may add. Such a
+field is [for anyone](/docs/engine/forms/groups#fields-anyone-fills-in): it's in no group, and
+every signer fills it in. Who a field is for is its `assignment`, one of three:
+`{ kind: 'group', groupId }`, `{ kind: 'anyone' }`, or `{ kind: 'unassigned' }` for nobody, the
+sender's. Place the next fields for anyone:
+
+```ts
+form.setDesignAssignment({ kind: 'anyone' }); // fields placed with a tool are anyone's
+form.setDesignGroup('buyer'); // back to Dana's
+```
+
+- **One assignment at a time.** `setDesignGroup(groupId)` is short for
+  `setDesignAssignment({ kind: 'group', groupId })`, and `setDesignGroup(null)` for
+  `{ kind: 'unassigned' }`. The form's state has both, as
+  <Fw only={['react', 'vue', 'svelte']}>`designAssignment` and `designGroup`</Fw><Fw only="angular">`form.designAssignment()` and `form.designGroup()`</Fw>, the group's id, or `null` while
+  the fields are for anyone or for nobody.
+  <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw> carries `{ groupId, assignment }`.
+- **The signature tool places nothing meanwhile.** One signer signs a signature field, so it is
+  never for anyone: the tool shows no field before you click, and a click goes on to the other
+  tools. Turn its button off while the design assignment is anyone.
+- **It shows in a color of its own,** `fields.anyoneTintColor`, a cyan at first: in design
+  mode, before you click, and on every signer's page. Screen readers read "Anyone" after its
+  name, in the viewer's language.
+- **It takes the right to put fields in every group,** `fields:set-group:all`, since every
+  group's signers fill it in. `form.canAssign({ kind: 'anyone' })` says whether the user has it,
+  and `setDesignAssignment()` refuses without it, as `assign()`, `create()` and `update()` do. A
+  group takes what `canSetGroup()` says, and nobody takes no such permission.
+
+Signing [locks](/docs/engine/forms/groups#signing) a field anyone fills in once it holds a value;
+an empty one stays open for the next signer. `prefill()` leaves it alone: a name or a date is one
+signer's.
+
 ### Give fields to a signer
 
 A form made somewhere else, in Acrobat for example, arrives with its fields in no group. Move one
@@ -121,16 +160,129 @@ like any setting, and `null` takes it out of its group again:
 ```ts
 await form.update(field.ref, { groupId: 'seller' });
 await form.update(field.ref, { groupId: null }); // nobody's
+await form.update(field.ref, { assignment: { kind: 'anyone' } }); // anyone's
 ```
+
+A field has one assignment: `assignment` replaces whatever it had, and so does `groupId`, which
+reads `null` for a field anyone fills in. Name one of the two in a change, not both.
 
 Or move every selected field in one call, which is one step to undo:
 
 <Snippet name="forms/signing-flow/move-selected" />
 
 <Fw only={['react', 'vue', 'svelte']}>`selectedFields`</Fw><Fw only="angular">`form.selectedFields()`</Fw> in the form's state has every field with a selected box, and `form.listSelectedFields()`
-reads it once. `moveToGroup(fields, groupId)` leaves out the fields already in the group, shows
-the rest in their new color at once, and resolves `{ fields }` as they are now. With `null` it
-takes the fields out of their group.
+reads it once. `assign(fields, assignment)` gives them an assignment, as one step to undo: it
+leaves out the fields that have it already, shows the rest in their new color at once, and
+resolves `{ fields }` as they are now. It refuses `{ kind: 'anyone' }` with `invalid-input` when
+one of the fields is a signature field, and moves nothing then. `moveToGroup(fields, groupId)` is
+short for `assign()` with that group, or with nobody for `null`.
+
+## What a field is for
+
+A field's `purpose` says what its value means, in a word the viewer and your app both read. It's
+saved in the PDF with the field, and other PDF apps ignore it:
+
+```ts
+await form.update(field.ref, { purpose: 'email' });
+await form.update(field.ref, { purpose: null }); // none
+```
+
+Any word is a purpose. These are the ones the viewer knows:
+
+| Purpose              | The value is                  |
+| :------------------- | :---------------------------- |
+| `name`               | The person's full name        |
+| `email`              | Their email address           |
+| `organization`       | Their company or organization |
+| `organization-title` | Their job title               |
+| `date-signed`        | The day they signed           |
+| `signature`          | Their signature               |
+| `initials`           | Their initials                |
+
+A purpose doesn't change what the field is: a name is still a text box. It does three things:
+
+- **An empty field shows what it's for.** The form layer writes the purpose's name in it, such as
+  "Email", until it has a value. The text is the layer's paint and never part of the PDF. Its
+  color is [`fields.placeholder`](../forms#settings).
+- **Your app can fill it in.** [`prefill()`](../forms#values-the-app-already-knows) writes the
+  user's name, email address, organization and job title into their fields, and today's date.
+- **The browser can help.** For the first four, the layer's text box says so with `autocomplete`,
+  so the browser offers the person's saved name or email address. They are the web's own names
+  for these values.
+
+A word of your own is saved and read back like these. The viewer has no name and no value for
+it, so its field shows no placeholder and `prefill()` leaves it alone: it is for your app to
+read.
+
+`form.listPurposes()` gives every purpose the viewer knows, each as `{ id, label }` with the
+label in the viewer's language.
+
+A tool for each kind of value places a text box with its purpose:
+
+| Tool                      | Places                                 | A click makes |
+| :------------------------ | :------------------------------------- | :------------ |
+| `form-name`               | A text box for the person's name       | 160 × 24      |
+| `form-email`              | A text box for their email address     | 160 × 24      |
+| `form-organization`       | A text box for their organization      | 160 × 24      |
+| `form-organization-title` | A text box for their job title         | 160 × 24      |
+| `form-date-signed`        | A read-only date field, `yyyy-mm-dd`   | 100 × 24      |
+
+Each is `form-` and its purpose. Apart from the purpose they place what `form-text` places, in
+the [group you place for](#place-fields-for-a-signer). The date field is read-only because the
+day of signing is written for the signer, not typed: `prefill()` writes today's date into it,
+and the signer sees it as text, with the tooltip "Filled in when you sign".
+
+### Make your own field tool
+
+A tool of your own `extends` a field tool and starts from it:
+
+```ts
+formPlugin({
+  tools: [
+    {
+      id: 'form-company-number',
+      extends: 'form-text',
+      field: { purpose: 'company-number', required: true },
+    },
+    {
+      id: 'form-date',
+      extends: 'form-text',
+      field: {
+        format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+      },
+      clickCreate: { width: 100, height: 24 },
+    },
+  ],
+});
+
+interaction.activateTool('form-date');
+```
+
+- **`extends`** names a field tool listed before it: a built-in one, or one of yours.
+- **`field`** is what every field the tool places starts with: any setting `create()` takes
+  except its kind, its name, its boxes and its group.
+- **`defaults`** is how its box looks, as for
+  [an annotation tool](../annotations/tools#make-your-own-tool).
+- **`clickCreate`** is the size a click makes, in points.
+
+An entry with the id of an existing tool and no `extends` changes that tool. With `extends`,
+that id is refused when the document opens: `extends` adds a tool, and never replaces one. This
+gives the built-in date field another pattern:
+
+```ts
+formPlugin({
+  tools: [
+    {
+      id: 'form-date-signed',
+      field: {
+        format: { kind: 'date', pattern: 'dd/mm/yyyy' },
+      },
+    },
+  ],
+});
+```
+
+The list is read when a document opens.
 
 ## Change a field's settings
 
@@ -160,6 +312,9 @@ takes the fields out of their group.
 | `options`                                    | For a dropdown or list: `{ label, value }` pairs      |
 | `maxLength`, `multiline`, `password`, `comb` | For a text box                                        |
 | `groupId`                                    | The group it's in: who fills it in. [Give fields to a signer](#give-fields-to-a-signer) |
+| `assignment`                                 | Who fills it in: `{ kind: 'group', groupId }`, `{ kind: 'anyone' }` or `{ kind: 'unassigned' }`. [Place fields anyone fills in](#place-fields-anyone-fills-in) |
+| `purpose`                                    | What it's for, or `null`. [What a field is for](#what-a-field-is-for) |
+| `format`                                     | For a text box or a dropdown, the shape of its value: `{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`, or `null` for any text. [Dates](../forms#dates) |
 
 `getFieldSettings(ref)` describes a field's settings for a panel you draw without knowing the
 field's kind: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
@@ -168,7 +323,27 @@ translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choi
 the field's own values, shown as they are. While the document has groups, `groupId` is one of the
 settings: a `choice` whose options are the ids of the groups the user may put the field in. Show
 each with its group's label, from the form's `groups`; none of them, `null`, takes the field out
-of its group.
+of its group. Beside it, `assignment` says who fills the field in, whole, with a control of its
+own, `assignment`: its options are the assignments the user may give the field
+(`canAssign()`), the field's own among them, and never anyone on a signature field. Show a
+group by its label, anyone as "Anyone", and nobody in a word of yours. A panel that draws
+`assignment` leaves `groupId` out; `groupId` stays for a panel that knows only groups.
+
+Two more settings describe what the field is for and the shape of its value:
+
+- **`purpose`** is a `choice` whose options are the ids of the purposes the viewer knows, and
+  the field's own when it is another word. Show each with its label, from
+  `form.listPurposes()`; none of them, `null`, takes the purpose away.
+- **`format`**, on a text box and a dropdown, has a control of its own, `format`. Its value is
+  what `update()` takes: `{ kind, pattern }`, or `null` for none. The setting lists the `kinds`
+  to offer, `'date'` and `'time'`, and for each the `patterns` Acrobat offers. Let people type a
+  pattern of their own too: `isDatePattern()` and `isTimePattern()` say whether the engine takes
+  it, and `update()` rejects one it doesn't with `invalid-input`, before anything is written. A
+  field whose format is `{ kind: 'other' }` has a format script of its own: show it as it is,
+  and `null` takes it away.
+
+An app that draws its panel from the description gains both, so give your panel a case for
+`format`, or leave that control out.
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel), or from code with
@@ -370,8 +545,11 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
 | `setDesignGroup(groupId)`               | Says who the next fields are for: a field placed with a tool goes into this group; with `null` it is in none. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields for a signer](#place-fields-for-a-signer) |
+| `setDesignAssignment(assignment)`       | Says who the next fields are for: a group, anyone or nobody. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields anyone fills in](#place-fields-anyone-fills-in) |
 | `moveToGroup(fields, groupId)`          | Puts fields in a group, or with `null` takes them out of theirs, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
+| `assign(fields, assignment)`            | Says who fields are for, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
 | `canSetGroup(groupId)`                  | Whether the user may put a field in that group. [Place fields for a signer](#place-fields-for-a-signer)                                                                                             |
+| `canAssign(assignment)`                 | Whether the user may give a field that assignment. [Place fields anyone fills in](#place-fields-anyone-fills-in) |
 | `canRestoreAttribution()`               | Whether an import may keep who created its fields, instead of naming the importing user. [Permissions](#permissions)                                                                                  |
 | `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
 
@@ -386,7 +564,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `onFieldCreated` | A field was added          | `field`, `origin` |
 | `onFieldUpdated` | A field's settings changed | `field`, `origin` |
 | `onFieldDeleted` | A field was removed        | `ref`, `origin`   |
-| `onDesignGroupChanged` | The group new fields are placed for changed | `groupId` |
+| `onDesignGroupChanged` | Who new fields are placed for changed: a group, anyone or nobody | `groupId`, `assignment` |
 
 ## Permissions
 
@@ -396,6 +574,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `doc.forms.import` | Importing fields with who created them                          | `form.canRestoreAttribution()` |
 | `doc.forms.script` | Writing scripts, submit buttons and links into fields and boxes | `form.canWriteScripts()`       |
 | `fields:set-group` | Putting a field in a group other than your own                  | `form.canSetGroup(groupId)`    |
+| `fields:set-group:all` | Making a field one anyone fills in                          | `form.canAssign({ kind: 'anyone' })` |
 
 Hide the field tools when `canDesign()` is false, and the script, submit and link options of a
 field's or a box's actions when `canWriteScripts()` is false. Scripts already in the form run either way.

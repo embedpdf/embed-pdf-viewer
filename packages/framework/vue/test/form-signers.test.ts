@@ -11,7 +11,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { AnnotationLayer, annotationPlugin } from '../src/annotation';
 import { interactionPlugin } from '../src/interaction';
 import { FormLayer, FormToken, formPlugin, useFormEvent, useFormState } from '../src/form';
-import type { FormDesignGroupChangedEvent, FormGroup } from '../src/form';
+import type { FieldAssignment, FormDesignGroupChangedEvent, FormGroup } from '../src/form';
 import { makePageContext, providePage } from '../src/runtime';
 import type { PageContextValue } from '../src/runtime';
 import { probe, settle, viewerWith } from './counter-plugin';
@@ -21,6 +21,9 @@ import { probe, settle, viewerWith } from './counter-plugin';
  * its group's color (a fill and an edge), named by the app or not, nothing shows while the tint
  * is 0, and the form's state says who the groups are and who new fields are placed for.
  */
+
+/** The buyer's group, as an assignment. */
+const BUYER_ASSIGNMENT = { kind: 'group', groupId: 'buyer' } as const;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures');
@@ -91,10 +94,11 @@ describe('fields for several people', () => {
       // for, and each change of that.
       let groups!: Readonly<Ref<readonly FormGroup[]>>;
       let designGroup!: Readonly<Ref<string | null>>;
+      let designAssignment!: Readonly<Ref<FieldAssignment>>;
       const changes: FormDesignGroupChangedEvent[] = [];
       const Reader = probe(() => {
         // State refs stay reactive when destructured.
-        ({ groups, designGroup } = useFormState());
+        ({ groups, designGroup, designAssignment } = useFormState());
         useFormEvent(
           (form) => form.onDesignGroupChanged,
           (event) => changes.push(event),
@@ -166,7 +170,20 @@ describe('fields for several people', () => {
         form.setDesignGroup('buyer');
         await settle();
         expect(designGroup.value).toBe('buyer');
-        expect(changes).toEqual([{ groupId: 'buyer' }]);
+        expect(designAssignment.value).toEqual(BUYER_ASSIGNMENT);
+        // For anyone: in no group. Naming a group again is that group's.
+        form.setDesignAssignment({ kind: 'anyone' });
+        await settle();
+        expect(designGroup.value).toBeNull();
+        expect(designAssignment.value).toEqual({ kind: 'anyone' });
+        form.setDesignGroup('buyer');
+        await settle();
+        expect(designAssignment.value).toEqual(BUYER_ASSIGNMENT);
+        expect(changes).toEqual([
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+          { groupId: null, assignment: { kind: 'anyone' } },
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+        ]);
 
         // Design mode: the fields are lent to the annotation layer, which shows the buyer's
         // field in the buyer's color, above its drawing, and the other field with none.

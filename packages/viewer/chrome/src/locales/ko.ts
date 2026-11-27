@@ -469,6 +469,11 @@ export const ko: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': '서명할 때 입력됩니다' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: '누구나',
       settings: {
         name: '이름',
         tooltip: '도구 설명',
@@ -476,6 +481,9 @@ export const ko: Locale = {
         readOnly: '읽기 전용',
         noExport: '내보내지 않음',
         group: '작성자',
+        assignment: '작성자',
+        purpose: '용도',
+        format: '서식',
         defaultValue: '기본값',
         maxLength: '최대 길이',
         multiline: '여러 줄',

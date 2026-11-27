@@ -13,13 +13,21 @@ import {
   type PendingChange,
 } from '@embedpdf/core';
 import {
+  assignmentOfGroup,
+  assignmentsEqual,
+  checkedPurpose,
   draftWritesScripts,
+  formatWriteOf,
   planFormCopies,
   writesScripts,
   type AnnotationRef,
   type ChangeItem,
   type ChangeOp,
+  type FieldAssignment,
   type FormField,
+  type FormFieldKind,
+  type FormFieldPatch,
+  type FormFieldRef,
   type FormImportDrop,
   type WidgetAnnotation,
   type WidgetPlacement,
@@ -32,7 +40,7 @@ import type {
   FormFieldResult,
   FormGroupMoveResult,
 } from '../contract';
-import { fieldByRef, fieldKeyOf, widgetRowOf } from '../model';
+import { fieldByRef, fieldKeyOf, patchOfAssignment, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { createObjectNumbers } from '../services/object-numbers';
 import { undoLookOf } from '../sync/predict';
@@ -91,6 +99,26 @@ export function createFieldWrites(
 ) {
   const numbers = createObjectNumbers(ctx);
 
+  /**
+   * Refuse, before anything shows, a write whose purpose or format the engine would refuse for
+   * what it says: a purpose that is no purpose, a format a field of `kind` can't have
+   * (`invalid-input`). `kind` is `undefined` for a field the form doesn't show yet, which is
+   * the engine's to answer. An engine that takes neither (a CloudPDF server older than the
+   * version they arrived in) refuses the change itself (`unsupported`): the plugin can't know
+   * that before it asks.
+   */
+  const checkFacts = (
+    write: { readonly purpose?: unknown; readonly format?: unknown; readonly actions?: unknown },
+    kind: FormFieldKind | undefined,
+  ): void => {
+    try {
+      checkedPurpose(write.purpose);
+      if (kind !== undefined) formatWriteOf(write as Parameters<typeof formatWriteOf>[0], kind);
+    } catch (error) {
+      throw toPluginError('form', error);
+    }
+  };
+
   /** Refuse up front without `doc.forms.modify`, and without `doc.forms.script` when it writes scripts. */
   const allow = (operation: string, scripts = false): void => {
     ctx.assertAllowed(MODIFY, operation);
@@ -130,6 +158,8 @@ export function createFieldWrites(
     allow('form.create', draftWritesScripts(draft));
     // No group (`null`, or none named) takes form design alone, checked above.
     if (typeof draft.groupId === 'string') groups.assertMaySet(draft.groupId, 'form.create');
+    if (draft.assignment) groups.assertMayAssign(draft.assignment, 'form.create');
+    checkFacts(draft, draft.kind);
     // The field, then each widget, in the draft's order.
     const count = 1 + (draft.widgets?.length ?? 0);
     const [objectNumber, ...widgetObjectNumbers] =
@@ -279,25 +309,34 @@ export function createFieldWrites(
     return duplicateResultOf(items, copy.copies, copy.dropped);
   };
 
-  const moveToGroup: FormCapability['moveToGroup'] = async (refs, groupId, options) => {
-    allow('form.moveToGroup');
-    // Out of every group (`null`) takes form design alone, checked above.
-    if (groupId !== null) groups.assertMaySet(groupId, 'form.moveToGroup');
+  /** The fields `refs` name, in their order; `not-found` for one the form doesn't have. */
+  const fieldsOf = (refs: readonly FormFieldRef[]): FormField[] => {
     const index = fields.view();
-    const moved = refs.map((ref) => {
+    return refs.map((ref) => {
       const field = fieldByRef(index, ref);
       if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
       return field;
     });
-    // A field already in the group has nothing to change; a field named twice moves once.
+  };
+
+  /**
+   * Change who fills fields in, as one change and one step to undo: each field `moves` says has
+   * something to change gets `patchOf`'s patch, once however often it is named. Resolves the
+   * fields as they are now, in the order given.
+   */
+  const reassign = async (
+    moved: readonly FormField[],
+    moves: (field: FormField) => boolean,
+    patchOf: (field: FormField) => FormFieldPatch,
+    options?: OperationOptions,
+  ): Promise<FormGroupMoveResult> => {
     const moving = new Map<string, FormField>();
-    for (const field of moved) if (field.groupId !== groupId) moving.set(fieldKeyOf(field), field);
-    if (moving.size === 0) return { fields: moved } satisfies FormGroupMoveResult;
-    // One change, so one step to undo.
+    for (const field of moved) if (moves(field)) moving.set(fieldKeyOf(field), field);
+    if (moving.size === 0) return { fields: moved };
     const change = stageAll(
       'update',
       [...moving.values()].map(
-        (field): ChangeOp => ({ type: 'forms.update', field: field.ref, patch: { groupId } }),
+        (field): ChangeOp => ({ type: 'forms.update', field: field.ref, patch: patchOf(field) }),
       ),
     );
     let items: readonly ChangeItem[];
@@ -310,10 +349,43 @@ export function createFieldWrites(
     for (const item of items) {
       if (item.type === 'forms.update') answered.set(fieldKeyOf(item.field), item.field);
     }
-    return {
-      fields: moved.map((field) => answered.get(fieldKeyOf(field)) ?? field),
-    } satisfies FormGroupMoveResult;
+    return { fields: moved.map((field) => answered.get(fieldKeyOf(field)) ?? field) };
   };
+
+  /**
+   * Give fields an assignment, as one change and one step to undo: `assign()`, and
+   * `moveToGroup()` with its group's. Nobody's takes form design alone, checked first; a field
+   * that has it already has nothing to change. Each op says it as `patchOfAssignment` does.
+   */
+  const assignAs = async (
+    operation: string,
+    refs: readonly FormFieldRef[],
+    assignment: FieldAssignment,
+    options?: OperationOptions,
+  ): Promise<FormGroupMoveResult> => {
+    allow(operation);
+    groups.assertMayAssign(assignment, operation);
+    const moved = fieldsOf(refs);
+    if (assignment.kind === 'anyone' && moved.some((field) => field.kind === 'signature')) {
+      throw new PluginError(
+        'invalid-input',
+        'form',
+        'a signature field is signed by one signer, so it is never for anyone',
+      );
+    }
+    return reassign(
+      moved,
+      (field) => !assignmentsEqual(field.assignment, assignment),
+      () => patchOfAssignment(assignment),
+      options,
+    );
+  };
+
+  const moveToGroup: FormCapability['moveToGroup'] = (refs, groupId, options) =>
+    assignAs('form.moveToGroup', refs, assignmentOfGroup(groupId), options);
+
+  const assign: FormCapability['assign'] = (refs, assignment, options) =>
+    assignAs('form.assign', refs, assignment, options);
 
   return {
     copyOps,
@@ -323,16 +395,19 @@ export function createFieldWrites(
       duplicate,
       duplicateWidgets,
       moveToGroup,
+      assign,
       update: async (ref, patch, options) => {
         allow('form.update', writesScripts(patch.actions));
-        // A field's own group, given back unchanged, is no change, and taking it out of its
-        // group (`null`) takes form design alone, checked above.
-        if (
-          typeof patch.groupId === 'string' &&
-          patch.groupId !== fieldByRef(fields.view(), ref)?.groupId
-        ) {
+        const field = fieldByRef(fields.view(), ref);
+        // A field's own group or assignment, given back unchanged, is no change, and nobody's
+        // (`groupId: null`, `{ kind: 'unassigned' }`) takes form design alone, checked above.
+        if (typeof patch.groupId === 'string' && patch.groupId !== field?.groupId) {
           groups.assertMaySet(patch.groupId, 'form.update');
         }
+        if (patch.assignment && !(field && assignmentsEqual(field.assignment, patch.assignment))) {
+          groups.assertMayAssign(patch.assignment, 'form.update');
+        }
+        checkFacts(patch, field?.kind);
         const change = stage('update', { type: 'forms.update', field: ref, patch });
         return { field: (await answer<'forms.update'>(change, options)).field };
       },

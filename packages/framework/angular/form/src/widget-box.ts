@@ -108,7 +108,7 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
     const frame = this.frame();
     return this.embedded
       ? widgetBoxStyleOf(
-          { look: this.item().look, accent: this.item().accent },
+          { look: this.item().look, accent: this.item().accent, yours: this.item().yours },
           { left: 0, top: 0, width: frame.width, height: frame.height },
           this.colors(),
           { edge: this.drawsEdge },

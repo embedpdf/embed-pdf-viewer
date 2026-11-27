@@ -10,6 +10,7 @@ import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import { FORM_CONTROL_FILL } from '@embedpdf/web';
 import type { FormColors } from '@embedpdf/web';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
+import FieldPlaceholder from './FieldPlaceholder.vue';
 import { useWidgetBox } from './widget-box';
 
 const props = defineProps<{
@@ -29,7 +30,11 @@ const signed = computed(() => known.value ?? props.item.signed);
 const actionable = computed(
   () => signature.value !== null && (signed.value || !props.item.disabled),
 );
-const { element: box, style: boxStyle } = useWidgetBox(
+const {
+  element: box,
+  frame,
+  style: boxStyle,
+} = useWidgetBox(
   () => props.item,
   () => props.colors,
   // Without the signature plugin the box has nothing to focus: the cursor passes over it.
@@ -60,5 +65,6 @@ function onClick(): void {
       }"
       @click="onClick"
     />
+    <FieldPlaceholder v-if="item.placeholder !== null" :item="item" :frame="frame" />
   </div>
 </template>

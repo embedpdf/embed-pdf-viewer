@@ -3,13 +3,30 @@
  * kind describes its look: which settings the field's kind has, how each is
  * edited, and its value. `update()` writes them. While the document has
  * groups, a field's group is one of them: the choices are the groups the
- * user may put a field in, and the one the field is in.
+ * user may put a field in, and the one the field is in. So are what the field
+ * is for (its purpose: the ones the plugin knows, and the field's own) and,
+ * for a text field and a dropdown, the shape of its value (its format: a date
+ * or a time with a pattern).
  */
 import { memoByKey } from '@embedpdf/core';
-import type { FormField, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import {
+  assignmentsEqual,
+  STANDARD_DATE_PATTERNS,
+  STANDARD_TIME_PATTERNS,
+  takesFormat,
+  type FieldAssignment,
+  type FormField,
+  type FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 
-import type { FormCapability, FormFieldSetting, FormFieldSettings, FormGroup } from '../contract';
-import { canonicalKey, fieldByKey } from '../model';
+import type {
+  FormCapability,
+  FormFieldSetting,
+  FormFieldSettings,
+  FormGroup,
+  FormPurpose,
+} from '../contract';
+import { ANYONE, canonicalKey, fieldByKey, UNASSIGNED } from '../model';
 import type { FormServices } from '../services';
 
 /** What every field has. */
@@ -133,6 +150,85 @@ function groupSetting(
   ];
 }
 
+/**
+ * Who fills the field in, whole: nobody, each of the document's groups, and anyone, those the
+ * user may give it, and the field's own; anyone never on a signature field, which one signer
+ * signs. Nothing while there is no other to choose.
+ */
+function assignmentSetting(
+  field: FormField,
+  groups: readonly FormGroup[],
+  mayAssign: (assignment: FieldAssignment) => boolean,
+): readonly FormFieldSetting[] {
+  const candidates: FieldAssignment[] = [
+    UNASSIGNED,
+    ...groups.map((group): FieldAssignment => ({ kind: 'group', groupId: group.id })),
+    ...(field.kind === 'signature' ? [] : [ANYONE]),
+  ];
+  const options = candidates.filter(
+    (assignment) => assignmentsEqual(assignment, field.assignment) || mayAssign(assignment),
+  );
+  if (!options.some((assignment) => assignmentsEqual(assignment, field.assignment))) {
+    options.push(field.assignment);
+  }
+  if (options.length < 2) return [];
+  return [
+    {
+      key: 'assignment',
+      control: 'assignment',
+      label: 'Filled in by',
+      labelKey: 'form.settings.assignment',
+      options,
+    },
+  ];
+}
+
+/**
+ * What the field is for, among the purposes the plugin knows, and the field's own when it is
+ * another word.
+ */
+function purposeSetting(
+  field: FormField,
+  purposes: readonly FormPurpose[],
+): readonly FormFieldSetting[] {
+  const options = purposes.map((purpose) => purpose.id);
+  if (field.purpose !== null && !options.includes(field.purpose)) options.push(field.purpose);
+  return [
+    {
+      key: 'purpose',
+      control: 'choice',
+      label: 'Purpose',
+      labelKey: 'form.settings.purpose',
+      options,
+      free: false,
+    },
+  ];
+}
+
+const FORMAT_KINDS = Object.freeze(['date', 'time'] as const);
+const FORMAT_PATTERNS = Object.freeze({
+  date: STANDARD_DATE_PATTERNS,
+  time: STANDARD_TIME_PATTERNS,
+});
+
+/**
+ * The shape of a text field's or a dropdown's value: a date or a time, with the patterns
+ * Acrobat offers for each. Nothing for another kind.
+ */
+function formatSetting(field: FormField): readonly FormFieldSetting[] {
+  if (!takesFormat(field.kind)) return [];
+  return [
+    {
+      key: 'format',
+      control: 'format',
+      label: 'Format',
+      labelKey: 'form.settings.format',
+      kinds: FORMAT_KINDS,
+      patterns: FORMAT_PATTERNS,
+    },
+  ];
+}
+
 /** Each setting's value, as the field holds it. */
 function valuesOf(
   field: FormField,
@@ -148,15 +244,28 @@ function valuesOf(
   return values;
 }
 
-export function createFieldSettings({ fields, groups }: Pick<FormServices, 'fields' | 'groups'>) {
+export function createFieldSettings({
+  fields,
+  groups,
+  purposes,
+}: Pick<FormServices, 'fields' | 'groups' | 'purposes'>) {
   const settingsByKey = memoByKey(
-    (key: string) => [fieldByKey(fields.view(), key), groups.list()] as const,
-    (_key, field, listed): FormFieldSettings | null => {
+    (key: string) =>
+      [
+        fieldByKey(fields.view(), key),
+        groups.list(),
+        purposes.list(),
+        groups.mayAssign(ANYONE),
+      ] as const,
+    (_key, field, listed, known): FormFieldSettings | null => {
       if (!field) return null;
       const properties = [
         ...COMMON,
         ...groupSetting(field, listed, groups.maySet),
+        ...assignmentSetting(field, listed, groups.mayAssign),
+        ...purposeSetting(field, known),
         ...familySettings(field),
+        ...formatSetting(field),
       ];
       return { properties, values: valuesOf(field, properties) };
     },

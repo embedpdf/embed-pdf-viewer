@@ -238,6 +238,10 @@ export interface ModelAnnotation {
   painter?: (box: Rect) => readonly SceneNode[];
   /** A lent record's accent, from its lender ({@link RecordAccent}); absent for a record without one. */
   accent?: RecordAccent;
+  /** What a lent record shows while it holds nothing, from its lender ({@link RecordPlaceholder}); absent for a record without one. */
+  placeholder?: RecordPlaceholder;
+  /** A lent record's edge when it has no border and no accent, from its lender ({@link RecordOutline}); absent for a record without one. */
+  outline?: RecordOutline;
   /**
    * This session's authority over this record (see permissions.md), set by the
    * plugin from the security service; the core only reads it. Fused into
@@ -834,6 +838,39 @@ export interface RecordAccent {
   readonly color: string;
   /** How strong the fill shows: from `0`, not at all, to `1`. */
   readonly strength: number;
+  /**
+   * The color is the lender's own tint for a record in no group (a form's `fields.tintColor`),
+   * not a group's: a renderer lets that setting's CSS variable win over it.
+   */
+  readonly base?: boolean;
+  /**
+   * The color is the lender's tint for a record anyone fills in (a form's
+   * `fields.anyoneTintColor`), not a group's: a renderer lets that setting's CSS variable win
+   * over it.
+   */
+  readonly anyone?: boolean;
+}
+
+/**
+ * The edge a lent record shows when it has no border of its own and no accent, from its lender
+ * (a form field in design mode), so a record with no look of its own shows: a renderer draws it
+ * around the record's box. It is never part of the record itself.
+ */
+export interface RecordOutline {
+  /** A CSS color, or `null` for the lender's default edge (a form's: the viewer's accent at 55%). */
+  readonly color: string | null;
+}
+
+/**
+ * What a lent record shows while it holds nothing, from its lender (what an
+ * empty form field is for): a renderer writes it in the record's box, over
+ * its drawing. It is never part of the record itself.
+ */
+export interface RecordPlaceholder {
+  /** A few words. */
+  readonly text: string;
+  /** The color they are written in: a CSS color. */
+  readonly color: string;
 }
 
 /** Per-annotation render data — its content geometry + style + live state. */
@@ -894,6 +931,10 @@ export interface RenderItem {
   lentScene?: () => readonly SceneNode[];
   /** A lent record's accent (`ModelAnnotation.accent`), drawn over its frame; absent for a record without one. */
   accent?: RecordAccent;
+  /** What a lent record shows while it holds nothing (`ModelAnnotation.placeholder`), drawn in its frame; absent for a record without one. */
+  placeholder?: RecordPlaceholder;
+  /** A lent record's edge (`ModelAnnotation.outline`), drawn around its frame; absent for a record without one. */
+  outline?: RecordOutline;
   /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
   ghostOpacity?: number;
   selected: boolean;

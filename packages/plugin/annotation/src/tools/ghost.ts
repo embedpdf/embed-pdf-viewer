@@ -6,6 +6,7 @@ import {
   resolveClickPlacement,
   unmadeItem,
   type Draft,
+  type LentPaint,
   type Model,
   type Point,
   type RenderItem,
@@ -63,10 +64,20 @@ function stillAClick(draft: Draft | null, placing: ForeignPlacement | null): boo
  * A sibling plugin's gesture with one of this plugin's tools (the form
  * palette's drag-to-place) reports itself through `previewPlacement`, and
  * once it is a drag it paints as a drawing in progress, the same way.
+ *
+ * A lender's tool (a form field tool) paints what the lender paints over the
+ * record it will be (`toolPaintOf`): its live drawing, accent, outline and
+ * placeholder, through the same render path as a lent record, so the ghost is
+ * the field it places, see-through.
  */
 export function createGhost(
   ctx: Pick<AnnotationContext, 'state'>,
-  { store, geometry, tools }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools'>,
+  {
+    store,
+    geometry,
+    tools,
+    lending,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'lending'>,
   stamps: Pick<Stamps, 'armed'>,
 ) {
   const clearGhost = (): void => {
@@ -129,6 +140,10 @@ export function createGhost(
     return placedShape(annotation, placement);
   };
 
+  /** What the lender paints over what `tool` places on `page`, when the tool is one of its own. */
+  const lentPaintOf = (tool: ResolvedTool, page: PageRef): LentPaint | undefined =>
+    lending.lender()?.toolPaintOf?.(tool.id, page) ?? undefined;
+
   /**
    * What the ghost and a sibling plugin's placement paint on a page, at the
    * view the page shows: the click's annotation at the pointer (`ghost`), and
@@ -147,8 +162,10 @@ export function createGhost(
     ) {
       const shape = clickShape(tool, ghostAt, model);
       if (shape) {
+        const annotation = annotationOfTool(model, tool);
+        const lent = lentPaintOf(tool, ghostAt.page);
         items.push({
-          ...unmadeItem(GHOST_ID, annotationOfTool(model, tool), shape, 'ghost', view),
+          ...unmadeItem(GHOST_ID, annotation, shape, 'ghost', view, undefined, lent),
           ghostOpacity: tool.ghost.opacity,
         });
       }
@@ -167,7 +184,10 @@ export function createGhost(
       });
       const annotation = annotationOfTool(model, placingTool);
       const shape = placement && placedShape(annotation, placement);
-      if (shape) items.push(unmadeItem(PLACING_ID, annotation, shape, 'draft', view));
+      const lent = lentPaintOf(placingTool, placing.page);
+      if (shape) {
+        items.push(unmadeItem(PLACING_ID, annotation, shape, 'draft', view, undefined, lent));
+      }
     }
     return items;
   };

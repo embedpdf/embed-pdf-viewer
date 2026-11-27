@@ -3,20 +3,28 @@
   raster where the core places it (following a move as it happens), or the
   vector scene for everything drawn live (shapes, clouds, markup, a drawing
   in progress, a tool's ghost, a picture older than the annotation). One rule
-  picks (`pictureOrPainting`). A lent record's accent (a form field's group's
-  color) fills the frame above it. A renderer gets it all as `native`.
+  picks (`pictureOrPainting`). A lent record's accent (a form field's tint)
+  fills the frame above it, or its outline edges it, and its placeholder (what
+  an empty field is for) is written over both. A tool's ghost carries them too,
+  see-through as its drawing is. A renderer gets it all as `native`.
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { CSSProperties } from 'vue';
 import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
 import {
+  frameInPixels,
+  ghostOpacity,
   pictureOrPainting,
   rasterInFrame,
   recordAccentStyleOf,
+  recordOutlineStyleOf,
+  recordPlaceholderStyleOf,
   shownAppearance,
   type AppearanceUrl,
 } from '@embedpdf/web';
+import { useViewerSettings } from '../runtime/documents';
+import { usePage } from '../runtime/page';
 import AnnotationScene from './AnnotationScene.vue';
 
 const props = defineProps<{
@@ -24,6 +32,16 @@ const props = defineProps<{
   /** The page's loaded pictures, by item and state; `null` until the first ones arrive. */
   urls: Readonly<Record<string, AppearanceUrl>> | null;
 }>();
+
+const page = usePage();
+// A lent field's outline is the form's edge, which follows the viewer's accent.
+const viewerAccent = useViewerSettings((settings) => settings.accent);
+
+/** A ghost's paint is see-through, as its drawing is. */
+const seeThrough = computed(
+  (): CSSProperties =>
+    props.item.source === 'ghost' ? { opacity: ghostOpacity(props.item.ghostOpacity ?? 0.5) } : {},
+);
 
 const shows = computed(() => {
   const { item, urls } = props;
@@ -65,12 +83,44 @@ const baked = computed((): { url: string; style: CSSProperties } | null => {
 });
 
 const accent = computed((): CSSProperties | null =>
-  props.item.accent ? recordAccentStyleOf(props.item.accent) : null,
+  props.item.accent ? { ...recordAccentStyleOf(props.item.accent), ...seeThrough.value } : null,
 );
+
+const outline = computed((): CSSProperties | null =>
+  props.item.outline
+    ? { ...recordOutlineStyleOf(props.item.outline, viewerAccent.value), ...seeThrough.value }
+    : null,
+);
+
+/** The placeholder in the record's own text size and alignment, in the item's frame. */
+const placeholder = computed((): { text: string; style: CSSProperties } | null => {
+  const { item } = props;
+  if (!item.placeholder) return null;
+  return {
+    text: item.placeholder.text,
+    style: {
+      ...recordPlaceholderStyleOf(
+        item.placeholder,
+        // A ghost has no record yet: its text style is the field's to be.
+        (item.annotation ?? item.text ?? null) as {
+          fontSize?: number | null;
+          textAlign?: string | null;
+        } | null,
+        item.frame.box,
+        frameInPixels(item.frame, page.value.transform),
+      ),
+      ...seeThrough.value,
+    },
+  };
+});
 </script>
 
 <template>
   <img v-if="baked" :src="baked.url" alt="" draggable="false" :style="baked.style" />
   <AnnotationScene v-else-if="shows?.kind === 'painting'" :item="item" />
   <div v-if="accent" :style="accent" />
+  <div v-if="outline" data-epdf-outline="" :style="outline" />
+  <span v-if="placeholder" aria-hidden="true" data-epdf-placeholder="" :style="placeholder.style">
+    {{ placeholder.text }}
+  </span>
 </template>

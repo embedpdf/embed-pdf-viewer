@@ -5,8 +5,10 @@
 <script lang="ts">
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+  import { ariaDescriptionOf } from '@embedpdf/web';
   import type { FormColors } from '@embedpdf/web';
   import { useCapability } from '../runtime/readers.svelte';
+  import FieldPlaceholder from './FieldPlaceholder.svelte';
   import FormFocusRing from './FormFocusRing.svelte';
   import { FILL, useWidgetActivation } from './widget';
   import WidgetBox from './WidgetBox.svelte';
@@ -25,15 +27,17 @@
   }
 </script>
 
-<WidgetBox {item} {colors} onclick={activate}>
+<WidgetBox {item} {colors} onclick={activate} title={item.hint ?? undefined}>
   <!--
     See-through over the picture. One-way: it shows the field's selection whenever that changes;
     between changes the browser owns it, and a change writes through the plugin. A disabled
-    select must not swallow the box's clicks.
+    select must not swallow the box's clicks. The placeholder's block follows the select with no
+    blank between them: Svelte would keep one more blank as a text node, in every box.
   -->
   <select
     value={item.selected[0] ?? ''}
     aria-label={item.label}
+    {...ariaDescriptionOf(item.hint)}
     disabled={item.disabled}
     onfocus={() => (focused = true)}
     onblur={() => (focused = false)}
@@ -47,6 +51,6 @@
     {#each item.options as option, index (index)}
       <option value={option.value}>{option.label}</option>
     {/each}
-  </select>
+  </select>{#if item.placeholder !== null}<FieldPlaceholder {item} />{/if}
   <FormFocusRing visible={focused} color={colors.focus} />
 </WidgetBox>

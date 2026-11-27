@@ -58,7 +58,28 @@ export const sv: EmbedpdfStrings = {
       'form-combobox': 'Rullgardinsmeny',
       'form-listbox': 'Listruta',
       'form-signature': 'Signaturfält',
+      'form-name': 'Namnfält',
+      'form-email': 'E-postfält',
+      'form-organization': 'Organisationsfält',
+      'form-organization-title': 'Befattningsfält',
+      'form-date-signed': 'Fält för signeringsdatum',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Namn',
+      email: 'E-post',
+      organization: 'Organisation',
+      'organization-title': 'Befattning',
+      'date-signed': 'Signeringsdatum',
+      signature: 'Signatur',
+      initials: 'Initialer',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Fylls i när du skriver under' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'Vem som helst',
   },
   outline: { untitled: 'Namnlös' },
 };

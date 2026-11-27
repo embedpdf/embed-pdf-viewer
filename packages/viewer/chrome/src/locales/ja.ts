@@ -470,6 +470,11 @@ export const ja: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': '署名時に入力されます' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: '誰でも',
       settings: {
         name: '名前',
         tooltip: 'ツールヒント',
@@ -477,6 +482,9 @@ export const ja: Locale = {
         readOnly: '読み取り専用',
         noExport: '書き出さない',
         group: '記入者',
+        assignment: '記入者',
+        purpose: '用途',
+        format: '書式',
         defaultValue: 'デフォルト値',
         maxLength: '最大文字数',
         multiline: '複数行',

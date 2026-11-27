@@ -6,11 +6,14 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import type { FullAutoFill } from 'svelte/elements';
   import { FontsToken } from '@embedpdf/plugin-fonts';
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   // The draft calls are the host lens's.
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
   import {
+    ariaDescriptionOf,
+    autocompleteOf,
     createTextFieldEditor,
     cssText,
     rectInPixels,
@@ -20,13 +23,12 @@
   import { useFontMounts } from '../runtime/font-mounts.svelte';
   import { usePage } from '../runtime/page';
   import { useCapability, useOptionalSelector } from '../runtime/readers.svelte';
+  import FieldPlaceholder from './FieldPlaceholder.svelte';
   import { useWidgetActivation } from './widget';
   import WidgetBox from './WidgetBox.svelte';
 
-  let {
-    item,
-    colors,
-  }: { item: Extract<FormWidgetItem, { control: 'text' }>; colors: FormColors } = $props();
+  let { item, colors }: { item: Extract<FormWidgetItem, { control: 'text' }>; colors: FormColors } =
+    $props();
 
   const page = usePage();
   const form = useCapability(FormHostToken);
@@ -61,6 +63,10 @@
     ),
   );
 
+  // What the field is for: the browser may offer the person's saved value, and a screen reader
+  // hears what an empty box asks for. Both attributes are left out for a field without a purpose.
+  const autocomplete = $derived(autocompleteOf(item.purpose) as FullAutoFill | undefined);
+
   function onInput(event: Event & { currentTarget: HTMLInputElement | HTMLTextAreaElement }) {
     editor.input(event.currentTarget.value);
   }
@@ -74,14 +80,19 @@
 
 <!--
   A click runs the widget's action too, as in Acrobat: the editor's focus click bubbles here, a
-  read-only field's lands here directly.
+  read-only field's lands here directly. The placeholder is above the editor, which is opaque
+  while focused, and gone with the first character typed. Its block follows the editor's with no
+  blank between them: Svelte keeps a blank between two blocks as a text node, in every box.
 -->
-<WidgetBox {item} {colors} onclick={activate}>
+<WidgetBox {item} {colors} onclick={activate} title={item.hint ?? undefined}>
   {#if item.multiline}
     <textarea
       value={editing.draft}
       maxlength={item.maxLength ?? undefined}
       aria-label={item.label}
+      {autocomplete}
+      aria-placeholder={item.placeholder ?? undefined}
+      {...ariaDescriptionOf(item.hint)}
       disabled={item.disabled}
       style={editorStyle}
       onfocus={editor.focus}
@@ -95,6 +106,9 @@
       value={editing.draft}
       maxlength={item.maxLength ?? undefined}
       aria-label={item.label}
+      {autocomplete}
+      aria-placeholder={item.placeholder ?? undefined}
+      {...ariaDescriptionOf(item.hint)}
       disabled={item.disabled}
       style={editorStyle}
       onfocus={editor.focus}
@@ -102,5 +116,5 @@
       onblur={editor.blur}
       onkeydown={onKeyDown}
     />
-  {/if}
+  {/if}{#if item.placeholder !== null && editing.draft === ''}<FieldPlaceholder {item} />{/if}
 </WidgetBox>

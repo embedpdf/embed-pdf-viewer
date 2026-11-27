@@ -1,11 +1,14 @@
 /**
  * The form's groups, as the app sets them: who this document's groups are (`setGroups()`), and
- * who new fields are placed for (the design group). Both are session state a toolbar sets and
- * reads; neither is written into the PDF. A field placed with a tool goes into the design group
- * (tools/handlers.ts); `null`, where it starts, names none, so the field is in no group.
+ * who new fields are placed for (the design assignment: a group, anyone or nobody). Both are
+ * session state a toolbar sets and reads; neither is written into the PDF. A field placed with a
+ * tool gets the design assignment (tools/handlers.ts); nobody's, where it starts, is a field in
+ * no group. `setDesignGroup()` is the released shorthand: a group's id, or `null` for nobody.
  */
+import { assignmentOfGroup, groupIdOfAssignment } from '@embedpdf/engine-core/runtime';
+
 import type { FormCapability, FormGroupInput } from '../contract';
-import { setDesignGroup, setGroups, type NamedGroup } from '../model';
+import { setDesignAssignment, setGroups, type NamedGroup } from '../model';
 import type { FormContext, FormServices } from '../services';
 
 /** The app's list as the state holds it: each id once (the first entry of an id is the group). */
@@ -28,12 +31,21 @@ export function createGroupWrites(ctx: FormContext, { groups }: Pick<FormService
       setGroups: (list) => {
         ctx.state.update(setGroups, namedGroupsOf(list));
       },
-      getDesignGroup: () => ctx.state.get().designGroup,
+      getDesignGroup: () => groupIdOfAssignment(ctx.state.get().designAssignment),
+      getDesignAssignment: () => ctx.state.get().designAssignment,
       setDesignGroup: (groupId) => {
+        // Nobody's takes no right of its own: whoever may design the form names it.
         if (groupId !== null) groups.assertMaySet(groupId, 'form.setDesignGroup');
-        ctx.state.update(setDesignGroup, groupId);
+        ctx.state.update(setDesignAssignment, assignmentOfGroup(groupId));
+      },
+      setDesignAssignment: (assignment) => {
+        if (assignment.kind !== 'unassigned') {
+          groups.assertMayAssign(assignment, 'form.setDesignAssignment');
+        }
+        ctx.state.update(setDesignAssignment, assignment);
       },
       canSetGroup: groups.maySet,
+      canAssign: groups.mayAssign,
     } satisfies Partial<FormCapability>,
   };
 }

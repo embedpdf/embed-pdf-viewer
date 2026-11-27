@@ -60,6 +60,7 @@ import type {
   Shape,
   Id,
   Model,
+  ModelAnnotation,
   Rect,
   RenderItem,
   Style,
@@ -164,11 +165,37 @@ function effStyle(annotation: Annotation, view: ViewEnv | undefined): Style {
 }
 
 /**
+ * What a lender paints over a record it lends, and over what one of its tools
+ * would place: its live drawing, its accent, its placeholder and its outline.
+ */
+export type LentPaint = Pick<ModelAnnotation, 'painter' | 'accent' | 'placeholder' | 'outline'>;
+
+/**
+ * A lender's paint as a render item carries it, its drawing made in `box`: the
+ * same for a lent record and for the ghost of a lender's tool, so a field and
+ * the ghost of the tool that places it can't be painted two ways.
+ */
+function lentPaintOf(
+  lent: LentPaint,
+  box: Rect,
+): Pick<RenderItem, 'lentScene' | 'accent' | 'placeholder' | 'outline'> {
+  return {
+    // A lent record's lender draws it where it is now, a gesture included.
+    ...(lent.painter ? { lentScene: once(lent.painter, box) } : {}),
+    ...(lent.accent ? { accent: lent.accent } : {}),
+    ...(lent.placeholder ? { placeholder: lent.placeholder } : {}),
+    ...(lent.outline ? { outline: lent.outline } : {}),
+  };
+}
+
+/**
  * How an annotation not made yet paints, drawn as it will be once made: a
  * drawing in progress (`draft`) or the tool's ghost (`ghost`, what a click
  * would place). `annotation` is what the tool creates, its defaults and
  * flags; `shape` is where it goes, as the made one will store it, so a
  * screen-anchored icon shows at its size on screen, as a made one does.
+ * `lent` is what a lender paints over what its tool places (a form field's
+ * look, tint, outline and placeholder), as it paints over the made one.
  */
 export function unmadeItem(
   id: Id,
@@ -177,23 +204,26 @@ export function unmadeItem(
   source: 'draft' | 'ghost',
   view?: ViewEnv,
   measure?: MeasurementAppearance,
+  lent?: LentPaint,
 ): RenderItem {
   const geometry = anchoredGeometry(shape, anchorModeOf({ annotation }), view);
   const style = effStyle(annotation, view);
   const distance = measure && measurementLayout(geometry, measure, style);
   const text = textOf(annotation);
+  const box = distance?.visualBounds ?? geomVisualBounds(geometry, style);
   return placed(
     {
       id,
       ref: null,
       subtype: kindOf(annotation).name,
       geometry,
-      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+      box,
       style,
       ...(text ? { text } : {}),
       ...iconOf(annotation),
       ...redactionLabelOf(annotation),
       ...(measure ? { measure } : {}),
+      ...(lent ? lentPaintOf(lent, box) : {}),
       source,
       selected: false,
       rot: geomRotation(geometry),
@@ -257,9 +287,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           measure,
           source: sourceDuring(model, id),
           pictureVersion: record.pictureVersion ?? 0,
-          // A lent record's lender draws it where it is now, a gesture included.
-          ...(record.painter ? { lentScene: once(record.painter, box) } : {}),
-          ...(record.accent ? { accent: record.accent } : {}),
+          ...lentPaintOf(record, box),
           selected: model.selected.includes(id),
           ...(model.hovered === id ? { hovered: true } : {}),
           rot: geomRotation(geometry),

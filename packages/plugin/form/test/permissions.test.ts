@@ -9,6 +9,7 @@ import {
 import { createTestContext } from '@embedpdf/core/testing';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
+import { grouped } from './helpers/grouped';
 import { FORM_DEFAULTS } from '../src/contract';
 import { createFormController } from '../src/controller';
 import { initialFormModel } from '../src/model';
@@ -29,7 +30,6 @@ const field = (
   alternateName: null,
   mappingName: null,
   groupId: null,
-  assignment: { kind: 'unassigned' },
   purpose: null,
   createdBy: null,
   createdAt: null,
@@ -47,7 +47,7 @@ const field = (
   password: false,
   comb: false,
   format: null,
-  ...over,
+  ...grouped(over),
 });
 
 /** The form of these fields, each with one widget on page 1. */

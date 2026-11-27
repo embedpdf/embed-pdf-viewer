@@ -2234,6 +2234,9 @@ importers:
       '@embedpdf/plugin-fonts':
         specifier: workspace:*
         version: link:../fonts
+      '@embedpdf/plugin-i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction

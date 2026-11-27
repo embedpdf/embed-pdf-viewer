@@ -8,17 +8,22 @@
  * and `@embedpdf/web` turns them into pixels and SVG elements, the same for every framework.
  */
 import { ChangeDetectionStrategy, Component, computed, Directive, input } from '@angular/core';
-import { EpdfSvgShapes } from '@embedpdf/angular/runtime';
+import { EpdfSvgShapes, injectPage } from '@embedpdf/angular/runtime';
 import { MITER_LIMIT, scene, type RenderItem } from '@embedpdf/core-annotation';
 import {
+  frameInPixels,
   ghostOpacity,
   rasterInFrame,
   recordAccentStyleOf,
+  recordOutlineStyleOf,
+  recordPlaceholderStyleOf,
   sceneViewBox,
   svgShapesOf,
   type FramePixels,
   type PictureOrPainting,
 } from '@embedpdf/web';
+import { pagePixelsOf } from './page-reads';
+import { injectChromeSettings } from './settings';
 
 /**
  * The box an annotation draws into, in the page layer: placed, sized and turned like the
@@ -88,8 +93,9 @@ export class EpdfAnnotationScene {
 /**
  * An annotation's own drawing, filling its frame: the engine's picture where the core places it
  * (following a move as it happens), or its scene, as the layer's one rule picks (`shows`,
- * `pictureOrPainting`). A lent record's accent (a form field's group's color) fills the frame
- * above it.
+ * `pictureOrPainting`). A lent record's accent (a form field's tint) fills the frame above it,
+ * or its outline edges it, and its placeholder (what an empty field is for) is written over both.
+ * A tool's ghost carries them too, see-through as its drawing is.
  */
 @Component({
   selector: 'epdf-annotation-native',
@@ -118,6 +124,14 @@ export class EpdfAnnotationScene {
     @if (accent(); as accentStyle) {
       <div [style]="accentStyle"></div>
     }
+    @if (outline(); as outlineStyle) {
+      <div data-epdf-outline="" [style]="outlineStyle"></div>
+    }
+    @if (placeholder(); as placeholder) {
+      <span aria-hidden="true" data-epdf-placeholder="" [style]="placeholder.style">{{
+        placeholder.text
+      }}</span>
+    }
   `,
 })
 export class EpdfAnnotationNative {
@@ -133,8 +147,45 @@ export class EpdfAnnotationNative {
     const item = this.item();
     return item.raster ? rasterInFrame(item.raster, item.frame) : null;
   });
+  /** A ghost's paint is see-through, as its drawing is. */
+  private readonly seeThrough = computed(() => {
+    const item = this.item();
+    return item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : null;
+  });
   protected readonly accent = computed(() => {
     const { accent } = this.item();
-    return accent ? recordAccentStyleOf(accent) : null;
+    return accent ? { ...recordAccentStyleOf(accent), ...this.seeThrough() } : null;
+  });
+  /** A lent field's outline is the form's edge, which follows the viewer's accent. */
+  private readonly viewer = injectChromeSettings();
+  protected readonly outline = computed(() => {
+    const { outline } = this.item();
+    return outline
+      ? { ...recordOutlineStyleOf(outline, this.viewer.accent()), ...this.seeThrough() }
+      : null;
+  });
+
+  /** The page's transform, for the size the placeholder's words are written at. */
+  private readonly pixels = pagePixelsOf(injectPage('<epdf-annotation-layer>'));
+  /** The words a lent record shows while it holds nothing, in the record's own text size. */
+  protected readonly placeholder = computed(() => {
+    const { placeholder, annotation, text, frame } = this.item();
+    if (!placeholder) return null;
+    return {
+      text: placeholder.text,
+      style: {
+        ...recordPlaceholderStyleOf(
+          placeholder,
+          // A ghost has no record yet: its text style is the field's to be.
+          (annotation ?? text ?? null) as {
+            fontSize?: number | null;
+            textAlign?: string | null;
+          } | null,
+          frame.box,
+          frameInPixels(frame, this.pixels()),
+        ),
+        ...this.seeThrough(),
+      },
+    };
   });
 }

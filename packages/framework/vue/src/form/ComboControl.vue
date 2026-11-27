@@ -9,9 +9,10 @@ import { ref } from 'vue';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // Writes from the layer go through the host lens, like every control's.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { FORM_CONTROL_FILL } from '@embedpdf/web';
+import { ariaDescriptionOf, FORM_CONTROL_FILL } from '@embedpdf/web';
 import type { FormColors } from '@embedpdf/web';
 import { useCapability } from '../runtime/capabilities';
+import FieldPlaceholder from './FieldPlaceholder.vue';
 import FormFocusRing from './FormFocusRing.vue';
 import { useWidgetActivation } from './composables';
 import { useWidgetBox } from './widget-box';
@@ -23,7 +24,11 @@ const props = defineProps<{
 
 const form = useCapability(FormHostToken);
 const activate = useWidgetActivation(() => props.item.annotationRef);
-const { element: box, style: boxStyle } = useWidgetBox(
+const {
+  element: box,
+  frame,
+  style: boxStyle,
+} = useWidgetBox(
   () => props.item,
   () => props.colors,
 );
@@ -36,10 +41,11 @@ function onChange(event: Event): void {
 </script>
 
 <template>
-  <div ref="box" :style="boxStyle" @click="activate">
+  <div ref="box" :style="boxStyle" :title="item.hint ?? undefined" @click="activate">
     <select
       :value="item.selected[0] ?? ''"
       :aria-label="item.label"
+      v-bind="ariaDescriptionOf(item.hint)"
       :disabled="item.disabled"
       :style="{
         ...FORM_CONTROL_FILL,
@@ -56,6 +62,7 @@ function onChange(event: Event): void {
         {{ option.label }}
       </option>
     </select>
+    <FieldPlaceholder v-if="item.placeholder !== null" :item="item" :frame="frame" />
     <FormFocusRing :visible="focused" :color="colors.focus" />
   </div>
 </template>

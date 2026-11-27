@@ -70,6 +70,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  autocompleteOf,
   bindFieldFocus,
   claimClick,
   createFieldControlPress,
@@ -77,6 +78,7 @@ import {
   createTextFieldEditor,
   fieldControlFor,
   fieldControlPlaceOf,
+  fieldPlaceholderStyleOf,
   FORM_CONTROL_FILL,
   formColorsOf,
   isClickClaimed,
@@ -277,7 +279,7 @@ function WidgetBox({
         }}
         style={{
           ...widgetBoxStyleOf(
-            { look: item.look, accent: item.accent },
+            { look: item.look, accent: item.accent, yours: item.yours },
             { left: 0, top: 0, width: frame.width, height: frame.height },
             colors,
             { edge },
@@ -307,6 +309,25 @@ function WidgetBox({
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * What an empty field shows for its purpose: the layer's paint over the field's picture, never
+ * the field's value. Mounted only for a box that has a placeholder, so a form without purposes
+ * draws what it drew before. Its color is the form's `fields.placeholder`.
+ */
+function FieldPlaceholder({ item, page }: { item: FormWidgetItem; page: PageContextValue }) {
+  const color = useSelector(FormHostToken, (form) => form.getSettings().fields.placeholder);
+  const frame = rectInPixels(item.box, page.transform);
+  return (
+    <span
+      aria-hidden="true"
+      data-epdf-placeholder=""
+      style={fieldPlaceholderStyleOf(item, frame, color)}
+    >
+      {item.placeholder}
+    </span>
   );
 }
 
@@ -342,6 +363,11 @@ const TextControl = React.memo(function TextControl({ item, page, colors }: Cont
     value: draft,
     maxLength: item.maxLength ?? undefined,
     'aria-label': item.label,
+    // What the field is for: the browser may offer the person's saved value, and a screen
+    // reader hears what an empty box asks for.
+    autoComplete: autocompleteOf(item.purpose),
+    'aria-placeholder': item.placeholder ?? undefined,
+    'aria-description': item.hint ?? undefined,
     disabled: item.disabled,
     onFocus: editor.focus,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -355,12 +381,22 @@ const TextControl = React.memo(function TextControl({ item, page, colors }: Cont
   return (
     // A click runs the widget's action too, as in Acrobat: the editor's
     // focus click bubbles here, a read-only field's lands here directly.
-    <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      onClick={activate}
+      title={item.hint ?? undefined}
+    >
       {item.multiline ? (
         <textarea {...editorProps} />
       ) : (
         <input {...editorProps} type={item.password ? 'password' : 'text'} />
       )}
+      {/* Above the editor, which is opaque while focused; gone with the first character typed. */}
+      {item.placeholder !== null && draft === '' ? (
+        <FieldPlaceholder item={item} page={page} />
+      ) : null}
     </WidgetBox>
   );
 });
@@ -418,12 +454,19 @@ const ComboControl = React.memo(function ComboControl({
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
   return (
-    <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      onClick={activate}
+      title={item.hint ?? undefined}
+    >
       {/* Controlled, never made again on a change: a new select would drop the focus to the page
           while the old one never reports its blur. */}
       <select
         value={item.selected[0] ?? ''}
         aria-label={item.label}
+        aria-description={item.hint ?? undefined}
         disabled={item.disabled}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -444,6 +487,7 @@ const ComboControl = React.memo(function ComboControl({
           </option>
         ))}
       </select>
+      {item.placeholder !== null ? <FieldPlaceholder item={item} page={page} /> : null}
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
   );
@@ -561,6 +605,7 @@ const SignatureControl = React.memo(function SignatureControl({
           }}
         />
       ) : null}
+      {item.placeholder !== null ? <FieldPlaceholder item={item} page={page} /> : null}
     </WidgetBox>
   );
 });

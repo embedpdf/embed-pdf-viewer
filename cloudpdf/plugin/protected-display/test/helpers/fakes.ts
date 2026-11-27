@@ -160,6 +160,8 @@ export const pluginClockOf = (manual: ManualClock): PluginClock => ({
   after: (ms, run) => manual.clock.after(ms, run),
   nextFrame: (run) => manual.clock.nextFrame!(run),
   hasFrames: true,
+  // The manual clock's day when the test gives one, else a day of its own: nothing here reads it.
+  today: () => manual.clock.today?.() ?? { year: 2026, month: 1, day: 1 },
 });
 
 /** Let what's waiting on promises run. */

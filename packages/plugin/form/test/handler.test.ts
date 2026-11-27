@@ -41,6 +41,7 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
     getPageBox: () => PAGE,
     // The palette places for no group, unless a test says for whom.
     getDesignGroup: () => null,
+    getDesignAssignment: () => ({ kind: 'unassigned' }),
     list: () => [{ name: 'text_1' }],
     // The field shows once the engine answers, unless a test says it shows at once.
     get: () => null,
@@ -413,17 +414,36 @@ describe('form place handler', () => {
     expect((placed[1] as { options: unknown[] }).options).toHaveLength(2);
   });
 
-  it('places the field for the group the palette places for, and names none without one', async () => {
+  it('places the field for who the palette places for, and names nobody without one', async () => {
+    const designing = (assignment: unknown) =>
+      makeForm({ getDesignAssignment: () => assignment } as Partial<FormHostCapability>);
     const own = makeForm();
-    const forBuyer = makeForm({ getDesignGroup: () => 'buyer' } as Partial<FormHostCapability>);
-    for (const { form } of [own, forBuyer]) {
+    const forBuyer = designing({ kind: 'group', groupId: 'buyer' });
+    const forAnyone = designing({ kind: 'anyone' });
+    for (const { form } of [own, forBuyer, forAnyone]) {
       const handler = createPlaceHandler(form, interactionFor('form-text'), null);
       handler.onPointerDown(at('down', 100, 100));
       handler.onPointerUp?.(at('up', 100, 100));
     }
     await flush();
+    expect(own.placed[0]).not.toHaveProperty('assignment');
     expect(own.placed[0]).not.toHaveProperty('groupId');
+    // A group goes as 3.4 placed it; anyone as an assignment.
     expect(forBuyer.placed[0]).toMatchObject({ kind: 'text', name: 'text_2', groupId: 'buyer' });
+    expect(forBuyer.placed[0]).not.toHaveProperty('assignment');
+    expect(forAnyone.placed[0]).toMatchObject({ kind: 'text', assignment: { kind: 'anyone' } });
+  });
+
+  it('the signature tool places nothing while the palette places for anyone', async () => {
+    const forAnyone = makeForm({
+      getDesignAssignment: () => ({ kind: 'anyone' }) as const,
+    } as Partial<FormHostCapability>);
+    const handler = createPlaceHandler(forAnyone.form, interactionFor('form-signature'), null);
+    // The press is declined, so it goes on to the other handlers.
+    expect(handler.onPointerDown(at('down', 100, 100))).toBe(false);
+    handler.onPointerUp?.(at('up', 100, 100));
+    await flush();
+    expect(forAnyone.placed).toHaveLength(0);
   });
 
   it('a rejected create is contained (logged, no unhandled rejection)', async () => {

@@ -15,9 +15,12 @@
 import { reload, type MirrorReload } from '@embedpdf/core';
 import {
   annotationKey,
+  assignmentsEqual,
+  groupIdOfAssignment,
   reorderPart,
   type AnnotationRef,
   type DocumentEvent,
+  type FieldAssignment,
   type FormField,
   type FormFieldRef,
   type FormSnapshot,
@@ -401,10 +404,12 @@ export const placeOf = (row: WidgetAnnotation): WidgetPlace => ({
   rect: row.rect,
 });
 
-/** One widget on its page: its address, where it is and its look. */
+/** One widget on its page: its address, where it is, its look, and whether it holds a mark. */
 export interface PageWidget extends WidgetPlace {
   readonly ref: AnnotationRef;
   readonly look: FormWidgetLook;
+  /** A mark is drawn in the box: a signature field's, drawn without signing. */
+  readonly hasMark: boolean;
 }
 
 /** One page's widgets: widget annotation object number → where it is and how it looks. */
@@ -443,6 +448,7 @@ export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): Page
         fontSize: row.fontSize ?? null,
         textAlign: row.textAlign ?? 'left',
       },
+      hasMark: row.hasMark,
     };
   }
   return widgets;
@@ -547,22 +553,38 @@ export interface NamedGroup {
 
 const NO_NAMED_GROUPS: readonly NamedGroup[] = Object.freeze([]);
 
+/** Nobody's: the assignment of a field in no group, and where the design assignment starts. */
+export const UNASSIGNED: FieldAssignment = Object.freeze({ kind: 'unassigned' });
+
+/** Anyone's: every signer may fill the field in. */
+export const ANYONE: FieldAssignment = Object.freeze({ kind: 'anyone' });
+
 /**
- * The plugin's session state: the box the cursor is in, the group that fields placed with a
- * tool go in, and who the app says this document's groups are. A write in flight shows in the
- * mirror's view.
+ * An assignment as a change says it: in the released `groupId` wherever that can (a group's id,
+ * `null` for nobody), so the plugin sends what 3.4 sent for what 3.4 could do, and as
+ * `assignment` only for anyone. The engine takes either from any assignment.
+ */
+export const patchOfAssignment = (
+  assignment: FieldAssignment,
+): { groupId: string | null } | { assignment: FieldAssignment } =>
+  assignment.kind === 'anyone' ? { assignment } : { groupId: groupIdOfAssignment(assignment) };
+
+/**
+ * The plugin's session state: the box the cursor is in, who fields placed with a tool are for
+ * (a group, anyone or nobody), and who the app says this document's groups are. A write in
+ * flight shows in the mirror's view.
  */
 export interface FormModel {
   readonly focused: FocusedWidget | null;
-  /** The group a field placed with a tool goes in; `null` when it names none. */
-  readonly designGroup: string | null;
+  /** Who a field placed with a tool is for; nobody (`unassigned`) at first. */
+  readonly designAssignment: FieldAssignment;
   /** The groups the app named, in its order, each id once. */
   readonly groups: readonly NamedGroup[];
 }
 
 export const initialFormModel = (): FormModel => ({
   focused: null,
-  designGroup: null,
+  designAssignment: UNASSIGNED,
   groups: NO_NAMED_GROUPS,
 });
 
@@ -577,7 +599,9 @@ export function setGroups(state: FormModel, groups: readonly NamedGroup[]): Form
   return same ? state : { ...state, groups };
 }
 
-/** Name the group that fields placed with a tool go in; the same group changes nothing. */
-export function setDesignGroup(state: FormModel, groupId: string | null): FormModel {
-  return state.designGroup === groupId ? state : { ...state, designGroup: groupId };
+/** Say who fields placed with a tool are for; the same assignment changes nothing. */
+export function setDesignAssignment(state: FormModel, assignment: FieldAssignment): FormModel {
+  return assignmentsEqual(state.designAssignment, assignment)
+    ? state
+    : { ...state, designAssignment: Object.freeze({ ...assignment }) };
 }

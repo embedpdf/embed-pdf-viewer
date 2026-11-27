@@ -26,6 +26,9 @@ import { FormLayer, useFormEvent, useFormState } from '../src/form';
 import { makePageContext, PageProvider, useKernel, Viewer } from '../src/runtime';
 import type { PageContextValue } from '../src/runtime';
 
+/** The buyer's group, as an assignment. */
+const BUYER_ASSIGNMENT = { kind: 'group', groupId: 'buyer' } as const;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const packages = resolve(here, '..', '..', '..');
 const blank = resolve(packages, 'engine', 'main', 'test', 'fixtures', 'hello_world.pdf');
@@ -183,7 +186,18 @@ describe('fields for several people', () => {
         ]);
         act(() => form.setDesignGroup('buyer'));
         expect(state.designGroup).toBe('buyer');
-        expect(changes).toEqual([{ groupId: 'buyer' }]);
+        expect(state.designAssignment).toEqual(BUYER_ASSIGNMENT);
+        // For anyone: in no group. Naming a group again is that group's.
+        act(() => form.setDesignAssignment({ kind: 'anyone' }));
+        expect(state.designGroup).toBeNull();
+        expect(state.designAssignment).toEqual({ kind: 'anyone' });
+        act(() => form.setDesignGroup('buyer'));
+        expect(state.designAssignment).toEqual(BUYER_ASSIGNMENT);
+        expect(changes).toEqual([
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+          { groupId: null, assignment: { kind: 'anyone' } },
+          { groupId: 'buyer', assignment: BUYER_ASSIGNMENT },
+        ]);
 
         // Design mode: the fields are lent to the annotation layer, which shows each field in
         // its group's color, above its drawing, and the field in no group with none.

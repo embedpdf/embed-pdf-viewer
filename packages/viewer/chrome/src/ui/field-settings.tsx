@@ -22,6 +22,15 @@ const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px
 
 const NO_GROUPS: readonly FormGroup[] = Object.freeze([]);
 
+/**
+ * The settings the sidebar draws. The form plugin also describes what a field is for (its
+ * purpose), the shape of its value (its format) and who fills it in, whole (its assignment,
+ * anyone included); the sidebar leaves those three out until the viewer has its own way to set
+ * them, so it shows what it showed, the field's group among it.
+ */
+const NOT_DRAWN: ReadonlySet<string> = new Set(['purpose', 'format', 'assignment']);
+const drawn = (spec: FormFieldSetting): boolean => !NOT_DRAWN.has(spec.key);
+
 /** One option of a dropdown or a list, as its settings hold it. */
 interface Option {
   readonly label: string;
@@ -45,7 +54,7 @@ export function FieldSettings({ field }: { field: FormField }) {
 
   return (
     <div>
-      {settings.properties.map((spec) => (
+      {settings.properties.filter(drawn).map((spec) => (
         <SettingControl
           key={`${spec.key}:${spec.control}`}
           fieldKey={JSON.stringify(field.ref)}
