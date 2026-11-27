@@ -4,6 +4,7 @@ import {
   allowsSomeFieldWrite,
   annotationKey,
   authorizeCapability,
+  authorizeForAnyone,
   authorizeFieldGroup,
   authorizeFieldWrite,
   authorizeUnprotected,
@@ -149,7 +150,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
     ? op.fields.map((ref) => readField(ctx, ref))
     : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.kind));
   // A reset fills in every field it puts back: each must be the caller's to fill.
-  for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
+  for (const target of targets) authorizeFieldWrite(ctx.authority, target.field, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
   const result = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).reset(
     op.fields ? [...op.fields] : undefined,
@@ -188,6 +189,7 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (draftWritesScripts(op.draft)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const groupId = newFieldGroup(ctx, op.draft.groupId);
+  authorizeForAnyone(ctx.authority, op.draft.forAnyone === true);
   const { field, calculationOrder } = new FormMutator(
     ctx.runtime,
     ctx.session,
@@ -222,8 +224,10 @@ export function copyFields(ctx: ChangeContext, op: Op<'forms.copy'>): Done {
       actor: ctx.authority.identity,
       mayScript: allowsCapability(ctx.authority, 'doc.forms.script'),
       // A copy is the caller's own create: it keeps its source's group when
-      // the caller may set it, and is in none when its source is.
+      // the caller may set it, and is in none when its source is; the same
+      // for a source anyone fills in.
       groupOf: (groupId) => newFieldGroup(ctx, groupId),
+      forAnyoneOf: (forAnyone) => newFieldForAnyone(ctx, forAnyone),
       limits: ctx.limits,
     },
     ctx.signal,
@@ -252,6 +256,9 @@ export function updateField(ctx: ChangeContext, op: Op<'forms.update'>, opIndex:
     const groupId = namedGroup(op.patch.groupId);
     if (groupId !== before.field.groupId) authorizeFieldGroup(ctx.authority, groupId);
   }
+  // As for a group: making a field one anyone fills in takes a right, undoing it doesn't.
+  if (op.patch.forAnyone === true && !before.field.forAnyone)
+    authorizeForAnyone(ctx.authority, true);
   assertExpected(opIndex, propertiesOf(before.field), op.expect);
   return writeUpdate(ctx, before, op.patch);
 }
@@ -515,7 +522,7 @@ export function setSignatureAppearance(
   op: Op<'forms.setSignatureAppearance'>,
 ): Done {
   const before = readField(ctx, op.field);
-  authorizeFieldWrite(ctx.authority, before.field.groupId, 'sign');
+  authorizeFieldWrite(ctx.authority, before.field, 'sign');
   return recordRevert(ctx, before, 'forms.setSignatureAppearance', () =>
     new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setSignatureAppearance(
       op.field,
@@ -543,9 +550,11 @@ export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
       actor: op.actor ?? {},
       limits: op.limits,
       mayScript: (op.mayScript ?? false) && allowsCapability(ctx.authority, 'doc.forms.script'),
-      // A restoring import keeps each field's group, under the import's
-      // rights; a copy is the caller's own create.
+      // A restoring import keeps each field's group, and whether anyone
+      // fills it in, under the import's rights; a copy is the caller's own
+      // create.
       groupOf: (groupId) => (rights ? groupId : newFieldGroup(ctx, groupId)),
+      forAnyoneOf: (forAnyone) => (rights ? forAnyone : newFieldForAnyone(ctx, forAnyone)),
     },
     ctx.signal,
   );
@@ -571,7 +580,7 @@ export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
   authorizeSomeFill(ctx);
   const importer = new FormImporter(ctx.runtime, ctx.session, ctx.fonts);
   const plan = importer.planValues(op.bundle, op.limits, ctx.signal, (field) =>
-    allowsFieldWrite(ctx.authority, field.groupId, 'fill'),
+    allowsFieldWrite(ctx.authority, field, 'fill'),
   );
   const fields: FormField<PdfCoordinates>[] = [];
   const reverse: ReverseStep[] = [];
@@ -632,12 +641,12 @@ function importRights(ctx: ChangeContext, op: FormImportOp): StepRights | undefi
  * own, so the script's output travels with its input.
  */
 function authorizeFill(ctx: ChangeContext, target: ReadField): void {
-  if (allowsFieldWrite(ctx.authority, target.field.groupId, 'fill')) return;
+  if (allowsFieldWrite(ctx.authority, target.field, 'fill')) return;
   if (isCalculated(ctx, target) && ctx.fillsOwnField()) {
     authorizeUnprotected(ctx.authority, 'doc.forms.fill');
     return;
   }
-  authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
+  authorizeFieldWrite(ctx.authority, target.field, 'fill');
 }
 
 /**
@@ -645,12 +654,12 @@ function authorizeFill(ctx: ChangeContext, target: ReadField): void {
  * caller may fill the field in, or the change fills in a field of their own.
  */
 function authorizeScriptOutput(ctx: ChangeContext, target: ReadField): void {
-  if (allowsFieldWrite(ctx.authority, target.field.groupId, 'fill')) return;
+  if (allowsFieldWrite(ctx.authority, target.field, 'fill')) return;
   if (ctx.fillsOwnField()) {
     authorizeUnprotected(ctx.authority, 'doc.forms.fill');
     return;
   }
-  authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
+  authorizeFieldWrite(ctx.authority, target.field, 'fill');
 }
 
 /** Check that the caller may fill in some field, before the write knows which. */
@@ -673,7 +682,7 @@ function authorizeRevertedFills(
   for (const objectNumber of step.subject.fields) {
     const target = tryReadFieldByNumber(ctx, objectNumber);
     if (!target) continue;
-    if (action === 'sign') authorizeFieldWrite(ctx.authority, target.field.groupId, 'sign');
+    if (action === 'sign') authorizeFieldWrite(ctx.authority, target.field, 'sign');
     else authorizeFill(ctx, target);
   }
 }
@@ -687,6 +696,15 @@ function newFieldGroup(ctx: ChangeContext, named: string | null | undefined): st
   const groupId = namedGroup(named);
   authorizeFieldGroup(ctx.authority, groupId);
   return groupId;
+}
+
+/**
+ * Whether a new field is one anyone fills in, as its source is: checked as
+ * a create marking it would be.
+ */
+function newFieldForAnyone(ctx: ChangeContext, forAnyone: boolean): boolean {
+  authorizeForAnyone(ctx.authority, forAnyone);
+  return forAnyone;
 }
 
 /**
@@ -721,7 +739,7 @@ export function opsFillOwnField<C extends Coordinates>(
   return ops.some((op) => {
     if (op.type !== 'forms.setValue' && op.type !== 'forms.setAppearanceText') return false;
     const target = tryReadField(ctx, op.field);
-    return target !== null && allowsFieldWrite(ctx.authority, target.field.groupId, 'fill');
+    return target !== null && allowsFieldWrite(ctx.authority, target.field, 'fill');
   });
 }
 
@@ -734,7 +752,7 @@ export function stepsFillOwnField(ctx: ChangeContext, steps: readonly ReverseSte
       'fields' in step.subject &&
       step.subject.fields.some((objectNumber) => {
         const target = tryReadFieldByNumber(ctx, objectNumber);
-        return target !== null && allowsFieldWrite(ctx.authority, target.field.groupId, 'fill');
+        return target !== null && allowsFieldWrite(ctx.authority, target.field, 'fill');
       }),
   );
 }
@@ -1279,6 +1297,7 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
     mappingName: field.mappingName,
     // `null` for a field in no group: putting that back takes the field out of its group.
     groupId: field.groupId,
+    forAnyone: field.forAnyone,
     purpose: field.purpose,
     actions: scriptsOf(field),
   };

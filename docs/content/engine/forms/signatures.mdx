@@ -655,10 +655,18 @@ await sign(doc, {
 covers the fields in its group: `'invoice'` locks `invoice.total` too. Once signed, writing a
 locked field fails with `ProtectedDocument`, and an import skips it.
 
-A signature field in a group (`groupId`, see [Signers and groups](/docs/engine/forms/groups))
-locks the rest of its group when you name no `lock`: the group's other fields as they are when you
-sign, but not its signature fields, which their signers still sign. Name a `lock` to choose
-yourself.
+When you name no `lock`, a signing locks two kinds of field (see
+[Signers and groups](/docs/engine/forms/groups)):
+
+- **The rest of its group,** when the signature field is in one (`groupId`): the group's other
+  fields as they are when you sign, but not its signature fields, which their signers still sign.
+- **Every field anyone fills in (`forAnyone: true`) that holds a value,** whether the signature
+  field is in a group or not: text that isn't empty, a box or a radio button that is on, an
+  option that is chosen. One still empty stays open for the next signer, and the first signing
+  after it is filled in locks it.
+
+With neither, it locks nothing. A document timestamp is no signer's, so it adds no field anyone
+fills in. Name a `lock` to choose yourself: the signing locks exactly that.
 
 ## Signature fields and their look
 

@@ -43,8 +43,8 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   annotations: 1,
   annotationsAll: 1,
   annotationsExport: 1,
-  // 2: a field's purpose and format (3.4). 3: a fill names nobody, so
-  // `filledBy`, `filledByName` and `filledAt` read `null`.
+  // 2: a field's purpose and format (3.4). 3: whether a field is for anyone, and a
+  // fill names nobody, so `filledBy`, `filledByName` and `filledAt` read `null`.
   form: 3,
   formExport: 3,
   metadata: 1,

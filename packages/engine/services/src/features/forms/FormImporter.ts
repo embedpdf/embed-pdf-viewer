@@ -54,6 +54,12 @@ export interface FormImportRequest {
    * for none): checked by the caller, which refuses one it may not set.
    */
   readonly groupOf: (groupId: string | null) => string | null;
+  /**
+   * Whether a field is one anyone fills in, given whether it was in the
+   * bundle: checked by the caller, which refuses one it may not mark. Left
+   * out, the field is as it was.
+   */
+  readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
 }
 
 /** What a values import writes, decided before the first write. */
@@ -115,6 +121,7 @@ export class FormImporter {
       {
         actor: request.actor,
         groupOf: request.groupOf,
+        ...(request.forAnyoneOf ? { forAnyoneOf: request.forAnyoneOf } : {}),
         signal,
         // Who made each field, as the bundle has it. Who filled it in
         // travels nowhere: a fill records nobody.

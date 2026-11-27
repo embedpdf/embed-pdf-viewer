@@ -19,6 +19,7 @@ const BASE = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  forAnyone: false,
   purpose: null,
   createdBy: null,
   createdAt: null,
@@ -152,6 +153,25 @@ describe('form schemas', () => {
       expect(schema.safeParse({ ...draft, groupId: 'g'.repeat(257) }).success).toBe(false);
     }
     expect(FormFieldPatchSchema.parse({ groupId: null })).toEqual({ groupId: null });
+  });
+
+  test('a draft and a patch take forAnyone as true or false, and nothing else', () => {
+    const draft = { kind: 'text', name: 'note' };
+    for (const schema of [FormFieldDraftSchema, FormFieldPatchSchema]) {
+      expect(schema.safeParse({ ...draft, forAnyone: true }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, forAnyone: false }).success).toBe(true);
+      expect(schema.safeParse({ ...draft, forAnyone: null }).success).toBe(false);
+      expect(schema.safeParse({ ...draft, forAnyone: 'yes' }).success).toBe(false);
+    }
+  });
+
+  test('a field from a server older than forAnyone reads forAnyone: false', () => {
+    const { forAnyone: _forAnyone, ...older } = RADIO as unknown as Record<string, unknown>;
+    expect(FormFieldDTOSchema.parse(older)).toEqual({ ...RADIO, forAnyone: false });
+    expect(FormFieldDTOSchema.parse({ ...RADIO, forAnyone: true })).toEqual({
+      ...RADIO,
+      forAnyone: true,
+    });
   });
 
   test('a draft and a patch take a purpose, or null for none, and none with space around it', () => {

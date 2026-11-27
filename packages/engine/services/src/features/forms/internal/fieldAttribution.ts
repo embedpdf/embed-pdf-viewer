@@ -2,6 +2,7 @@ import { EngineError, EngineErrorCode, isFieldPurpose } from '@embedpdf/engine-c
 import type { AnnotationActor, IsoDateTime } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { withScratch } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
 import { formatPdfDate, pdfDateToIso } from '../../../shared/pdf-date';
 import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/writeEmbedMetadata';
@@ -14,6 +15,7 @@ import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/w
  *   /EMBD_Metadata <<
  *     /SchemaVersion 1
  *     /GroupID      (buyer)                     % who fills it in
+ *     /ForAnyone    true                        % or: every signer fills it in
  *     /Purpose      (email)                     % what its value means
  *     /CreatedBy    (u-17)                      % the creating session's user
  *     /CreatedAt    (D:20261008104200+00'00')
@@ -31,7 +33,8 @@ import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/w
  * The engine stamps the attribution from the session's identity, never from
  * what a caller sends. An anonymous session names nobody: it stamps no
  * creation. The group is what the caller sets, with the authority to set
- * it, and so is the purpose, which the engine keeps and reads nothing into.
+ * it, and so are `forAnyone` and the purpose, which the engine keeps and
+ * reads nothing into.
  */
 export interface FieldAttribution {
   readonly createdBy: string | null;
@@ -41,10 +44,14 @@ export interface FieldAttribution {
 
 const KEY_SCHEMA_VERSION = 'SchemaVersion';
 const KEY_GROUP_ID = 'GroupID';
+const KEY_FOR_ANYONE = 'ForAnyone';
 const KEY_PURPOSE = 'Purpose';
 const KEY_CREATED_BY = 'CreatedBy';
 const KEY_CREATED_AT = 'CreatedAt';
 const KEY_IMPORTED_BY = 'ImportedBy';
+
+/** `EPDF_FORMFIELD_FAMILY_SIGNATURE` in public/epdf_form.h. */
+const FAMILY_SIGNATURE = 7;
 
 const NO_ATTRIBUTION: FieldAttribution = { createdBy: null, createdAt: null, importedBy: null };
 
@@ -98,6 +105,66 @@ export function writeFieldGroup(
   groupId: string | null,
 ): void {
   writeAttribution(runtime, docPtr, fieldObjectNumber, [[KEY_GROUP_ID, groupId]]);
+}
+
+/**
+ * Whether anyone fills in field `fieldIndex` of a loaded form model. Never
+ * a field in a group, nor a signature field: an entry another tool left on
+ * one reads as `false`, so the field is that group's or its signer's.
+ */
+export function readFieldForAnyone(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): boolean {
+  if (!readForAnyoneEntry(runtime, model, fieldIndex)) return false;
+  if (FAMILY_SIGNATURE === runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)) return false;
+  return readFieldGroup(runtime, model, fieldIndex) === null;
+}
+
+/**
+ * The field's `ForAnyone` entry as it is stored, beside a group or on a
+ * signature field too: what a write compares with what the field should
+ * hold, so an entry that reads as `false` never comes back.
+ */
+export function readForAnyoneEntry(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): boolean {
+  const { fn, mem } = runtime;
+  if (!fn.EPDFForm_HasFieldEmbedMetadata(model, fieldIndex)) return false;
+  return withScratch(
+    mem,
+    4,
+    (out) =>
+      fn.EPDFForm_GetFieldEmbedMetadataBoolean(model, fieldIndex, KEY_FOR_ANYONE, out) &&
+      mem.peek(out, 'i32') !== 0,
+  );
+}
+
+/** Make a field one anyone fills in; `false` takes the entry away. */
+export function writeFieldForAnyone(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  fieldObjectNumber: number,
+  forAnyone: boolean,
+): void {
+  writeAttribution(runtime, docPtr, fieldObjectNumber, []);
+  if (!forAnyone) {
+    clearEntry(runtime, docPtr, fieldObjectNumber, KEY_FOR_ANYONE);
+    return;
+  }
+  if (
+    !runtime.fn.EPDFForm_SetFieldEmbedMetadataBoolean(
+      docPtr,
+      fieldObjectNumber,
+      KEY_FOR_ANYONE,
+      true,
+    )
+  ) {
+    throw attributionFailed(fieldObjectNumber);
+  }
 }
 
 /**

@@ -63,6 +63,54 @@ by a user who may fill in every field.
 The group is a setting of the field: it's saved in the PDF (in the field's `/EMBD_Metadata`),
 other PDF apps ignore it, and a form [export](/docs/engine/forms/import-export) carries it.
 
+## Fields anyone fills in
+
+Some fields belong to no one signer: a reference number whoever signs first knows, a delivery
+date either party may settle. Mark such a field `forAnyone`:
+
+```ts
+await doc.forms.create({
+  kind: 'text',
+  name: 'delivery.date',
+  forAnyone: true,
+  widgets: [{ page, rect: { x: 72, y: 200, width: 120, height: 24 } }],
+});
+field.forAnyone; // true
+```
+
+So a field is filled in by one of three:
+
+| The field                  | Who fills it in                                                              |
+| :------------------------- | :--------------------------------------------------------------------------- |
+| In a group (`groupId`)     | The users who may fill in that group's fields                                |
+| `forAnyone: true`             | Every user who may fill in some field: each signer, and the sender           |
+| In no group, not `forAnyone`  | The users who may fill in every field: the sender                            |
+
+A field in a group can't also be `forAnyone`, and neither can a signature field: both fail with
+`InvalidArg`. To move a field between a group and `forAnyone`, name both in one update:
+
+```ts
+await doc.forms.update(field.ref, { groupId: null, forAnyone: true });
+await doc.forms.update(field.ref, { groupId: 'buyer', forAnyone: false });
+```
+
+Marking a field `forAnyone` lets every group's signers fill it in, so it takes the permission to put
+fields in every group, `fields:set-group:all`, beside `doc.forms.modify`. `forAnyone: false` takes
+`doc.forms.modify` alone, as taking a field out of its group does.
+
+Like the group, `forAnyone` is saved in the field's `/EMBD_Metadata`, other PDF apps ignore it, and
+a form export carries it. Signing [locks](#signing) a `forAnyone` field once it holds a value.
+
+<Engine cloud>
+
+`forAnyone` needs a server of version 3.5. An older one is never sent it: a `create()` or an
+`update()` that names it, `false` too, fails with `NotImplemented`, and so does an
+[`import()`](/docs/engine/forms/import-export) of a bundle with a `forAnyone` field.
+`details.needs` and `details.serverVersion` say which side to update. Reading still works: every
+field of an older server reads `forAnyone: false`.
+
+</Engine>
+
 ## Give each signer their group
 
 Each signer gets the permissions to fill in and sign their own group's fields:
@@ -107,6 +155,7 @@ naming the permission it would take:
 await doc.forms.setValue(buyerName.ref, { value: 'Dana Smith' });
 await doc.forms.setValue(sellerName.ref, { value: 'x' });
 // Forbidden: details.required is 'fields:fill:group=seller'
+await doc.forms.setValue(deliveryDate.ref, { value: '2026-12-01' }); // a `forAnyone` field: allowed
 ```
 
 A field a script calculates, such as a total, may be in another group or in none. Write it in
@@ -133,10 +182,18 @@ A signer signs their own signature field, and only theirs:
 const prepared = await doc.signatures.prepare({ field: buyerSignature.ref });
 ```
 
-When the signature field is in a group and you name no `lock`, signing locks the rest of the
-group: every field in it as it is when the buyer signs, except its signature fields. After that,
-writing one of them fails with `ProtectedDocument` for everyone, in this engine and in other PDF
-apps. Name a [`lock`](/docs/engine/forms/signatures#lock-fields) to choose the fields yourself.
+When you name no `lock`, signing locks what the signer has seen:
+
+- **The rest of the group,** when the signature field is in one: every field in it as it is when
+  the buyer signs, except its signature fields.
+- **Every `forAnyone` field that holds a value,** whoever filled it in: this signer, an earlier one,
+  or the sender before sending. This holds for a signature field in no group too.
+
+After that, writing one of them fails with `ProtectedDocument` for everyone, in this engine and in
+other PDF apps. A `forAnyone` field still empty when the buyer signs stays open: the seller may fill
+it in, and it locks when the seller signs. Name a
+[`lock`](/docs/engine/forms/signatures#lock-fields) to choose the fields yourself; then nothing is
+added to it.
 
 The engine doesn't order the signers. Give the seller their permissions when the buyer is done.
 
@@ -177,7 +234,9 @@ rights.setGroup; // the groups the user may put a field in
 ```
 
 `{ all: true }` is every field. Otherwise only the fields in `groups` are the user's; a field in
-no group isn't, and an empty list is no field at all.
+no group isn't, and an empty list is no field at all. A `forAnyone` field is the user's to fill in
+unless `fill` is that empty list. A user may mark fields `forAnyone` when `setGroup` is
+`{ all: true }`.
 
 The engine checks every write the same way, so these answers never disagree with a call. See
 [Permissions](/docs/engine/concepts/permissions#form-fields).

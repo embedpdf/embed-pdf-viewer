@@ -26,6 +26,13 @@ interface FormFieldPatchBase {
    * takes no `fields:set-group` right: form design is enough.
    */
   groupId?: string | null;
+  /**
+   * Every signer may fill the field in. `true` takes `fields:set-group:all`
+   * and a field the update leaves in no group: to move a field from a
+   * group, send `groupId: null` with it. `false` takes form design alone.
+   * A signature field is never one.
+   */
+  forAnyone?: boolean;
   /** What the field's value means; `null` takes the purpose away. */
   purpose?: string | null;
   /**

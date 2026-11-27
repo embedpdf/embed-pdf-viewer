@@ -18,6 +18,7 @@ import {
 } from './bundleLimits';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormField } from '../forms/field';
+import { withForAnyone } from '../forms/anyone';
 import { withPurposeAndFormat } from '../forms/format';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { encodePageKey } from '../identity/PageRef';
@@ -92,15 +93,16 @@ const WIDGET_ROW_FIELDS = ['data', 'resources'] as const;
  * `bundle` with every field whole. A bundle written before a field had a
  * `purpose` and a `format` (a file kept from an earlier version, an export
  * from an older server) holds fields without them: each gets both, as a
- * read gives them (`withPurposeAndFormat`). A bundle that has them all comes
- * back as it is.
+ * read gives them (`withPurposeAndFormat`), and `forAnyone: false` when it is
+ * older than that too (`withForAnyone`). A bundle that has them all comes back
+ * as it is.
  */
 export function completeFormBundle<
   Bundle extends { readonly fields: readonly { readonly data: object }[] },
 >(bundle: Bundle): Bundle {
   let completed = false;
   const fields = bundle.fields.map((row) => {
-    const data = withPurposeAndFormat(row.data as Record<string, unknown>);
+    const data = withForAnyone(withPurposeAndFormat(row.data as Record<string, unknown>));
     if (data === row.data) return row;
     completed = true;
     return { ...row, data };

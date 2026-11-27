@@ -21,6 +21,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -41,6 +42,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -55,6 +57,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -71,6 +74,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -100,6 +104,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -128,6 +133,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
@@ -142,6 +148,7 @@ export namespace FormFieldDraft {
         alternateName?: string | undefined;
         mappingName?: string | undefined;
         groupId?: (string | null) | undefined;
+        forAnyone?: boolean | undefined;
         purpose?: (string | null) | undefined;
         actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
