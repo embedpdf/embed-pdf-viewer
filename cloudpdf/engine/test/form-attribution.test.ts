@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { createTestSigner, sign } from '@embedpdf/core-signature';
 import {
   CHANGE_FIXTURE_PDF,
   runFormAttributionConformance,
@@ -29,6 +30,7 @@ const runner: ConformanceTestRunner = {
 const TENANT_ID = 'cloud-form-attribution-tenant';
 let fx: DbSeededFixture | undefined;
 let docs = 0;
+const key = createTestSigner({ commonName: 'Form Attribution Check' });
 
 beforeAll(async () => {
   fx = await buildDbSeededFixture({ secret: 'cloud-form-attribution-secret' });
@@ -54,5 +56,9 @@ runFormAttributionConformance(runner, {
     }
     const token = docScopedToken(fx, TENANT_ID, docId, scope, undefined, identity);
     return engine.open({ kind: 'token', token });
+  },
+  // The server judges a completion's CMS: a real one, from a test key.
+  sign: async (doc, field) => {
+    await sign(doc, { field, key: await key });
   },
 });

@@ -79,6 +79,7 @@ import type { CloudManifest } from './CloudDocumentHandle';
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
+import { forAnyoneTheServerLacks, bundleForAnyoneTheServerLacks } from './anyoneFields';
 import {
   bundleImageTheServerLacks,
   bundlePurposeTheServerLacks,
@@ -266,9 +267,12 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
       return this.writes.run(opId, signal, async (write) => {
         // Checked first: what the server lacks is asked of a bundle that is one.
         const manifest = await this.checkedManifest(bundle);
-        // A server older than purposes, or than button images, would drop one.
+        // A server older than purposes would drop one without saying so, one
+        // older than fields anyone fills in would make such a field an
+        // ordinary one, and one older than button images would drop those.
         const lacking =
           bundlePurposeTheServerLacks(this.http.serverVersion, manifest) ??
+          bundleForAnyoneTheServerLacks(this.http.serverVersion, manifest) ??
           bundleImageTheServerLacks(this.http.serverVersion, manifest);
         if (lacking) throw lacking;
         const body: FormImportBody = {
@@ -345,9 +349,10 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.rejectIfClosed<FormFieldCreateResult>();
     if (rejected) return rejected;
-    // A purpose, a format and a layout are never sent to a server older than them.
+    // A purpose, a format, `forAnyone` and a layout are never sent to a server older than them.
     const lacking =
       fieldFactsTheServerLacks(this.http.serverVersion, draft) ??
+      forAnyoneTheServerLacks(this.http.serverVersion, draft) ??
       widgetLayoutTheServerLacks(this.http.serverVersion, ...(draft.widgets ?? []));
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
@@ -383,7 +388,9 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
     if (rejected) return rejected;
-    const lacking = fieldFactsTheServerLacks(this.http.serverVersion, patch);
+    const lacking =
+      fieldFactsTheServerLacks(this.http.serverVersion, patch) ??
+      forAnyoneTheServerLacks(this.http.serverVersion, patch);
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);

@@ -173,6 +173,7 @@ export function evaluateStep(input: StepInput): RevisionAnalysis {
     ruleDss(ctx);
     ruleSignatureFieldAdded(ctx);
     ruleSignatureAdded(ctx);
+    ruleUnsignedSignatureAppearance(ctx);
     ruleFormFill(ctx);
     ruleAnnotation(ctx);
   } else {
@@ -402,13 +403,14 @@ class StepContext {
    * the DSS): objects whose references come from `parents` through labels
    * `accept`, then everything referenced from those objects, and so on.
    * Runs per side, because a replaced appearance stream exists on one
-   * side only.
+   * side only. `admit` narrows which changed objects may join.
    */
   claimSubtree(
     side: Side,
     roots: Set<number>,
     accept: (label: string, parent: number) => boolean,
     rule: string,
+    admit: (c: ObjectChange) => boolean = () => true,
   ): void {
     // Two sets, never merged: an edge from a root is inside the subtree
     // only through an accepted label, on every pass; an edge from an object
@@ -421,7 +423,8 @@ class StepContext {
       grew = false;
       for (const c of this.changes) {
         if (roots.has(c.objectNumber) || joined.has(c.objectNumber)) continue;
-        if (this.locked.has(c.objectNumber)) continue;
+        // An object the rule doesn't admit stays out, and so does what hangs off it.
+        if (this.locked.has(c.objectNumber) || !admit(c)) continue;
         const edges = c.usage[side];
         if (edges.length === 0) continue;
         const inside = edges.filter(
@@ -998,6 +1001,66 @@ function ruleSignatureAdded(ctx: StepContext): void {
   for (const side of SIDES)
     ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
   if (values.size > 0) ctx.claimSubtree('new', values, () => true, rule);
+}
+
+/**
+ * A new appearance on a signature field that is not signed, before the step
+ * or after it: the field and its widgets change `/AP` and nothing else, and
+ * every object under the new `/AP` is new (removed ones may go). Acrobat
+ * does not count it as a change after an approval signature ("not
+ * modified": whether the field had an appearance before or not, merged or
+ * with a widget of its own, a picture or a drawing, corpus v4/93, 94, 97,
+ * 99), and permits it under a P=2 certification (v4/101, 102). Runs at
+ * `fill` and above, as every rule in the step's form block does.
+ *
+ * A signed field is left alone on purpose. Acrobat reports the same drawing
+ * over a signed field as "not modified" too (v4/95), but there it replaces
+ * the look the signature was made with, so it stays unexplained.
+ */
+function ruleUnsignedSignatureAppearance(ctx: StepContext): void {
+  const rule = 'signature-appearance';
+  const isAp = (label: string) => label === 'AP' || label.startsWith('AP/');
+  const owners = new Set<number>();
+  for (const [num, field] of ctx.before.fieldByObj) {
+    const after = ctx.after.fieldByObj.get(num);
+    if (field.kind !== 'signature' || after?.kind !== 'signature') continue;
+    if (ctx.before.signedFields.has(num) || ctx.after.signedFields.has(num)) continue;
+    const parts = new Set([num, ...field.widgets]);
+    if (after.widgets.length !== field.widgets.length || after.widgets.some((w) => !parts.has(w))) {
+      continue;
+    }
+    const written = [...parts]
+      .map((n) => ctx.byNum.get(n))
+      .filter((c): c is ObjectChange => c !== undefined && !ctx.isIdentical(c));
+    // A lock has already condemned what it covers.
+    if (written.length === 0 || written.some((c) => ctx.locked.has(c.objectNumber))) continue;
+    const beyondAppearance = (c: ObjectChange) =>
+      [...changedKeys(c.value.old, c.value.new)].filter((k) => k !== 'AP');
+    if (written.some((c) => beyondAppearance(c).length > 0)) {
+      // Only the appearance has a case behind it. A condemned field still
+      // claims its stable edges: one cause in the report, not a cascade.
+      for (const c of written) {
+        const keys = beyondAppearance(c);
+        if (keys.length === 0) continue;
+        ctx.forbidden(
+          c,
+          rule,
+          `signature field "${field.name}", not signed, keys changed: ${keys.join(', ')}`,
+        );
+        ctx.claimStable(c, rule, false);
+      }
+      continue;
+    }
+    for (const c of written) {
+      ctx.claimStable(c, rule);
+      ctx.permitted(c, rule, `new appearance on signature field "${field.name}", not signed`);
+    }
+    for (const n of parts) owners.add(n);
+  }
+  if (owners.size === 0) return;
+  // Under the new /AP only new objects; under the old one only objects removed.
+  ctx.claimSubtree('new', owners, isAp, rule, (c) => c.change === 'added');
+  ctx.claimSubtree('old', owners, isAp, rule, (c) => c.change === 'freed');
 }
 
 /**

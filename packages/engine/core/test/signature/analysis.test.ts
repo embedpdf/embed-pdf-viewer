@@ -1150,6 +1150,144 @@ describe('evaluateStep: appearance regeneration', () => {
   });
 });
 
+describe('evaluateStep: a new appearance on a signature field that is not signed', () => {
+  /** {@link structure} with a second signature field, `open` (31), that nobody signed. */
+  const withOpenField = (first: Partial<Signature> = {}, widgets: number[] = [31]) =>
+    structure({
+      fields: [
+        ...structure().fields,
+        { objectNumber: 31, name: 'open', kind: 'signature', widgets },
+      ],
+      signatures: [
+        signature(0, 30, first),
+        signature(1, 31, {
+          signed: false,
+          fieldName: 'open',
+          revisionIndex: null,
+          coverage: null,
+          byteRange: null,
+        }),
+      ],
+    });
+  const approval = withOpenField();
+  const listed = [edge(10, 'Fields/[2]'), edge(3, 'Annots/[2]')];
+  /** Object `n` written with `/AP` pointing at `ap` instead of `32`, and `extra` keys. */
+  const redrawn = (n: number, name: string, uses: ObjectReferrer[], extra = '') =>
+    change(
+      n,
+      {
+        old: `<</AP <</N 32 0 R>>/FT /Sig/T (${name})>>`,
+        new: `<</AP <</N 40 0 R>>${extra}/FT /Sig/T (${name})>>`,
+      },
+      { old: uses, new: uses },
+    );
+  /** The wrapper EmbedPDF draws a picture with: a form, the form it places, and the image. */
+  const wrapper = (owner: number) => [
+    change(
+      40,
+      { old: null, new: 'stream(41,aa)<</Resources <</XObject <</EPDFWRAP 41 0 R>>>>>>' },
+      { new: [edge(owner, 'AP/N')] },
+    ),
+    change(
+      41,
+      { old: null, new: 'stream(58,bb)<</Resources <</XObject <</FXX1 42 0 R>>>>>>' },
+      { new: [edge(40, 'Resources/XObject/EPDFWRAP')] },
+    ),
+    change(
+      42,
+      { old: null, new: 'stream(26,cc)<</Subtype /Image/Width 30/Height 10>>' },
+      { new: [edge(41, 'Resources/XObject/FXX1')] },
+    ),
+  ];
+  const judge = (changes: ObjectChange[], at: RevisionStructure = approval) =>
+    evaluateStep({ older: 1, newer: 2, changes, before: at, after: at });
+  const refused = (step: ReturnType<typeof evaluateStep>) =>
+    step.findings.filter((f) => f.verdict === 'forbidden');
+
+  test('after an approval signature it is permitted: the field changes /AP alone, and all under it is new (corpus v4/93, 94, 97)', () => {
+    const step = judge([redrawn(31, 'open', listed), ...wrapper(31)]);
+    expect(step.verdict).toBe('permitted');
+    expect(refused(step)).toEqual([]);
+    expect(step.findings.find((f) => f.objectNumber === 31)?.rule).toBe('signature-appearance');
+  });
+
+  test('a widget of its own changes /AP, and the field nothing (corpus v4/99)', () => {
+    const separate = withOpenField({}, [33]);
+    const widget = redrawn(33, 'open', [edge(31, 'Kids/[0]'), edge(3, 'Annots/[2]')]);
+    const step = judge([widget, ...wrapper(33)], separate);
+    expect(step.verdict).toBe('permitted');
+    expect(step.findings.find((f) => f.objectNumber === 33)?.rule).toBe('signature-appearance');
+  });
+
+  test('the old appearance may go with it; an object that was there before may not join', () => {
+    const freed = change(
+      32,
+      { old: 'stream(9,dd)<</Subtype /Form>>', new: null },
+      { old: [edge(31, 'AP/N')] },
+    );
+    expect(judge([redrawn(31, 'open', listed), ...wrapper(31), freed]).verdict).toBe('permitted');
+    // A font that was in the file, changed and drawn by the new appearance: not part of it.
+    const font = change(
+      50,
+      { old: '<</BaseFont /Helvetica/Type /Font>>', new: '<</BaseFont /Courier/Type /Font>>' },
+      { old: [edge(10, 'DR/Font/Helv')], new: [edge(40, 'Resources/Font/F1')] },
+    );
+    const step = judge([redrawn(31, 'open', listed), ...wrapper(31), font]);
+    expect(step.verdict).toBe('forbidden');
+    expect(refused(step).map((f) => [f.objectNumber, f.rule])).toContainEqual([50, 'unexplained']);
+  });
+
+  test('under a certification that allows form filling it is permitted too (corpus v4/101, 102)', () => {
+    const certified = withOpenField({ docMdp: 2, catalogCertification: true });
+    const step = judge([redrawn(31, 'open', listed), ...wrapper(31)], certified);
+    expect(step.levelInForce).toBe('fill');
+    expect(step.verdict).toBe('permitted');
+    // After one that allows no changes, nothing is permitted.
+    const none = withOpenField({ docMdp: 1, catalogCertification: true });
+    expect(judge([redrawn(31, 'open', listed), ...wrapper(31)], none).verdict).toBe('forbidden');
+  });
+
+  test("the signed field's own appearance stays forbidden, though Acrobat accepts it (corpus v4/95)", () => {
+    const step = judge([redrawn(30, 'sig0', [edge(10, 'Fields/[1]')]), ...wrapper(30)]);
+    expect(step.verdict).toBe('forbidden');
+    expect(step.findings.some((f) => f.rule === 'signature-appearance')).toBe(false);
+  });
+
+  test('a key beyond /AP is named as the cause (Acrobat: "Form Fields with Property Changes")', () => {
+    const step = judge([
+      redrawn(31, 'open', listed, '/EMBD_Metadata <</AppearanceFit (contain)>>'),
+      ...wrapper(31),
+    ]);
+    expect(step.verdict).toBe('forbidden');
+    const [cause] = refused(step).filter((f) => f.objectNumber === 31);
+    expect(cause.rule).toBe('signature-appearance');
+    expect(cause.detail).toMatch(/keys changed: EMBD_Metadata/);
+    // One cause for the field: its references are explained by it.
+    expect(refused(step).filter((f) => f.objectNumber === 31)).toHaveLength(1);
+  });
+
+  test("a field signed in the same step is the signing rule's, and a lock condemns before it", () => {
+    const signedNow = structure({
+      fields: approval.fields,
+      signatures: [signature(0, 30), signature(1, 31, { fieldName: 'open', revisionIndex: 2 })],
+    });
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [redrawn(31, 'open', listed), ...wrapper(31)],
+      before: approval,
+      after: signedNow,
+    });
+    expect(step.findings.some((f) => f.rule === 'signature-appearance')).toBe(false);
+    const locked = withOpenField({
+      fieldMdp: { action: 'include', fields: ['open'] },
+    } as Partial<Signature>);
+    const lockedStep = judge([redrawn(31, 'open', listed), ...wrapper(31)], locked);
+    expect(lockedStep.verdict).toBe('forbidden');
+    expect(refused(lockedStep).find((f) => f.objectNumber === 31)?.rule).toBe('field-lock');
+  });
+});
+
 describe('evaluateStep: a signature field added by Acrobat', () => {
   /**
    * What Acrobat writes when it adds a document timestamp to a page whose /Annots was an array

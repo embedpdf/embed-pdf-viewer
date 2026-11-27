@@ -237,7 +237,7 @@ const { fields, dropped } = await otherForm.import(await FormTransfer.parse(text
 The import adds the fields as one change, and one step to undo: an undo takes them away again.
 When your app adds the fields by itself, pass `{ history: false }`, and undo leaves them alone. A
 field whose name the form has already is left out and listed in `dropped`. By default each field
-keeps who created and filled it in, which needs `canRestoreAttribution()`; pass
+keeps who created it, which needs `canRestoreAttribution()`; pass
 `{ attribution: 'stamp' }` to make them yours. See
 [Import & export](/docs/engine/forms/import-export).
 

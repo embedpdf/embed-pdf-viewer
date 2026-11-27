@@ -420,8 +420,8 @@ export interface FormImportOp {
   /** A design import's: whether each field gets the bundle's value. */
   readonly values?: boolean;
   /**
-   * Whom `'stamp'` makes the creator and filler, as `create` and `setValue`
-   * do, and whose user `'restore'` records as `importedBy`.
+   * Whom `'stamp'` makes the creator, as `create` does, and whose user
+   * `'restore'` records as `importedBy`.
    */
   readonly actor?: AnnotationActor;
   readonly limits: BundleLimits;

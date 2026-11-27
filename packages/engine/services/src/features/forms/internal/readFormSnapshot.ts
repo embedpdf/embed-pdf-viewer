@@ -19,7 +19,12 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 import { PageIndexLookup, readButtonHasImage } from './buttonImage';
-import { readFieldAttribution, readFieldGroup, readFieldPurpose } from './fieldAttribution';
+import {
+  readFieldForAnyone,
+  readFieldAttribution,
+  readFieldGroup,
+  readFieldPurpose,
+} from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldKind> = {
@@ -171,8 +176,13 @@ export function readFieldAt(
     defaultValueEntry,
     ...(actions ? { actions } : {}),
     groupId: readFieldGroup(runtime, model, fieldIndex),
+    forAnyone: readFieldForAnyone(runtime, model, fieldIndex),
     purpose: readFieldPurpose(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
+    // Deprecated: a fill records nobody (see fieldAttribution.ts).
+    filledBy: null,
+    filledByName: null,
+    filledAt: null,
     widgets: [],
   };
   const scalarValue = entryScalar(valueEntry);
@@ -298,6 +308,42 @@ export function readFormFields(
     fields,
     calculationOrder,
   };
+}
+
+/**
+ * Whether field `fieldIndex` holds a value, as a read of it says: text that
+ * isn't empty (a text field, a dropdown), a checkbox or radio button that is
+ * on, an option that is selected (a list). A push button, a signature field
+ * and a field of a kind the engine doesn't model hold none.
+ */
+export function fieldHoldsValue(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): boolean {
+  const { fn } = runtime;
+  switch (FAMILY_BY_CODE[fn.EPDFForm_GetFieldFamily(model, fieldIndex)]) {
+    case 'text':
+    case 'combobox':
+      return entryScalar(readValueEntry(runtime, model, fieldIndex, false)) !== '';
+    case 'checkbox':
+    case 'radio': {
+      const count = fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
+      for (let w = 0; w < count; w++) {
+        if (fn.EPDFForm_IsFieldWidgetChecked(model, fieldIndex, w)) return true;
+      }
+      return false;
+    }
+    case 'listbox': {
+      const count = fn.EPDFForm_CountFieldOptions(model, fieldIndex);
+      for (let o = 0; o < count; o++) {
+        if (fn.EPDFForm_IsFieldOptionSelected(model, fieldIndex, o)) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
 }
 
 function readValueEntry(

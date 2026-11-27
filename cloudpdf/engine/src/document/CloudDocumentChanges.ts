@@ -32,6 +32,7 @@ import { assertServerTakesMark, exactBuffer, markPart } from './signatureMark';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { ChangeSender, CloudWrites, SentChange } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
+import { forAnyoneTheServerLacks, type ForAnyoneWrite } from './anyoneFields';
 import {
   fieldFactsTheServerLacks,
   widgetLayoutTheServerLacks,
@@ -89,8 +90,8 @@ export class CloudDocumentChanges {
       });
     }
     // A kind of op the server doesn't have yet is refused here, alone, and so
-    // is a field's purpose or format, or a widget's layout, on its way to a
-    // server older than them.
+    // is a field's purpose, format or `forAnyone`, or a widget's layout, on its
+    // way to a server older than them.
     const lacking = isUndoChange(change)
       ? null
       : (opsTheServerLacks(
@@ -98,6 +99,7 @@ export class CloudDocumentChanges {
           change.ops.map((op) => op.type),
         ) ??
         fieldFactsTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
+        forAnyoneTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
         widgetLayoutTheServerLacks(this.serverVersion(), ...change.ops.flatMap(widgetWritesOf)));
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<ChangeResult>(async (signal) => {
@@ -267,7 +269,9 @@ function changeRequestOf(changes: readonly SentChange[]): {
  * update's patch, and what an update or a delete expects. They are what can
  * name a field's purpose or format.
  */
-function fieldWritesOf(op: Extract<Change, { ops: unknown }>['ops'][number]): FieldWrite[] {
+function fieldWritesOf(
+  op: Extract<Change, { ops: unknown }>['ops'][number],
+): (FieldWrite & ForAnyoneWrite)[] {
   switch (op.type) {
     case 'forms.create':
       return [op.draft];

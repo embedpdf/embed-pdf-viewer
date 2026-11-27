@@ -19,6 +19,7 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
+  checkedForAnyone,
   checkedPurpose,
   defaultEntryOfDraft,
   EngineError,
@@ -66,9 +67,9 @@ import {
   type OrderChange,
 } from './internal/calculationOrder';
 import {
-  clearFieldFill,
+  readForAnyoneEntry,
   stampFieldCreation,
-  stampFieldFill,
+  writeFieldForAnyone,
   writeFieldGroup,
   writeFieldPurpose,
 } from './internal/fieldAttribution';
@@ -134,16 +135,15 @@ export class FormMutator {
   ) {}
 
   /**
-   * Set a field's value, as `actor` filled it in: what engine-core's rules
-   * (`fieldAfterValue`) leave the field holding. A write that changes the
-   * field names who filled it in; one that leaves it as it was writes
-   * nothing.
+   * Set a field's value: what engine-core's rules (`fieldAfterValue`) leave
+   * the field holding. The value and its drawing are all it writes, as every
+   * PDF app does, so a signature made before it keeps its verdict; one that
+   * leaves the field as it was writes nothing.
    */
   setValue(
     ref: FormFieldRef,
     value: FormFieldValue,
     signal: AbortSignal,
-    actor: AnnotationActor,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
@@ -154,7 +154,6 @@ export class FormMutator {
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
     const after = fieldAfterValue({ field: before, widgets: [] }, value).field;
     const changed = this.writeFieldAfter(resolved.fieldObjectNumber, before, after);
-    if (changed) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
     return this.readBack(resolved.fieldObjectNumber, changed ?? []);
   }
 
@@ -251,7 +250,6 @@ export class FormMutator {
     signal: AbortSignal,
   ): FieldWriteResult<FormResetResult<PdfCoordinates>> {
     throwIfAborted(signal);
-    const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const targets =
       refs === undefined ? this.wholeFormTargets(model) : this.namedTargets(model, refs);
@@ -264,10 +262,7 @@ export class FormMutator {
       .flatMap((before) => {
         const after = fieldAfterReset({ field: before, widgets: [] }).field;
         const changed = this.writeFieldAfter(fieldObjectNumberOf(before), before, after);
-        if (!changed) return [];
-        // Back at its default, the value was filled in by nobody.
-        clearFieldFill(this.runtime, docPtr, fieldObjectNumberOf(before));
-        return [{ before, changed }];
+        return changed ? [{ before, changed }] : [];
       });
     if (written.length > 0) this.session.invalidateDerived();
 
@@ -380,8 +375,12 @@ export class FormMutator {
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.kind, placement));
     // The default is checked against the draft before anything is written,
-    // and so are the purpose and the format.
+    // and so are who fills it in, the purpose and the format.
     defaultEntryOfDraft(draft);
+    const forAnyone = checkedForAnyone(draft.forAnyone, {
+      kind: draft.kind,
+      groupId: draft.groupId ?? null,
+    });
     const purpose = checkedPurpose(draft.purpose);
     const format = formatWriteOf(draft, draft.kind) ?? null;
     if ('maxLength' in draft && draft.maxLength !== undefined) {
@@ -424,6 +423,7 @@ export class FormMutator {
     if (draft.groupId !== undefined && draft.groupId !== null) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
     }
+    if (forAnyone) writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, true);
     if (purpose !== null) writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
@@ -596,7 +596,7 @@ export class FormMutator {
     const drawings = this.session.drawingIndex();
     for (const widget of before.widgets) {
       if (mark === null) clearWidgetMark(this.runtime, docPtr, widget);
-      else bakeWidgetAppearance(this.runtime, docPtr, drawings, widget, mark, { recordFit: true });
+      else bakeWidgetAppearance(this.runtime, docPtr, drawings, widget, mark);
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };
@@ -669,6 +669,15 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.kind);
+    // Checked on the field as the patch leaves it: one in a group is no one else's.
+    const forAnyone = checkedForAnyone(
+      patch.forAnyone,
+      { kind: before.kind, groupId: patch.groupId !== undefined ? patch.groupId : before.groupId },
+      before.forAnyone,
+    );
+    // The entry as stored, read before any write: one another tool left beside
+    // a group reads as `false`, and goes once the field is taken out of it.
+    const storedForAnyone = readForAnyoneEntry(this.runtime, model, resolved.fieldIndex);
     const purpose = patch.purpose === undefined ? undefined : checkedPurpose(patch.purpose);
     const format = formatWriteOf(patch, before.kind);
     // Checked against the field as the patch leaves it, before anything is written.
@@ -720,6 +729,8 @@ export class FormMutator {
     if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
     }
+    if (forAnyone !== storedForAnyone)
+      writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, forAnyone);
     if (purpose !== undefined && purpose !== before.purpose) {
       writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     }
@@ -1194,6 +1205,7 @@ const PATCH_BASE_MEMBERS = [
   'alternateName',
   'mappingName',
   'groupId',
+  'forAnyone',
   'purpose',
   'actions',
 ];

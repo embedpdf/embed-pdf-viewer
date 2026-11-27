@@ -84,6 +84,12 @@ interface FormFieldDraftBase {
    */
   groupId?: string | null;
   /**
+   * Every signer may fill the field in, not one group's. Not with a
+   * `groupId`, and not on a signature field. Takes `fields:set-group:all`,
+   * since it reaches every group. Left out, `false`.
+   */
+  forAnyone?: boolean;
+  /**
    * What the field's value means: `email`, `date-signed`, or a name of
    * your own, 1 to 256 characters with no space at its start or end. Left
    * out or `null`, the field has none.

@@ -21,6 +21,7 @@ const base = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  forAnyone: false,
   purpose: null,
   createdBy: null,
   createdAt: null,

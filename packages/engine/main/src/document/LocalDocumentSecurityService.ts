@@ -11,6 +11,7 @@ import {
   type DocumentUnlockResult,
   EngineError,
   EngineErrorCode,
+  type FieldAssignment,
   type FieldRights,
   type Identity,
   type PasswordPrompt,
@@ -114,13 +115,13 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
   }
 
   /** Per-field form authorization mirrors: the guard's own field checks. */
-  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'fill' | 'sign', field: FieldAssignment): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
-  allowsField(action: 'fill' | 'sign' | 'set-group', target: { groupId: string | null }): boolean {
+  allowsField(action: 'fill' | 'sign' | 'set-group', target: FieldAssignment): boolean {
     const guard = this.guard;
     if (!guard) return false;
     if (action === 'set-group') return guard.canSetFieldGroup(target.groupId ?? '');
-    return guard.canFieldWrite(target.groupId, action);
+    return guard.canFieldWrite(target, action);
   }
 
   /** The guard's field rights; none without a scope context. */

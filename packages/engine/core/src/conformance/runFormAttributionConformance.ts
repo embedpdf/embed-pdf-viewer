@@ -1,22 +1,27 @@
 import { CHANGE_FIXTURE_PDF } from './runChangeConformance';
 import type { AttributionSession } from './runAnnotationAttributionConformance';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { BANDS_PNG } from './stampFixtures';
 import type { Identity } from '../auth/scope';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { FormField } from '../forms/field';
+import type { PageBox } from '../geometry/pageSpace';
+import { annotationKey } from '../identity/annotationKey';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import { toPageRef } from '../identity/PageRef';
+import type { StepVerdict } from '../signature/analysis/types';
 
 /**
- * Who made a field and who filled it in, on both engines with the same
- * identities. The engine stamps it from the session: `create` names the
- * creator, a write that changes a value names its filler (a script's value
- * counts as filled by the user whose fill ran it), a reset and an anonymous
- * fill name nobody, and an undo puts the previous filler back. A widget row
- * reports no attribution: the field holds it.
+ * Who made a field, on both engines with the same identities. The engine
+ * stamps it from the session: `create` names the creator. A fill records
+ * nobody, named or not: it writes the value and its drawing, as every PDF app
+ * does, so a signature made before it stays permitted, and so does one made
+ * before a mark is drawn in and signed. A widget row reports no attribution:
+ * the field holds it.
  *
  * It runs on {@link CHANGE_FIXTURE_PDF}: the text field `name`, merged with
- * its widget (9), holding `Ann`.
+ * its widget (9), holding `Ann`, on page 3.
  */
 
 export interface FormAttributionConformanceOptions {
@@ -34,11 +39,25 @@ export interface FormAttributionConformanceOptions {
     session: AttributionSession,
     from?: DocumentHandle,
   ) => Promise<DocumentHandle>;
+  /**
+   * Sign field `field` of `doc` with an approval signature. Default: a
+   * signing completed with a placeholder CMS, which the local engine takes;
+   * a server judges the CMS, so the cloud engine passes a real one.
+   */
+  sign?: (doc: DocumentHandle, field: FormFieldRef) => Promise<void>;
 }
 
 // `doc.download` lets a session continue another's document (locally, its bytes).
 const FILL = ['doc.open', 'doc.render', 'doc.download', 'doc.forms.fill'] as const;
 const DESIGN = ['doc.open', 'doc.render', 'doc.download', 'doc.forms.modify'] as const;
+const SIGNER = [...FILL, 'doc.forms.modify', 'doc.sign'] as const;
+const EVERYTHING = ['*'] as const;
+
+/** A DER `SEQUENCE`: what a completion takes as a CMS, without judging it. */
+const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
+const PAGE = toPageRef(3);
+const LEFT_BOX: PageBox = { x: 20, y: 100, width: 120, height: 40 };
+const RIGHT_BOX: PageBox = { x: 160, y: 100, width: 120, height: 40 };
 
 const ALICE: Identity = { userId: 'alice', displayName: 'Alice Author', groupId: 'legal' };
 const BOB: Identity = { userId: 'bob', displayName: 'Bob Builder' };
@@ -68,10 +87,40 @@ export function runFormAttributionConformance(
       options.openAs(engine, { scope, identity }, from);
 
     /** Continue `from`'s document as `identity`, closing `from`. */
-    const continueAs = async (from: DocumentHandle, identity: Identity) => {
-      const next = await open(identity, FILL, from);
+    const continueAs = async (
+      from: DocumentHandle,
+      identity: Identity,
+      scope: readonly string[] = FILL,
+    ) => {
+      const next = await open(identity, scope, from);
       await from.close();
       return next;
+    };
+
+    const signatureField = (doc: DocumentHandle, name: string, box: PageBox) =>
+      doc.forms.create({ kind: 'signature', name, widgets: [{ page: PAGE, box }] });
+
+    const sign = async (doc: DocumentHandle, name: string) => {
+      const field: FormFieldRef = { kind: 'fqn', name };
+      if (options.sign) return options.sign(doc, field);
+      const prepared = await doc.signatures.prepare({ field });
+      await doc.signatures.complete({
+        signingId: prepared.signingId,
+        cms: PLACEHOLDER_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+    };
+
+    /** What changed since field `name`'s signature, up to the working copy. */
+    const verdictSince = async (doc: DocumentHandle, name: string): Promise<StepVerdict> => {
+      const { signatures } = await doc.signatures.list();
+      const signature = signatures.find((s) => s.fieldName === name && s.signed);
+      if (!signature) throw new Error(`'${name}' is not signed`);
+      const analysis = await doc.signatures.analyze({
+        since: { signatureIndex: signature.index },
+        until: 'working-copy',
+      });
+      return analysis.verdict;
     };
 
     const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormField> => {
@@ -105,72 +154,65 @@ export function runFormAttributionConformance(
       }
     });
 
-    test('a fill names who filled the value in; one that changes nothing names nobody new', async () => {
+    test('a fill records nobody, named or not, and neither does a reset', async () => {
       let doc = await open(ALICE);
-      const before = Date.now();
       const { field } = await doc.forms.setValue(NAME, { value: 'Cleo' });
-      expect(field.filledBy).toBe('alice');
-      expect(field.filledByName).toBe('Alice Author');
-      expectStampedSince(field.filledAt, before);
+      expect([field.filledBy, field.filledByName, field.filledAt]).toEqual([null, null, null]);
 
       doc = await continueAs(doc, BOB);
       try {
-        const same = await doc.forms.setValue(NAME, { value: 'Cleo' });
-        expect(same.field.filledBy).toBe('alice');
-        const changed = await doc.forms.setValue(NAME, { value: 'Bea' });
-        expect(changed.field.filledBy).toBe('bob');
-        expect(changed.field.filledByName).toBe('Bob Builder');
-        expect((await fieldOf(doc, 'name')).filledBy).toBe('bob');
+        expect((await fieldOf(doc, 'name')).filledBy).toBe(null);
+        await doc.forms.setValue(NAME, { value: 'Bea' });
+        const reset = await doc.forms.reset(NAME);
+        const cleared = reset.fields.find((f) => f.name === 'name')!;
+        expect([cleared.filledBy, cleared.filledByName, cleared.filledAt]).toEqual([
+          null,
+          null,
+          null,
+        ]);
       } finally {
         await doc.close();
       }
     });
 
-    test('a reset, and an anonymous fill, name nobody', async () => {
-      let doc = await open(ALICE);
+    test('a named fill after a signature leaves it permitted, and so does a reset', async () => {
+      let doc = await open(ALICE, SIGNER);
+      await signatureField(doc, 'approval', LEFT_BOX);
       await doc.forms.setValue(NAME, { value: 'Cleo' });
-      const reset = await doc.forms.reset(NAME);
-      const cleared = reset.fields.find((field) => field.name === 'name')!;
-      expect([cleared.filledBy, cleared.filledByName, cleared.filledAt]).toEqual([
-        null,
-        null,
-        null,
-      ]);
+      await sign(doc, 'approval');
 
-      await doc.forms.setValue(NAME, { value: 'Cleo' });
-      doc = await continueAs(doc, ANONYMOUS);
-      try {
-        const { field } = await doc.forms.setValue(NAME, { value: 'Someone' });
-        expect([field.filledBy, field.filledByName, field.filledAt]).toEqual([null, null, null]);
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test("a script's value counts as filled in by the user whose fill ran it", async () => {
-      const doc = await open(ALICE);
-      try {
-        // A script's results go in the change of the fill that ran it.
-        await doc.apply({
-          ops: [{ type: 'forms.setValue', field: NAME, value: { value: 'Calculated' } }],
-        });
-        expect((await fieldOf(doc, 'name')).filledBy).toBe('alice');
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('undoing a fill puts the previous filler back', async () => {
-      let doc = await open(ALICE);
-      await doc.forms.setValue(NAME, { value: 'Cleo' });
       doc = await continueAs(doc, BOB);
+      await doc.forms.setValue(NAME, { value: 'Bea' });
+      await doc.forms.reset(NAME);
+      await doc.forms.setValue(NAME, { value: 'Dee' });
+
+      doc = await continueAs(doc, ANONYMOUS, EVERYTHING);
       try {
-        const filled = await doc.forms.setValue(NAME, { value: 'Bea' });
-        expect(filled.field.filledBy).toBe('bob');
-        await doc.apply({ undoOf: filled.meta.opId });
-        const field = await fieldOf(doc, 'name');
-        expect(field.filledBy).toBe('alice');
-        expect(field.filledByName).toBe('Alice Author');
+        expect(await verdictSince(doc, 'approval')).toBe('permitted');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a mark drawn in and then signed leaves an earlier signature permitted', async () => {
+      let doc = await open(ALICE, SIGNER);
+      await signatureField(doc, 'first', LEFT_BOX);
+      await signatureField(doc, 'second', RIGHT_BOX);
+      await sign(doc, 'first');
+
+      doc = await continueAs(doc, BOB, SIGNER);
+      await doc.forms.setSignatureAppearance({ kind: 'fqn', name: 'second' }, BANDS_PNG);
+      await sign(doc, 'second');
+
+      doc = await continueAs(doc, ANONYMOUS, EVERYTHING);
+      try {
+        expect(await verdictSince(doc, 'first')).toBe('permitted');
+        const { fields, widgets } = await doc.forms.list();
+        const second = fields.find((f) => f.name === 'second')!;
+        const row = widgets.find(
+          (w) => annotationKey(w.ref) === annotationKey(second.widgets[0]!.ref!),
+        );
+        expect(row?.hasMark).toBe(true);
       } finally {
         await doc.close();
       }

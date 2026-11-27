@@ -31,7 +31,7 @@ import {
 import { withUtf16String } from '../../../../runtime/memory/strings';
 import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
 import { checkStyleCharacter } from '../../../forms/internal/widgetCaption';
-import { readAppearanceFit, refitAppearance } from '../appearanceFit';
+import { refitAppearance } from '../appearanceFit';
 import {
   readAnnotRect,
   readBorderStyle,
@@ -87,11 +87,11 @@ export function assertMarkKeepsItsLook(
 
 /**
  * Fit the mark in a widget into its box again, once the box or its turn has
- * changed: by the fit the mark records, else `contain`, the fit a signing
- * draws its mark with.
+ * changed: `contain`, the fit every mark is drawn with. It gives the widget a
+ * new wrapper around the same drawing, so it still reads as a mark.
  */
-export function refitWidgetMark(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): void {
-  refitAppearance(fn, annotPtr, readAppearanceFit(fn, mem, annotPtr) ?? 'contain');
+export function refitWidgetMark(fn: PdfFunctions, annotPtr: Ptr): void {
+  refitAppearance(fn, annotPtr, 'contain');
 }
 
 /**

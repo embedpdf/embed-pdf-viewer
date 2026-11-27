@@ -66,6 +66,17 @@ export const FIELD_PURPOSE_AND_FORMAT_SINCE = '3.4';
  */
 export const BUTTON_IMAGE_AND_LAYOUT_SINCE = '3.5';
 
+/**
+ * The version a form field anyone fills in (`forAnyone`) arrived in on the
+ * wire: in the draft of a create, the patch of an update and what it
+ * expects, as a route's body and as a change op. A client never sends it to
+ * an older server, whose request schemas refuse a member they don't know,
+ * nor a bundle with such a field, which an older server would import as an
+ * ordinary one. Reading needs no such check: an older server's field reads
+ * `forAnyone: false` (`FormFieldDTOSchema`).
+ */
+export const ANYONE_FIELDS_SINCE = '3.5';
+
 const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
   version.major < than.major || (version.major === than.major && version.minor < than.minor);
 

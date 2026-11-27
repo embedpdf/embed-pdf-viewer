@@ -64,7 +64,7 @@ interface EngineBaseline {
 
 const manifests: { corpusVersion: string; cases: Fixture[]; certificateSha256: string }[] =
   await Promise.all(
-    ['v1', 'v2', 'v3'].map(async (directory) => {
+    ['v1', 'v2', 'v3', 'v4'].map(async (directory) => {
       const manifest = JSON.parse(
         await readFile(resolve(corpus, directory, 'manifest.json'), 'utf8'),
       );

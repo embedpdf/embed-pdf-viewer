@@ -21709,6 +21709,9 @@
                 "type": "string",
                 "nullable": true
               },
+              "forAnyone": {
+                "type": "boolean"
+              },
               "purpose": {
                 "type": "string",
                 "nullable": true
@@ -21795,6 +21798,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -21852,6 +21856,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -21936,6 +21943,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -21988,6 +21996,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22042,6 +22053,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22095,6 +22107,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22174,6 +22189,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22229,6 +22245,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22296,6 +22315,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22352,6 +22372,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22396,6 +22419,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22448,6 +22472,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22489,6 +22516,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22540,6 +22568,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22584,6 +22615,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
+              "forAnyone",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22814,6 +22846,9 @@
                 "maxLength": 256,
                 "nullable": true
               },
+              "forAnyone": {
+                "type": "boolean"
+              },
               "purpose": {
                 "type": "string",
                 "minLength": 1,
@@ -22886,6 +22921,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
@@ -22926,6 +22964,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -22973,6 +23014,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23045,6 +23089,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
@@ -23101,6 +23148,9 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
               },
@@ -23141,6 +23191,9 @@
               },
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "forAnyone": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23190,6 +23243,9 @@
             "minLength": 1,
             "maxLength": 256,
             "nullable": true
+          },
+          "forAnyone": {
+            "type": "boolean"
           },
           "purpose": {
             "type": "string",

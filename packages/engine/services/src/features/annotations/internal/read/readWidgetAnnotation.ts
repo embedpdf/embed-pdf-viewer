@@ -11,7 +11,6 @@ import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/en
 import { withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../../runtime/memory/strings';
 import { readI32 } from '../../../../runtime/memory/structs';
-import { readAppearanceFit } from '../appearanceFit';
 import { widgetBorderStyleFromCode } from '../shapeBorderStyle';
 import { textAlignmentFromCode } from '../textAlignment';
 import { widgetLayoutFromCode } from '../widgetLayout';
@@ -108,8 +107,10 @@ export function readWidget(
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,
     fieldKind: 'unknown',
-    // A mark drawn in records how it fits; the join adds a signature, and
-    // keeps it only for a signature field's widget.
-    hasMark: readAppearanceFit(fn, mem, annotPtr) !== null,
+    // A mark is our wrapper placing a drawing, as the fork reads it from the
+    // appearance's own content, so it needs no record of ours in the widget
+    // (one would change what an earlier signature sealed). The join adds a
+    // signature, and keeps it only for a signature field's widget.
+    hasMark: fn.EPDFAnnot_GetDrawing(annotPtr) !== 0,
   };
 }

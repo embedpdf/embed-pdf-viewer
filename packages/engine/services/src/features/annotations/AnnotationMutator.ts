@@ -327,7 +327,7 @@ export class AnnotationMutator {
         } else if (currentDto.hasMark) {
           // A mark in the widget stays, and is fitted into the box as it now
           // stands and turns: a stamp's drawing is re-fitted the same way.
-          refitWidgetMark(fn, mem, annotPtr);
+          refitWidgetMark(fn, annotPtr);
           ok = false;
         } else {
           // Drawn as its field's family draws it: a signature field's and

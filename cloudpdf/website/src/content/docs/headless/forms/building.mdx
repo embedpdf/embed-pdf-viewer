@@ -372,7 +372,7 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `setDesignGroup(groupId)`               | Says who the next fields are for: a field placed with a tool goes into this group; with `null` it is in none. Fires <Fw only={['react', 'vue', 'svelte']}>`onDesignGroupChanged`</Fw><Fw only="angular">`designGroupChanged$`</Fw>. [Place fields for a signer](#place-fields-for-a-signer) |
 | `moveToGroup(fields, groupId)`          | Puts fields in a group, or with `null` takes them out of theirs, as one step to undo. Resolves `{ fields }`. [Give fields to a signer](#give-fields-to-a-signer) |
 | `canSetGroup(groupId)`                  | Whether the user may put a field in that group. [Place fields for a signer](#place-fields-for-a-signer)                                                                                             |
-| `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
+| `canRestoreAttribution()`               | Whether an import may keep who created its fields, instead of naming the importing user. [Permissions](#permissions)                                                                                  |
 | `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -393,7 +393,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | Permission         | What it allows                                                  | Check                          |
 | :----------------- | :-------------------------------------------------------------- | :----------------------------- |
 | `doc.forms.modify` | Adding, changing, removing and repairing fields                 | `form.canDesign()`             |
-| `doc.forms.import` | Importing fields and values with who created and filled them in | `form.canRestoreAttribution()` |
+| `doc.forms.import` | Importing fields with who created them                          | `form.canRestoreAttribution()` |
 | `doc.forms.script` | Writing scripts, submit buttons and links into fields and boxes | `form.canWriteScripts()`       |
 | `fields:set-group` | Putting a field in a group other than your own                  | `form.canSetGroup(groupId)`    |
 

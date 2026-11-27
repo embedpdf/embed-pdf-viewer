@@ -15,8 +15,9 @@ import { createLocalEngine, type LocalEngine } from '../src/index';
  * someone else signed, after an approval signature and after a
  * certification for form filling: filling in, permitted, as Acrobat 26 says
  * of the same files (checked Nov 26 2026). A mark drawn into an unsigned
- * signature field is not filling in, and stays forbidden, as Acrobat calls
- * that signature invalid. The rules are `signature/analysis/evaluate.ts`;
+ * signature field is permitted too: its widget's dictionary is not written,
+ * only a new appearance, which neither the analysis nor Acrobat counts
+ * against the signature. The rules are `signature/analysis/evaluate.ts`;
  * a locked button and a caption or layout change are unit tests there
  * (`test/signature/analysis.test.ts`), since the engine refuses those
  * writes.
@@ -201,13 +202,10 @@ describe('an image set after another signature, as the analysis judges it', () =
     ]) {
       expect(found[file], file).toMatchObject({ verdict: 'permitted', notPermitted: [] });
     }
-    // A mark, at both levels, as on 3.4.0 before marks became drawings: the
-    // widget's fit record and its new `/AP /N` are unexplained.
+    // A mark, at both levels: a new appearance on an unsigned signature field,
+    // with nothing written into its widget's dictionary.
     for (const file of ['approval-mark', 'certified-fill-mark']) {
-      expect(found[file], file).toMatchObject({ verdict: 'forbidden' });
-      expect((found[file] as { notPermitted: string[] }).notPermitted, file).toContainEqual(
-        expect.stringMatching(/^unexplained \d+:AP\/N$/),
-      );
+      expect(found[file], file).toMatchObject({ verdict: 'permitted', notPermitted: [] });
     }
   });
 });

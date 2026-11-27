@@ -2,6 +2,7 @@ import type {
   BaseVersionInfo,
   DigestAlgorithm,
   DocumentProtection,
+  FieldLockSpec,
   FormFieldRef,
   FormWidget,
   Signature,
@@ -13,6 +14,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
   readByteRange,
+  readFieldLock,
   readRevisions,
   readSignaturesFromModel,
   readContentsAt,
@@ -103,6 +105,8 @@ export class SignatureReader {
     fieldObjectNumber: number;
     signed: boolean;
     widget: FormWidget | null;
+    /** The field's own `/Lock`, which a signing of it applies as it is. */
+    lock: FieldLockSpec | null;
   } {
     const { fn } = this.runtime;
     const model = acquireSignatureModel(this.runtime, this.session);
@@ -124,6 +128,7 @@ export class SignatureReader {
         widgetObjNum > 0
           ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, index)))
           : null,
+      lock: readFieldLock(this.runtime, model, index),
     };
   }
 

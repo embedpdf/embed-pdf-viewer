@@ -77,7 +77,7 @@ To list what the user was given (for a "you can…" panel), read `doc.security.s
 | `doc.forms.read`         | See form fields and their values.                                                                          |
 | `doc.forms.fill`         | Fill in form fields.                                                                                       |
 | `doc.forms.modify`       | Create, change and delete form fields.                                                                     |
-| `doc.forms.import`       | Import form fields and values with who created and filled them in, and when.                               |
+| `doc.forms.import`       | Import form fields with who created them, and when.                                                        |
 | `doc.forms.script`       | Write scripts, submit buttons and links into form fields.                                                  |
 | `doc.sign`               | Sign the document.                                                                                         |
 | `doc.sign.certify`       | Sign as the certifying signature.                                                                          |
@@ -203,6 +203,10 @@ replaces `doc.sign` for signing, so `['doc.forms.fill', 'fields:fill:group=buyer
 buyer's fields only. A field in no group is then left to users without a `fields:fill` permission.
 Any `fields:` permission lets the user read the form: groups limit what they change, never what
 they see.
+
+A field marked `forAnyone` is for every signer: any user who may fill in some field may fill it in,
+whatever group their permission names. Marking one takes `fields:set-group:all`, since it reaches
+every group.
 
 A field a script calculates, such as a total, is filled in together with the field it's
 calculated from. Writing it is allowed when the same change also fills in one of the user's own
@@ -335,7 +339,9 @@ field is usually made for someone else. `annotations:set-group:group=<id>` and
 `fields:fill:group=<id>` fill in that group's fields.
 
 A user's own group takes no `set-group` permission. An annotation's group can be changed, never
-removed. A field's can be removed (`groupId: null`), which takes `doc.forms.modify` alone.
+removed. A field's can be removed (`groupId: null`), which takes `doc.forms.modify` alone. A field
+in no group can be for anyone instead (`forAnyone: true`): every user with a `fields:fill`
+permission, or `doc.forms.fill`, fills it in.
 
 A `group=<id>` permission names the group it covers: the user doesn't need to be in it. To give
 someone several groups, give them one permission per group.
@@ -348,8 +354,7 @@ such as syncing from your own database: it lets the caller create annotations in
 name.
 
 `doc.forms.import` does the same for [form fields](/docs/engine/forms/import-export): an import
-keeps who created each field and who filled it in, instead of naming the importing user. On a
-signed form, who filled a field in is evidence, so give it as carefully.
+keeps who created each field, instead of naming the importing user.
 
 ### Scripts in forms
 
