@@ -805,10 +805,20 @@ export function revertForm(
 }
 
 /**
+ * Who fills a field in, told in two members: the group it belongs to and
+ * whether it is for anyone. An update's undo puts them back together, and
+ * only while both still hold what the update left: a field another update
+ * gave to someone since stays theirs, where putting one member back alone
+ * would make a field that is both a group's and for anyone.
+ */
+const ASSIGNMENT: readonly string[] = ['groupId', 'forAnyone'];
+
+/**
  * The second chance of a field update's undo: each property that still holds
  * what the update set goes back, through an ordinary update. A rename goes
- * back only while no sibling has taken the old name, and the scripts only
- * when all of them can ({@link scriptsCanGoBack}).
+ * back only while no sibling has taken the old name, the scripts only when
+ * all of them can ({@link scriptsCanGoBack}), and who fills the field in only
+ * as a whole ({@link ASSIGNMENT}).
  */
 function revertProperties(
   ctx: ChangeContext,
@@ -820,12 +830,15 @@ function revertProperties(
   const left = fallback.left as Record<string, unknown>;
   const restore = fallback.restore as Record<string, unknown>;
   const keys = Object.keys(left);
-  const kept = keys.filter(
+  const holds = keys.filter(
     (key) =>
       valuesEqual(now[key], left[key]) &&
       (key !== 'name' || nameIsFree(ctx, current.field.name, String(restore.name))) &&
       (key !== 'actions' || scriptsCanGoBack(left.actions, restore.actions)),
   );
+  // An assignment someone changed since stays: neither of its members goes back.
+  const assignmentHolds = ASSIGNMENT.every((key) => !keys.includes(key) || holds.includes(key));
+  const kept = assignmentHolds ? holds : holds.filter((key) => !ASSIGNMENT.includes(key));
   if (kept.length === 0) return leftAlone(ctx, 'forms.update');
   const done = writeUpdate(ctx, current, pick(restore, kept) as FormFieldPatch);
   const skipped = keys.filter((key) => !kept.includes(key));
@@ -1044,9 +1057,13 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
       // removed, and a format no write can name (`other`) comes back as the
       // scripts it was.
       const named = Object.keys(patch).map((key) => (key === 'format' ? 'actions' : key));
-      const keys = [...new Set(named)].filter(
+      const changed = [...new Set(named)].filter(
         (key) => key !== 'kind' && !valuesEqual(was[key], is[key]),
       );
+      // Who fills the field in goes back whole ({@link ASSIGNMENT}).
+      const keys = changed.some((key) => ASSIGNMENT.includes(key))
+        ? [...new Set([...changed, ...ASSIGNMENT])]
+        : changed;
       return {
         kind: 'properties',
         objectNumber: before.objectNumber,

@@ -668,6 +668,10 @@ When you name no `lock`, a signing locks two kinds of field (see
 With neither, it locks nothing. A document timestamp is no signer's, so it adds no field anyone
 fills in. Name a `lock` to choose yourself: the signing locks exactly that.
 
+A signature field can carry a lock of its own, set by whoever made the PDF (its `/Lock`, which a
+signature reads as `lock`). Signing it locks exactly that: the engine adds no field to it, and a
+`lock` you name must be the same, or the signing fails with `SignatureRefused`.
+
 ## Signature fields and their look
 
 A signature field is a form field of kind `'signature'`. Create one like any field (see

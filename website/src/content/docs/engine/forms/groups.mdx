@@ -193,7 +193,8 @@ After that, writing one of them fails with `ProtectedDocument` for everyone, in 
 other PDF apps. A `forAnyone` field still empty when the buyer signs stays open: the seller may fill
 it in, and it locks when the seller signs. Name a
 [`lock`](/docs/engine/forms/signatures#lock-fields) to choose the fields yourself; then nothing is
-added to it.
+added to it. Nothing is added either when the PDF already locks the signature field itself (its own
+`/Lock`, which another tool may have set): the signing locks what that lock says.
 
 The engine doesn't order the signers. Give the seller their permissions when the buyer is done.
 

@@ -142,7 +142,8 @@ export class SignatureMutator {
    * Prepare a signing of `input.field`, which `authority` must be allowed to
    * sign (its group, `fields:sign`). A signature without a `lock` of its own
    * locks what its signer has seen ({@link defaultLock}): the rest of its
-   * group, and the fields anyone fills in that hold a value.
+   * group, and the fields anyone fills in that hold a value; a field that
+   * carries its own `/Lock` signs with that lock alone.
    *
    * A document timestamp may name no field: one is made for it on the
    * candidate, so it joins the document with the timestamp, in one revision.
@@ -173,7 +174,8 @@ export class SignatureMutator {
     if (field) authorizeFieldWrite(authority, groupId, 'sign');
     else authorizeCapability(authority, 'doc.sign');
     const lock: FieldLockSpec | undefined =
-      input.lock ?? this.defaultLock(groupId, (input.kind ?? 'signature') === 'signature');
+      input.lock ??
+      this.defaultLock(groupId, (input.kind ?? 'signature') === 'signature', field?.lock ?? null);
     if (field?.signed) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
@@ -406,8 +408,18 @@ export class SignatureMutator {
    * fills in that holds a value now, whoever filled it in; one still empty
    * stays open for the next signer. A document timestamp is no signer's, so
    * it adds none of those. `undefined` when there is nothing to lock.
+   *
+   * A signature field that carries a lock of its own (`ownLock`, its `/Lock`)
+   * adds nothing: the PDF's author decided what its signature locks, the
+   * signature's lock is derived from it (ISO 32000-2, 12.7.5.5), and the
+   * runtime refuses a signing that asks for another.
    */
-  private defaultLock(groupId: string | null, signature: boolean): FieldLockSpec | undefined {
+  private defaultLock(
+    groupId: string | null,
+    signature: boolean,
+    ownLock: FieldLockSpec | null,
+  ): FieldLockSpec | undefined {
+    if (ownLock) return undefined;
     const forAnyone = signature ? filledAnyoneFields(this.runtime, this.session) : [];
     if (groupId === null && forAnyone.length === 0) return undefined;
     const group = groupId === null ? [] : groupLockFields(this.runtime, this.session, groupId);

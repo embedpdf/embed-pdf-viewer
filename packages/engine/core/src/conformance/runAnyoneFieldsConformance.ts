@@ -70,6 +70,38 @@ export const ANYONE_FIELDS_PDF = (() => {
   ]);
 })();
 
+/**
+ * One page whose signature fields carry a lock of their own (`/Lock`), as the
+ * PDF's author may set: `all_sig`, in no group, locks every field, and
+ * `dana_sig`, in Dana's group, locks `dana_name` alone. `reference` is a
+ * field anyone fills in.
+ */
+const OWN_LOCK_PDF = (() => {
+  const meta = (entries: string) => `/EMBD_Metadata << /SchemaVersion 1 ${entries} >>`;
+  const widget = (type: string, name: string, rect: string, extra: string) =>
+    `<< /Type /Annot /Subtype /Widget /FT /${type} /T (${name}) /Rect [${rect}] /F 4 /P 3 0 R ${extra} >>`;
+  const lock = (entries: string) => `/Lock << /Type /SigFieldLock ${entries} >>`;
+  const fields = '4 0 R 5 0 R 6 0 R 7 0 R';
+  return pdfOf([
+    `<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [${fields}] ` +
+      '/DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv << /Type /Font /Subtype /Type1 ' +
+      '/BaseFont /Helvetica >> >> >> >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Contents 8 0 R /Resources << >> ' +
+      `/Annots [${fields}] >>`,
+    widget('Tx', 'dana_name', '20 360 180 380', meta('/GroupID (dana)')),
+    widget('Tx', 'reference', '20 320 180 340', meta('/ForAnyone true')),
+    widget('Sig', 'all_sig', '20 20 120 60', lock('/Action /All')),
+    widget(
+      'Sig',
+      'dana_sig',
+      '140 20 240 60',
+      `${meta('/GroupID (dana)')} ${lock('/Action /Include /Fields [(dana_name)]')}`,
+    ),
+    '<< /Length 0 >>\nstream\n\nendstream',
+  ]);
+})();
+
 /** The tokens of the people the form is for. */
 export const ANYONE_FIELD_TOKENS = {
   /** The sender: designs the form, puts fields in every group, fills in every field. */
@@ -458,6 +490,34 @@ export function runAnyoneFieldsConformance(
       });
     });
 
+    test("a signature field's own lock decides what its signing locks", async () => {
+      // The field already locks every field: a filled one adds nothing, and the signing goes on.
+      await as(
+        'filler',
+        async (doc) => {
+          await doc.forms.setValue(field('reference'), { value: 'PO-42' });
+          await sign(doc, { field: field('all_sig') });
+          expect((await lockOf(doc, 'all_sig'))?.action).toBe('all');
+          expect(await fill(doc, 'reference', 'PO-43')).toBe(EngineErrorCode.ProtectedDocument);
+        },
+        OWN_LOCK_PDF,
+      );
+      // A narrower lock of its own stays as it is: what it leaves open stays open.
+      await as(
+        'dana',
+        async (doc) => {
+          await doc.forms.setValue(field('reference'), { value: 'PO-42' });
+          await sign(doc, { field: field('dana_sig') });
+          expect(await lockOf(doc, 'dana_sig')).toMatchObject({
+            action: 'include',
+            fields: ['dana_name'],
+          });
+          expect(await fill(doc, 'reference', 'PO-43')).toBe('resolved');
+        },
+        OWN_LOCK_PDF,
+      );
+    });
+
     test('a field in a group, or a signature field, is never for anyone', async () => {
       await as('everything', async (doc) => {
         const invalid = async (attempt: Promise<unknown>, named = true) => {
@@ -552,6 +612,31 @@ export function runAnyoneFieldsConformance(
           forAnyone: false,
           required: true,
         });
+      });
+    });
+
+    test('an undo leaves a newer assignment as it is and puts the rest back', async () => {
+      await as('sender', async (doc) => {
+        // One update takes `reference` from anyone and gives it a label…
+        const edited = await doc.apply({
+          ops: [
+            {
+              type: 'forms.update',
+              field: field('reference'),
+              patch: { forAnyone: false, alternateName: 'Order number' },
+            },
+          ],
+        });
+        // …and a later one gives it to Ada.
+        await doc.forms.update(field('reference'), { groupId: 'ada' });
+        const undone = await doc.apply({ undoOf: edited.meta.opId });
+        expect(await doc.forms.get(field('reference'))).toMatchObject({
+          groupId: 'ada',
+          forAnyone: false,
+          alternateName: null,
+        });
+        const item = undone.items[0] as { skipped?: readonly string[] };
+        expect([...(item.skipped ?? [])].sort()).toEqual(['forAnyone', 'groupId']);
       });
     });
 
