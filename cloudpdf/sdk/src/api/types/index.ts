@@ -99,6 +99,7 @@ export * from "./DocVersionsSignaturesResponse.js";
 export * from "./EngineError.js";
 export * from "./ErrorResponse.js";
 export * from "./FieldActionsPatch.js";
+export * from "./FieldAssignment.js";
 export * from "./FieldLockSpec.js";
 export * from "./FieldPosition.js";
 export * from "./FieldScriptWrite.js";

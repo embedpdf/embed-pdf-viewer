@@ -21709,8 +21709,8 @@
                 "type": "string",
                 "nullable": true
               },
-              "forAnyone": {
-                "type": "boolean"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "type": "string",
@@ -21798,7 +21798,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -21857,8 +21857,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -21943,7 +21943,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -21997,8 +21997,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22053,7 +22053,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22108,8 +22108,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22189,7 +22189,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22246,8 +22246,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22315,7 +22315,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22372,8 +22372,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22419,7 +22419,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22472,8 +22472,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22516,7 +22516,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22568,8 +22568,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22615,7 +22615,7 @@
               "valueEntry",
               "defaultValueEntry",
               "groupId",
-              "forAnyone",
+              "assignment",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22631,6 +22631,46 @@
           }
         ],
         "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
+      },
+      "FieldAssignment": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["group"]
+              },
+              "groupId": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "groupId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["anyone"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["unassigned"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          }
+        ]
       },
       "FormFieldFormat": {
         "anyOf": [
@@ -22846,8 +22886,8 @@
                 "maxLength": 256,
                 "nullable": true
               },
-              "forAnyone": {
-                "type": "boolean"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "type": "string",
@@ -22921,8 +22961,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -22965,8 +23005,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23015,8 +23055,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23089,8 +23129,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23148,8 +23188,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23192,8 +23232,8 @@
               "groupId": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
-              "forAnyone": {
-                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/forAnyone"
+              "assignment": {
+                "$ref": "#/components/schemas/FieldAssignment"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/purpose"
@@ -23244,8 +23284,8 @@
             "maxLength": 256,
             "nullable": true
           },
-          "forAnyone": {
-            "type": "boolean"
+          "assignment": {
+            "$ref": "#/components/schemas/FieldAssignment"
           },
           "purpose": {
             "type": "string",

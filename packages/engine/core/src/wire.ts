@@ -485,7 +485,7 @@ export {
   type TokenPin,
 } from './wire/cachedReads';
 export {
-  ANYONE_FIELDS_SINCE,
+  FIELD_ASSIGNMENT_SINCE,
   API_VERSION,
   FIELD_PURPOSE_AND_FORMAT_SINCE,
   BUTTON_IMAGE_AND_LAYOUT_SINCE,

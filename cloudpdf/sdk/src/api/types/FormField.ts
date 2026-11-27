@@ -30,7 +30,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -71,7 +71,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -118,7 +118,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -166,7 +166,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -214,7 +214,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -261,7 +261,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -295,7 +295,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -328,7 +328,7 @@ export namespace FormField {
         defaultValueEntry: CloudPDF.FormValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
-        forAnyone: boolean;
+        assignment: CloudPDF.FieldAssignment;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;

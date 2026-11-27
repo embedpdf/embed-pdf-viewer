@@ -429,10 +429,10 @@ export class SignatureMutator {
     ownLock: FieldLockSpec | null,
   ): FieldLockSpec | undefined {
     if (ownLock) return undefined;
-    const forAnyone = signature ? filledAnyoneFields(this.runtime, this.session) : [];
-    if (groupId === null && forAnyone.length === 0) return undefined;
+    const anyone = signature ? filledAnyoneFields(this.runtime, this.session) : [];
+    if (groupId === null && anyone.length === 0) return undefined;
     const group = groupId === null ? [] : groupLockFields(this.runtime, this.session, groupId);
-    return { action: 'include', fields: [...group, ...forAnyone] };
+    return { action: 'include', fields: [...group, ...anyone] };
   }
 
   private callPrepare(

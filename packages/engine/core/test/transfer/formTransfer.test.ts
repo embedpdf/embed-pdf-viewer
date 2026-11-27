@@ -51,7 +51,7 @@ function textField(
     mappingName: null,
     valueEntry: { kind: 'scalar', value: `${name} value` },
     defaultValueEntry: { kind: 'none' },
-    forAnyone: false,
+    assignment: { kind: 'unassigned' },
     purpose: null,
     createdBy: 'alice',
     createdAt: '2026-10-08T10:42:00Z',
@@ -362,22 +362,26 @@ describe('a form bundle through the file', () => {
     expect(same.fields[0]!.data.purpose).toBe('date-signed');
   });
 
-  test('a file from before fields anyone fills in reads forAnyone: false, and one is kept', async () => {
+  test("a file from before assignments reads each field's from its group, and one is kept", async () => {
+    const dana = { kind: 'group', groupId: 'dana' } as const;
     const now = bundleOf(
-      [textField('ref', 10, [20], { forAnyone: true }), textField('plain', 11, [21])],
+      [
+        textField('ref', 10, [20], { assignment: { kind: 'anyone' } }),
+        textField('dana', 11, [21], { groupId: 'dana', assignment: dana }),
+      ],
       [10, 11].map((field, at) => widgetRow(20 + at, refOf(field))),
     );
     const older = JSON.parse(FormTransfer.stringify(now)) as {
       fields: { data: Record<string, unknown> }[];
     };
-    for (const row of older.fields) delete row.data.forAnyone;
+    for (const row of older.fields) delete row.data.assignment;
     const read = await FormTransfer.parse(JSON.stringify(older));
-    expect(read.fields.map(({ data }) => [data.name, data.forAnyone])).toEqual([
-      ['ref', false],
-      ['plain', false],
+    expect(read.fields.map(({ data }) => [data.name, data.assignment])).toEqual([
+      ['ref', { kind: 'unassigned' }],
+      ['dana', dana],
     ]);
     const same = await FormTransfer.parse(FormTransfer.stringify(now));
-    expect(same.fields.map(({ data }) => data.forAnyone)).toEqual([true, false]);
+    expect(same.fields.map(({ data }) => data.assignment)).toEqual([{ kind: 'anyone' }, dana]);
   });
 
   test("refuses another family's file, and one past a limit", async () => {

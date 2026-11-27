@@ -9,7 +9,7 @@ import { PageBoxSchema, PdfRotationSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
 import { isDatePattern, isTimePattern } from './datePattern';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
-import { withForAnyone } from './anyone';
+import { withAssignment, type FieldAssignment } from './assignment';
 import { withButtonImage } from './buttonImage';
 import { withPurposeAndFormat, type FormFieldFormat, type FormFieldFormatWritable } from './format';
 import type { FormFieldPatch } from './patch';
@@ -119,6 +119,21 @@ const FieldPurposeSchema = z.string().min(1).max(FIELD_PURPOSE_MAX_LENGTH).refin
   message: 'a purpose has no space at its start or its end, and no NUL character',
 });
 
+/**
+ * Who fills a field in, by its `kind`. Closed: a client that doesn't know
+ * an assignment couldn't tell who may fill the field in. No `.describe()`:
+ * a draft and a patch take it as an optional member, which would carry the
+ * description beside the component's reference, and each SDK would then
+ * make a type of its own for every kind of draft.
+ */
+export const FieldAssignmentSchema: z.ZodType<FieldAssignment> = closed(
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('group'), groupId: z.string() }),
+    z.object({ kind: z.literal('anyone') }),
+    z.object({ kind: z.literal('unassigned') }),
+  ]),
+);
+
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
   name: z.string(),
@@ -132,7 +147,7 @@ const FormFieldBaseShape = {
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
   groupId: z.string().nullable(),
-  forAnyone: z.boolean(),
+  assignment: FieldAssignmentSchema,
   purpose: z.string().nullable(),
   createdBy: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
@@ -210,7 +225,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
-  (field) => withForAnyone(withButtonImage(withPurposeAndFormat(field))),
+  (field) => withAssignment(withButtonImage(withPurposeAndFormat(field))),
 ).describe(
   'A form field, by its `family`. A newer server can add families: read one your client ' +
     "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +
@@ -273,7 +288,7 @@ const FormFieldDraftBaseShape = {
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
   groupId: z.string().min(1).max(256).nullable().optional(),
-  forAnyone: z.boolean().optional(),
+  assignment: FieldAssignmentSchema.optional(),
   purpose: FieldPurposeSchema.nullable().optional(),
   actions: FieldActionsPatchSchema.optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
@@ -333,7 +348,7 @@ const FormFieldPatchBaseShape = {
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
   groupId: z.string().min(1).max(256).nullable().optional(),
-  forAnyone: z.boolean().optional(),
+  assignment: FieldAssignmentSchema.optional(),
   purpose: FieldPurposeSchema.nullable().optional(),
   actions: FieldActionsPatchSchema.optional(),
 };

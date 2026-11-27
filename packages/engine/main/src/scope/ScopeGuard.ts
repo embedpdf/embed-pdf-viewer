@@ -172,8 +172,8 @@ export class ScopeGuard {
     );
   }
 
-  /** Whether the handle may `action` (fill in, or sign) `field`: its group, and whether anyone fills it in. */
-  canFieldWrite(field: FieldAssignment, action: FieldWriteAction): boolean {
+  /** Whether the handle may `action` (fill in, or sign) a field: its assignment, or its group id alone. */
+  canFieldWrite(field: FieldAssignment | string | null, action: FieldWriteAction): boolean {
     return allowsFieldWrite(this.changeAuthority(), field, action);
   }
 

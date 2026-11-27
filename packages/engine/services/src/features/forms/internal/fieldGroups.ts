@@ -1,7 +1,7 @@
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { PageIndexLookup } from './buttonImage';
-import { readFieldForAnyone, readFieldGroup } from './fieldAttribution';
+import { readFieldAssignment, readFieldGroup } from './fieldAttribution';
 import { acquireFormModel } from './formModelCache';
 import { FAMILY_BY_CODE, fieldHoldsValue } from './readFormSnapshot';
 import type { DocumentSession } from '../../../document-session/DocumentSession';
@@ -58,7 +58,7 @@ export function filledAnyoneFields(runtime: PdfRuntimeModule, session: DocumentS
   const names: string[] = [];
   const count = fn.EPDFForm_CountFields(model);
   for (let index = 0; index < count; index++) {
-    if (!readFieldForAnyone(runtime, model, index)) continue;
+    if (readFieldAssignment(runtime, model, index).kind !== 'anyone') continue;
     if (!fieldHoldsValue(runtime, model, index, docPtr, pages)) continue;
     const name = readUtf16String(mem, (buf, cap) =>
       fn.EPDFForm_GetFieldName(model, index, buf, cap),

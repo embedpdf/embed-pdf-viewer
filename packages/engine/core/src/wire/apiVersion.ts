@@ -67,15 +67,17 @@ export const FIELD_PURPOSE_AND_FORMAT_SINCE = '3.4';
 export const BUTTON_IMAGE_AND_LAYOUT_SINCE = '3.5';
 
 /**
- * The version a form field anyone fills in (`forAnyone`) arrived in on the
- * wire: in the draft of a create, the patch of an update and what it
- * expects, as a route's body and as a change op. A client never sends it to
- * an older server, whose request schemas refuse a member they don't know,
- * nor a bundle with such a field, which an older server would import as an
- * ordinary one. Reading needs no such check: an older server's field reads
- * `forAnyone: false` (`FormFieldDTOSchema`).
+ * The version a field's `assignment` arrived in on the wire, and with it a
+ * field anyone fills in: in the draft of a create, the patch of an update
+ * and what it expects, as a route's body and as a change op. A client sends
+ * an older server, whose request schemas refuse a member they don't know, a
+ * group's or an unassigned field's assignment as the `groupId` it knows, and
+ * never `{ kind: 'anyone' }`, nor a bundle with such a field, which an older
+ * server would import as an unassigned one. Reading needs no such check: an
+ * older server's field reads its assignment from its group
+ * (`FormFieldDTOSchema`).
  */
-export const ANYONE_FIELDS_SINCE = '3.5';
+export const FIELD_ASSIGNMENT_SINCE = '3.5';
 
 const isOlder = (version: ApiVersion, than: ApiVersion): boolean =>
   version.major < than.major || (version.major === than.major && version.minor < than.minor);

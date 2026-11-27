@@ -19,7 +19,7 @@ const BASE = {
   alternateName: null,
   mappingName: null,
   groupId: null,
-  forAnyone: false,
+  assignment: { kind: 'unassigned' },
   purpose: null,
   createdBy: null,
   createdAt: null,
@@ -155,23 +155,35 @@ describe('form schemas', () => {
     expect(FormFieldPatchSchema.parse({ groupId: null })).toEqual({ groupId: null });
   });
 
-  test('a draft and a patch take forAnyone as true or false, and nothing else', () => {
+  test('a draft and a patch take an assignment of one of three kinds, and nothing else', () => {
     const draft = { kind: 'text', name: 'note' };
     for (const schema of [FormFieldDraftSchema, FormFieldPatchSchema]) {
-      expect(schema.safeParse({ ...draft, forAnyone: true }).success).toBe(true);
-      expect(schema.safeParse({ ...draft, forAnyone: false }).success).toBe(true);
-      expect(schema.safeParse({ ...draft, forAnyone: null }).success).toBe(false);
-      expect(schema.safeParse({ ...draft, forAnyone: 'yes' }).success).toBe(false);
+      for (const assignment of [
+        { kind: 'group', groupId: 'buyer' },
+        { kind: 'anyone' },
+        { kind: 'unassigned' },
+      ]) {
+        expect(schema.safeParse({ ...draft, assignment }).success).toBe(true);
+      }
+      for (const assignment of [null, true, { kind: 'everyone' }, { kind: 'group' }]) {
+        expect(schema.safeParse({ ...draft, assignment }).success).toBe(false);
+      }
     }
   });
 
-  test('a field from a server older than forAnyone reads forAnyone: false', () => {
-    const { forAnyone: _forAnyone, ...older } = RADIO as unknown as Record<string, unknown>;
-    expect(FormFieldDTOSchema.parse(older)).toEqual({ ...RADIO, forAnyone: false });
-    expect(FormFieldDTOSchema.parse({ ...RADIO, forAnyone: true })).toEqual({
+  test('a field from a server older than assignments reads its assignment from its group', () => {
+    const { assignment: _assignment, ...older } = RADIO as unknown as Record<string, unknown>;
+    expect(FormFieldDTOSchema.parse(older)).toEqual(RADIO);
+    expect(FormFieldDTOSchema.parse({ ...older, groupId: 'dana' })).toEqual({
       ...RADIO,
-      forAnyone: true,
+      groupId: 'dana',
+      assignment: { kind: 'group', groupId: 'dana' },
     });
+    const anyone = { ...RADIO, assignment: { kind: 'anyone' } };
+    expect(FormFieldDTOSchema.parse(anyone)).toEqual(anyone);
+    // Closed: an assignment this client doesn't know is no field it can read.
+    const unknown = { ...RADIO, assignment: { kind: 'everyone' } };
+    expect(FormFieldDTOSchema.safeParse(unknown).success).toBe(false);
   });
 
   test('a draft and a patch take a purpose, or null for none, and none with space around it', () => {

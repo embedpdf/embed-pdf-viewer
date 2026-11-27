@@ -46,9 +46,11 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   // 2: a field's purpose and format (3.4). 3: whether a field is for anyone, and a
   // fill names nobody, so `filledBy`, `filledByName` and `filledAt` read `null`.
   // 4: a push button's hasImage, a widget's layout, a push button's image in a bundle
-  // (3.5, after 3 was already served without them).
-  form: 4,
-  formExport: 4,
+  // (3.5, after 3 was already served without them). 5: a field's `assignment` in
+  // place of `forAnyone` (3.5, after 4 may have been served with `forAnyone`, which a
+  // client of this version would read as no field anyone fills in).
+  form: 5,
+  formExport: 5,
   metadata: 1,
   outline: 1,
   attachments: 1,

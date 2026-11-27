@@ -10,7 +10,7 @@ export interface FormFieldPatch {
     alternateName?: (string | null) | undefined;
     mappingName?: (string | null) | undefined;
     groupId?: (string | null) | undefined;
-    forAnyone?: boolean | undefined;
+    assignment?: CloudPDF.FieldAssignment | undefined;
     purpose?: (string | null) | undefined;
     actions?: CloudPDF.FieldActionsPatch | undefined;
     kind?: FormFieldPatch.Kind | undefined;

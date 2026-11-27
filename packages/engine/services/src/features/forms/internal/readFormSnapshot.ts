@@ -13,18 +13,19 @@ import type {
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formatOfActions, formWidget, toPageRef, topRowOf } from '@embedpdf/engine-core/runtime';
+import {
+  formatOfActions,
+  formWidget,
+  groupIdOfAssignment,
+  toPageRef,
+  topRowOf,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 import { PageIndexLookup, readButtonHasImage } from './buttonImage';
-import {
-  readFieldForAnyone,
-  readFieldAttribution,
-  readFieldGroup,
-  readFieldPurpose,
-} from './fieldAttribution';
+import { readFieldAssignment, readFieldAttribution, readFieldPurpose } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldKind> = {
@@ -155,6 +156,7 @@ export function readFieldAt(
   const defaultValueEntry = readValueEntry(runtime, model, fieldIndex, true);
   const actions = readFieldActions(runtime, model, fieldIndex, docPtr, actionBudget);
 
+  const assignment = readFieldAssignment(runtime, model, fieldIndex);
   const base: FormFieldBase<PdfCoordinates> = {
     ref:
       fieldObjectNumber > 0
@@ -175,8 +177,8 @@ export function readFieldAt(
     valueEntry,
     defaultValueEntry,
     ...(actions ? { actions } : {}),
-    groupId: readFieldGroup(runtime, model, fieldIndex),
-    forAnyone: readFieldForAnyone(runtime, model, fieldIndex),
+    groupId: groupIdOfAssignment(assignment),
+    assignment,
     purpose: readFieldPurpose(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
     // Deprecated: a fill records nobody (see fieldAttribution.ts).
