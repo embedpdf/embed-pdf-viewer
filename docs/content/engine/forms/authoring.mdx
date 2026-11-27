@@ -489,26 +489,6 @@ time of day is midnight when you leave it out.
 - **Every pattern the engine takes reads back:** `parseDate()` of what `formatDate()` wrote
   gives the same date, on the parts the pattern shows.
 
-<Engine cloud>
-
-A server can be older than your app. `purpose` and `format` need a server of version 3.4: an
-older one is never sent them, so a `create()` or an `update()` that names either fails with
-`NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update.
-Reading still works against it, an exported bundle included: `format` is read from the field's
-scripts as described above, and `purpose` reads `null`. An [`import()`](import-export) of a bundle
-in which a field has a purpose fails the same way: such a server would make the field without it.
-
-A push button's image and a widget's `layout` need a server of version 3.5. Against an older
-one, `setButtonImage()`, a `create()`, `addWidget()` or `updateWidget()` that names a `layout`, and an
-import of a bundle with a button that shows an image fail with `NotImplemented` before anything
-is sent. Reading still works: an older server's widgets read `layout: 'caption'` for a push
-button's and `null` for the rest, and its push buttons `hasImage: false`.
-
-`forAnyone` needs a server of version 3.5, the same way: a `create()` or an `update()` that names it
-fails with `NotImplemented` against an older one, and every field it reads says `forAnyone: false`.
-
-</Engine>
-
 ## Scripts and calculations
 
 A field can run scripts: while the user types (`keystroke`), to show the value (`format`), to

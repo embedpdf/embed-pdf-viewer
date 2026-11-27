@@ -746,15 +746,6 @@ with a mark, pass `appearance` to `sign()` or `prepare()`.
   the local engine, and the server stores what it is given after the same check. So
   `addValidationInfo()` from `@embedpdf/core-signature` works here as it is.
 - **A document timestamp needs no field** here either: the server makes it.
-- **An image as a mark, and taking a mark out, need a server of version 3.4.** An older one is
-  never sent them: `setSignatureAppearance()` with a PNG, a JPEG or `null`, and `sign()` or
-  `prepare()` with a PNG or a JPEG as `appearance`, fail with `NotImplemented`, and
-  `details.needs` and `details.serverVersion` say which side to update. A one-page PDF works
-  against it.
-- **These need a server of version 3.3.** An older one is never sent them:
-  `getValidationInfo()`, `addValidationInfo()` and a document timestamp with no `field` fail
-  with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to
-  update. Checking signatures still works against it.
 
 </Engine>
 

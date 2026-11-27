@@ -225,32 +225,6 @@ second request with the same `opId` returns what the first one did and writes no
 
 An export is cached until the document's form or pages change, so exporting again is cheap.
 
-A server older than version 3.4 keeps no [purpose](/docs/engine/forms/authoring#purpose). An
-import of a bundle in which a field has one fails with `NotImplemented` before the bundle is sent,
-and `details.needs` and `details.serverVersion` say which side to update. To import without the
-purposes, clear them first:
-
-```ts
-const plain = {
-  ...bundle,
-  fields: bundle.fields.map((row) => ({
-    ...row,
-    data: { ...row.data, purpose: null },
-  })),
-};
-await doc.forms.import(plain);
-```
-
-A date or a time format needs no such step: an older server reads it from the field's scripts.
-
-A server older than version 3.5 keeps no push button image and no widget
-[`layout`](/docs/engine/forms/authoring#a-button-with-an-image) but `'caption'`. An import of a
-bundle with a widget whose layout is another, or that names an image, fails the same way.
-
-A server older than version 3.5 has no [`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in)
-fields: an import of a bundle with one fails the same way, before it is sent. A bundle whose
-fields all read `forAnyone: false` goes out.
-
 </Engine>
 
 ## Permissions

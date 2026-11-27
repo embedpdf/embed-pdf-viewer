@@ -99,16 +99,6 @@ fields in every group, `fields:set-group:all`, beside `doc.forms.modify`. `forAn
 Like the group, `forAnyone` is saved in the field's `/EMBD_Metadata`, other PDF apps ignore it, and
 a form export carries it. Signing [locks](#signing) a `forAnyone` field once it holds a value.
 
-<Engine cloud>
-
-`forAnyone` needs a server of version 3.5. An older one is never sent it: a `create()` or an
-`update()` that names it, `false` too, fails with `NotImplemented`, and so does an
-[`import()`](/docs/engine/forms/import-export) of a bundle with a `forAnyone` field.
-`details.needs` and `details.serverVersion` say which side to update. Reading still works: every
-field of an older server reads `forAnyone: false`.
-
-</Engine>
-
 ## Give each signer their group
 
 Each signer gets the permissions to fill in and sign their own group's fields:
