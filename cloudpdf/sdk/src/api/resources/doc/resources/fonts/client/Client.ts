@@ -61,7 +61,7 @@ export class FontsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.5",
             }),
             requestOptions?.headers,
         );
@@ -147,7 +147,7 @@ export class FontsClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": documentPassword,
-                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.4",
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.5",
             }),
             requestOptions?.headers,
         );

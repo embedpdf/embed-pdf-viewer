@@ -1,5 +1,19 @@
 # @cloudpdf/server
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field that anyone fills in: a create (`POST .../form/fields`), an update (`PATCH .../form/fields/{field}`) and the `forms.create` and `forms.update` ops of a change take `forAnyone`, and every field a response carries has it. Every token that may fill in some field fills in such a field; marking one takes `fields:set-group:all`. A signature without a lock of its own locks every such field that holds a value.
+
+  The form's and the form export's engine values are raised, so answers with the new field get new URLs.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – The change op `forms.setButtonImage` puts a push button's image in (its `image` part) or takes it out (`null`), and a widget's `layout` is read and written. The op `forms.addWidget` gives a push button's new widget the field's image. The change analysis counts a push button's image as filling in, as Acrobat does. A mark in a signature field is stored once however many fields show it. The `form` and `formExport` engine values are raised: their answers carry `hasImage`, `layout`, and a push button's image in a bundle.
+
+### Patch Changes
+
+- [#1162](https://github.com/embedpdf/embed-pdf-viewer/pull/1162) by [@bobsingor](https://github.com/bobsingor) – Fill in a field, or draw a mark into a signature field and sign it, after another signature, and that signature now stays valid in Acrobat and in the analysis. A fill records nobody now, so a values import needs only what a fill needs, no longer `doc.forms.import`, and form reads give `filledBy`, `filledByName` and `filledAt` as `null` (cached form reads get new URLs).
+
 ## 3.4.0
 
 ### Minor Changes

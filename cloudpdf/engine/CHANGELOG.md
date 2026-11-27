@@ -1,5 +1,17 @@
 # @cloudpdf/engine
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field can be one anyone fills in: `doc.forms.create()`, `doc.forms.update()` and the `forms.create` and `forms.update` ops of `doc.apply()` take `forAnyone`, every read returns `field.forAnyone`, and `doc.security.allowsField('fill', field)` answers for such a field.
+
+  Writing it needs a server of version 3.5. An older one is never sent it: a create, an update or a change that names `forAnyone` (`false` too, and in `expect`) fails with `NotImplemented`, and `details.needs` and `details.serverVersion` say which side to update. So does an import (`doc.forms.import()`) of a bundle with such a field, which an older server would make an ordinary field. Reading works against an older server: every field reads `forAnyone: false`, in an exported bundle too.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.setButtonImage(field, image | null)` puts a PNG, a JPEG or a one-page PDF in every widget of a push button, or takes it out, and the image travels as a part of the change, as a stamp's does. A push button reads `hasImage`, and its widgets a `layout` that a create, `addWidget()` and `updateWidget()` write.
+
+  Both need a server of version 3.5. An older one is never sent them: `setButtonImage()`, the op `forms.setButtonImage`, a write that names a `layout`, and an import of a bundle with a button that shows an image fail with `NotImplemented` before anything is sent, and `details.needs` and `details.serverVersion` say which side to update. Reading works against an older server: its push buttons read `hasImage: false`, and its widgets `layout: 'caption'` for a push button's and `null` for the rest.
+
 ## 3.4.0
 
 ### Minor Changes
