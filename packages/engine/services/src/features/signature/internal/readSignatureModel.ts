@@ -89,6 +89,15 @@ export function readByteRange(
   });
 }
 
+/** The lock signature field `index` of `model` carries of its own (`/Lock`), or `null`. */
+export function readFieldLock(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  index: number,
+): FieldLockSpec | null {
+  return readLock(runtime, model, index, FIELDS_LOCK);
+}
+
 function readLock(
   runtime: PdfRuntimeModule,
   model: Ptr,

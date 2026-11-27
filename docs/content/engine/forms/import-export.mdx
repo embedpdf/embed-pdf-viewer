@@ -62,7 +62,8 @@ else is refused with `InvalidArg`.
 A file kept from an earlier version reads as today's bundle. A field written before fields had a
 [`purpose`](/docs/engine/forms/authoring#purpose) and a
 [`format`](/docs/engine/forms/authoring#dates-and-times) gets both: `purpose: null`, and the
-format its scripts give.
+format its scripts give. One written before
+[`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in) reads `forAnyone: false`.
 
 ## Copy the design
 
@@ -112,7 +113,9 @@ still name someone in `filledBy`; the import leaves it out.
 
 A field keeps its group (`groupId`) with `'restore'`. With `'stamp'`, it goes in the group it had,
 when the user may put fields there (their own, or one they have `fields:set-group` for), and
-stays in no group when it had none. A group they may not set refuses the import.
+stays in no group when it had none. A group they may not set refuses the import. A `forAnyone`
+field stays `forAnyone` the same way: always with `'restore'`, and with `'stamp'` when the user has
+`fields:set-group:all`.
 
 ### Scripts and actions
 
@@ -237,6 +240,10 @@ await doc.forms.import(plain);
 ```
 
 A date or a time format needs no such step: an older server reads it from the field's scripts.
+
+A server older than version 3.5 has no [`forAnyone`](/docs/engine/forms/groups#fields-anyone-fills-in)
+fields: an import of a bundle with one fails the same way, before it is sent. A bundle whose
+fields all read `forAnyone: false` goes out.
 
 </Engine>
 

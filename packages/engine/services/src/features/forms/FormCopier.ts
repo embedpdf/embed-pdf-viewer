@@ -43,6 +43,12 @@ export interface FormCopyRequest {
    * none): checked by the caller, which refuses one it may not set.
    */
   readonly groupOf: (groupId: string | null) => string | null;
+  /**
+   * Whether a copy is one anyone fills in, given whether its source is:
+   * checked by the caller, which refuses one it may not mark. Left out, the
+   * copy is as its source.
+   */
+  readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
   /** What the copy may carry: `fields` names as many fields as a bundle holds items. */
   readonly limits: BundleLimits;
 }
@@ -111,7 +117,12 @@ export class FormCopier {
         return { ...create, ...(numbers ? { objectNumbers: numbers } : {}) };
       }),
       plan.calculationOrder,
-      { actor: request.actor, groupOf: request.groupOf, signal },
+      {
+        actor: request.actor,
+        groupOf: request.groupOf,
+        ...(request.forAnyoneOf ? { forAnyoneOf: request.forAnyoneOf } : {}),
+        signal,
+      },
     );
     return {
       ...made,

@@ -111,6 +111,13 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
    */
   groupId: string | null;
   /**
+   * Every signer may fill the field in: a user who may fill in some field
+   * fills in this one, whatever group their permission names. Such a field
+   * is in no group and is never a signature field. A signing that names no
+   * lock locks it once it holds a value.
+   */
+  forAnyone: boolean;
+  /**
    * What the field's value means: `email`, `date-signed`, or a name an app
    * made up. The engine keeps it and reads nothing into it. `null` for a
    * field with none.

@@ -19,6 +19,7 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
+  checkedForAnyone,
   checkedPurpose,
   defaultEntryOfDraft,
   EngineError,
@@ -63,7 +64,9 @@ import {
   type OrderChange,
 } from './internal/calculationOrder';
 import {
+  readForAnyoneEntry,
   stampFieldCreation,
+  writeFieldForAnyone,
   writeFieldGroup,
   writeFieldPurpose,
 } from './internal/fieldAttribution';
@@ -369,8 +372,12 @@ export class FormMutator {
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.kind, placement));
     // The default is checked against the draft before anything is written,
-    // and so are the purpose and the format.
+    // and so are who fills it in, the purpose and the format.
     defaultEntryOfDraft(draft);
+    const forAnyone = checkedForAnyone(draft.forAnyone, {
+      kind: draft.kind,
+      groupId: draft.groupId ?? null,
+    });
     const purpose = checkedPurpose(draft.purpose);
     const format = formatWriteOf(draft, draft.kind) ?? null;
     if ('maxLength' in draft && draft.maxLength !== undefined) {
@@ -413,6 +420,7 @@ export class FormMutator {
     if (draft.groupId !== undefined && draft.groupId !== null) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
     }
+    if (forAnyone) writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, true);
     if (purpose !== null) writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
@@ -608,6 +616,15 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.kind);
+    // Checked on the field as the patch leaves it: one in a group is no one else's.
+    const forAnyone = checkedForAnyone(
+      patch.forAnyone,
+      { kind: before.kind, groupId: patch.groupId !== undefined ? patch.groupId : before.groupId },
+      before.forAnyone,
+    );
+    // The entry as stored, read before any write: one another tool left beside
+    // a group reads as `false`, and goes once the field is taken out of it.
+    const storedForAnyone = readForAnyoneEntry(this.runtime, model, resolved.fieldIndex);
     const purpose = patch.purpose === undefined ? undefined : checkedPurpose(patch.purpose);
     const format = formatWriteOf(patch, before.kind);
     // Checked against the field as the patch leaves it, before anything is written.
@@ -659,6 +676,8 @@ export class FormMutator {
     if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
       writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
     }
+    if (forAnyone !== storedForAnyone)
+      writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, forAnyone);
     if (purpose !== undefined && purpose !== before.purpose) {
       writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     }
@@ -1118,6 +1137,7 @@ const PATCH_BASE_MEMBERS = [
   'alternateName',
   'mappingName',
   'groupId',
+  'forAnyone',
   'purpose',
   'actions',
 ];

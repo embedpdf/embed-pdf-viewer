@@ -754,6 +754,7 @@ export {
   type FormFieldFormatWritable,
 } from './forms/format';
 export { checkedPurpose, isFieldPurpose } from './forms/purpose';
+export { checkedForAnyone } from './forms/anyone';
 export type {
   BaseVersionInfo,
   DigestAlgorithm,
@@ -1039,6 +1040,7 @@ export {
   authorizeAnnotationUpdate,
   allowsFieldWrite,
   allowsSomeFieldWrite,
+  authorizeForAnyone,
   authorizeFieldGroup,
   authorizeFieldWrite,
 } from './auth/scope';
@@ -1052,6 +1054,7 @@ export {
   checkFieldAction,
   checkPluginPermission,
   fieldRightsOf,
+  type FieldAssignment,
   type FieldGroupRight,
   type FieldRights,
   checkSetGroup,

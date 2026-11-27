@@ -272,27 +272,68 @@ export function checkSetGroup(
 }
 
 /**
- * True iff the scope lets the caller `action` (fill in, or sign) a form
- * field in `groupId` (`null` for a field in no group).
+ * Authority to put records of `entity` in every group: `*`,
+ * `<entity>:set-group:all` or `<entity>:*:all`. Marking a form field one
+ * anyone fills in takes it, since such a field reaches every group's
+ * signers.
+ */
+export function checkSetEveryGroup(entity: CollabEntity, rawScope: ReadonlyArray<string>): boolean {
+  return rawScope
+    .map(parseScope)
+    .some(
+      (s) =>
+        s.kind === 'wildcard' ||
+        (s.kind === 'collab' &&
+          s.entity === entity &&
+          (s.action === 'set-group' || s.action === '*') &&
+          s.filter.kind === 'all'),
+    );
+}
+
+/**
+ * Whose a form field is, as the field rights read it: its group, and whether
+ * anyone fills it in. A field read (`FormField`) is one.
+ */
+export interface FieldAssignment {
+  /** The field's group; `null` for a field in no group. */
+  readonly groupId: string | null;
+  /** Every signer may fill the field in (`FormField.forAnyone`). Left out, `false`. */
+  readonly forAnyone?: boolean;
+}
+
+/** `field` as an assignment: a group id alone (or `null`) is a field of that group. */
+function assignmentOf(field: FieldAssignment | string | null): FieldAssignment {
+  return field !== null && typeof field === 'object' ? field : { groupId: field };
+}
+
+/**
+ * True iff the scope lets the caller `action` (fill in, or sign) the form
+ * `field`: the field itself, or its group id (`null` for a field in no
+ * group).
  *
  * Narrowing, per action, as for annotations:
  *   1. wildcard `*` → allow;
- *   2. if any `fields:<action>` scope exists (or `fields:*`) → only those
+ *   2. a field anyone fills in (`forAnyone`) → allow when the scope lets the
+ *      caller `action` some field ({@link checkAnyFieldAction}), whatever
+ *      group its scopes name;
+ *   3. if any `fields:<action>` scope exists (or `fields:*`) → only those
  *      decide: the field must match one of their filters, even when the
  *      broad capability is also present. A field in no group then matches
  *      only `:all`;
- *   3. otherwise the broad capability decides, for every field:
+ *   4. otherwise the broad capability decides, for every field:
  *      `doc.forms.fill` to fill, `doc.sign` to sign.
  *
  * Nothing here narrows form design (`doc.forms.modify`).
  */
 export function checkFieldAction(
   action: 'fill' | 'sign',
-  groupId: string | null,
+  field: FieldAssignment | string | null,
   rawScope: ReadonlyArray<string>,
   permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
+  const { groupId, forAnyone } = assignmentOf(field);
+  if (forAnyone) return checkAnyFieldAction(action, rawScope, permissionFlags, protection);
   const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
   if (protectedCapabilities(protection).has(broad)) return false;
   const parsed = rawScope.map(parseScope);
@@ -313,7 +354,8 @@ export function checkFieldAction(
 /**
  * The form fields a session may act on, by group: every field (`all`), or
  * only the fields of `groups` (none when the list is empty). A field in no
- * group counts only under `all`.
+ * group counts only under `all`. A field anyone fills in counts unless the
+ * list is empty.
  */
 export type FieldGroupRight =
   | { readonly all: true }

@@ -2,6 +2,7 @@ import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { Identity } from '../auth/scope/types';
 import type {
   DocCapability,
+  FieldAssignment,
   FieldRights,
   PdfPermissionFlags,
   PluginPermission,
@@ -242,18 +243,20 @@ export interface DocumentSecurityService {
   /**
    * Per-field form authorization, mirroring what the engine checks on every
    * fill, signing and form design write:
-   *   - `fill`/`sign` take the field (its `groupId`): a `fields:fill` /
-   *     `fields:sign` scope for its group, or, without one, `doc.forms.fill`
-   *     / `doc.sign` for every field;
+   *   - `fill`/`sign` take the field (its `groupId`, and `forAnyone`): a
+   *     `fields:fill` / `fields:sign` scope for its group, or, without one,
+   *     `doc.forms.fill` / `doc.sign` for every field. A field anyone fills
+   *     in takes any of them, whatever group it names;
    *   - `set-group` takes the destination group (`fields:set-group:` ladder;
    *     the caller's own default group is always assignable). Taking a field
    *     out of its group has no destination: it takes form design alone
-   *     (`allows('doc.forms.modify')`).
+   *     (`allows('doc.forms.modify')`). Making a field one anyone fills in
+   *     takes every group: `fieldRights().setGroup.all`.
    *
    * A courtesy for UI gating, like {@link allowsAnnotation}: the engine
    * enforces every write with the same predicates.
    */
-  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'fill' | 'sign', field: FieldAssignment): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
 
   /**
