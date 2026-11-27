@@ -29,7 +29,8 @@ import { toPageRef } from '../identity/PageRef';
  *     on a field a signature locked;
  *   - the picture is a drawing the document holds once, however many push
  *     buttons, signature fields and stamps show it, and a copy, an export
- *     and an import carry it.
+ *     and an import carry it. An export leaves it out of a field the form
+ *     doesn't export, as it leaves out a value.
  *
  * It runs on {@link PICTURE_BUTTON_PDF}.
  */
@@ -690,6 +691,33 @@ export function runPictureButtonConformance(
       await as('everything', async (doc) => {
         const imported = await doc.forms.import(exported, { values: false });
         expect(imported.fields.map((f) => [f.name, hasImageOf(f)])).toEqual([['initials', false]]);
+      });
+    });
+
+    test("a field the form doesn't export goes without its picture, as without a value", async () => {
+      let bundle: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
+      await as('everything', async (doc) => {
+        const { field } = await doc.forms.create({
+          kind: 'pushbutton',
+          name: 'photo',
+          noExport: true,
+          widgets: [{ page: PAGE, box: box(0), layout: 'image' }],
+        });
+        await doc.forms.setButtonImage(field.ref, BANDS_PNG);
+        expect(hasImageOf(await read(doc, 'photo'))).toBe(true);
+        bundle = await doc.forms.export({ fields: [field.ref] });
+      });
+      const exported = bundle!;
+      expect(exported.fields.map((f) => [f.data.name, hasImageOf(f.data)])).toEqual([
+        ['photo', false],
+      ]);
+      expect(exported.widgets.map((row) => [row.data.layout, row.resources])).toEqual([
+        ['image', {}],
+      ]);
+      expect(exported.resources).toEqual({});
+      await as('everything', async (doc) => {
+        const imported = await doc.forms.import(exported);
+        expect(imported.fields.map((f) => [f.name, hasImageOf(f)])).toEqual([['photo', false]]);
       });
     });
   });

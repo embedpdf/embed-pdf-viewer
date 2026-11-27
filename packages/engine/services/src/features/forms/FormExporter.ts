@@ -1,4 +1,5 @@
 import {
+  annotationKey,
   assertWithinLimit,
   formExportRowsOf,
   manifestBytesOf,
@@ -28,9 +29,10 @@ import { bundlePagesOf } from '../transfer/bundlePages';
  * its widgets, as one bundle in page space (see `formExportRowsOf`). It
  * reads the form as `list()` does and writes nothing. A widget is drawn
  * from its data, so its only resource is a push button's image: the
- * drawing its icon names, as a one-page PDF (`image`), once however
- * many widgets show it. It is checked against `limits` as it is built, so an
- * export never makes one an import refuses.
+ * drawing its icon names, as a one-page PDF (`image`), once however many
+ * widgets show it, and none for a field the form doesn't export. It is
+ * checked against `limits` as it is built, so an export never makes one an
+ * import refuses.
  */
 export class FormExporter {
   constructor(
@@ -55,10 +57,22 @@ export class FormExporter {
     );
     assertWithinLimit('form', limits, 'items', fields.length + widgets.length);
     const images = new ButtonImageCollector(this.runtime, this.session, limits);
+    // A widget's picture goes with its field's: none for a field the export
+    // takes without one, as one the form doesn't export.
+    const withoutPicture = new Set(
+      fields.flatMap((field) =>
+        field.kind === 'pushbutton' && !field.hasImage
+          ? field.widgets.flatMap((widget) => (widget.ref ? [annotationKey(widget.ref)] : []))
+          : [],
+      ),
+    );
     const rows = {
       pages: bundlePagesOf(this.runtime, this.session, widgets),
       fields: fields.map((data) => ({ data })),
-      widgets: widgets.map((data) => ({ data, resources: images.of(data) })),
+      widgets: widgets.map((data) => ({
+        data,
+        resources: withoutPicture.has(annotationKey(data.ref)) ? {} : images.of(data),
+      })),
       calculationOrder,
     };
     assertWithinLimit('form', limits, 'pages', rows.pages.length);

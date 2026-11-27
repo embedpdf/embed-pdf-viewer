@@ -541,7 +541,7 @@ export function setSignatureAppearance(
  */
 export function setButtonImage(ctx: ChangeContext, op: Op<'forms.setButtonImage'>): Done {
   const before = readField(ctx, op.field);
-  authorizeFieldWrite(ctx.authority, before.field.groupId, 'fill');
+  authorizeFieldWrite(ctx.authority, before.field, 'fill');
   return recordRevert(ctx, before, 'forms.setButtonImage', () =>
     new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setButtonImage(
       op.field,

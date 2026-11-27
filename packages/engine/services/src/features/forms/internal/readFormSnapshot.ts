@@ -313,16 +313,26 @@ export function readFormFields(
 /**
  * Whether field `fieldIndex` holds a value, as a read of it says: text that
  * isn't empty (a text field, a dropdown), a checkbox or radio button that is
- * on, an option that is selected (a list). A push button, a signature field
- * and a field of a kind the engine doesn't model hold none.
+ * on, an option that is selected (a list), a push button that holds a
+ * picture (`hasImage`). A signature field and a field of a kind the engine
+ * doesn't model hold none.
  */
 export function fieldHoldsValue(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
+  docPtr: Ptr,
+  pages = new PageIndexLookup(runtime, docPtr),
 ): boolean {
   const { fn } = runtime;
   switch (FAMILY_BY_CODE[fn.EPDFForm_GetFieldFamily(model, fieldIndex)]) {
+    case 'pushbutton':
+      return readButtonHasImage(
+        runtime,
+        docPtr,
+        readPlainWidgets(runtime, model, fieldIndex),
+        pages,
+      );
     case 'text':
     case 'combobox':
       return entryScalar(readValueEntry(runtime, model, fieldIndex, false)) !== '';

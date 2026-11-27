@@ -27,7 +27,8 @@ export interface FormExportRows<C extends Coordinates> {
  * order: whole fields, each with every widget it has, whatever page they're
  * on; the fields' widget rows, in their fields' order; and the calculation
  * order among them. A field the form doesn't export (`noExport`) goes
- * without its value and who filled it, a signature field unsigned. `pages`
+ * without its value (a push button without its picture) and who filled it,
+ * a signature field unsigned. `pages`
  * is the document's pages; a selected field or page the document doesn't
  * have is refused with `NotFound`.
  */
@@ -94,7 +95,8 @@ export function fieldMatches(
 
 /**
  * A field as an export carries it: one the form doesn't export without its
- * value and who filled it, and a signature field without its signature.
+ * value (a push button without its picture) and who filled it, and a
+ * signature field without its signature.
  */
 function exportedField<C extends Coordinates>(field: FormField<C>): FormField<C> {
   if (field.kind === 'signature') return { ...field, valueEntry: { kind: 'none' } };
@@ -131,6 +133,8 @@ function exportedField<C extends Coordinates>(field: FormField<C>): FormField<C>
         selectedValues: [],
         options: field.options.map((option) => ({ ...option, selected: false })),
       } as FormField<C>;
+    case 'pushbutton':
+      return { ...unfilled, kind: 'pushbutton', hasImage: false } as FormField<C>;
     default:
       return unfilled as FormField<C>;
   }

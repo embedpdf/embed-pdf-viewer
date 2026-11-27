@@ -1,5 +1,6 @@
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { BANDS_PNG } from './stampFixtures';
 import type { Identity } from '../auth/scope/types';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
@@ -20,7 +21,8 @@ import type { FieldLockSpec } from '../signature/types';
  *   - marking a field takes `fields:set-group:all`, and a field in a group or
  *     a signature field is refused;
  *   - a signing that names no lock locks every such field that holds a value,
- *     whoever filled it in, and leaves an empty one open for the next signer;
+ *     whoever filled it in (an image field holds one once it holds a
+ *     picture), and leaves an empty one open for the next signer;
  *     a signing that names a lock decides for itself;
  *   - a copy, an export and an import keep the fact;
  *   - what a signature allows: filling in a field it left open is permitted,
@@ -432,6 +434,52 @@ export function runAnyoneFieldsConformance(
           expect(includes((await lockOf(doc, 'ada_sig'))?.fields, 'agree')).toBe(true);
           const refused = await refusal(doc.forms.setValue(field('agree'), { checked: false }));
           expect(codeOf(refused)).toBe(EngineErrorCode.ProtectedDocument);
+        },
+        afterDana,
+      );
+    });
+
+    test('an image field is every signer’s to fill in, and locks once it holds a picture', async () => {
+      const prepared = await handOn('sender', async (doc) => {
+        for (const [name, x] of [
+          ['initials', 20],
+          ['photo', 200],
+        ] as const) {
+          await doc.forms.create({
+            kind: 'pushbutton',
+            name,
+            forAnyone: true,
+            widgets: widgetsAt(x).map((widget) => ({ ...widget, layout: 'image' as const })),
+          });
+        }
+      });
+      /** What putting a picture in `name` (or taking it out) gives: `'resolved'` or the refusal's code. */
+      const picture = async (doc: DocumentHandle, name: string, image: Uint8Array | null) =>
+        codeOf(await refusal(doc.forms.setButtonImage(field(name), image)));
+      // Dana puts her initials in; her signing locks them and leaves the empty photo open.
+      const afterDana = await handOn(
+        'dana',
+        async (doc) => {
+          expect(doc.security.allowsField('fill', await doc.forms.get(field('initials')))).toBe(
+            true,
+          );
+          expect(await picture(doc, 'initials', BANDS_PNG)).toBe('resolved');
+          await sign(doc, { field: field('dana_sig') });
+          const locked = (await lockOf(doc, 'dana_sig'))?.fields ?? [];
+          expect(locked).toContain('initials');
+          expect(includes(locked, 'photo')).toBe(false);
+          expect(await picture(doc, 'initials', null)).toBe(EngineErrorCode.ProtectedDocument);
+        },
+        prepared,
+      );
+      await as(
+        'ada',
+        async (doc) => {
+          expect(await picture(doc, 'initials', BANDS_PNG)).toBe(EngineErrorCode.ProtectedDocument);
+          expect(await picture(doc, 'photo', BANDS_PNG)).toBe('resolved');
+          await sign(doc, { field: field('ada_sig') });
+          expect(includes((await lockOf(doc, 'ada_sig'))?.fields, 'photo')).toBe(true);
+          expect(await picture(doc, 'photo', null)).toBe(EngineErrorCode.ProtectedDocument);
         },
         afterDana,
       );

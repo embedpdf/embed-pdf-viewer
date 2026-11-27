@@ -664,8 +664,8 @@ When you name no `lock`, a signing locks two kinds of field (see
   fields as they are when you sign, but not its signature fields, which their signers still sign.
 - **Every field anyone fills in (`forAnyone: true`) that holds a value,** whether the signature
   field is in a group or not: text that isn't empty, a box or a radio button that is on, an
-  option that is chosen. One still empty stays open for the next signer, and the first signing
-  after it is filled in locks it.
+  option that is chosen, a button that holds an image. One still empty stays open for the next
+  signer, and the first signing after it is filled in locks it.
 
 With neither, it locks nothing. A document timestamp is no signer's, so it adds no field anyone
 fills in. Name a `lock` to choose yourself: the signing locks exactly that.
