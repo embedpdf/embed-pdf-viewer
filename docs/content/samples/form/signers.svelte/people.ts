@@ -1,16 +1,12 @@
-// What each person may do, as permissions: the sender places fields for both signers, and each
-// signer fills in and signs their own.
+// What each person may do, as permissions: the sender places fields for both signers and for
+// anyone, and each signer fills in and signs their own, and fills in anyone's.
 const see = ['doc.open', 'doc.render', 'doc.download', 'doc.forms.read'];
 
 export const people = {
   sender: {
     name: 'The sender',
-    scope: [
-      ...see,
-      'doc.forms.modify',
-      'fields:set-group:group=borrower',
-      'fields:set-group:group=approver',
-    ],
+    // Every group: a field anyone fills in is every group's.
+    scope: [...see, 'doc.forms.modify', 'fields:set-group:all'],
   },
   borrower: {
     name: 'Dana Smith',
@@ -29,3 +25,6 @@ export const signers = [
   { id: 'borrower', label: 'Dana Smith', color: '#2563eb' },
   { id: 'approver', label: 'Ada Lovelace' }, // a color is picked for it
 ];
+
+// The color a field anyone fills in shows in: the form's `fields.anyoneTintColor`.
+export const ANYONE = 'var(--epdf-form-field-anyone-tint-color, #0891b2)';

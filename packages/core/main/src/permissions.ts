@@ -1,7 +1,7 @@
-import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
+import { assignmentOfGroup, type DocumentHandle } from '@embedpdf/engine-core/runtime';
 
 import { PluginError } from './errors';
-import type { Permission } from './types';
+import type { AssignedField, Permission } from './types';
 
 /**
  * What `ctx.allows` reads: the document session's own predicates, the ones the
@@ -31,17 +31,20 @@ export function permissionDenied(
 /**
  * What a plugin throws for a form field the session may not fill in or sign:
  * a refusal that names the permission it would take, as the engine's does
- * (`fields:<action>:group=<group>`, or the broad one for a field in no group).
+ * (`fields:<action>:group=<group>`, or the broad one for a field in no
+ * group). A field anyone fills in takes any permission to fill in (sign)
+ * some field, and names the broad one too: it is in no group.
  */
 export function fieldPermissionDenied(
   capability: string,
   action: 'fill' | 'sign',
-  field: { readonly groupId: string | null },
+  field: AssignedField,
   operation: string,
 ): PluginError {
+  const assignment = field.assignment ?? assignmentOfGroup(field.groupId);
   const permission =
-    field.groupId !== null
-      ? `fields:${action}:group=${field.groupId}`
+    assignment.kind === 'group'
+      ? `fields:${action}:group=${assignment.groupId}`
       : action === 'fill'
         ? 'doc.forms.fill'
         : 'doc.sign';

@@ -44,18 +44,14 @@ const loan = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'loan', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// What each person may do, as permissions: the sender places fields for both signers, and each
-// signer fills in and signs their own.
+// What each person may do, as permissions: the sender places fields for both signers and for
+// anyone, and each signer fills in and signs their own, and fills in anyone's.
 const see = ['doc.open', 'doc.render', 'doc.download', 'doc.forms.read'];
 const people = {
   sender: {
     name: 'The sender',
-    scope: [
-      ...see,
-      'doc.forms.modify',
-      'fields:set-group:group=borrower',
-      'fields:set-group:group=approver',
-    ],
+    // Every group: a field anyone fills in is every group's.
+    scope: [...see, 'doc.forms.modify', 'fields:set-group:all'],
   },
   borrower: {
     name: 'Dana Smith',
@@ -73,6 +69,9 @@ const FIELD_TOOLS = [
   ['form-checkbox', 'Checkbox'],
   ['form-signature', 'Signature'],
 ] as const;
+
+// The color a field anyone fills in shows in: the form's `fields.anyoneTintColor`.
+const ANYONE = 'var(--epdf-form-field-anyone-tint-color, #0891b2)';
 
 // A document keeps the permissions it opened with, so the next person opens the saved form again.
 function HandOver({ person }: { person: Person }) {
@@ -96,8 +95,15 @@ function HandOver({ person }: { person: Person }) {
 function SenderToolbar() {
   const form = useForm();
   const interaction = useInteraction();
-  const { groups, designGroup } = useFormState();
+  const { groups, designGroup, designAssignment } = useFormState();
+  const forAnyone = designAssignment.kind === 'anyone';
   const { activeToolId } = useInteractionState();
+
+  // One signer signs a signature field, so it's never for anyone: the tool places nothing then.
+  const placeForAnyone = () => {
+    form.setDesignAssignment({ kind: 'anyone' });
+    if (activeToolId === 'form-signature') interaction.activateTool('form-text');
+  };
 
   // Start by placing text fields for the first signer.
   useEffect(() => {
@@ -121,6 +127,16 @@ function SenderToolbar() {
           {group.label ?? group.id}
         </button>
       ))}
+      <button
+        type="button"
+        className="button"
+        aria-pressed={forAnyone}
+        disabled={!form.canAssign({ kind: 'anyone' })}
+        onClick={placeForAnyone}
+      >
+        <i className="swatch" style={{ background: ANYONE }} />
+        Anyone
+      </button>
       <span className="divider" />
       {FIELD_TOOLS.map(([id, label]) => (
         <button
@@ -128,6 +144,7 @@ function SenderToolbar() {
           type="button"
           className="button"
           aria-pressed={activeToolId === id}
+          disabled={forAnyone && id === 'form-signature'}
           onClick={() => interaction.activateTool(id)}
         >
           {label}
@@ -148,7 +165,13 @@ function SignerLegend({ person }: { person: Person }) {
           {group.label ?? group.id}: {fields.filter((field) => field.groupId === group.id).length}
         </span>
       ))}
-      <output className="readout">{people[person].name} fills in the fields in their color</output>
+      <span className="legend">
+        <i className="swatch" style={{ background: ANYONE }} />
+        Anyone: {fields.filter((field) => field.assignment.kind === 'anyone').length}
+      </span>
+      <output className="readout">
+        {people[person].name} fills in the fields in their color, and anyone's
+      </output>
     </div>
   );
 }

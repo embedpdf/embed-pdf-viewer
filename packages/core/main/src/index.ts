@@ -4,7 +4,7 @@ export * from './event-hook';
 export * from './serial-queue';
 export * from './errors';
 export { timerClock } from './clock';
-export type { Cancel, HostClock, PluginClock } from './clock';
+export type { CalendarDay, Cancel, HostClock, PluginClock } from './clock';
 export type { HostFontProgram, HostTextMeasurer } from './measurer';
 export { composeApi } from './compose';
 export type { LatestCancellation, LatestLane, LatestRun } from './lanes';

@@ -33,6 +33,7 @@ const base = {
   alternateName: null,
   mappingName: null,
   groupId: null,
+  assignment: { kind: 'unassigned' },
   purpose: null,
   createdBy: null,
   createdAt: null,

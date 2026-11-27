@@ -38,6 +38,7 @@ export function createWidgetReads(
     cursor,
     tabOrder,
     groups,
+    purposes,
   }: Pick<
     FormServices,
     | 'fields'
@@ -49,6 +50,7 @@ export function createWidgetReads(
     | 'cursor'
     | 'tabOrder'
     | 'groups'
+    | 'purposes'
   >,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
@@ -82,17 +84,21 @@ export function createWidgetReads(
       tabOrder.rows(),
       groups.list(),
       ctx.settings().get().fields.tint,
+      ctx.settings().get().fields.tintColor,
+      ctx.settings().get().fields.anyoneTintColor,
+      groups.anyoneLabel(),
+      purposes.list(),
+      purposes.signingDateHint(),
     ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
-      fillItems(
-        index,
-        pageObjectNumber,
-        widgets,
-        rights.mayFillByHand,
-        rights.mayFillOrSign,
-        tabOrder.groupPositionOf,
-        groups.lookOf,
-      ),
+      fillItems(index, pageObjectNumber, widgets, rights.mayFillByHand, rights.mayFillOrSign, {
+        groupPositionOf: tabOrder.groupPositionOf,
+        groupLookOf: groups.lookOf,
+        tintOf: groups.tintOf,
+        anyoneLabel: groups.anyoneLabel(),
+        purposeLabelOf: purposes.labelOf,
+        signingDateHint: purposes.signingDateHint(),
+      }),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */

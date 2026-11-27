@@ -53,7 +53,28 @@ export const nl: EmbedpdfStrings = {
       'form-combobox': 'Vervolgkeuzelijst',
       'form-listbox': 'Keuzelijst',
       'form-signature': 'Handtekeningveld',
+      'form-name': 'Naamveld',
+      'form-email': 'E-mailveld',
+      'form-organization': 'Organisatieveld',
+      'form-organization-title': 'Functieveld',
+      'form-date-signed': 'Veld voor de datum van ondertekening',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Naam',
+      email: 'E-mail',
+      organization: 'Organisatie',
+      'organization-title': 'Functie',
+      'date-signed': 'Datum van ondertekening',
+      signature: 'Handtekening',
+      initials: 'Initialen',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Ingevuld wanneer u ondertekent' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'Iedereen',
   },
   outline: { untitled: 'Naamloos' },
 };

@@ -47,6 +47,8 @@ const textField = (value: string): FormField =>
     noExport: false,
     alternateName: null,
     mappingName: null,
+    groupId: null,
+    assignment: { kind: 'unassigned' },
     createdBy: null,
     createdAt: null,
     filledBy: null,

@@ -82,6 +82,8 @@ import {
   pictureOrPainting,
   rasterInFrame,
   recordAccentStyleOf,
+  recordOutlineStyleOf,
+  recordPlaceholderStyleOf,
   rectInPixels,
   registerRendererBehaviors,
   sameAnnotationAnchor,
@@ -750,6 +752,8 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
   // `transform.zoom` (not `viewScale`): 1 = the page's physical 100%.
   const viewZoom = page.transform.zoom;
   const viewRotation = page.transform.rotation;
+  // A lent field's outline is the form's edge, which follows the viewer's accent.
+  const viewerAccent = useViewerSettings((settings) => settings.accent);
   const items = useSelector(
     AnnotationHostToken,
     (annotation) => annotation.listPageItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
@@ -836,15 +840,49 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
           ) : shows?.kind === 'picture' && item.raster ? (
             <BakedImage url={shows.picture.url} box={rasterInFrame(item.raster, item.frame)} />
           ) : null;
-        // A lent record's accent (a form field's group's color) fills its frame, above its drawing.
-        const native: React.ReactNode = item.accent ? (
-          <>
-            {drawn}
-            <div style={recordAccentStyleOf(item.accent)} />
-          </>
-        ) : (
-          drawn
-        );
+        // A lent record's accent (a form field's tint) fills its frame, above its drawing, or
+        // its outline edges it; its placeholder (what an empty field is for) is written over
+        // both. A tool's ghost carries them too, see-through as its drawing is.
+        const seeThrough =
+          item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : null;
+        const native: React.ReactNode =
+          item.accent || item.outline || item.placeholder ? (
+            <>
+              {drawn}
+              {item.accent ? (
+                <div style={{ ...recordAccentStyleOf(item.accent), ...seeThrough }} />
+              ) : null}
+              {item.outline ? (
+                <div
+                  data-epdf-outline=""
+                  style={{ ...recordOutlineStyleOf(item.outline, viewerAccent), ...seeThrough }}
+                />
+              ) : null}
+              {item.placeholder ? (
+                <span
+                  aria-hidden="true"
+                  data-epdf-placeholder=""
+                  style={{
+                    ...recordPlaceholderStyleOf(
+                      item.placeholder,
+                      // A ghost has no record yet: its text style is the field's to be.
+                      (item.annotation ?? item.text ?? null) as {
+                        fontSize?: number | null;
+                        textAlign?: string | null;
+                      } | null,
+                      item.frame.box,
+                      frameInPixels(item.frame, page.transform),
+                    ),
+                    ...seeThrough,
+                  }}
+                >
+                  {item.placeholder.text}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            drawn
+          );
         const framed = (
           content: React.ReactNode,
           options?: { interactive?: boolean; inert?: boolean },

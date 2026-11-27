@@ -58,7 +58,28 @@ export const fr: EmbedpdfStrings = {
       'form-combobox': 'Liste déroulante',
       'form-listbox': 'Zone de liste',
       'form-signature': 'Champ de signature',
+      'form-name': 'Champ de nom',
+      'form-email': 'Champ d’e-mail',
+      'form-organization': 'Champ d’organisation',
+      'form-organization-title': 'Champ de fonction',
+      'form-date-signed': 'Champ de date de signature',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Nom',
+      email: 'E-mail',
+      organization: 'Organisation',
+      'organization-title': 'Fonction',
+      'date-signed': 'Date de signature',
+      signature: 'Signature',
+      initials: 'Initiales',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Rempli lors de la signature' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'N’importe qui',
   },
   outline: { untitled: 'Sans titre' },
 };

@@ -470,6 +470,11 @@ export const he: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': 'ממולא בעת החתימה' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: 'כל אחד',
       settings: {
         name: 'שם',
         tooltip: 'תיאור כלי',
@@ -477,6 +482,9 @@ export const he: Locale = {
         readOnly: 'לקריאה בלבד',
         noExport: 'אל תייצא',
         group: 'למילוי על ידי',
+        assignment: 'למילוי על ידי',
+        purpose: 'מטרה',
+        format: 'פורמט',
         defaultValue: 'ערך ברירת מחדל',
         maxLength: 'אורך מרבי',
         multiline: 'מספר שורות',

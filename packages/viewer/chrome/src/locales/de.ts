@@ -471,6 +471,11 @@ export const de: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': 'Wird beim Unterschreiben ausgefüllt' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: 'Jede Person',
       settings: {
         name: 'Name',
         tooltip: 'QuickInfo',
@@ -478,6 +483,9 @@ export const de: Locale = {
         readOnly: 'Schreibgeschützt',
         noExport: 'Nicht exportieren',
         group: 'Auszufüllen von',
+        assignment: 'Auszufüllen von',
+        purpose: 'Zweck',
+        format: 'Format',
         defaultValue: 'Standardwert',
         maxLength: 'Maximale Länge',
         multiline: 'Mehrzeilig',

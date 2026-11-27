@@ -2,13 +2,16 @@
   A signature field. With the signature plugin, an empty field is "sign here" (a click makes it
   the target the next mark goes to), and a signed one asks your UI to show its details
   (`onInspectionRequested`). Without the plugin, or for a read-only empty field, it is only its
-  picture.
+  picture. An empty field with a purpose shows what it is for, button or not. The placeholder's
+  block follows the button's with no blank between them: Svelte keeps a blank between two blocks
+  as a text node, in every box.
 -->
 <script lang="ts">
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   import { SignatureToken } from '@embedpdf/plugin-signature/contract';
   import type { FormColors } from '@embedpdf/web';
   import { useOptionalCapability, useOptionalSelector } from '../runtime/readers.svelte';
+  import FieldPlaceholder from './FieldPlaceholder.svelte';
   import { FILL } from './widget';
   import WidgetBox from './WidgetBox.svelte';
 
@@ -54,5 +57,5 @@
       style:background="transparent"
       style:cursor="inherit"
     ></button>
-  {/if}
+  {/if}{#if item.placeholder !== null}<FieldPlaceholder {item} />{/if}
 </WidgetBox>

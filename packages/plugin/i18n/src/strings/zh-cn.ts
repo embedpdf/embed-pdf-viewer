@@ -48,7 +48,28 @@ export const zhCN: EmbedpdfStrings = {
       'form-combobox': '下拉列表',
       'form-listbox': '列表框',
       'form-signature': '签名字段',
+      'form-name': '姓名字段',
+      'form-email': '电子邮件字段',
+      'form-organization': '组织字段',
+      'form-organization-title': '职位字段',
+      'form-date-signed': '签署日期字段',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: '姓名',
+      email: '电子邮件',
+      organization: '组织',
+      'organization-title': '职位',
+      'date-signed': '签署日期',
+      signature: '签名',
+      initials: '姓名缩写',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': '签名时填写' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: '任何人',
   },
   outline: { untitled: '无标题' },
 };

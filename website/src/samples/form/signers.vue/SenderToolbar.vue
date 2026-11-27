@@ -1,8 +1,9 @@
 <!-- The sender picks who the next field is for, then a tool, and clicks the page. -->
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useInteraction, useInteractionState } from '@embedpdf/vue/interaction';
 import { useForm, useFormState } from '@embedpdf/vue/form';
+import { ANYONE } from './people';
 
 const FIELD_TOOLS = [
   ['form-text', 'Text'],
@@ -12,8 +13,15 @@ const FIELD_TOOLS = [
 
 const form = useForm();
 const interaction = useInteraction();
-const { groups, designGroup } = useFormState();
+const { groups, designGroup, designAssignment } = useFormState();
+const forAnyone = computed(() => designAssignment.value.kind === 'anyone');
 const { activeToolId } = useInteractionState();
+
+// One signer signs a signature field, so it's never for anyone: the tool places nothing then.
+function placeForAnyone() {
+  form.setDesignAssignment({ kind: 'anyone' });
+  if (activeToolId.value === 'form-signature') interaction.activateTool('form-text');
+}
 
 // Start by placing text fields for the first signer.
 onMounted(() => {
@@ -36,6 +44,15 @@ onMounted(() => {
     >
       <i class="swatch" :style="{ background: group.color }" />{{ group.label ?? group.id }}
     </button>
+    <button
+      type="button"
+      class="button"
+      :aria-pressed="forAnyone"
+      :disabled="!form.canAssign({ kind: 'anyone' })"
+      @click="placeForAnyone"
+    >
+      <i class="swatch" :style="{ background: ANYONE }" />Anyone
+    </button>
     <span class="divider" />
     <button
       v-for="[id, label] in FIELD_TOOLS"
@@ -43,6 +60,7 @@ onMounted(() => {
       type="button"
       class="button"
       :aria-pressed="activeToolId === id"
+      :disabled="forAnyone && id === 'form-signature'"
       @click="interaction.activateTool(id)"
     >
       {{ label }}

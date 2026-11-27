@@ -102,6 +102,7 @@ const placed = (box: { x: number; y: number; width: number; height: number }) =>
   rotation: 0 as const,
   rect: box,
   look: LOOK,
+  hasMark: false,
 });
 const BOXES: PageWidgets = { 4: placed({ x: 10, y: 20, width: 200, height: 24 }) };
 
@@ -422,6 +423,15 @@ describe('signature widgets', () => {
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
+  test('a box with a mark drawn in it shows no placeholder, and its field stays empty', () => {
+    const box = BOXES[4]!;
+    const field = signature({ purpose: 'signature' });
+    const project = (hasMark: boolean) =>
+      projectWidget(field, 9, { ...box, hasMark }, true, true, { purposeLabel: 'Signature' });
+    expect(project(false)).toMatchObject({ empty: true, placeholder: 'Signature' });
+    expect(project(true)).toMatchObject({ empty: true, placeholder: null, signed: false });
+  });
+
   test('a /V on the field marks the item signed', () => {
     const signed = signature({ valueEntry: { kind: 'unsupported' } });
     expect(projectWidget(signed, 9, BOXES[4]!, true, true)).toMatchObject({
@@ -483,7 +493,9 @@ describe('radio buttons', () => {
   const box = BOXES[4]!;
 
   test("each button is named by its group's tooltip and its own option, and says where it comes", () => {
-    expect(projectWidget(radio(), 21, box, true, true, { position: 1, size: 2 })).toMatchObject({
+    expect(
+      projectWidget(radio(), 21, box, true, true, { inGroup: { position: 1, size: 2 } }),
+    ).toMatchObject({
       control: 'toggle',
       kind: 'radio',
       label: 'Plan: monthly',
@@ -492,7 +504,9 @@ describe('radio buttons', () => {
       inGroup: { position: 1, size: 2 },
     });
     // The option is the button's export value: its /Opt entry over its on-state name.
-    expect(projectWidget(radio(), 22, box, true, true, { position: 2, size: 2 })).toMatchObject({
+    expect(
+      projectWidget(radio(), 22, box, true, true, { inGroup: { position: 2, size: 2 } }),
+    ).toMatchObject({
       label: 'Plan: Pay yearly',
       checked: true,
       inGroup: { position: 2, size: 2 },

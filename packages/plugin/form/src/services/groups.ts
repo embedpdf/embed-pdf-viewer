@@ -5,10 +5,15 @@
  * PDF. Every group shows in a color: its own when the app gives one, else one
  * of eight by its place in the list, so no two of the first eight share one.
  * How strongly it shows is the `fields.tint` setting; at `0` no field shows
- * its group at all.
+ * its group at all. A field anyone fills in (`assignment` `{ kind: 'anyone' }`) shows in
+ * `fields.anyoneTintColor`, and a field in no group in `fields.tintColor`,
+ * when the app gives one: one tint per field. A field anyone fills in reads
+ * as "Anyone" where a group's field reads as its group's label.
  */
 import { memo, PluginError, type Mirror } from '@embedpdf/core';
 import type { RecordAccent } from '@embedpdf/core-annotation';
+import type { FieldAssignment } from '@embedpdf/engine-core/runtime';
+import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 
 import type { FormGroupsChangedEvent } from '../contract';
 import type { FieldIndex, NamedGroup } from '../model';
@@ -60,15 +65,36 @@ export interface FormGroups {
    */
   lookOf(groupId: string | null): GroupLook | null;
   /**
+   * The tint a field shows in, by who fills it in: its group's color, else
+   * `fields.anyoneTintColor` for a field anyone fills in (`anyone: true`), else
+   * `fields.tintColor` (`base: true`), as strong as `fields.tint`. `null` while the tint is
+   * `0`, and when the setting it falls to is `null`. The same object until the groups or the
+   * settings change: for memos.
+   */
+  tintOf(field: { readonly assignment: FieldAssignment }): RecordAccent | null;
+  /** What a field anyone fills in reads as after its name, "Anyone" in the viewer's language. */
+  anyoneLabel(): string;
+  /**
    * Whether the session may put a field in this group: it may design the form, and the group is
    * its own or one a `fields:set-group` permission names. The engine's own answer.
    */
   maySet(groupId: string): boolean;
   /** Refuse putting a field in a group the session may not, naming the permission it takes. */
   assertMaySet(groupId: string, operation: string): void;
+  /**
+   * Whether the session may give a field this assignment: a group as `maySet()` says; anyone
+   * when it may design the form and put a field in every group (`fields:set-group:all`); nobody
+   * when it may design the form. The engine's own answers.
+   */
+  mayAssign(assignment: FieldAssignment): boolean;
+  /** Refuse an assignment the session may not give, naming the permission it takes. */
+  assertMayAssign(assignment: FieldAssignment, operation: string): void;
 }
 
 const MODIFY = 'doc.forms.modify';
+
+/** What a field anyone fills in reads as, in English: the fallback of `form.anyone`. */
+const ANYONE_LABEL = 'Anyone';
 
 const NO_LOOKS: ReadonlyMap<string, GroupLook> = new Map();
 
@@ -122,6 +148,26 @@ export function createGroups(
           ),
   );
 
+  /** The tint of a field in no group: `fields.tintColor`, marked so its CSS variable may win. */
+  const baseTint = memo(
+    () => [ctx.settings().get().fields.tintColor, ctx.settings().get().fields.tint] as const,
+    (color, strength): RecordAccent | null =>
+      color !== null && strength > 0 ? Object.freeze({ color, strength, base: true }) : null,
+  );
+
+  /** The tint of a field anyone fills in: `fields.anyoneTintColor`, marked so its CSS variable may win. */
+  const anyoneTint = memo(
+    () => [ctx.settings().get().fields.anyoneTintColor, ctx.settings().get().fields.tint] as const,
+    (color, strength): RecordAccent | null =>
+      color !== null && strength > 0 ? Object.freeze({ color, strength, anyone: true }) : null,
+  );
+
+  const i18n = ctx.tryGet(I18nToken);
+  const anyoneLabel = memo(
+    () => [i18n?.getTranslator() ?? null] as const,
+    (translate): string => translate?.('form.anyone', { fallback: ANYONE_LABEL }) ?? ANYONE_LABEL,
+  );
+
   // The event is derived from each committed state change, as the design group's is.
   ctx.state.onChange(({ previous, next }) => {
     if (previous.groups !== next.groups) events.groupsChanged.emit({ groups: list() });
@@ -129,18 +175,45 @@ export function createGroups(
 
   const maySetGroup = (groupId: string): boolean =>
     ctx.doc.security.allowsField('set-group', { groupId });
+  /** Every group's signers fill such a field in, so it takes the right to set every group. */
+  const maySetEveryGroup = (): boolean => ctx.doc.security.fieldRights().setGroup.all;
+
+  /** A refusal naming the permission putting a field there takes. */
+  const refused = (operation: string, permission: string): PluginError =>
+    new PluginError('permission-denied', 'form', `${operation} requires ${permission}`, {
+      permission,
+    });
 
   return {
     list,
     lookOf: (groupId) => (groupId === null ? null : (looks().get(groupId) ?? null)),
+    tintOf: ({ assignment }) =>
+      assignment.kind === 'group'
+        ? (looks().get(assignment.groupId)?.accent ?? null)
+        : assignment.kind === 'anyone' && ctx.settings().get().fields.anyoneTintColor !== null
+          ? anyoneTint()
+          : baseTint(),
+    anyoneLabel,
     maySet: (groupId) => ctx.allows(MODIFY) && maySetGroup(groupId),
     assertMaySet: (groupId, operation) => {
       ctx.assertAllowed(MODIFY, operation);
-      if (maySetGroup(groupId)) return;
-      const permission = `fields:set-group:group=${groupId}`;
-      throw new PluginError('permission-denied', 'form', `${operation} requires ${permission}`, {
-        permission,
-      });
+      if (!maySetGroup(groupId)) throw refused(operation, `fields:set-group:group=${groupId}`);
+    },
+    mayAssign: (assignment) =>
+      ctx.allows(MODIFY) &&
+      (assignment.kind === 'group'
+        ? maySetGroup(assignment.groupId)
+        : assignment.kind === 'anyone'
+          ? maySetEveryGroup()
+          : true),
+    assertMayAssign: (assignment, operation) => {
+      ctx.assertAllowed(MODIFY, operation);
+      if (assignment.kind === 'group' && !maySetGroup(assignment.groupId)) {
+        throw refused(operation, `fields:set-group:group=${assignment.groupId}`);
+      }
+      if (assignment.kind === 'anyone' && !maySetEveryGroup()) {
+        throw refused(operation, 'fields:set-group:all');
+      }
     },
   };
 }

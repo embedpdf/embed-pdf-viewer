@@ -55,12 +55,14 @@ const samePlain = (left: FormPlainValue, right: FormPlainValue): boolean =>
 
 /**
  * The form: `fields()`, `status()`, `formKind()`, `selectedField()`, `selectedFields()`,
- * `focusedField()`, `groups()` and `designGroup()` as signals; reading, filling, form data and
- * building as methods (`setValue()`, `importValues()`, `export()`, `create()`, `update()`,
- * `setGroups()`, `setDesignGroup()`, `moveToGroup()`, …, the Methods tables of the Filling forms
- * and Building forms pages); the events as streams (`valueChanged$`, `validationRejected$`,
- * `fieldCreated$`, `groupsChanged$`, `designGroupChanged$`, …); and the settings. Without a
- * document, `fields()` is empty and a method refuses with `not-ready`.
+ * `focusedField()`, `groups()`, `designGroup()` and `designAssignment()` as signals; reading,
+ * filling, form data and building as methods (`setValue()`, `importValues()`, `prefill()`,
+ * `export()`, `create()`, `update()`, `setGroups()`, `setDesignGroup()`,
+ * `setDesignAssignment()`, `moveToGroup()`, `assign()`, `listPurposes()`, …, the
+ * Methods tables of the Filling forms and Building forms pages); the events as streams
+ * (`valueChanged$`, `validationRejected$`, `fieldCreated$`, `groupsChanged$`,
+ * `designGroupChanged$`, …); and the settings. Without a document, `fields()` is empty and a
+ * method refuses with `not-ready`.
  */
 @Injectable({ providedIn: 'root' })
 export class EpdfForm extends pluginService({
@@ -85,11 +87,14 @@ export class EpdfForm extends pluginService({
     'getFocusedField',
     'listGroups',
     'getDesignGroup',
+    'getDesignAssignment',
+    'listPurposes',
     'validate',
     'exportValues',
     'setValue',
     'setValues',
     'importValues',
+    'prefill',
     'reset',
     'activateWidget',
     'focus',
@@ -102,7 +107,9 @@ export class EpdfForm extends pluginService({
     'duplicateWidgets',
     'setGroups',
     'setDesignGroup',
+    'setDesignAssignment',
     'moveToGroup',
+    'assign',
     'update',
     'delete',
     'removeWidget',
@@ -113,6 +120,7 @@ export class EpdfForm extends pluginService({
     'canFill',
     'canDesign',
     'canSetGroup',
+    'canAssign',
     'canRestoreAttribution',
     'canWriteScripts',
   ],

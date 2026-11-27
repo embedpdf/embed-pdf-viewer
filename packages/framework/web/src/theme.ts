@@ -188,6 +188,13 @@ export const EPDF_VARIABLES = {
   },
   'form-field-color': { setting: 'form.fields.color', default: '#1f2a44' },
   'form-field-tint': { setting: 'form.fields.tint', default: '0.16' },
+  // Off until the setting gives a color: a field in no group has no tint.
+  'form-field-tint-color': { setting: 'form.fields.tintColor', default: 'transparent' },
+  'form-field-anyone-tint-color': { setting: 'form.fields.anyoneTintColor', default: '#0891b2' },
+  'form-field-placeholder': {
+    setting: 'form.fields.placeholder',
+    default: 'rgb(31 42 68 / 0.55)',
+  },
 
   // ── parts you style yourself: CSS only ──
   'scrollbar-thumb': { default: 'rgb(0 0 0 / 0.4)' },

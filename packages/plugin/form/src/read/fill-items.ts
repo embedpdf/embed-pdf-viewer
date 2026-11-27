@@ -14,18 +14,33 @@
  * screen readers read a PDF radio button: the group's tooltip, then the button's own choice
  * (`Plan: monthly`). Its buttons are placed apart on the page, so no group element can hold them:
  * each says where it comes in the group itself (`inGroup`). A field of a group the app gave a
- * label (`setGroups()`) says whose it is last: `Signature, Dana Smith`.
+ * label (`setGroups()`) says whose it is last: `Signature, Dana Smith`; a field anyone fills in
+ * says so the same way: `Return by, Anyone`.
  *
- * A widget's `accent` is its group's color, and how strongly it shows, while the session fills
- * the field in: the form layer shows it as a light fill and an edge, and never writes it into
+ * A field is `yours` while the user fills it in: the session may, the box takes input (it isn't
+ * read-only, and the `fillable` setting lets people), and the field still takes a value. A
+ * field a signature locked is read-only, so it isn't yours, whoever signed. The viewer paints
+ * only such a box: its tint (`accent`: its group's color, else `fields.anyoneTintColor` for a
+ * field anyone fills in, else `fields.tintColor`), an edge where it has no border of its own,
+ * and its placeholder. Every other box looks as the PDF has it. None of it is ever written into
  * the PDF.
+ *
+ * A widget's `purpose` and `format` are its field's, as the engine reads them: what the value
+ * means, and what shape it has. Its `placeholder` is what an empty field shows for its purpose,
+ * the purpose's label; the layer paints it, and it is never written into the PDF either. A box
+ * with a mark drawn in it shows none: the mark is what it holds, though its field stays empty
+ * until it is signed. The day of signing tells the person whose date it is that it is filled
+ * in when they sign (`hint`).
  */
 import type { RecordAccent } from '@embedpdf/core-annotation';
-import type {
-  AnnotationRef,
-  FormField,
-  FormFieldOption,
-  FormFieldRef,
+import {
+  takesFormat,
+  type AnnotationRef,
+  type FieldAssignment,
+  type FormField,
+  type FormFieldFormat,
+  type FormFieldOption,
+  type FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 
 import { isEmpty } from './fields';
@@ -62,16 +77,46 @@ interface FormWidgetItemBase extends WidgetPlace {
   groupId: string | null;
   /** The session may fill the field in, or sign it for a signature field: its permissions alone. */
   canFill: boolean;
+  /**
+   * The field is the user's to fill in: the session may fill it in (`canFill`), the box takes
+   * input (the `fillable` setting lets people, so it isn't `disabled`), and the field still
+   * takes a value (it isn't a push button, read-only, nor a signed signature). A field a
+   * signature locked is read-only. The viewer paints only such a box: its tint, its edge and
+   * its placeholder. Every other box looks as the PDF has it.
+   */
+  yours: boolean;
   /** The form asks for a value: the field's Required flag. */
   required: boolean;
   /** The field holds nothing yet, by the rule `validate()` checks a required field with. */
   empty: boolean;
+  /** What the field is for, the word the PDF holds (`'name'`, `'email'`, an app's own), or `null`. */
+  purpose: string | null;
   /**
-   * What the box shows its group in: the group's color, a CSS color, and how strongly it shows
-   * (the `fields.tint` setting), while the session may fill the field in and the field still
-   * takes a value (it isn't a push button, read-only, nor a signed signature). `null`
-   * otherwise, for a field in no group, and while the tint is `0`: the box shows as the PDF has
-   * it. The same shape a lent field has on the annotation layer.
+   * The shape of the field's value, as the engine reads it from the field's format script: a
+   * date or a time with its pattern, `{ kind: 'other' }` for a format only its script knows, or
+   * `null` for none. Always `null` for a widget whose field is no text field or dropdown.
+   */
+  format: FormFieldFormat | null;
+  /**
+   * What the box shows while its field is empty and `yours`: the label of the field's purpose,
+   * in the viewer's language, on a text field, a dropdown and a signature field. `null` for a
+   * field that holds something, a box with a mark drawn in it, another kind of field, one with
+   * no purpose, one whose purpose is a word the plugin has no label for, and one that isn't
+   * `yours`.
+   */
+  placeholder: string | null;
+  /**
+   * A sentence about the field for people, as its tooltip and for screen readers
+   * (`aria-description`), in the viewer's language; `null` for none. The day of signing has one
+   * for the person whose date it is: it is filled in when they sign.
+   */
+  hint: string | null;
+  /**
+   * The box's tint while it's `yours`: its group's color, else `fields.anyoneTintColor` for a
+   * field anyone fills in (`anyone`), else `fields.tintColor` (`base`), a CSS color, and how
+   * strongly it shows (the `fields.tint` setting). `null` for a box that isn't yours, when the
+   * setting it falls to is `null`, and while the tint is `0`: the box shows as the PDF has it.
+   * The same shape a lent field has on the annotation layer.
    */
   accent: RecordAccent | null;
   /** How the widget looks in the PDF. */
@@ -81,7 +126,8 @@ interface FormWidgetItemBase extends WidgetPlace {
   /**
    * Accessible name: the field's tooltip (`/TU`) when it has one, else its full name. A radio
    * button adds the option it stands for, its export value: `Plan: monthly`. A field of a group
-   * the app gives a label says whose it is last: `Plan: monthly, Dana Smith`.
+   * the app gives a label says whose it is last: `Plan: monthly, Dana Smith`; a field anyone
+   * fills in says `Anyone`, in the viewer's language.
    */
   label: string;
 }
@@ -143,21 +189,55 @@ const ownedLabel = (name: string, owner: string | null): string =>
   owner === null ? name : `${name}, ${owner}`;
 
 /**
+ * What a box shows while its field is empty: the label of the field's purpose, for a field
+ * whose box has room for a few words (a text field, a dropdown, a signature field). `null` for
+ * a field that holds something, a box with a mark drawn in it (`hasMark`: a signature field is
+ * empty until it is signed, and the mark is in its box before that), another kind of field,
+ * and a purpose without a label.
+ */
+export function placeholderOf(
+  field: FormField,
+  purposeLabel: string | null,
+  hasMark: boolean,
+): string | null {
+  if (purposeLabel === null || hasMark || !isEmpty(field)) return null;
+  return field.kind === 'text' || field.kind === 'combobox' || field.kind === 'signature'
+    ? purposeLabel
+    : null;
+}
+
+/**
  * Whether the field still takes a value: it holds one (a push button doesn't), it isn't
  * read-only, nor a signed signature.
  */
-const takesValue = (field: FormField): boolean =>
+export const takesValue = (field: FormField): boolean =>
   field.kind !== 'pushbutton' &&
   !field.readOnly &&
   !(field.kind === 'signature' && field.valueEntry.kind !== 'none');
 
+/** What a box shows beside its field and its place, each from the form's services. */
+export interface WidgetDress {
+  /** Where a radio button comes among its group's buttons. */
+  readonly inGroup?: GroupPosition | null;
+  /** Who fills the field in, for people: its group's label, or Anyone's; `null` for none. */
+  readonly owner?: string | null;
+  /** The field's tint (`FormGroups.tintOf`), shown while the field is `yours`. */
+  readonly tint?: RecordAccent | null;
+  /** The label of the field's purpose, `null` for one with none or one nobody named. */
+  readonly purposeLabel?: string | null;
+  /** What the day of signing tells the person whose date it is, in the viewer's language. */
+  readonly signingDateHint?: string | null;
+}
+
+const UNDRESSED: WidgetDress = Object.freeze({});
+
 /**
  * Project one widget of a field into a fill control. `fillable`: people fill
  * the field in by hand (a signature field: sign it), which the box is
- * `disabled` without; `canFill`: the session's permission alone, which the
- * `fillable` setting doesn't change; `inGroup`: where a radio button comes
- * among its group's; `group`: how the field's group shows, `null` for a field
- * in none. Null for kinds with no fill control.
+ * `disabled` and not `yours` without; `canFill`: the session's permission
+ * alone, which the `fillable` setting doesn't change; `dress`: what the box
+ * shows beside its field ({@link WidgetDress}). Null for kinds with no fill
+ * control.
  */
 export function projectWidget(
   field: FormField,
@@ -165,11 +245,13 @@ export function projectWidget(
   widget: PageWidget,
   fillable: boolean,
   canFill: boolean,
-  inGroup: GroupPosition | null = null,
-  group: GroupLook | null = null,
+  dress: WidgetDress = UNDRESSED,
 ): FormWidgetItem | null {
   const key = fieldKeyOf(field);
-  const owner = group?.label ?? null;
+  const owner = dress.owner ?? null;
+  const inGroup = dress.inGroup ?? null;
+  // `fillable` holds `canFill`: the session may fill it in, and people do by hand.
+  const yours = fillable && takesValue(field);
   const base: FormWidgetItemBase = {
     key,
     fieldRef: field.ref,
@@ -179,9 +261,14 @@ export function projectWidget(
     ref: widget.ref,
     groupId: field.groupId,
     canFill,
+    yours,
     required: field.required,
     empty: isEmpty(field),
-    accent: canFill && takesValue(field) ? (group?.accent ?? null) : null,
+    purpose: field.purpose,
+    format: takesFormat(field.kind) ? (field as { format: FormFieldFormat | null }).format : null,
+    placeholder: yours ? placeholderOf(field, dress.purposeLabel ?? null, widget.hasMark) : null,
+    hint: canFill && field.purpose === 'date-signed' ? (dress.signingDateHint ?? null) : null,
+    accent: yours ? (dress.tint ?? null) : null,
     box: widget.box,
     rotation: widget.rotation,
     rect: widget.rect,
@@ -256,12 +343,40 @@ export function projectWidget(
   }
 }
 
+/** Who fills a field in, for people: its group's label, or Anyone's; `null` for none. */
+const ownerOf = ({ assignment }: FormField, sources: WidgetDressSources): string | null =>
+  assignment.kind === 'group'
+    ? (sources.groupLookOf?.(assignment.groupId)?.label ?? null)
+    : assignment.kind === 'anyone'
+      ? (sources.anyoneLabel ?? null)
+      : null;
+
+/** Where each box's dress comes from: the form's services, each asked per field or widget. */
+export interface WidgetDressSources {
+  /** Where a radio button comes among its group's buttons, by its widget's object number. */
+  readonly groupPositionOf?: (widget: number) => GroupPosition | null;
+  /** How a group shows: its label. */
+  readonly groupLookOf?: (groupId: string) => GroupLook | null;
+  /**
+   * A field's tint, by who fills it in: its group's color, else `fields.anyoneTintColor` for a
+   * field anyone fills in, else `fields.tintColor`.
+   */
+  readonly tintOf?: (field: { readonly assignment: FieldAssignment }) => RecordAccent | null;
+  /** What a field anyone fills in reads as after its name: "Anyone", in the viewer's language. */
+  readonly anyoneLabel?: string | null;
+  /** The label of a purpose. */
+  readonly purposeLabelOf?: (purpose: string | null) => string | null;
+  /** What the day of signing tells the person whose date it is. */
+  readonly signingDateHint?: string | null;
+}
+
 /**
  * Project one page's widgets into fill controls, each disabled when people
  * don't fill its field in by hand (`mayFillByHand`), each saying whether the
  * session may fill it in, or sign it (`mayFill`, its permissions alone), and
- * each radio button with where it comes in its group (`groupPositionOf`),
- * and each with how its field's group shows (`groupLookOf`).
+ * each dressed from `sources`: a radio button's place in its group, who fills
+ * the field in (its group's label, or Anyone's) and its tint, its purpose's
+ * label, the signing date's hint.
  * Widgets whose page has not loaded (or that are direct objects with no join
  * key) are skipped; the projection runs again when the page's widgets land.
  */
@@ -271,8 +386,7 @@ export function fillItems(
   widgets: PageWidgets | undefined,
   mayFillByHand: (field: FormField) => boolean,
   mayFill: (field: FormField) => boolean,
-  groupPositionOf: (widget: number) => GroupPosition | null = () => null,
-  groupLookOf: (groupId: string) => GroupLook | null = () => null,
+  sources: WidgetDressSources = {},
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
   const items: FormWidgetItem[] = [];
@@ -287,8 +401,13 @@ export function fillItems(
         placed,
         mayFillByHand(field),
         mayFill(field),
-        groupPositionOf(widget.objectNumber),
-        field.groupId === null ? null : groupLookOf(field.groupId),
+        {
+          inGroup: sources.groupPositionOf?.(widget.objectNumber) ?? null,
+          owner: ownerOf(field, sources),
+          tint: sources.tintOf?.(field) ?? null,
+          purposeLabel: sources.purposeLabelOf?.(field.purpose) ?? null,
+          signingDateHint: sources.signingDateHint ?? null,
+        },
       );
       if (item) items.push(item);
     }

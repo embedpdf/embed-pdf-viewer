@@ -15,6 +15,7 @@ import {
 import { createTestContext } from '@embedpdf/core/testing';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
+import { grouped } from './helpers/grouped';
 import { FORM_DEFAULTS, type FormConfig } from '../src/contract';
 import { createFormController } from '../src/controller';
 import { initialFormModel } from '../src/model';
@@ -54,7 +55,7 @@ const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormFie
   password: false,
   comb: false,
   format: null,
-  ...over,
+  ...grouped(over),
 });
 
 const checkbox = (over: Partial<Extract<FormField, { kind: 'checkbox' }>> = {}): FormField => ({
@@ -67,7 +68,7 @@ const checkbox = (over: Partial<Extract<FormField, { kind: 'checkbox' }>> = {}):
   widgets: [{ ...formWidget(10, PAGE), onState: 'Yes', exportValue: 'Yes', checked: false }],
   checked: false,
   exportValue: 'Yes',
-  ...over,
+  ...grouped(over),
 });
 
 const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}): FormField => ({
@@ -78,7 +79,7 @@ const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(11, PAGE)],
-  ...over,
+  ...grouped(over),
 });
 
 const row = (objectNumber: number, y: number, over: object = {}): WidgetAnnotation =>

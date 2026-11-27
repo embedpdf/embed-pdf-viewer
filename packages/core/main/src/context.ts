@@ -261,9 +261,9 @@ export function createPluginContext(
         throw permissionDenied(capability, permission, operation);
       }
     },
-    allowsField: (action, field) => doc().security.allowsField(action, { groupId: field.groupId }),
+    allowsField: (action, field) => doc().security.allowsField(action, field),
     assertAllowedField: (action, field, operation) => {
-      if (!doc().security.allowsField(action, { groupId: field.groupId })) {
+      if (!doc().security.allowsField(action, field)) {
         throw fieldPermissionDenied(capability, action, field, operation);
       }
     },

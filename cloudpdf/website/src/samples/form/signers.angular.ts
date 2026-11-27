@@ -30,18 +30,14 @@ const engine = cloudEngine();
 
 const loan: OpenInput = { kind: 'grant', grant: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// What each person may do, as permissions: the sender places fields for both signers, and each
-// signer fills in and signs their own.
+// What each person may do, as permissions: the sender places fields for both signers and for
+// anyone, and each signer fills in and signs their own, and fills in anyone's.
 const see = ['doc.open', 'doc.render', 'doc.download', 'doc.forms.read'];
 const people = {
   sender: {
     name: 'The sender',
-    scope: [
-      ...see,
-      'doc.forms.modify',
-      'fields:set-group:group=borrower',
-      'fields:set-group:group=approver',
-    ],
+    // Every group: a field anyone fills in is every group's.
+    scope: [...see, 'doc.forms.modify', 'fields:set-group:all'],
   },
   borrower: {
     name: 'Dana Smith',
@@ -66,6 +62,9 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
+// The color a field anyone fills in shows in: the form's `fields.anyoneTintColor`.
+const ANYONE = 'var(--epdf-form-field-anyone-tint-color, #0891b2)';
+
 /** The sender picks who the next field is for, then a tool, and clicks the page. */
 @Component({
   selector: 'demo-sender-toolbar',
@@ -84,12 +83,22 @@ const FIELD_TOOLS = [
           <i class="swatch" [style.background]="group.color"></i>{{ group.label ?? group.id }}
         </button>
       }
+      <button
+        type="button"
+        class="button"
+        [attr.aria-pressed]="forAnyone()"
+        [disabled]="!form.canAssign({ kind: 'anyone' })"
+        (click)="placeForAnyone()"
+      >
+        <i class="swatch" [style.background]="anyone"></i>Anyone
+      </button>
       <span class="divider"></span>
       @for (tool of tools; track tool[0]) {
         <button
           type="button"
           class="button"
           [attr.aria-pressed]="interaction.activeToolId() === tool[0]"
+          [disabled]="forAnyone() && tool[0] === 'form-signature'"
           (click)="interaction.activateTool(tool[0])"
         >
           {{ tool[1] }}
@@ -102,11 +111,25 @@ export class SenderToolbar {
   protected readonly form = inject(EpdfForm);
   protected readonly interaction = inject(EpdfInteraction);
   protected readonly tools = FIELD_TOOLS;
+  protected readonly anyone = ANYONE;
 
   constructor() {
     // Start by placing text fields for the first signer.
     this.form.setDesignGroup('borrower');
     this.interaction.activateTool('form-text');
+  }
+
+  /** Whether the next fields are for anyone. */
+  protected forAnyone() {
+    return this.form.designAssignment().kind === 'anyone';
+  }
+
+  /** One signer signs a signature field, so it's never for anyone: the tool places nothing then. */
+  protected placeForAnyone() {
+    this.form.setDesignAssignment({ kind: 'anyone' });
+    if (this.interaction.activeToolId() === 'form-signature') {
+      this.interaction.activateTool('form-text');
+    }
   }
 }
 
@@ -122,8 +145,12 @@ export class SenderToolbar {
           {{ group.label ?? group.id }}: {{ count(group.id) }}
         </span>
       }
+      <span class="legend">
+        <i class="swatch" [style.background]="anyone"></i>
+        Anyone: {{ anyoneCount() }}
+      </span>
       <output class="readout">
-        {{ people[person()].name }} fills in the fields in their color
+        {{ people[person()].name }} fills in the fields in their color, and anyone's
       </output>
     </div>
   `,
@@ -133,10 +160,16 @@ export class SignerLegend {
 
   protected readonly form = inject(EpdfForm);
   protected readonly people = people;
+  protected readonly anyone = ANYONE;
 
   /** How many fields are in a group. */
   protected count(groupId: string) {
     return this.form.fields().filter((field) => field.groupId === groupId).length;
+  }
+
+  /** How many fields anyone fills in. */
+  protected anyoneCount() {
+    return this.form.fields().filter((field) => field.assignment.kind === 'anyone').length;
   }
 }
 

@@ -11,10 +11,13 @@ import type {
   Id,
   Model,
   RecordAccent,
+  RecordPlaceholder,
   Rect,
   RenderItem,
   SceneNode,
   KindName,
+  LentPaint,
+  RecordOutline,
   TextEndAnchor,
   Quad,
   Point,
@@ -151,6 +154,25 @@ export interface AnnotationLender {
    * `null` for a record without one. Read again whenever {@link records} hands out a new object.
    */
   accentOf?(record: Annotation): RecordAccent | null;
+  /**
+   * What a record shows while it holds nothing (what an empty form field is for), written in
+   * its frame; `null` for a record without one. Read again whenever {@link records} hands out a
+   * new object.
+   */
+  placeholderOf?(record: Annotation): RecordPlaceholder | null;
+  /**
+   * The edge a record shows when it has no border of its own and no accent (a form field in
+   * design mode, so a field with no look shows); `null` for a record without one. Read again
+   * whenever {@link records} hands out a new object.
+   */
+  outlineOf?(record: Annotation): RecordOutline | null;
+  /**
+   * What the lender paints over the record one of its tools would place on `page`, as it paints
+   * over the made one: its live drawing (from the tool's live defaults), accent, outline and
+   * placeholder. The tool's ghost and the drag that places one paint it, so a placed record and
+   * its tool's ghost can't look two ways. `null` for a tool the lender doesn't place.
+   */
+  toolPaintOf?(toolId: string, page: PageRef): LentPaint | null;
   /** Its records' pictures on a page, at rest, in every state, each with its record's picture version. */
   renderAppearances(
     page: PageRef,

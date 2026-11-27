@@ -78,11 +78,12 @@ export function createValueWrites(
   /**
    * Plain values for several fields, as one change with one recalculation. A value its field
    * can't take, or a field the session may not fill in, fails on its own; the rest go together,
-   * and fail together when the engine refuses them.
+   * and fail together when the engine refuses them. `operation` is the verb a refusal names.
    */
   const fillPlain = async (
     entries: readonly { readonly ref: FormFieldRef; readonly value: FormFieldValue }[],
     options?: OperationOptions,
+    operation = 'form.setValues',
   ): Promise<{
     applied: FormFieldRef[];
     failed: { ref: FormFieldRef; error: PluginErrorInfo }[];
@@ -95,7 +96,7 @@ export function createValueWrites(
       try {
         const field = fieldByRef(index, entry.ref);
         if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
-        rights.assertMayFill(field, 'form.setValues');
+        rights.assertMayFill(field, operation);
         fieldValueWriteOf(field, entry.value);
         accepted.push({ ref: field.ref, value: entry.value });
       } catch (error) {
@@ -167,6 +168,8 @@ export function createValueWrites(
   };
 
   return {
+    /** Several fields' plain values as one change, for the verbs that write them (write/prefill.ts). */
+    fillPlain,
     /** A text field's write, for the text being typed (write/typing.ts). */
     setText: (ref: FormFieldRef, text: string): Promise<FormSetValueResult> =>
       commit(ref, { value: text }, 'form.setValue'),

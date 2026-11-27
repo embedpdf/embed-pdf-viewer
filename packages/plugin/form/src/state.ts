@@ -5,14 +5,15 @@
  * field changes.
  */
 import { defineState, type ResourceStatus } from '@embedpdf/core';
-import type { FormField, FormKind } from '@embedpdf/engine-core/runtime';
+import type { FieldAssignment, FormField, FormKind } from '@embedpdf/engine-core/runtime';
 
 import { FormToken, type FormGroup } from './contract';
+import { UNASSIGNED } from './model';
 
 /**
  * Every field, whether the form is read, what kind of form it is, the selected widget's field,
- * every selected field, the field the cursor is in, the document's groups, and the group new
- * fields are placed for.
+ * every selected field, the field the cursor is in, the document's groups, and who new fields
+ * are placed for: a group, anyone or nobody.
  */
 export interface FormState {
   /** Every field. The same array while nothing changes. */
@@ -29,8 +30,13 @@ export interface FormState {
   readonly selectedFields: readonly FormField[];
   /** Every group the app named or the form's fields are in. The same array while nothing changes. */
   readonly groups: readonly FormGroup[];
-  /** The group that fields placed with a tool go in (in design mode), or `null` when it names none. */
+  /**
+   * The group that fields placed with a tool go in (in design mode), or `null` when it names
+   * none: also while they are for anyone.
+   */
   readonly designGroup: string | null;
+  /** Who fields placed with a tool are for (in design mode): a group, anyone or nobody. */
+  readonly designAssignment: FieldAssignment;
 }
 
 const NO_FIELDS: readonly FormField[] = Object.freeze([]);
@@ -46,6 +52,7 @@ export const formState = defineState(FormToken, {
     selectedFields: form.listSelectedFields(),
     groups: form.listGroups(),
     designGroup: form.getDesignGroup(),
+    designAssignment: form.getDesignAssignment(),
   }),
   empty: {
     fields: NO_FIELDS,
@@ -56,5 +63,6 @@ export const formState = defineState(FormToken, {
     selectedFields: NO_FIELDS,
     groups: NO_GROUPS,
     designGroup: null,
+    designAssignment: UNASSIGNED,
   },
 });

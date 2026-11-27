@@ -471,6 +471,11 @@ export const sv: Locale = {
     },
     // A form field's settings, as the form plugin names them (`labelKey`).
     form: {
+      // What the day of signing tells the person whose date it is, as its tooltip: the form
+      // plugin's string, here so it reads the same in every language the viewer has.
+      hints: { 'date-signed': 'Fylls i när du skriver under' },
+      // What a field anyone fills in reads as after its name: the form plugin's string too.
+      anyone: 'Vem som helst',
       settings: {
         name: 'Namn',
         tooltip: 'Knappbeskrivning',
@@ -478,6 +483,9 @@ export const sv: Locale = {
         readOnly: 'Skrivskyddat',
         noExport: 'Exportera inte',
         group: 'Fylls i av',
+        assignment: 'Fylls i av',
+        purpose: 'Syfte',
+        format: 'Format',
         defaultValue: 'Standardvärde',
         maxLength: 'Maxlängd',
         multiline: 'Flera rader',

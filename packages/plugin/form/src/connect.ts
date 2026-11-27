@@ -15,13 +15,14 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import type { FormHostCapability } from './host-contract';
 import type { FormContext } from './services';
-import { FORM_TOOLS, PLACE_TAGS } from './tools/definitions';
+import { PLACE_TAGS, type FormToolDefinition } from './tools/definitions';
 import { createPlaceHandler } from './tools/handlers';
 
 export function connectForm(
   ctx: FormContext,
   form: FormHostCapability,
   lender: AnnotationLender,
+  tools: ReadonlyMap<string, FormToolDefinition>,
 ): void {
   const interaction = ctx.get(InteractionToken);
   const annotation = ctx.tryGet(AnnotationHostToken);
@@ -54,7 +55,7 @@ export function connectForm(
   // placement still works; only interactive styling needs the annotation
   // plugin, and so does the ghost. Either way the form place handler commits
   // them: these tools enable 'form-place', never 'annotation-draw'.
-  for (const tool of FORM_TOOLS) {
+  for (const tool of tools.values()) {
     ctx.cleanup(
       annotation
         ? annotation.tools.register({
@@ -75,7 +76,9 @@ export function connectForm(
           }),
     );
   }
-  ctx.cleanup(interaction.registerHandler(createPlaceHandler(form, interaction, annotation)));
+  ctx.cleanup(
+    interaction.registerHandler(createPlaceHandler(form, interaction, annotation, tools)),
+  );
 
   // Design mode: the widgets are lent to the annotation plugin, which selects,
   // moves, restyles and deletes them with its own tools (write/lending.ts).

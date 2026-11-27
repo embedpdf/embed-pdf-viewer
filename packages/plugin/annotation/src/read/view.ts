@@ -25,6 +25,8 @@ import {
   type Model,
   type ModelAnnotation,
   type RecordAccent,
+  type RecordOutline,
+  type RecordPlaceholder,
   sourceOfConfirmed,
   sourceOfNew,
 } from '@embedpdf/core-annotation';
@@ -131,21 +133,41 @@ export function createView(
     return painter ? { painter } : {};
   };
 
-  /** The same accent: none on both sides, or the same color as strong. */
+  /** The same accent: none on both sides, or the same color as strong, from the same place. */
   const sameAccent = (left: RecordAccent | null, right: RecordAccent | null): boolean =>
     left === right ||
     (left !== null &&
       right !== null &&
       left.color === right.color &&
-      left.strength === right.strength);
+      left.strength === right.strength &&
+      (left.base ?? false) === (right.base ?? false) &&
+      (left.anyone ?? false) === (right.anyone ?? false));
+
+  /** The same outline: none on both sides, or the same color. */
+  const sameOutline = (left: RecordOutline | null, right: RecordOutline | null): boolean =>
+    left === right || (left !== null && right !== null && left.color === right.color);
+
+  /** The same placeholder: none on both sides, or the same words in the same color. */
+  const samePlaceholder = (
+    left: RecordPlaceholder | null,
+    right: RecordPlaceholder | null,
+  ): boolean =>
+    left === right ||
+    (left !== null && right !== null && left.text === right.text && left.color === right.color);
 
   /**
-   * A lent record as the model has it, cached per shown row, the confirmed row it was made from
-   * and the accent its lender gives it.
+   * A lent record as the model has it, cached per shown row, the confirmed row it was made from,
+   * and the accent, the placeholder and the outline its lender gives it.
    */
   const lent = new WeakMap<
     Annotation,
-    { truth: Annotation | undefined; accent: RecordAccent | null; record: ModelAnnotation }
+    {
+      truth: Annotation | undefined;
+      accent: RecordAccent | null;
+      placeholder: RecordPlaceholder | null;
+      outline: RecordOutline | null;
+      record: ModelAnnotation;
+    }
   >();
   const lentRecord = (
     shown: Annotation,
@@ -153,8 +175,16 @@ export function createView(
     lender: AnnotationLender,
   ): ModelAnnotation => {
     const accent = lender.accentOf?.(shown) ?? null;
+    const placeholder = lender.placeholderOf?.(shown) ?? null;
+    const outline = lender.outlineOf?.(shown) ?? null;
     const cached = lent.get(shown);
-    if (cached && cached.truth === truth && sameAccent(cached.accent, accent)) {
+    if (
+      cached &&
+      cached.truth === truth &&
+      sameAccent(cached.accent, accent) &&
+      samePlaceholder(cached.placeholder, placeholder) &&
+      sameOutline(cached.outline, outline)
+    ) {
       return cached.record;
     }
     let record: ModelAnnotation;
@@ -191,7 +221,9 @@ export function createView(
         record = { ...record, source: 'vector' };
     }
     if (accent) record = { ...record, accent };
-    lent.set(shown, { truth, accent, record });
+    if (placeholder) record = { ...record, placeholder };
+    if (outline) record = { ...record, outline };
+    lent.set(shown, { truth, accent, placeholder, outline, record });
     return record;
   };
 

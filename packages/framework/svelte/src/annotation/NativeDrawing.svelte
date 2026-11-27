@@ -2,20 +2,29 @@
   The layer's own drawing of one annotation, inside its frame: the engine's raster where the core
   places it (following a move as it happens), or the vector scene for everything drawn live (a
   picture older than the annotation too). One rule picks (`pictureOrPainting`). A lent record's
-  accent (a form field's group's color) fills the frame above it. A renderer gets it all as
-  `native`. The accent's block follows the drawing's with no blank between them: Svelte keeps a
-  blank between two blocks as a text node, in every frame.
+  accent (a form field's tint) fills the frame above it, or its outline edges it, and its
+  placeholder (what an empty field is for) is written over both; a tool's ghost carries them
+  too, see-through as its drawing is. A renderer gets it all as `native`. One block holds the
+  three, so a record with none is drawn as it always was. A block follows the one before it
+  with no blank between them (`{/if}{#if`): Svelte keeps a blank between two blocks as a text
+  node, in every frame. A line break just inside a block or an element is dropped.
 -->
 <script lang="ts">
   import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
   import {
     cssText,
+    frameInPixels,
+    ghostOpacity,
     pictureOrPainting,
     rasterInFrame,
     recordAccentStyleOf,
+    recordOutlineStyleOf,
+    recordPlaceholderStyleOf,
     shownAppearance,
     type AppearanceUrl,
   } from '@embedpdf/web';
+  import { useViewerSettings } from '../runtime/documents.svelte';
+  import { usePage } from '../runtime/page';
   import AnnotationScene from './AnnotationScene.svelte';
 
   let {
@@ -37,6 +46,35 @@
     }),
   );
   const raster = $derived(item.raster ? rasterInFrame(item.raster, item.frame) : null);
+
+  // A placeholder is written in the record's own text size and alignment, in its frame on the
+  // page. Worked out only for a record that has one: nothing else reads it.
+  const page = usePage();
+  // A ghost's paint is see-through, as its drawing is.
+  const seeThrough = $derived(
+    item.source === 'ghost' ? `opacity: ${ghostOpacity(item.ghostOpacity ?? 0.5)}` : '',
+  );
+  const withGhost = (css: string): string => [css, seeThrough].filter(Boolean).join('; ');
+  const placeholderStyle = $derived(
+    item.placeholder
+      ? withGhost(
+          cssText(
+            recordPlaceholderStyleOf(
+              item.placeholder,
+              // A ghost has no record yet: its text style is the field's to be.
+              (item.annotation ?? item.text ?? null) as {
+                fontSize?: number | null;
+                textAlign?: string | null;
+              } | null,
+              item.frame.box,
+              frameInPixels(item.frame, page.transform),
+            ),
+          ),
+        )
+      : undefined,
+  );
+  // A lent field's outline is the form's edge, which follows the viewer's accent.
+  const viewerAccent = useViewerSettings((settings) => settings.accent);
 </script>
 
 {#if shows?.kind === 'painting'}
@@ -62,4 +100,17 @@
     style:transform={raster.transform}
     style:transform-origin="center"
   />
-{/if}{#if item.accent}<div style={cssText(recordAccentStyleOf(item.accent))}></div>{/if}
+{/if}{#if item.accent || item.outline || item.placeholder}
+  {#if item.accent}
+    <div style={withGhost(cssText(recordAccentStyleOf(item.accent)))}></div>
+  {/if}{#if item.outline}
+    <div
+      data-epdf-outline=""
+      style={withGhost(cssText(recordOutlineStyleOf(item.outline, viewerAccent.current)))}
+    ></div>
+  {/if}{#if item.placeholder}
+    <span aria-hidden="true" data-epdf-placeholder="" style={placeholderStyle}>
+      {item.placeholder.text}
+    </span>
+  {/if}
+{/if}

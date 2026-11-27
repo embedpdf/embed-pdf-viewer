@@ -61,7 +61,28 @@ export const de: EmbedpdfStrings = {
       'form-combobox': 'Dropdown-Liste',
       'form-listbox': 'Listenfeld',
       'form-signature': 'Unterschriftsfeld',
+      'form-name': 'Namensfeld',
+      'form-email': 'E-Mail-Feld',
+      'form-organization': 'Organisationsfeld',
+      'form-organization-title': 'Positionsfeld',
+      'form-date-signed': 'Feld für das Unterschriftsdatum',
     },
+  },
+  // What an empty form field shows for its purpose, and what a settings panel lists it as.
+  form: {
+    purposes: {
+      name: 'Name',
+      email: 'E-Mail',
+      organization: 'Organisation',
+      'organization-title': 'Position',
+      'date-signed': 'Unterschriftsdatum',
+      signature: 'Unterschrift',
+      initials: 'Initialen',
+    },
+    // What the day of signing tells the person whose date it is, as its tooltip.
+    hints: { 'date-signed': 'Wird beim Unterschreiben ausgefüllt' },
+    // What a field anyone fills in reads as after its name, as a group's label does.
+    anyone: 'Jede Person',
   },
   outline: { untitled: 'Unbenannt' },
 };

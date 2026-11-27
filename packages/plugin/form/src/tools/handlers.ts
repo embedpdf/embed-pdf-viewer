@@ -6,7 +6,12 @@ import {
   type Placement,
 } from '@embedpdf/core-annotation';
 import type { Rotation } from '@embedpdf/core-geometry';
-import type { FormFieldDraft, PageRef, WidgetPlacement } from '@embedpdf/engine-core/runtime';
+import type {
+  FieldAssignment,
+  FormFieldDraft,
+  PageRef,
+  WidgetPlacement,
+} from '@embedpdf/engine-core/runtime';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
   samplePointOn,
@@ -15,10 +20,22 @@ import {
 } from '@embedpdf/plugin-interaction/contract/host';
 
 import type { FormHostCapability } from '../host-contract';
-import type { Box } from '../model';
+import { patchOfAssignment, UNASSIGNED, type Box } from '../model';
 import { FORM_TOOL_BY_ID, type FormToolDefinition } from './definitions';
 
 type Vec = { x: number; y: number };
+
+/**
+ * How a field placed with `tool` looks: the tool's live defaults when the annotation plugin
+ * holds them (the user may have restyled the tool), else the tool table's, so a field is never
+ * invisible. The place handler and the tool's ghost both read it.
+ */
+export function toolLookOf(
+  tool: FormToolDefinition,
+  annotation: Pick<AnnotationHostCapability, 'tools'> | null,
+): ReturnType<typeof widgetAppearanceOf> {
+  return widgetAppearanceOf(annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults);
+}
 
 /** A name for a field placed with a tool: `text_1`, `text_2`, …, the first one the form doesn't have. */
 export function nextFieldName(family: string, taken: ReadonlySet<string>): string {
@@ -60,20 +77,30 @@ export function placedOnPage(
 
 /**
  * The field a palette tool places: one widget at `widget`, named like
- * `text_1`, in `groupId` when the palette places for a group (the form's
- * design group); without one it is in no group. A
- * radio button stands for `'Choice1'` and a dropdown or a list starts with
+ * `text_1`, for `assignment`, who the palette places for (the form's design
+ * assignment): in a group (`groupId`, as 3.4 placed it), or anyone's
+ * (`assignment`), but never anyone's for a signature field, which one signer
+ * signs. Nobody's, where it starts, names none, and the field is in no group.
+ * A radio button stands for `'Choice1'` and a dropdown or a list starts with
  * two options, as in Acrobat; rename and change them in a settings panel.
+ * What the tool gives its fields (`tool.field`: a purpose, a format, a flag)
+ * goes over what its kind starts with.
  */
 export function toolDraft(
   tool: FormToolDefinition,
   name: string,
   widget: WidgetPlacement,
-  groupId: string | null = null,
+  assignment: FieldAssignment = UNASSIGNED,
 ): FormFieldDraft {
-  const draft = kindDraft(tool, name, widget);
-  return groupId === null ? draft : { ...draft, groupId };
+  const draft = { ...kindDraft(tool, name, widget), ...tool.field } as FormFieldDraft;
+  if (assignment.kind === 'unassigned') return draft;
+  if (assignment.kind === 'anyone' && !placesForAnyone(tool)) return draft;
+  return { ...draft, ...patchOfAssignment(assignment) } as FormFieldDraft;
 }
+
+/** Whether a tool's field may be one anyone fills in: any but a signature field. */
+export const placesForAnyone = (tool: FormToolDefinition): boolean =>
+  tool.fieldKind !== 'signature';
 
 /** {@link toolDraft}'s field, as the tool's kind starts one. */
 function kindDraft(
@@ -132,11 +159,23 @@ export function createPlaceHandler(
   form: FormHostCapability,
   interaction: InteractionHostCapability,
   annotation: AnnotationHostCapability | null,
+  /** The field tools: the built-in ones unless the document's are given. */
+  tools: ReadonlyMap<string, FormToolDefinition> = FORM_TOOL_BY_ID,
 ): InteractionHandler {
   let origin: { page: PageRef; start: Vec; last: Vec; displayRotation?: Rotation } | null = null;
   /** Whether the tool places upright: the annotation plugin's tool says, else the tool table. */
   const uprightOf = (tool: FormToolDefinition): boolean =>
     annotation?.getResolvedTool(tool.id)?.upright ?? tool.upright;
+  /**
+   * The active tool, when it is a field tool and the user may design the form. While fields are
+   * placed for anyone, the signature tool is off: no ghost, and the press goes on to the other
+   * handlers.
+   */
+  const placingTool = (): FormToolDefinition | null => {
+    const tool = tools.get(interaction.getActiveToolId());
+    if (!tool || !form.canDesign()) return null;
+    return form.getDesignAssignment().kind === 'anyone' && !placesForAnyone(tool) ? null : tool;
+  };
   /** Drop the gesture and what it painted: its placement and the tool's ghost. */
   const endGesture = (): void => {
     origin = null;
@@ -152,17 +191,12 @@ export function createPlaceHandler(
     const pageBox = form.getPageBox(page);
     const placed = pageBox ? placedOnPage(placement, pageBox) : null;
     if (!placed) return;
-    // Style from the tool's live defaults when the annotation plugin holds
-    // them (the user may have restyled the tool); without it, use the tool
-    // table's defaults, so a field is never invisible.
-    const look = widgetAppearanceOf(
-      annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults,
-    );
+    const look = toolLookOf(tool, annotation);
     const name = nextFieldName(tool.fieldKind, new Set(form.list().map((field) => field.name)));
     // The new field shows at once, when the document holds the numbers it
     // takes: then it is selected in the same frame. Otherwise once it shows.
     const created = form.create(
-      toolDraft(tool, name, { page, ...placed, ...look }, form.getDesignGroup()),
+      toolDraft(tool, name, { page, ...placed, ...look }, form.getDesignAssignment()),
     );
     const field = form.get({ kind: 'fqn', name }) ?? (await created).field;
     // Skip the follow-up when the tool changed meanwhile.
@@ -186,15 +220,10 @@ export function createPlaceHandler(
     enabledFor: (tool) => tool.enables.has('form-place'),
     onHover: (sample) => {
       if (!annotation) return;
-      const toolId = interaction.getActiveToolId();
-      if (
-        sample.page &&
-        FORM_TOOL_BY_ID.has(toolId) &&
-        form.canDesign() &&
-        !interaction.hasCursorClaim()
-      ) {
+      const tool = sample.page && !interaction.hasCursorClaim() ? placingTool() : null;
+      if (sample.page && tool) {
         annotation.hoverGhostAt(
-          toolId,
+          tool.id,
           sample.page.ref,
           sample.page.point,
           sample.page.rotation,
@@ -205,10 +234,9 @@ export function createPlaceHandler(
       }
     },
     onPointerDown: (sample) => {
-      // No capture without a page, a known palette tool, or design permission:
+      // No capture without a page, a known palette tool, or the right to place its field:
       // declining lets editing, panning or text selection take the gesture.
-      if (!sample.page || !FORM_TOOL_BY_ID.has(interaction.getActiveToolId())) return false;
-      if (!form.canDesign()) return false;
+      if (!sample.page || !placingTool()) return false;
       origin = {
         page: sample.page.ref,
         start: sample.page.point,
@@ -234,7 +262,7 @@ export function createPlaceHandler(
       if (!origin) return;
       const gesture = origin;
       endGesture();
-      const tool = FORM_TOOL_BY_ID.get(interaction.getActiveToolId());
+      const tool = tools.get(interaction.getActiveToolId());
       if (!tool) return;
       // The up sample is the final point (projection first, like every
       // page-anchored gesture); a release over the gap falls back to the

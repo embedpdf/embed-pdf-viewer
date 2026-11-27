@@ -2,6 +2,7 @@ import { definePlugin } from '@embedpdf/core';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { FontsToken } from '@embedpdf/plugin-fonts/contract';
+import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
@@ -22,7 +23,8 @@ import { initialFormModel } from './model';
  * tools then select, move, restyle and delete. The render plugin draws the
  * widgets' pictures in both modes. With the fonts plugin, a text field in a
  * font of its own is edited in that font's program. With the Stage, `focus()` and
- * `focusNext()` bring the box they go to into view. `config` is the settings the app
+ * `focusNext()` bring the box they go to into view. With the i18n plugin, what an empty field
+ * shows for its purpose is in the viewer's language. `config` is the settings the app
  * registers, over {@link FORM_DEFAULTS}.
  */
 export const formPlugin = (config?: FormConfig) =>
@@ -31,7 +33,7 @@ export const formPlugin = (config?: FormConfig) =>
     token: FormToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [AnnotationToken, ActionsToken, RenderToken, FontsToken, StageToken],
+    optional: [AnnotationToken, ActionsToken, RenderToken, FontsToken, StageToken, I18nToken],
     state: initialFormModel,
     settings: { defaults: FORM_DEFAULTS, registered: config },
     create: createFormController,

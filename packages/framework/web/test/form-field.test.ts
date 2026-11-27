@@ -1,14 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  autocompleteOf,
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
+  fieldPlaceholderStyleOf,
   fieldTintOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,
   recordAccentStyleOf,
+  recordOutlineStyleOf,
+  recordPlaceholderStyleOf,
   showSelectedOptions,
   textFieldStyleOf,
   type FieldLook,
@@ -57,6 +61,38 @@ describe('a group’s color on a field', () => {
     expect(fieldTintOf({ color: 'var(--signer-1)', strength: 1 }).edge).toBe('var(--signer-1)');
   });
 
+  it('lets `--epdf-form-field-tint-color` win over the color of a field in no group', () => {
+    const tint = fieldTintOf({ color: '#0ea5e9', strength: 0.16, base: true });
+    expect(tint.edge).toBe('var(--epdf-form-field-tint-color, #0ea5e9)');
+    expect(tint.fill).toBe(
+      'color-mix(in srgb, var(--epdf-form-field-tint-color, #0ea5e9) calc(var(--epdf-form-field-tint, 0.16) * 100%), transparent)',
+    );
+    // A group's color is the app's, and no variable stands in for it.
+    expect(fieldTintOf({ color: '#2563eb', strength: 0.16 }).edge).toBe('#2563eb');
+  });
+
+  it('lets `--epdf-form-field-anyone-tint-color` win over the color of a field anyone fills in', () => {
+    const tint = fieldTintOf({ color: '#0891b2', strength: 0.16, anyone: true });
+    expect(tint.edge).toBe('var(--epdf-form-field-anyone-tint-color, #0891b2)');
+    expect(tint.fill).toBe(
+      'color-mix(in srgb, var(--epdf-form-field-anyone-tint-color, #0891b2) calc(var(--epdf-form-field-tint, 0.16) * 100%), transparent)',
+    );
+  });
+
+  it('outlines a lent record with no look and no tint in the form’s edge color', () => {
+    expect(recordOutlineStyleOf({ color: null }, '#3858e9')).toEqual({
+      position: 'absolute',
+      inset: '0',
+      boxSizing: 'border-box',
+      boxShadow:
+        'inset 0 0 0 1px var(--epdf-form-field-border, color-mix(in srgb, var(--epdf-accent, #3858e9) 55%, transparent))',
+      pointerEvents: 'none',
+    });
+    expect(recordOutlineStyleOf({ color: '#64748b' }, '#3858e9').boxShadow).toBe(
+      'inset 0 0 0 1px var(--epdf-form-field-border, #64748b)',
+    );
+  });
+
   it('fills a lent record’s frame, above its drawing, with the variable over its strength', () => {
     expect(recordAccentStyleOf({ color: '#2563eb', strength: 0.4 })).toEqual({
       position: 'absolute',
@@ -67,6 +103,116 @@ describe('a group’s color on a field', () => {
       boxShadow: 'inset 0 0 0 1px #2563eb',
       pointerEvents: 'none',
     });
+  });
+});
+
+describe('what an empty field shows for its purpose', () => {
+  const frame = { left: 10, top: 20, width: 320, height: 40 };
+  // A box 160 points wide drawn 320 pixels wide: two pixels per point.
+  const field = { box: { width: 160 }, look };
+
+  it('fills the box as the layer’s own paint: no pointer, no selection, its own text rules', () => {
+    const style = fieldPlaceholderStyleOf(field, frame, '#64748b');
+    expect(style).toMatchObject({
+      position: 'absolute',
+      inset: '0',
+      pointerEvents: 'none',
+      userSelect: 'none',
+      overflow: 'hidden',
+      whiteSpace: 'nowrap',
+      // The page's own text rules don't reach it.
+      fontStyle: 'normal',
+      fontWeight: '400',
+      letterSpacing: 'normal',
+      textTransform: 'none',
+    });
+  });
+
+  it('is written in the placeholder color: the variable first, then the setting, then the built-in one', () => {
+    expect(fieldPlaceholderStyleOf(field, frame, '#64748b').color).toBe(
+      'var(--epdf-form-field-placeholder, #64748b)',
+    );
+    expect(fieldPlaceholderStyleOf(field, frame, 'var(--muted)').color).toBe(
+      'var(--epdf-form-field-placeholder, var(--muted))',
+    );
+    expect(fieldPlaceholderStyleOf(field, frame).color).toBe(
+      'var(--epdf-form-field-placeholder, rgb(31 42 68 / 0.55))',
+    );
+  });
+
+  it('takes the field’s own text size and alignment, scaled with the page', () => {
+    // 10 pt at two pixels per point, aligned as the field's text is.
+    expect(fieldPlaceholderStyleOf(field, frame)).toMatchObject({
+      fontSize: '20px',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      padding: '0 4px',
+    });
+    expect(
+      fieldPlaceholderStyleOf({ ...field, look: { ...look, textAlign: 'center' } }, frame)
+        .justifyContent,
+    ).toBe('center');
+    expect(
+      fieldPlaceholderStyleOf({ ...field, look: { ...look, textAlign: 'left' } }, frame)
+        .justifyContent,
+    ).toBe('flex-start');
+  });
+
+  it('is 12 pt for a size that fits the box, and never taller than the box has room for', () => {
+    const fitted = { ...field, look: { ...look, fontSize: 0 } };
+    expect(fieldPlaceholderStyleOf(fitted, frame).fontSize).toBe('24px');
+    // A box 20 pixels tall has room for 14.
+    expect(fieldPlaceholderStyleOf(fitted, { ...frame, height: 20 }).fontSize).toBe('14px');
+    expect(
+      fieldPlaceholderStyleOf({ ...field, look: { ...look, fontSize: 30 } }, frame).fontSize,
+    ).toBe('28px');
+  });
+
+  it('starts at the top of a box for several lines', () => {
+    expect(fieldPlaceholderStyleOf({ ...field, multiline: true }, frame)).toMatchObject({
+      alignItems: 'flex-start',
+      padding: '4px',
+    });
+  });
+
+  it('on a lent field takes the record’s own text and the placeholder’s own color', () => {
+    const placeholder = { text: 'Name', color: 'tomato' };
+    // The same field, lent: its frame in page points, and that frame in pixels.
+    const box = { width: 160 };
+    const pixels = { width: 320, height: 40 };
+    expect(
+      recordPlaceholderStyleOf(placeholder, { fontSize: 10, textAlign: 'right' }, box, pixels),
+    ).toEqual(fieldPlaceholderStyleOf(field, frame, 'tomato'));
+    // A record that says nothing about its text is drawn as 12 pt from the left.
+    expect(recordPlaceholderStyleOf(placeholder, null, box, pixels)).toMatchObject({
+      fontSize: '24px',
+      justifyContent: 'flex-start',
+      color: 'var(--epdf-form-field-placeholder, tomato)',
+    });
+    expect(
+      recordPlaceholderStyleOf(placeholder, { textAlign: 'justify' }, box, pixels).justifyContent,
+    ).toBe('flex-start');
+    // The size follows the pixels the frame has, whatever the zoom is called.
+    expect(
+      recordPlaceholderStyleOf(placeholder, { fontSize: 10 }, box, { width: 80, height: 10 })
+        .fontSize,
+    ).toBe('5px');
+  });
+});
+
+describe('autocomplete from a field’s purpose', () => {
+  it('is the purpose where the purpose is one of the web’s names for a value', () => {
+    for (const purpose of ['name', 'email', 'organization', 'organization-title']) {
+      expect(autocompleteOf(purpose)).toBe(purpose);
+    }
+  });
+
+  it('is left out for every other purpose, and for none', () => {
+    for (const purpose of ['signature', 'initials', 'date-signed', 'ticket-number', 'Name', '']) {
+      expect(autocompleteOf(purpose)).toBeUndefined();
+    }
+    expect(autocompleteOf(null)).toBeUndefined();
+    expect(autocompleteOf(undefined)).toBeUndefined();
   });
 });
 

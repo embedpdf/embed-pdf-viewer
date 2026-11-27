@@ -35,6 +35,7 @@ export { computeMoveSnap, type SnapResult } from './snap';
 export {
   pageItems,
   unmadeItem,
+  type LentPaint,
   iconOf,
   chrome,
   selectedItems,
@@ -285,6 +286,8 @@ export type {
   Session,
   UpdateResult,
   RecordAccent,
+  RecordOutline,
+  RecordPlaceholder,
   RenderItem,
   RenderNode,
   SceneFontProgram,

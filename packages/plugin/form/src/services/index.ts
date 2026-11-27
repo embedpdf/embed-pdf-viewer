@@ -20,9 +20,11 @@ import { createFormattedTexts, type FormattedTexts } from './formatted';
 import { createGroups, type FormGroups } from './groups';
 import { createWidgetLooks, type WidgetLooks } from './looks';
 import { createWidgetPictures, type WidgetPictures } from './pictures';
+import { createPurposes, type FormPurposes } from './purposes';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
 import { createTabOrder, type TabOrder } from './tab-order';
+import { resolveFormTools, type FormToolDefinition } from '../tools/definitions';
 
 export type { FormContext } from './context';
 
@@ -32,6 +34,10 @@ export interface FormServices {
   readonly rights: FillRights;
   /** Who the form's groups are for people: each one's label and the color its fields show in. */
   readonly groups: FormGroups;
+  /** What a field is for, as people read it: each purpose's label, and the value the session has for it. */
+  readonly purposes: FormPurposes;
+  /** The field tools: the built-in ones as the `tools` setting left them, and the app's own. */
+  readonly tools: ReadonlyMap<string, FormToolDefinition>;
   readonly events: FormEvents;
   /** Where the cursor is among the fields, and the controls it can go into. */
   readonly cursor: FormCursor;
@@ -66,6 +72,9 @@ export function createServices(ctx: FormContext): FormServices {
     fields,
     rights: createFillRights(ctx, fields),
     groups: createGroups(ctx, fields, events),
+    purposes: createPurposes(ctx),
+    // Read once: a tool is registered with the hub and the annotation plugin when the document opens.
+    tools: resolveFormTools(ctx.settings().get().tools),
     events,
     cursor: createCursor(ctx, fields, events),
     tabOrder: createTabOrder(ctx, fields),

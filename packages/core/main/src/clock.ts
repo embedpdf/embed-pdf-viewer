@@ -13,12 +13,23 @@
  * What an instance schedules belongs to it ({@link instanceClock}): it is
  * cancelled when the instance closes, and nothing runs after that.
  *
+ * The clock also says what day it is (`today()`), on the host's calendar, for
+ * a plugin that writes a date: the device's own unless the host says another.
+ *
  * This file is the one place in the kernel and the plugins that touches the
- * environment's timers (the lint rule in `eslint.config.js` says so).
+ * environment's timers and calendar (the lint rule in `eslint.config.js` says
+ * so for the timers).
  */
 
 /** Cancels what a clock call scheduled. Does nothing once it ran or was cancelled. */
 export type Cancel = () => void;
+
+/** A day on a calendar: the year, the month from 1 to 12, and the day of the month from 1. */
+export interface CalendarDay {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+}
 
 /** What a host provides: the kernel's only source of time. */
 export interface HostClock {
@@ -31,6 +42,8 @@ export interface HostClock {
    * on the `now()` clock. Absent on a host that never paints.
    */
   nextFrame?(run: (timeMs: number) => void): Cancel;
+  /** What day it is where the host is. Absent: the device's own calendar, in its time zone. */
+  today?(): CalendarDay;
 }
 
 /** A plugin instance's clock: `ctx.clock`. */
@@ -44,6 +57,14 @@ export interface PluginClock {
   nextFrame(run: (timeMs: number) => void): Cancel;
   /** False on a host that never paints (Node, a worker, most tests): animations jump to their end. */
   readonly hasFrames: boolean;
+  /** What day it is where the person is: the host's calendar, else the device's in its time zone. */
+  today(): CalendarDay;
+}
+
+/** Today on the device's own calendar, in its time zone. */
+function deviceToday(): CalendarDay {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
 }
 
 /** Timers only, no frames: the kernel's default. */
@@ -103,5 +124,6 @@ export function instanceClock(host: HostClock, lifetime: AbortSignal): PluginClo
     after: (ms, run) => own((fire) => host.after(ms, fire), run),
     nextFrame: (run) => own(nextFrameOfHost, run),
     hasFrames: host.nextFrame !== undefined,
+    today: () => host.today?.() ?? deviceToday(),
   };
 }

@@ -46,6 +46,7 @@ import type {
   DocumentEvent,
   EventOrigin,
   EngineRenderPolicy,
+  FieldAssignment,
   PageDestination,
   PdfDestination,
   Identity,
@@ -343,6 +344,15 @@ export interface GlobalState {
 export type PluginScope = 'workspace' | 'document';
 
 /**
+ * A form field as a permission check reads it, the members the engine's `allowsField` takes: who
+ * it is for (`assignment`), else its `groupId` (a group's id, or `null` for none).
+ */
+export interface AssignedField {
+  readonly groupId: string | null;
+  readonly assignment?: FieldAssignment;
+}
+
+/**
  * The context a plugin's `create()` receives. Document-scoped plugins get a
  * context bound to one document; workspace plugins reach documents through
  * `forDocument`. Everything here is bound to the instance's lifetime, so a
@@ -404,19 +414,17 @@ export interface PluginContext<State = unknown, PluginSettings extends object = 
   /**
    * Whether the session may fill in (`fill`) or sign (`sign`) this form
    * field: a `fields:<action>` permission for its group, or `doc.forms.fill`
-   * (`doc.sign`) for every field. The same answer the engine enforces with.
-   * Document-scoped plugins only, like `allows`.
+   * (`doc.sign`) for every field. A field anyone fills in (its `assignment`
+   * is `{ kind: 'anyone' }`) takes any of them. Without an `assignment`, the
+   * field's `groupId` says who it is for. The same answer the engine
+   * enforces with. Document-scoped plugins only, like `allows`.
    */
-  allowsField(action: 'fill' | 'sign', field: { readonly groupId: string | null }): boolean;
+  allowsField(action: 'fill' | 'sign', field: AssignedField): boolean;
   /**
    * Refuse a write to a field the session may not fill in or sign: throws
    * `permission-denied` naming what it would take (`fields:fill:group=buyer`).
    */
-  assertAllowedField(
-    action: 'fill' | 'sign',
-    field: { readonly groupId: string | null },
-    operation: string,
-  ): void;
+  assertAllowedField(action: 'fill' | 'sign', field: AssignedField, operation: string): void;
 
   // ── capabilities ──
   get<T>(token: CapabilityToken<T>): T;

@@ -11,10 +11,16 @@ import { FontsToken } from '@embedpdf/plugin-fonts';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // The draft calls are the host lens's.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { createTextFieldEditor, textFieldEditorStyleOf } from '@embedpdf/web';
+import {
+  ariaDescriptionOf,
+  autocompleteOf,
+  createTextFieldEditor,
+  textFieldEditorStyleOf,
+} from '@embedpdf/web';
 import type { FormColors } from '@embedpdf/web';
 import { useCapability, useOptionalSelector } from '../runtime/capabilities';
 import { useFontMounts } from '../runtime/font-mounts';
+import FieldPlaceholder from './FieldPlaceholder.vue';
 import { useWidgetActivation } from './composables';
 import { useWidgetBox } from './widget-box';
 
@@ -25,7 +31,11 @@ const props = defineProps<{
 
 const form = useCapability(FormHostToken);
 const activate = useWidgetActivation(() => props.item.annotationRef);
-const { element: box, frame, style: boxStyle } = useWidgetBox(
+const {
+  element: box,
+  frame,
+  style: boxStyle,
+} = useWidgetBox(
   () => props.item,
   () => props.colors,
 );
@@ -56,6 +66,18 @@ const editorStyle = computed(() =>
   textFieldEditorStyleOf(props.item, frame.value, props.colors, state.value.focused, layout.value),
 );
 
+// What the field is for: the browser may offer the person's saved value, and a
+// screen reader hears what an empty box asks for.
+const autocomplete = computed(() => autocompleteOf(props.item.purpose));
+const ariaPlaceholder = computed(() => props.item.placeholder ?? undefined);
+// What a screen reader hears about the field besides its name: the day of signing's hint.
+const description = computed(() => ariaDescriptionOf(props.item.hint));
+// The empty box shows it too, above the editor, which is opaque while focused;
+// gone with the first character typed.
+const showsPlaceholder = computed(
+  () => props.item.placeholder !== null && state.value.draft === '',
+);
+
 const onInput = (event: Event) =>
   editor.input((event.target as HTMLInputElement | HTMLTextAreaElement).value);
 
@@ -71,12 +93,15 @@ function onKeydown(event: KeyboardEvent): void {
     A click runs the widget's action too, as in Acrobat: the editor's focus
     click bubbles here, a read-only field's lands here directly.
   -->
-  <div ref="box" :style="boxStyle" @click="activate">
+  <div ref="box" :style="boxStyle" :title="item.hint ?? undefined" @click="activate">
     <textarea
       v-if="item.multiline"
       :value="state.draft"
       :maxlength="item.maxLength ?? undefined"
       :aria-label="item.label"
+      :autocomplete="autocomplete"
+      :aria-placeholder="ariaPlaceholder"
+      v-bind="description"
       :disabled="item.disabled"
       :style="editorStyle"
       @focus="editor.focus"
@@ -90,6 +115,9 @@ function onKeydown(event: KeyboardEvent): void {
       :value="state.draft"
       :maxlength="item.maxLength ?? undefined"
       :aria-label="item.label"
+      :autocomplete="autocomplete"
+      :aria-placeholder="ariaPlaceholder"
+      v-bind="description"
       :disabled="item.disabled"
       :style="editorStyle"
       @focus="editor.focus"
@@ -97,5 +125,6 @@ function onKeydown(event: KeyboardEvent): void {
       @blur="editor.blur"
       @keydown="onKeydown"
     />
+    <FieldPlaceholder v-if="showsPlaceholder" :item="item" :frame="frame" />
   </div>
 </template>
