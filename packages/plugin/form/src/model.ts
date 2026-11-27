@@ -26,6 +26,7 @@ import {
   type FormSnapshot,
   type FormWidget,
   type PageRef,
+  type PdfActionTree,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -410,6 +411,8 @@ export interface PageWidget extends WidgetPlace {
   readonly look: FormWidgetLook;
   /** A mark is drawn in the box: a signature field's, drawn without signing. */
   readonly hasMark: boolean;
+  /** The box is an image field's: it shows its button's image alone and does nothing of its own (`isImageBox`). */
+  readonly imageBox: boolean;
 }
 
 /** One page's widgets: widget annotation object number → where it is and how it looks. */
@@ -428,6 +431,43 @@ export const hasArea = (row: WidgetAnnotation): boolean =>
  */
 export const shownOnScreen = (row: WidgetAnnotation): boolean =>
   !row.hidden && !row.noView && hasArea(row);
+
+/** Acrobat's image field press: a script that asks for a picture, and nothing else. */
+const IMPORTS_ICON = /^\s*event\.target\.buttonImportIcon\(\s*\)\s*;?\s*$/;
+
+/** Whether an action tree is Acrobat's import-icon script alone. */
+const importsIcon = (tree: PdfActionTree): boolean =>
+  tree.root?.type === 'javascript' &&
+  IMPORTS_ICON.test(tree.root.script) &&
+  tree.root.next.length === 0;
+
+/**
+ * Whether a widget is an image box: a push button's box that shows its image alone
+ * (`layout: 'image'`) and does nothing of its own. Every event of the box's actions (`activate`,
+ * `mouseUp`, `mouseDown`, `cursorEnter`, `cursorExit`, `focus`, `blur` and the page events) is
+ * empty, but a press (`activate` or `mouseUp`) may hold Acrobat's import-icon script
+ * (`event.target.buttonImportIcon()`), which every image field Acrobat makes has. So an icon-only
+ * print or submit button stays a button. Never by the field's name, nor by whether it holds an
+ * image.
+ */
+export function isImageBox(row: WidgetAnnotation): boolean {
+  if (row.fieldKind !== 'pushbutton' || row.layout !== 'image') return false;
+  for (const [event, tree] of Object.entries(row.actions ?? {})) {
+    if (!tree) continue;
+    if ((event === 'activate' || event === 'mouseUp') && importsIcon(tree)) continue;
+    return false;
+  }
+  return true;
+}
+
+/** Whether a field is an image field: a push button one of whose boxes is an image box. */
+export function isImageField(index: FieldIndex, field: FormField): boolean {
+  if (field.kind !== 'pushbutton') return false;
+  return field.widgets.some((widget) => {
+    const row = widgetRowOf(index, widget.objectNumber);
+    return row !== null && isImageBox(row);
+  });
+}
 
 /** The widgets one page shows, from the form's widget rows. */
 export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): PageWidgets {
@@ -449,6 +489,7 @@ export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): Page
         textAlign: row.textAlign ?? 'left',
       },
       hasMark: row.hasMark,
+      imageBox: isImageBox(row),
     };
   }
   return widgets;
@@ -507,6 +548,8 @@ export function widgetRowOf(index: FieldIndex, annotObjectNumber: number): Widge
 export interface WidgetHit extends WidgetPlace {
   readonly annotObjectNumber: number;
   readonly field: FormField;
+  /** The box is an image field's: it shows its button's image alone and does nothing of its own (`isImageBox`). */
+  readonly imageBox: boolean;
 }
 
 export const boxContains = (box: Box, point: { x: number; y: number }): boolean =>
@@ -523,14 +566,14 @@ export function widgetAt(
 ): WidgetHit | null {
   if (!widgets) return null;
   let best: WidgetHit | null = null;
-  for (const [key, { box, rotation, rect }] of Object.entries(widgets)) {
+  for (const [key, { box, rotation, rect, imageBox }] of Object.entries(widgets)) {
     // Where it stands is what the point is on: a quarter turn keeps its area.
     if (!boxContains(rect, point)) continue;
     const annotObjectNumber = Number(key);
     const field = fieldForWidget(index, annotObjectNumber);
     if (!field) continue;
     if (!best || rect.width * rect.height < best.rect.width * best.rect.height) {
-      best = { annotObjectNumber, field, box, rotation, rect };
+      best = { annotObjectNumber, field, box, rotation, rect, imageBox };
     }
   }
   return best;

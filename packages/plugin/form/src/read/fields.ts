@@ -25,6 +25,7 @@ import {
   fieldByRef,
   fieldForWidget,
   fieldKeyOf,
+  isImageField,
   widgetRowOf,
 } from '../model';
 import type { FormContext, FormServices } from '../services';
@@ -94,8 +95,12 @@ export function writeOfPlainValue(field: FormField, value: FormPlainValue): Form
   }
 }
 
-/** Whether a field holds nothing a required check would accept. */
-export function isEmpty(field: FormField): boolean {
+/**
+ * Whether a field holds nothing a required check would accept. An image field (`imageField`,
+ * `isImageField`) is empty while it holds no image; any other push button holds no value at all,
+ * so it never is.
+ */
+export function isEmpty(field: FormField, imageField = false): boolean {
   switch (field.kind) {
     case 'text':
     case 'combobox':
@@ -108,6 +113,8 @@ export function isEmpty(field: FormField): boolean {
       return field.selectedValues.length === 0;
     case 'signature':
       return field.valueEntry.kind === 'none';
+    case 'pushbutton':
+      return imageField && !field.hasImage;
     default:
       return false;
   }
@@ -187,7 +194,10 @@ export function createFieldReads(
     () => [fields.view(), ctx.document(), rights.key()],
     (index): FormValidation => {
       const missing = (index.snapshot?.fields ?? [])
-        .filter((field) => field.required && isEmpty(field) && rights.mayFill(field))
+        .filter(
+          (field) =>
+            field.required && isEmpty(field, isImageField(index, field)) && rights.mayFill(field),
+        )
         .map((field) => ({ field, place: placeOf(field) }))
         .sort(
           (left, right) =>

@@ -512,3 +512,54 @@ export class FormSignatureControl extends FormWidgetBox<WidgetOf<'signature'>> {
     else signature.setTarget(field);
   }
 }
+
+/**
+ * An image field: with the signature plugin, a press makes the field the target, where the next
+ * mark the person picks goes in as its picture, empty or filled, as a signature field's press
+ * does. It runs no script. Without the plugin, the field is only its picture.
+ */
+@Component({
+  selector: 'div[epdfFormImage]',
+  imports: [FormFieldPlaceholder],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[style.cursor]': "actionable() ? 'pointer' : 'default'" },
+  template: `
+    @if (actionable()) {
+      <button
+        type="button"
+        [attr.aria-label]="item().label"
+        [attr.data-has-image]="item().hasImage ? '' : null"
+        [style]="buttonStyle"
+        (click)="open()"
+      ></button>
+    }
+    @if (item().placeholder !== null) {
+      <span epdfFormPlaceholder [item]="item()"></span>
+    }
+  `,
+})
+export class FormImageControl extends FormWidgetBox<WidgetOf<'image'>> {
+  private readonly signature = new CapabilityBinding(
+    injectKernelHost('<epdf-form-layer>'),
+    () => SignatureToken,
+    () => this.page.documentId,
+  );
+
+  protected readonly actionable = computed(
+    () => this.signature.capability() !== null && !this.item().disabled,
+  );
+  // Without the signature plugin the box has nothing to focus: the cursor passes over it.
+  protected override readonly focusable = this.actionable;
+
+  protected readonly buttonStyle = {
+    ...FORM_CONTROL_FILL,
+    padding: '0',
+    border: '0',
+    background: 'transparent',
+    cursor: 'inherit',
+  };
+
+  protected open(): void {
+    this.signature.capability()?.setTarget(this.item().fieldRef);
+  }
+}

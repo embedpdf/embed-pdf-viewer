@@ -19,6 +19,7 @@ import { createFieldWrites } from './write/fields';
 import { createFill } from './write/fill';
 import { createFocus } from './write/focus';
 import { createGroupWrites } from './write/groups';
+import { createImageWrites } from './write/images';
 import { createInterchange } from './write/interchange';
 import { createWidgetLender } from './write/lending';
 import { createPrefill } from './write/prefill';
@@ -40,6 +41,7 @@ export function createFormController(ctx: FormContext) {
   const values = createValueWrites(ctx, services, fills);
   const typing = createTyping(ctx, services, values.setText);
   const prefill = createPrefill(ctx, services, values.fillPlain);
+  const images = createImageWrites(ctx, services);
   const resets = createResetWrites(ctx, services, fills);
   const design = createFieldWrites(ctx, services);
   const groups = createGroupWrites(ctx, services);
@@ -59,6 +61,7 @@ export function createFormController(ctx: FormContext) {
     values.api,
     typing.api,
     prefill.api,
+    images.api,
     resets.api,
     design.api,
     groups.api,

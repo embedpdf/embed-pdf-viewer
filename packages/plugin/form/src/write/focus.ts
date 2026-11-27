@@ -23,7 +23,14 @@ import type {
 
 import type { FormCapability, FormFocusNextOptions, FormFocusOptions } from '../contract';
 import type { FormHostCapability } from '../host-contract';
-import { fieldByKey, fieldByRef, fieldForWidget, fieldKeyOf, widgetRowOf } from '../model';
+import {
+  fieldByKey,
+  fieldByRef,
+  fieldForWidget,
+  fieldKeyOf,
+  isImageBox,
+  widgetRowOf,
+} from '../model';
 import { isEmpty, widgetObjectOf } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
 
@@ -151,7 +158,7 @@ export function createFocus(
     const at = own === undefined ? null : (group?.at ?? own);
     const candidates = stops.filter(
       (stop) =>
-        (!empty || isEmpty(stop.field)) &&
+        (!empty || isEmpty(stop.field, isImageBox(stop.row))) &&
         stop !== group &&
         !passed.has(widgetObjectOf(stop.row.ref)),
     );

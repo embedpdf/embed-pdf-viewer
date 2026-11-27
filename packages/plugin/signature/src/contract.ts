@@ -271,7 +271,7 @@ export interface SignatureSignedEvent {
   readonly result: SignatureCompleteResult;
   readonly origin: EventOrigin;
 }
-/** This session's `fillField()` drew a mark into a field. */
+/** This session's `fillField()` drew a mark into a field, or `placeMark()` put one into an image field. */
 export interface SignatureFilledEvent {
   readonly field: FormFieldRef;
 }
@@ -398,15 +398,22 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   clearField(field: FormFieldRef, options?: OperationOptions): Promise<void>;
   /**
    * Do what a click with an armed mark does: in a field, sign, fill or ask
-   * (`onSignRequested`), by `mode`; anywhere else, place it as a stamp.
-   * Rejects like the verb it runs.
+   * (`onSignRequested`), by `mode`; anywhere else, place it as a stamp. In
+   * an image field (a push button), whatever the mode, put the mark in as its
+   * picture with the form plugin's `setButtonImage()`: filling in, with the
+   * right to fill it in, one step to undo; it never signs or asks, resolves
+   * `'filled'` and fires `onFilled`. Rejects like the verb it runs.
    */
   placeMark(
     mark: Mark,
     target: { field: FormFieldRef } | StampPlacement,
     options?: OperationOptions,
   ): Promise<PlaceMarkResult>;
-  /** Make a field the target, where the next mark the person picks goes; `null` clears. Fires `onTargetChanged`. */
+  /**
+   * Make a field the target, where the next mark the person picks goes: a signature field, or an
+   * image field (the form layer's press on either does this); `null` clears. Fires
+   * `onTargetChanged`.
+   */
   setTarget(field: FormFieldRef | null): void;
   /** Ask your UI to show a signed field's details, as clicking it does. Fires `onInspectionRequested`. */
   requestInspection(field: FormFieldRef): void;
@@ -475,7 +482,7 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   // ── events ──
   /** A field was signed, whoever signed it; fires once the facts show the sealed field. */
   readonly onSigned: EventHook<SignatureSignedEvent>;
-  /** A mark was drawn into a field. */
+  /** A mark was drawn into a field, or put into an image field as its picture. */
   readonly onFilled: EventHook<SignatureFilledEvent>;
   /** A drawn mark was taken out of a field. */
   readonly onCleared: EventHook<SignatureClearedEvent>;

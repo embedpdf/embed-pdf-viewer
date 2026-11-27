@@ -143,6 +143,8 @@ const WIDGET_TEXT_FIELDS = [
   'fontColor',
   'textAlign',
 ] as const;
+/** A push button's: its text, and where it shows its caption and its image (an image field's `image`). */
+const WIDGET_BUTTON_FIELDS = [...WIDGET_TEXT_FIELDS, 'layout'] as const;
 
 /** Every field of an engine kind a tool's defaults may set: any field but the ones above. */
 const draftDefaults = (subtype: AnnotationSubtype): readonly string[] =>
@@ -179,7 +181,7 @@ export const TOOL_DEFAULT_FIELDS = {
   // maps them onto /MK //BS //DA //Q.
   'widget-text': WIDGET_TEXT_FIELDS,
   'widget-choice': WIDGET_TEXT_FIELDS,
-  'widget-button': WIDGET_TEXT_FIELDS,
+  'widget-button': WIDGET_BUTTON_FIELDS,
   'widget-toggle': WIDGET_BOX_FIELDS,
   'widget-radio': WIDGET_BOX_FIELDS,
   // The bare box every other widget family ingests as (a signature field's

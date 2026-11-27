@@ -23,6 +23,7 @@ import {
   FormComboControl,
   FormListControl,
   FormSignatureControl,
+  FormImageControl,
   FormTextControl,
   FormToggleControl,
 } from './controls';
@@ -58,6 +59,7 @@ const sameFrame = (left: FieldControlFrame, right: FieldControlFrame): boolean =
     FormListControl,
     FormButtonControl,
     FormSignatureControl,
+    FormImageControl,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(click)': 'clicked($event)' },
@@ -95,6 +97,9 @@ const sameFrame = (left: FieldControlFrame, right: FieldControlFrame): boolean =
           }
           @case ('signature') {
             <div epdfFormSignature [item]="own" [colors]="colors()"></div>
+          }
+          @case ('image') {
+            <div epdfFormImage [item]="own" [colors]="colors()"></div>
           }
         }
       </div>

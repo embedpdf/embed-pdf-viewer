@@ -136,7 +136,8 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
   },
   // A signature field: the bare widget box every non-text kind ingests
   // as (`widget-box`). It has no value of its own to style — the signing
-  // act (the signature plugin) draws the mark into it later.
+  // act (the signature plugin) draws the mark into it later. It says what
+  // it's for, so an empty one shows "Signature".
   {
     id: 'form-signature',
     fieldKind: 'signature',
@@ -145,7 +146,12 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     upright: true,
     defaults: FIELD_CHROME,
     cursor: 'crosshair',
+    field: { purpose: 'signature' },
   },
+  // Image fields, as Acrobat's Image field tool makes them: a push button that shows its image
+  // alone (`layout: 'image'`) and does nothing of its own. The person puts the picture in.
+  imageTool('form-initials', { width: 72, height: 36 }, 'initials'),
+  imageTool('form-image', { width: 120, height: 90 }),
   // The values a person fills in: a text field that says what it is for. `prefill()` writes
   // the first four from the session's identity; the tool's id is `form-` and the purpose.
   valueTool('name'),
@@ -164,6 +170,24 @@ export const FORM_TOOLS: readonly FormToolDefinition[] = [
     },
   },
 ];
+
+/** An image field's tool: a push button whose box shows its image alone, with a purpose or none. */
+function imageTool(
+  id: string,
+  clickCreate: { width: number; height: number },
+  purpose?: string,
+): FormToolDefinition {
+  return {
+    id,
+    fieldKind: 'pushbutton',
+    visualKind: 'widget-button',
+    clickCreate,
+    upright: true,
+    defaults: { ...FIELD_CHROME, layout: 'image' },
+    cursor: 'crosshair',
+    ...(purpose ? { field: { purpose } } : {}),
+  };
+}
 
 /** A text tool whose fields have a purpose: what `form-text` places, and the purpose. */
 function valueTool(purpose: string): FormToolDefinition {

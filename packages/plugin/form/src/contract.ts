@@ -18,6 +18,7 @@ import type {
 import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
+  BinarySource,
   FieldAssignment,
   FieldPosition,
   FormBundle,
@@ -657,7 +658,7 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * empty for a page that isn't in the document.
    */
   listWidgets(page: PageRef | number): readonly FormWidgetItem[];
-  /** The widget under a point on a page, with its field and its place, or `null`. */
+  /** The widget under a point on a page, with its field, its place and whether it's an image box, or `null`. */
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /**
    * The field whose widgets are selected (in design mode): one widget, or several of the same
@@ -736,6 +737,20 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     value: FormFieldValue,
     options?: OperationOptions,
   ): Promise<FormSetValueResult>;
+  /**
+   * Put a picture into an image field, `{ source }`: a PNG, a JPEG or a one-page PDF, as a
+   * stamp's source. `null` takes it out. It is filling in, with the right `setValue()` takes
+   * (`canFill`), and one change with one step to undo: the box says it holds a picture at once
+   * (`empty` is `false`), and shows it once the engine has drawn it. Fires `onFieldUpdated`.
+   * Resolves the field as it is now. Rejects `permission-denied` for a field you may not fill in,
+   * `invalid-input` for a field that is no push button or a source that is no picture,
+   * `not-found`, `operation-cancelled`.
+   */
+  setButtonImage(
+    ref: FormFieldRef,
+    image: { readonly source: BinarySource } | null,
+    options?: OperationOptions,
+  ): Promise<FormFieldResult>;
   /**
    * Fill in several fields, in order; one that fails, such as a field you may
    * not fill in, doesn't stop the rest.

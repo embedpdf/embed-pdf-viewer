@@ -178,7 +178,7 @@ a page, and a control gets its box as `widget`:
 
 | Value         | What it is                                                                                         |
 | :------------ | :------------------------------------------------------------------------------------------------- |
-| `control`     | Which control it is: `'text'`, `'toggle'`, `'choice'`, `'button'` or `'signature'`                 |
+| `control`     | Which control it is: `'text'`, `'toggle'`, `'choice'`, `'button'`, `'signature'` or `'image'` for an [image field](building#image-fields) |
 | `fieldRef`    | The field it belongs to: what `setValue()` and `get()` take                                         |
 | `ref`         | The box's own ref: what `useFormWidgetAnchor()` and `getWidget()` take                              |
 | `label`       | Its name for screen readers: the field's tooltip, else its name, then whose field it is when its [group](../forms#fields-for-several-people) has a label, or "Anyone" for a field [anyone fills in](../forms#fields-anyone-fills-in) |
@@ -188,15 +188,16 @@ a page, and a control gets its box as `widget`:
 | `accent`      | Its tint, `{ color, strength }`, or `null`: its [group's](../forms#fields-for-several-people) color, else `fields.anyoneTintColor` for a field [anyone fills in](../forms#fields-anyone-fills-in), else `fields.tintColor`, as strong as `fields.tint`, while it's `yours` |
 | `disabled`    | Draw it, take no input: a read-only field, one this user may not fill in, one [`fillable`](../forms#settings) leaves out, or a value on its way |
 | `required`    | The form asks for a value                                                                          |
-| `empty`       | It holds nothing yet: no text, nothing ticked or picked, no signature. What [`validate()`](../forms#check-required-fields) counts as missing |
+| `empty`       | It holds nothing yet: no text, nothing ticked or picked, no signature, no picture. What [`validate()`](../forms#check-required-fields) counts as missing |
 | `purpose`     | What the field is for, such as `'name'`, `'email'` or `'date-signed'`, or `null`. See [What a field is for](building#what-a-field-is-for) |
 | `format`      | The shape of its value: `{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`, `{ kind: 'other' }` for a format only the PDF's script knows, or `null`. Always `null` for a box that isn't a text box or a dropdown. See [Dates](../forms#dates) |
-| `placeholder` | What it shows while it's empty and `yours`, or `null`: its purpose's label, such as "Email", in the viewer's language. A text box, a dropdown and a signature field have one; a signature box with a mark drawn in it has none |
+| `placeholder` | What it shows while it's empty and `yours`, or `null`: its purpose's label, such as "Email", in the viewer's language. A text box, a dropdown, a signature field and an image field have one; a signature box with a mark drawn in it has none |
 | `hint`        | A sentence about it, for its tooltip and screen readers (`aria-description`), or `null`. The date of signing says "Filled in when you sign" to the person whose date it is |
 | `box`, `rotation`, `rect` | Where it is; see [Turned fields](../forms#turned-fields)                               |
 
 Then each control has its value: a text box its `value`, a checkbox or radio button `checked` and
-its `exportValue`, a dropdown or list its `options` and `selected`, a signature box `signed`.
+its `exportValue`, a dropdown or list its `options` and `selected`, a signature box `signed`, an
+image box `hasImage`.
 
 ## Good to know
 
@@ -217,8 +218,8 @@ your own. A lent field has the same `accent` on the annotation layer in design m
 ### Placeholders
 
 An empty field with a [purpose](building#what-a-field-is-for) shows what it's for while it's
-`yours`: a text box, a dropdown and a signature field do, since a checkbox, a radio button and a
-list have no room for it. Another person's field and a read-only one show none. A signature box with a mark drawn in it shows the mark alone, before it is signed too. The
+`yours`: a text box, a dropdown, a signature field and an image field do, since a checkbox, a
+radio button and a list have no room for it. Another person's field and a read-only one show none. A signature box with a mark drawn in it shows the mark alone, before it is signed too. The
 placeholder is part of the layer's own control, so a control that keeps `native` shows it, and one
 that draws the box alone reads `widget.placeholder` and draws its own. The
 layer's text box also carries the browser's `autocomplete` for the purposes the web knows; your
@@ -230,6 +231,18 @@ too, so whoever builds the form sees what each field is for.
 An empty signature field's control is a button. A click makes the field the
 [target](signatures#sign-here-in-a-form), where the next mark goes. Your own control for it calls
 `signature.setTarget(widget.fieldRef)`, or opens your own signing UI.
+
+### Image fields
+
+An [image field](building#image-fields)'s box is `control: 'image'`. With the signature plugin,
+the layer's control is a button: a press makes the field the
+[target](signatures#sign-here-in-a-form), as a signature box's does, empty or filled, and runs no
+script. Without the signature plugin the box is only its picture. Your own control for it calls
+`signature.setTarget(widget.fieldRef)`, or opens your own picker and calls
+`form.setButtonImage(widget.fieldRef, { source })`.
+
+The layer offers no way to take a picture out. To let people take theirs out, give your card a
+button that calls `form.setButtonImage(widget.fieldRef, null)` while `widget.hasImage` is true.
 
 ### Dropdown lists
 

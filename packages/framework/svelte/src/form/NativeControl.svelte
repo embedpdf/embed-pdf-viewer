@@ -8,12 +8,15 @@
                 scrolling.
     button    → a native click target over the picture that runs its action.
     signature → "sign here", or the signed field's details, with the signature plugin.
+    image     → an image field: with the signature plugin, a press makes it the target its
+                picture goes to.
 -->
 <script lang="ts">
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   import type { FormColors } from '@embedpdf/web';
   import ButtonControl from './ButtonControl.svelte';
   import ComboControl from './ComboControl.svelte';
+  import ImageControl from './ImageControl.svelte';
   import ListControl from './ListControl.svelte';
   import SignatureControl from './SignatureControl.svelte';
   import TextControl from './TextControl.svelte';
@@ -34,4 +37,6 @@
   <ButtonControl {item} {colors} />
 {:else if item.control === 'signature'}
   <SignatureControl {item} {colors} />
+{:else if item.control === 'image'}
+  <ImageControl {item} {colors} />
 {/if}

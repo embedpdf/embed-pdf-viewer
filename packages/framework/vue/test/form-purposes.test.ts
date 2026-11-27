@@ -466,4 +466,70 @@ describe('what a field is for', () => {
       }
     },
   );
+
+  it(
+    "an image field's box: says what it's for, a press makes it the target, and it holds the picture put in",
+    { timeout: 60_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await realEngine();
+      const context = shallowRef<PageContextValue | null>(null);
+      const Page = pageWith(context, () => [h('div', { 'data-layer': 'form' }, [h(FormLayer)])]);
+      const { kernel, wrapper } = await viewerWith(
+        [interactionPlugin(), annotationPlugin(), formPlugin(), signaturePlugin()],
+        () => [h(Page)],
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await vi.waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        const signature = kernel.capability(SignatureToken);
+        await form.refresh();
+        const page = kernel.documents.getPage(0, 'blank')!.ref;
+        const { field } = await form.create({
+          kind: 'pushbutton',
+          name: 'initials',
+          purpose: 'initials',
+          widgets: [{ page, rect: { x: 72, y: 100, width: 72, height: 36 }, layout: 'image' }],
+        });
+        context.value = letterPage('blank', page);
+        await settle();
+
+        // A button named after the field, empty, saying what it's for.
+        const button = await found<HTMLButtonElement>('button[aria-label="initials"]');
+        const box = button.parentElement as HTMLElement;
+        expect(box.querySelector(PLACEHOLDER)!.textContent!.trim()).toBe('Initials');
+        expect(button.hasAttribute('data-has-image')).toBe(false);
+        // A press makes it the target, as a signature box's does; nothing else runs.
+        button.click();
+        expect(signature.getTarget()).toEqual(field.ref);
+
+        // The card's mark goes in as its picture: the box says so, and its placeholder goes.
+        await signature.placeMark(
+          { source: new Uint8Array(await readFile(resolve(fixtures, 'signature_artwork.pdf'))) },
+          { field: field.ref },
+        );
+        await vi.waitFor(() =>
+          expect(
+            document.querySelector('button[aria-label="initials"]')!.hasAttribute('data-has-image'),
+          ).toBe(true),
+        );
+        expect(signature.getTarget()).toBeNull();
+        expect(form.listWidgets(page)[0]).toMatchObject({ control: 'image', hasImage: true });
+        expect(
+          document
+            .querySelector('button[aria-label="initials"]')!
+            .parentElement!.querySelector(PLACEHOLDER),
+        ).toBeNull();
+      } finally {
+        wrapper.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
 });

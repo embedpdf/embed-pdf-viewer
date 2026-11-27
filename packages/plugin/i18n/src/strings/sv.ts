@@ -63,6 +63,8 @@ export const sv: EmbedpdfStrings = {
       'form-organization': 'Organisationsfält',
       'form-organization-title': 'Befattningsfält',
       'form-date-signed': 'Fält för signeringsdatum',
+      'form-initials': 'Initialfält',
+      'form-image': 'Bildfält',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

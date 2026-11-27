@@ -103,6 +103,7 @@ const placed = (box: { x: number; y: number; width: number; height: number }) =>
   rect: box,
   look: LOOK,
   hasMark: false,
+  imageBox: false,
 });
 const BOXES: PageWidgets = { 4: placed({ x: 10, y: 20, width: 200, height: 24 }) };
 
@@ -452,6 +453,7 @@ describe('signature widgets', () => {
     expect(widgetAt(index, boxes, { x: 60, y: 60 })).toMatchObject({
       annotObjectNumber: 9,
       field: { name: 'sig' },
+      imageBox: false,
     });
     expect(widgetAt(index, boxes, { x: 10, y: 10 })).toMatchObject({ annotObjectNumber: 4 });
     expect(widgetAt(index, boxes, { x: 500, y: 500 })).toBeNull();

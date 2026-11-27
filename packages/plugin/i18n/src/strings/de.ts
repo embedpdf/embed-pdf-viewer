@@ -66,6 +66,8 @@ export const de: EmbedpdfStrings = {
       'form-organization': 'Organisationsfeld',
       'form-organization-title': 'Positionsfeld',
       'form-date-signed': 'Feld für das Unterschriftsdatum',
+      'form-initials': 'Initialenfeld',
+      'form-image': 'Bildfeld',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

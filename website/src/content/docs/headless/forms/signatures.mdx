@@ -46,8 +46,10 @@ People can also arm their signature and click where it goes, as in Preview. With
 a mark from a signature library:
 
 - **over an empty signature field**, the click signs it;
-- **over a signed field**, nothing happens;
-- **anywhere else**, the mark is placed as a stamp.
+- **over an [image field](building#image-fields) the person fills in**, such as their initials,
+  the mark goes in as its picture, in place of any picture it holds;
+- **over a signed field, or an image field that isn't theirs to fill in**, nothing happens;
+- **anywhere else**, the mark is placed as a stamp, even over a button that does something.
 
 `placeMark()` does the same from code:
 
@@ -58,6 +60,12 @@ await signature.placeMark({ assetId }, { page: page.ref, center: { x: 120, y: 90
 
 What happens in a field depends on `mode`: `'sign'` signs it, `'visual'` only draws the mark in,
 and `'ask'` asks your UI first through <Fw only={['react', 'vue', 'svelte']}>`onSignRequested`</Fw><Fw only="angular">`signRequested$`</Fw>, so you can show your own sign dialog.
+
+An [image field](building#image-fields), such as the person's initials, is no signature: in
+every mode `placeMark()` puts the mark in as its picture, through
+[`form.setButtonImage()`](../forms#image-fields). It's filling in, so it takes the right to fill
+the field in, never signs or asks, and is one step to undo. It resolves `'filled'` and fires
+<Fw only={['react', 'vue', 'svelte']}>`onFilled`</Fw><Fw only="angular">`filled$`</Fw>, as `fillField()` does.
 
 <Example name="signature/click-to-sign" />
 
@@ -334,7 +342,8 @@ a normal PDF, so Acrobat can open it too.
 With the [form layer](../forms), an empty signature field can be clicked. The layer draws no "sign
 here" text in it: the field is a button with nothing in it, named after the field for screen readers.
 Clicking it makes the field the **target**: the next mark the person picks goes there. A signed field,
-clicked, asks your UI to show its details:
+clicked, asks your UI to show its details. An [image field](building#image-fields) is a target
+too, empty or filled: clicking it lets the person put their mark in, or a new one over it:
 
 ```ts
 signature.setTarget(toFieldRef('approval')); // the next mark goes here; null clears
@@ -353,7 +362,7 @@ Everything `useSignature()` gives you.
 | Method                                                    | What it does                                                                                                                              |
 | :-------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
 | `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey` and `timestampAuthority`, `certify` and `lock`, and resolves `{ signature, version, protection, validationInfo, validationInfoError }`. [Sign a field](#sign-a-field) |
-| `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
+| `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; in an image field, always puts the mark in as its picture; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
 | `fillField(field, mark)`, `clearField(field)`             | Draws a mark into a field without signing, or takes it out again. Refused on a signed field. [Fill a field without signing](#fill-a-field-without-signing) |
 | `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second checks what the key returned, adds the timestamp when an authority is set, and seals the document. [Signing in two steps](#signing-in-two-steps) |
 | `cancelPending()`                                         | Gives up a signature prepared in two steps, so the document can be changed again                                                          |
@@ -413,7 +422,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Event                     | Fires when                                           | Carries                     |
 | :------------------------ | :--------------------------------------------------- | :-------------------------- |
 | `onSigned`                | A field was signed, whoever signed it                | `field`, `result`, `origin` |
-| `onFilled`, `onCleared`   | A mark was drawn into a field, or removed            | `field`                     |
+| `onFilled`, `onCleared`   | A mark was drawn into a field, or put into an image field; or removed | `field`                     |
 | `onValidated`             | The signatures were checked                          | `verdicts`                  |
 | `onProtectionChanged`     | What the signatures allow changed                    | `protection`                |
 | `onInvalidationPredicted` | A change would break a signature once saved          | `field`, `detail`           |
