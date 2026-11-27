@@ -1013,6 +1013,127 @@
         "permitted"
       ],
       "rationale": "A Square annotation recoloured after an approval signature (\"Annotations Modified\")."
+    },
+    {
+      "id": "92",
+      "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "93",
+      "sha256": "86b4ff6acd975f04861cc29d76cc78cad01adb3c8e087b68e27704cb026c5427",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A new appearance on the unsigned SignatureTwo, the field (or its widget) changing /AP alone and the drawing all new objects: Acrobat \"not modified\"; we report a permitted change."
+    },
+    {
+      "id": "94",
+      "sha256": "9031ac4df794a3b705165e6858825f060be372fccdc3611a589f7b45d46b771d",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A new appearance on the unsigned SignatureTwo, the field (or its widget) changing /AP alone and the drawing all new objects: Acrobat \"not modified\"; we report a permitted change."
+    },
+    {
+      "id": "95",
+      "sha256": "33dbba4d8fc9f6a320207f8048bc66002c138365ff1a883106d6763d104266d6",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat reports the signed field's own appearance replaced after signing as \"not modified\" (also after an explicit revalidation); it replaces the look the signature was made with, so it stays forbidden."
+    },
+    {
+      "id": "96",
+      "sha256": "a4283915585120ec8db71a5471ed07df1f692ffb9fa634d30795ca0f62afbb95",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "97",
+      "sha256": "d162b8b9550f8975286cfcd632563d26a82dd5b0a544077b757e7f634449de68",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A new appearance on the unsigned SignatureTwo, the field (or its widget) changing /AP alone and the drawing all new objects: Acrobat \"not modified\"; we report a permitted change."
+    },
+    {
+      "id": "98",
+      "sha256": "3cf2fb78235bff992cf5afa693616a6308883e1617c6a36392e756ed97e098a8",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "99",
+      "sha256": "2a5f88f6122929ccf6eebe7f2041b891fa2d6abf67268dd8a3475ef0085a2043",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A new appearance on the unsigned SignatureTwo, the field (or its widget) changing /AP alone and the drawing all new objects: Acrobat \"not modified\"; we report a permitted change."
+    },
+    {
+      "id": "100",
+      "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "101",
+      "sha256": "0ccaf0841f98b2f3f6ed2c46e08d73cefd8163320498a1b1e1105baedd55e986",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "The same new appearance under a P=2 certification: Acrobat \"changes ... permitted by the Certifying party\"."
+    },
+    {
+      "id": "102",
+      "sha256": "5907445e3072735cc6f02c80560008386b729343363f613e66b41ac7b9ee7bdc",
+      "observationRunId": "acrobat-pro-26.002.22031-macos-arm64-2026-11-26-v4-trusted",
+      "policyVersion": 6,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "The same new appearance under a P=2 certification: Acrobat \"changes ... permitted by the Certifying party\"."
     }
   ]
 }

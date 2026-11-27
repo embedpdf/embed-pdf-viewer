@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "role-probes-v4",
+  "source": "synthetic-from-scratch",
+  "generator": {
+    "pyhanko": "0.37.0",
+    "cryptography": "50.0.1",
+    "signingTime": "2026-09-13T12:00:00+00:00"
+  },
+  "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+  "cases": [
+    {
+      "id": "92",
+      "file": "92-approval-control.pdf",
+      "question": "Unchanged approval signature; SignatureTwo is unsigned and keeps its empty appearance.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+        "byteLength": 20331,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "93",
+      "file": "93-approval-unsigned-wrapper-appearance.pdf",
+      "question": "Is EmbedPDF's wrapper drawing as a new appearance on the unsigned SignatureTwo accepted?",
+      "control": "92",
+      "profile": "approval",
+      "facts": {
+        "sha256": "86b4ff6acd975f04861cc29d76cc78cad01adb3c8e087b68e27704cb026c5427",
+        "byteLength": 21571,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "wrapper",
+        "widget": "merged"
+      }
+    },
+    {
+      "id": "94",
+      "file": "94-approval-unsigned-plain-appearance.pdf",
+      "question": "Is a plain vector drawing as a new appearance on the unsigned SignatureTwo accepted?",
+      "control": "92",
+      "profile": "approval",
+      "facts": {
+        "sha256": "9031ac4df794a3b705165e6858825f060be372fccdc3611a589f7b45d46b771d",
+        "byteLength": 20951,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "plain",
+        "widget": "merged"
+      }
+    },
+    {
+      "id": "95",
+      "file": "95-approval-signed-field-wrapper-appearance.pdf",
+      "question": "Negative control: is the same new appearance on the signed SignatureOne rejected?",
+      "control": "92",
+      "profile": "approval",
+      "facts": {
+        "sha256": "33dbba4d8fc9f6a320207f8048bc66002c138365ff1a883106d6763d104266d6",
+        "byteLength": 21579,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureOne",
+        "drawing": "wrapper",
+        "widget": "merged"
+      }
+    },
+    {
+      "id": "96",
+      "file": "96-approval-no-appearance-control.pdf",
+      "question": "Unchanged approval signature; SignatureTwo is unsigned and has no /AP at all.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "a4283915585120ec8db71a5471ed07df1f692ffb9fa634d30795ca0f62afbb95",
+        "byteLength": 20311,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2898,
+              19284,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "97",
+      "file": "97-approval-unsigned-appearance-added.pdf",
+      "question": "Is a first appearance (/AP added where there was none) on the unsigned SignatureTwo accepted?",
+      "control": "96",
+      "profile": "approval",
+      "facts": {
+        "sha256": "d162b8b9550f8975286cfcd632563d26a82dd5b0a544077b757e7f634449de68",
+        "byteLength": 21551,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2898,
+              19284,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "wrapper",
+        "widget": "merged"
+      }
+    },
+    {
+      "id": "98",
+      "file": "98-approval-separate-widget-control.pdf",
+      "question": "Unchanged approval signature; the unsigned SignatureTwo has a separate /Kids widget.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "3cf2fb78235bff992cf5afa693616a6308883e1617c6a36392e756ed97e098a8",
+        "byteLength": 20405,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2972,
+              19358,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "99",
+      "file": "99-approval-unsigned-separate-widget-appearance.pdf",
+      "question": "Is a new appearance on the separate widget of the unsigned SignatureTwo accepted (field untouched)?",
+      "control": "98",
+      "profile": "approval",
+      "facts": {
+        "sha256": "2a5f88f6122929ccf6eebe7f2041b891fa2d6abf67268dd8a3475ef0085a2043",
+        "byteLength": 21604,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2972,
+              19358,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "wrapper",
+        "widget": "separate"
+      }
+    },
+    {
+      "id": "100",
+      "file": "100-p2-control.pdf",
+      "question": "Unchanged P2 certification; SignatureTwo is unsigned.",
+      "control": null,
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+        "byteLength": 20491,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "101",
+      "file": "101-p2-unsigned-wrapper-appearance.pdf",
+      "question": "Under P2, is the wrapper drawing as a new appearance on the unsigned SignatureTwo accepted?",
+      "control": "100",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "0ccaf0841f98b2f3f6ed2c46e08d73cefd8163320498a1b1e1105baedd55e986",
+        "byteLength": 21731,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "wrapper",
+        "widget": "merged"
+      }
+    },
+    {
+      "id": "102",
+      "file": "102-p2-unsigned-plain-appearance.pdf",
+      "question": "Under P2, is a plain drawing as a new appearance on the unsigned SignatureTwo accepted?",
+      "control": "100",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "5907445e3072735cc6f02c80560008386b729343363f613e66b41ac7b9ee7bdc",
+        "byteLength": 21111,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "appearanceProbe": {
+        "field": "SignatureTwo",
+        "drawing": "plain",
+        "widget": "merged"
+      }
+    }
+  ]
+}
