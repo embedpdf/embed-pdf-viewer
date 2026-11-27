@@ -84,17 +84,23 @@ So a field is filled in by one of three:
 | `forAnyone: true`             | Every user who may fill in some field: each signer, and the sender           |
 | In no group, not `forAnyone`  | The users who may fill in every field: the sender                            |
 
-A field in a group can't also be `forAnyone`, and neither can a signature field: both fail with
-`InvalidArg`. To move a field between a group and `forAnyone`, name both in one update:
+A field is in a group or `forAnyone`, never both, so setting one replaces the other: marking a
+field takes it out of its group, and a group takes the mark away.
 
 ```ts
-await doc.forms.update(field.ref, { groupId: null, forAnyone: true });
-await doc.forms.update(field.ref, { groupId: 'buyer', forAnyone: false });
+await doc.forms.update(field.ref, { forAnyone: true }); // out of its group, for anyone
+await doc.forms.update(field.ref, { groupId: 'buyer' }); // the buyer's, no longer for anyone
 ```
 
+`groupId: null` and `forAnyone: false` each take away only their own: `groupId: null` leaves a
+`forAnyone` field for anyone, and `forAnyone: false` makes it the sender's. A group and
+`forAnyone: true` in one update fail with `InvalidArg`, and so does `forAnyone: true` on a
+signature field, which one signer signs.
+
 Marking a field `forAnyone` lets every group's signers fill it in, so it takes the permission to put
-fields in every group, `fields:set-group:all`, beside `doc.forms.modify`. `forAnyone: false` takes
-`doc.forms.modify` alone, as taking a field out of its group does.
+fields in every group, `fields:set-group:all`, beside `doc.forms.modify`. Taking the mark away
+takes `doc.forms.modify` alone, as taking a field out of its group does, and a group that takes it
+away takes that group's permission, as for any field.
 
 Like the group, `forAnyone` is saved in the field's `/EMBD_Metadata`, other PDF apps ignore it, and
 a form export carries it. Signing [locks](#signing) a `forAnyone` field once it holds a value.

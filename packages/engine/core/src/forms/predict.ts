@@ -12,7 +12,7 @@
  * are left to that read too, with the format they give the field; a `format`
  * write is worked out here, its two scripts included.
  */
-import { checkedForAnyone } from './anyone';
+import { assignmentAfter, checkedForAnyone } from './anyone';
 import type { FormFieldOptionInput, FormFieldDraft, WidgetPlacement } from './draft';
 import type { FormFieldDisplay } from './effects';
 import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
@@ -358,9 +358,8 @@ export function formFieldAfter<C extends Coordinates>(
   }
   if (patch.alternateName !== undefined) field.alternateName = patch.alternateName || null;
   if (patch.mappingName !== undefined) field.mappingName = patch.mappingName || null;
-  if (patch.groupId !== undefined) field.groupId = patch.groupId;
-  // Checked on the field as the patch leaves it: in a group, it is for no one else.
-  field.forAnyone = checkedForAnyone(patch.forAnyone, field, field.forAnyone);
+  // Setting one of the group and anyone replaces the other.
+  Object.assign(field, assignmentAfter(patch, field));
   if (patch.purpose !== undefined) field.purpose = checkedPurpose(patch.purpose);
   if (field.kind === 'text' || field.kind === 'combobox') {
     // The format the field already has is no change: its scripts stay as they are.

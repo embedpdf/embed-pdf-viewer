@@ -426,6 +426,26 @@ const CASES: readonly PredictionCase[] = [
     op: { type: 'update', patch: { groupId: 'buyer', forAnyone: false } },
   },
   {
+    name: "update: a group's field for anyone, the mark alone",
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { forAnyone: true } },
+  },
+  {
+    name: 'update: a group for a field anyone fills in, the group alone',
+    draft: text({ forAnyone: true }),
+    op: { type: 'update', patch: { groupId: 'buyer' } },
+  },
+  {
+    name: 'update: no group for a field anyone fills in',
+    draft: text({ forAnyone: true }),
+    op: { type: 'update', patch: { groupId: null } },
+  },
+  {
+    name: "update: a group's field not for anyone",
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { forAnyone: false } },
+  },
+  {
     name: 'update: forAnyone, and something else',
     draft: text({ forAnyone: true }),
     op: { type: 'update', patch: { required: true } },
@@ -618,18 +638,28 @@ const REFUSALS: readonly PredictionCase[] = [
     op: { type: 'update', patch: { purpose: ' email ' } },
   },
   {
-    name: 'forAnyone on a field in a group',
-    draft: text({ groupId: 'buyer' }),
-    op: { type: 'update', patch: { forAnyone: true } },
+    name: 'a group and forAnyone in one update',
+    draft: text(),
+    op: { type: 'update', patch: { groupId: 'buyer', forAnyone: true } },
   },
   {
-    name: 'a group for a field anyone fills in',
+    name: 'a group and forAnyone for a field anyone fills in',
     draft: text({ forAnyone: true }),
-    op: { type: 'update', patch: { groupId: 'buyer' } },
+    op: { type: 'update', patch: { groupId: 'buyer', forAnyone: true } },
   },
   {
     name: 'a signature field for anyone',
     draft: (page, name) => ({ kind: 'signature', name, widgets: [{ page, rect: box(72) }] }),
+    op: { type: 'update', patch: { forAnyone: true } },
+  },
+  {
+    name: "a group's signature field for anyone",
+    draft: (page, name) => ({
+      kind: 'signature',
+      name,
+      groupId: 'buyer',
+      widgets: [{ page, rect: box(72) }],
+    }),
     op: { type: 'update', patch: { forAnyone: true } },
   },
   {

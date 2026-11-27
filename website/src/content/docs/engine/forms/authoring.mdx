@@ -252,7 +252,8 @@ await doc.forms.update(field.ref, { required: true, maxLength: 80 });
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
 `{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip,
 `{ groupId: null }` for no group, `{ purpose: null }` for no purpose, `{ format: null }` for no
-format. `{ forAnyone: false }` makes a field one group's or the sender's again.
+format. `{ forAnyone: false }` makes a field anyone fills in the sender's again. A group and
+`forAnyone: true` replace each other: see [Fields anyone fills in](/docs/engine/forms/groups#fields-anyone-fills-in).
 
 You can change the settings in the tables above, except the kind and the widgets. A signature
 field takes the settings every field has: `name`, `readOnly`, `required`, `noExport`,

@@ -6,6 +6,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import type { FormFieldPatch } from '../forms/patch';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import type { FieldLockSpec } from '../signature/types';
@@ -18,8 +19,9 @@ import type { FieldLockSpec } from '../signature/types';
  *   - every token that may fill in some field fills one in; a token that may
  *     fill in none can't, and a group's token still can't fill in the
  *     sender's fields;
- *   - marking a field takes `fields:set-group:all`, and a field in a group or
- *     a signature field is refused;
+ *   - marking a field takes `fields:set-group:all` and takes it out of its
+ *     group, and giving it a group takes the mark away; a group and the mark
+ *     together, or the mark on a signature field, is refused;
  *   - a signing that names no lock locks every such field that holds a value,
  *     whoever filled it in (an image field holds one once it holds a
  *     picture), and leaves an empty one open for the next signer;
@@ -566,7 +568,7 @@ export function runAnyoneFieldsConformance(
       );
     });
 
-    test('a field in a group, or a signature field, is never for anyone', async () => {
+    test('a field is never in a group and for anyone, and a signature field never for anyone', async () => {
       await as('everything', async (doc) => {
         const invalid = async (attempt: Promise<unknown>, named = true) => {
           const error = await refusal(attempt);
@@ -577,10 +579,20 @@ export function runAnyoneFieldsConformance(
           doc.forms.create({ kind: 'text', name: 'x', groupId: 'dana', forAnyone: true }),
         );
         await invalid(doc.forms.create({ kind: 'signature', name: 'x', forAnyone: true }));
-        await invalid(doc.forms.update(field('dana_name'), { forAnyone: true }));
+        // A group and the mark in one update, either way round.
+        await invalid(doc.forms.update(field('dana_name'), { groupId: 'dana', forAnyone: true }));
+        await invalid(doc.forms.update(field('reference'), { groupId: 'ada', forAnyone: true }));
         await invalid(doc.forms.update(field('witness_sig'), { forAnyone: true }));
-        // A group for such a field without taking `forAnyone` away.
-        await invalid(doc.forms.update(field('reference'), { groupId: 'dana' }));
+        // A signature field in a group keeps its group: nothing is written.
+        await invalid(doc.forms.update(field('dana_sig'), { forAnyone: true }));
+        expect(await doc.forms.get(field('dana_sig'))).toMatchObject({
+          groupId: 'dana',
+          forAnyone: false,
+        });
+        expect(await doc.forms.get(field('reference'))).toMatchObject({
+          groupId: null,
+          forAnyone: true,
+        });
         // Refused by the request's schema on the wire, by the engine locally.
         await invalid(
           doc.forms.update(field('reference'), { forAnyone: 'yes' as unknown as boolean }),
@@ -605,6 +617,51 @@ export function runAnyoneFieldsConformance(
       });
     });
 
+    test('setting a group or the mark replaces the other; null and false take away only their own', async () => {
+      await as('sender', async (doc) => {
+        const update = async (name: string, patch: FormFieldPatch) => {
+          const { field: updated } = await doc.forms.update(field(name), patch);
+          const read = await doc.forms.get(field(name));
+          expect(updated).toMatchObject({ groupId: read.groupId, forAnyone: read.forAnyone });
+          return { groupId: read.groupId, forAnyone: read.forAnyone };
+        };
+        // The mark takes the field out of its group…
+        expect(await update('dana_name', { forAnyone: true })).toEqual({
+          groupId: null,
+          forAnyone: true,
+        });
+        // …and a group takes the mark away.
+        expect(await update('dana_name', { groupId: 'ada' })).toEqual({
+          groupId: 'ada',
+          forAnyone: false,
+        });
+        // `null` takes away only the group, and `false` only the mark.
+        expect(await update('reference', { groupId: null })).toEqual({
+          groupId: null,
+          forAnyone: true,
+        });
+        expect(await update('ada_name', { forAnyone: false })).toEqual({
+          groupId: 'ada',
+          forAnyone: false,
+        });
+        // In a batch, as on its own; and another tool's entry beside a group counts for nothing.
+        await doc.apply({
+          ops: [
+            { type: 'forms.update', field: field('notes'), patch: { groupId: 'dana' } },
+            { type: 'forms.update', field: field('both'), patch: { forAnyone: true } },
+          ],
+        });
+        expect(await doc.forms.get(field('notes'))).toMatchObject({
+          groupId: 'dana',
+          forAnyone: false,
+        });
+        expect(await doc.forms.get(field('both'))).toMatchObject({
+          groupId: null,
+          forAnyone: true,
+        });
+      });
+    });
+
     test('marking one takes fields:set-group:all; unmarking takes form design', async () => {
       await as('designer', async (doc) => {
         const refused = await refusal(
@@ -618,9 +675,26 @@ export function runAnyoneFieldsConformance(
         expect((update as EngineError).details).toMatchObject({
           required: 'fields:set-group:all',
         });
+        // So does taking a field out of a group by marking it; nothing is written.
+        const fromGroup = await refusal(doc.forms.update(field('dana_name'), { forAnyone: true }));
+        expect((fromGroup as EngineError).details).toMatchObject({
+          required: 'fields:set-group:all',
+        });
+        expect((await doc.forms.get(field('dana_name'))).groupId).toBe('dana');
         // `false` takes form design alone, as no group does.
         await doc.forms.update(field('reference'), { forAnyone: false });
         expect((await doc.forms.get(field('reference'))).forAnyone).toBe(false);
+        // A group takes the mark away with the group's right alone.
+        await doc.forms.update(field('notes'), { groupId: 'dana' });
+        expect(await doc.forms.get(field('notes'))).toMatchObject({
+          groupId: 'dana',
+          forAnyone: false,
+        });
+        const toAda = await refusal(doc.forms.update(field('delivery'), { groupId: 'ada' }));
+        expect((toAda as EngineError).details).toMatchObject({
+          required: 'fields:set-group:group=ada',
+        });
+        expect((await doc.forms.get(field('delivery'))).forAnyone).toBe(true);
         expect(doc.security.fieldRights().setGroup).toEqual({ all: false, groups: ['dana'] });
       });
       await as('sender', async (doc) => {
@@ -644,20 +718,26 @@ export function runAnyoneFieldsConformance(
         await doc.apply({ undoOf: marked.meta.opId });
         expect((await doc.forms.get(field('sender_note'))).forAnyone).toBe(false);
 
+        // The mark alone took the field out of its group: the undo gives the group back.
         const moved = await doc.apply({
-          ops: [
-            {
-              type: 'forms.update',
-              field: field('dana_name'),
-              patch: { groupId: null, forAnyone: true },
-            },
-          ],
+          ops: [{ type: 'forms.update', field: field('dana_name'), patch: { forAnyone: true } }],
         });
         await doc.forms.update(field('dana_name'), { required: true });
         await doc.apply({ undoOf: moved.meta.opId });
         expect(await doc.forms.get(field('dana_name'))).toMatchObject({
           groupId: 'dana',
           forAnyone: false,
+          required: true,
+        });
+        // A group alone took the mark away: the undo gives the mark back.
+        const given = await doc.apply({
+          ops: [{ type: 'forms.update', field: field('reference'), patch: { groupId: 'ada' } }],
+        });
+        await doc.forms.update(field('reference'), { required: true });
+        await doc.apply({ undoOf: given.meta.opId });
+        expect(await doc.forms.get(field('reference'))).toMatchObject({
+          groupId: null,
+          forAnyone: true,
           required: true,
         });
       });

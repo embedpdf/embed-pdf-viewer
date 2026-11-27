@@ -22,15 +22,16 @@ interface FormFieldPatchBase {
   mappingName?: string | null;
   /**
    * Move the field to another group: the session's own, or one it has
-   * `fields:set-group` for. `null` takes the field out of its group, which
-   * takes no `fields:set-group` right: form design is enough.
+   * `fields:set-group` for. A field anyone filled in is then no longer for
+   * anyone. `null` takes the field out of its group, which takes no
+   * `fields:set-group` right: form design is enough.
    */
   groupId?: string | null;
   /**
    * Every signer may fill the field in. `true` takes `fields:set-group:all`
-   * and a field the update leaves in no group: to move a field from a
-   * group, send `groupId: null` with it. `false` takes form design alone.
-   * A signature field is never one.
+   * and takes the field out of its group; naming a group beside it fails
+   * with `InvalidArg`, and so does `true` on a signature field. `false`
+   * takes form design alone and leaves the group as it is.
    */
   forAnyone?: boolean;
   /** What the field's value means; `null` takes the purpose away. */

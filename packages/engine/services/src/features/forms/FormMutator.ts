@@ -19,6 +19,7 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
+  assignmentAfter,
   checkedForAnyone,
   checkedPurpose,
   defaultEntryOfDraft,
@@ -669,12 +670,8 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.kind);
-    // Checked on the field as the patch leaves it: one in a group is no one else's.
-    const forAnyone = checkedForAnyone(
-      patch.forAnyone,
-      { kind: before.kind, groupId: patch.groupId !== undefined ? patch.groupId : before.groupId },
-      before.forAnyone,
-    );
+    // Who fills the field in: setting one of the group and anyone replaces the other.
+    const { groupId, forAnyone } = assignmentAfter(patch, before);
     // The entry as stored, read before any write: one another tool left beside
     // a group reads as `false`, and goes once the field is taken out of it.
     const storedForAnyone = readForAnyoneEntry(this.runtime, model, resolved.fieldIndex);
@@ -726,8 +723,8 @@ export class FormMutator {
         'mapping name rejected',
       );
     }
-    if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
-      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
+    if (groupId !== before.groupId) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, groupId);
     }
     if (forAnyone !== storedForAnyone)
       writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, forAnyone);

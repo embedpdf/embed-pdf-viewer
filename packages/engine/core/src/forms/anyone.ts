@@ -12,7 +12,8 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
  * names, else what the field was (`was`, `false` for a new field). `field`
  * is the field as the write leaves it: its kind and its group. Refused with
  * `InvalidArg`: a value that isn't `true` or `false`, and `true` on a field
- * in a group or on a signature field, which one signer signs.
+ * in a group or on a signature field, which one signer signs. An update
+ * works out the field it leaves with {@link assignmentAfter}.
  */
 export function checkedForAnyone(
   named: unknown,
@@ -35,8 +36,7 @@ export function checkedForAnyone(
   if (field.groupId !== null) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'a field in a group is not also for anyone: send groupId: null with forAnyone: true, or ' +
-        'forAnyone: false with a groupId',
+      'a field is in a group or for anyone, not both: name one of groupId and forAnyone: true',
       { details: { field: 'forAnyone' } },
     );
   }
@@ -44,7 +44,33 @@ export function checkedForAnyone(
 }
 
 /**
- * A field as something older tha `forAnyone` wrote it, made whole: no field
+ * Who fills a field in after an update: its group, and whether anyone does.
+ * A field is one signer's, anyone's or the sender's, so setting one replaces
+ * the other: `forAnyone: true` takes the field out of its group, and a group
+ * makes it no longer for anyone. `groupId: null` takes away only the group,
+ * `forAnyone: false` only that anyone fills it in. Refused with `InvalidArg`,
+ * as {@link checkedForAnyone} says: a patch that names a group and
+ * `forAnyone: true` together, and `forAnyone: true` on a signature field.
+ */
+export function assignmentAfter(
+  patch: { readonly groupId?: string | null; readonly forAnyone?: boolean },
+  field: {
+    readonly kind: FormFieldKind;
+    readonly groupId: string | null;
+    readonly forAnyone: boolean;
+  },
+): { groupId: string | null; forAnyone: boolean } {
+  const groupId =
+    patch.groupId !== undefined ? patch.groupId : patch.forAnyone === true ? null : field.groupId;
+  const was = typeof patch.groupId === 'string' ? false : field.forAnyone;
+  return {
+    groupId,
+    forAnyone: checkedForAnyone(patch.forAnyone, { kind: field.kind, groupId }, was),
+  };
+}
+
+/**
+ * A field as something older than `forAnyone` wrote it, made whole: no field
  * was for anyone then. An older server answers with such a field, and a
  * bundle kept from an earlier version holds them. A field that has it comes
  * back as it is.

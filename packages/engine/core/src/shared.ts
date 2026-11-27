@@ -755,7 +755,7 @@ export {
   type FormFieldFormatWritable,
 } from './forms/format';
 export { checkedPurpose, isFieldPurpose } from './forms/purpose';
-export { checkedForAnyone } from './forms/anyone';
+export { assignmentAfter, checkedForAnyone } from './forms/anyone';
 export type {
   BaseVersionInfo,
   DigestAlgorithm,
