@@ -1,5 +1,7 @@
 # @embedpdf/plugin-link
 
+## 3.5.0
+
 ## 3.4.0
 
 ## 3.3.0

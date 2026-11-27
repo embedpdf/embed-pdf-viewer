@@ -1,5 +1,40 @@
 # @embedpdf/engine-core
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field can be one anyone fills in: `FormField.forAnyone`, and `forAnyone` in a `FormFieldDraft` and a `FormFieldPatch`. Every user who may fill in some field may fill in such a field, whatever group their permission names; a user who may fill in no field still can't, and a group's permission still doesn't reach the sender's fields (a field in no group that isn't `forAnyone`).
+  - **The checks.** `checkFieldAction()`, `allowsFieldWrite()` and `authorizeFieldWrite()` take the field itself (a `FieldAssignment`: `{ groupId, forAnyone? }`, which a `FormField` is) beside its group id alone, and `DocumentSecurityService.allowsField('fill' | 'sign', field)` takes a `FieldAssignment`. A field that is `forAnyone` takes any fill right: `doc.forms.fill`, `fields:fill:all` or a `fields:fill:group=…`.
+  - **Marking one** takes `fields:set-group:all`, since it reaches every group: `authorizeForAnyone()`. `false` takes no right of its own. `fieldRights().setGroup` is `{ all: true }` exactly when a user may mark one.
+  - **What a field can't be.** A field in a group is never also `forAnyone`, and a signature field never is: `checkedForAnyone()` refuses both with `InvalidArg` (`details.field: 'forAnyone'`), as the engine does. To move a field between a group and `forAnyone`, name both in one update.
+  - **Prediction.** `formFieldOfDraft()` and `formFieldAfter()` give `forAnyone` as the engine reads it back.
+  - **The wire.** `FormFieldDTOSchema` reads a field of a server older tha `forAnyone` as `forAnyone: false`, and `completeFormBundle()` does the same for a bundle kept from before it. `ANYONE_FIELDS_SINCE` (`'3.5'`) is the version it arrives in on the wire.
+  - **Conformance.** `runAnyoneFieldsConformance()` and its fixture `ANYONE_FIELDS_PDF` hold both engines to the rule, the lock included.
+
+  A field built by hand as a `FormField` (a test fixture) needs `forAnyone`.
+
+- [#1162](https://github.com/embedpdf/embed-pdf-viewer/pull/1162) by [@bobsingor](https://github.com/bobsingor) – Deprecate `FormField.filledBy`, `filledByName` and `filledAt`: they always read `null`, because a fill no longer records who filled a field in. A fill writes only the value and its drawing, as every PDF app does, so a signature made before it stays valid. `FormValuesImportOptions.attribution` is deprecated too and has no effect. All four go in 4.0. `runFormAttributionConformance` takes a `sign` option, for an engine whose server judges a completion's CMS.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – A push button can hold an image, as Acrobat's image field does: `doc.forms.setButtonImage(field, image | null)` puts a PNG, a JPEG or a one-page PDF in every widget of the field, or takes it out. The image is one part of the button's look, which is drawn from the image, the caption and the layout.
+  - **`layout` on a widget** (`WidgetLayout`): where a push button's widget shows its caption and its image (`/MK /TP`): `'caption'`, `'image'`, `'caption-below'`, `'caption-above'`, `'caption-right'`, `'caption-left'` or `'caption-over'`. All seven read from the file, and a placement (`create()`, `addWidget()`) and `updateWidget()` write any of them. Every other widget reads `null` and refuses one; a push button's widget always has one, so `null` is refused there.
+  - **`hasImage` on a push button** (`PushButtonField`): whether one of its widgets has an icon (`/MK /I`), one `setButtonImage()` put in or another app made.
+  - **`doc.forms.setButtonImage()`** is filling in: it takes `doc.forms.fill`, or `fields:fill` for the field's group (any signer's, for a field anyone fills in), and a field a signature locked refuses it with `ProtectedDocument`. A signing that names no lock locks a field anyone fills in once it holds an image, as it does one that holds text. It is one change with one undo step, the op `forms.setButtonImage` of `doc.apply` (`{ field, image }`), and emits `forms.updated`. Each widget shows the image as its `layout` says, which is left as it is.
+  - **A place added later gets the image:** `addWidget()` on a push button that holds one gives the new widget the same image, as a text field's new widget shows its value. It shows it as the placement's `layout` says; without `layout: 'image'` the new place keeps the image and shows its caption.
+  - **The image is stored once**, however many push buttons, signature fields and stamps show it. A copy with its values (`doc.forms.copy()`) keeps a push button's image, and a form bundle carries it as the widget's `image` resource, once. A field marked `noExport` exports without it (`hasImage: false`, no resource), as without its value.
+  - **Signatures: an image is filling in.** `doc.signatures.analyze()` counts a push button's image as filling in, as Acrobat does: putting one in or taking it out (a change of `/MK /I` and nothing else in `/MK`, and the drawing under it) is `permitted` after an approval signature and after a certification that allows form filling. A field a signature locked stays `forbidden`, and so does a change to a button's caption, colors or layout under such a certification.
+  - **Reading an older side:** a field or a bundle without `hasImage` reads `false`, and a widget row without `layout` reads `'caption'` for a push button's and `null` for any other (`WidgetDTOSchema`, `FormFieldDTOSchema`, `completeFormBundle()`). `BUTTON_IMAGE_AND_LAYOUT_SINCE` (`'3.5'`) is the version both arrive in on the wire, and `forms.setButtonImage` is a change kind of that version. On the wire the op names its image's part as `resources: { image }` (`ButtonImageResourceKeysSchema`).
+
+### Patch Changes
+
+- [#1161](https://github.com/embedpdf/embed-pdf-viewer/pull/1161) by [@bobsingor](https://github.com/bobsingor) – A new look on a signature field that nobody signed no longer reads as a forbidden change.
+
+  A mark drawn into such a field (`forms.setSignatureAppearance()`) and saved after someone else signed made `analyze()` and `validateSignatures()` read that earlier signature as `forbidden`: "is referenced from object N at AP/N and no rule explains it". Acrobat keeps the signature valid: after an approval signature it reports the document as not modified, and after a certification that allows form filling (`permission: 2`) it reports a permitted change. The engine now reads it as `permitted`, with the rule `signature-appearance`, when the field and its widgets change their `/AP` and nothing else and everything the new appearance draws with is new.
+
+  A new look on a signed field stays `forbidden`: it replaces the look the signature was made with. Acrobat doesn't report that change. When an unsigned signature field changes more than its appearance, the analysis now names the keys that changed instead of every reference to the field.
+
+  `SIGNATURE_POLICY_VERSION` is 6, so analyses cached on the cloud are computed again.
+
 ## 3.4.0
 
 ### Minor Changes

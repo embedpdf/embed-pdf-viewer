@@ -1,5 +1,31 @@
 # @embedpdf/engine
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field can be one anyone fills in: `doc.forms.create({ …, forAnyone: true })` and `doc.forms.update(ref, { forAnyone })`, and every read returns `field.forAnyone`. Every signer may fill in such a field, whatever group their permission names, and `doc.security.allowsField('fill', field)` answers for it.
+
+  ```ts
+  await doc.forms.create({
+    kind: 'text',
+    name: 'delivery.date',
+    forAnyone: true,
+    widgets,
+  });
+  await doc.forms.update(field.ref, { groupId: null, forAnyone: true }); // from a group
+  ```
+
+  A signature without a `lock` of its own locks every such field that holds a value at that signing, beside the rest of the signer's group; one still empty stays open for the next signer. Marking a field takes `fields:set-group:all`. A field in a group and a signature field are never `forAnyone`: both fail with `InvalidArg`. A document in which no field is marked behaves as before.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.setButtonImage(field, image | null)` puts a PNG, a JPEG or a one-page PDF in every widget of a push button, or takes it out: an image field, as Acrobat makes one. A push button reads `hasImage`, and its widgets a `layout` (`'caption'`, `'image'`, `'caption-below'` and four more) that a create and `updateWidget()` write. It is filling in, one change with one undo step (the op `forms.setButtonImage`): a field anyone fills in takes any signer's image, and a signing locks it once it holds one. A field marked `noExport` exports without its image. A widget added later with `addWidget()` gets the field's image too, shown as its `layout` says. The change analysis counts the image as filling in, as Acrobat does: after an approval signature or a certification for form filling, `analyze()` reads it as `permitted`.
+
+  A picture shown in many places is stored once: a mark in ten signature fields now saves as one image, as ten stamps already did.
+
+### Patch Changes
+
+- [#1162](https://github.com/embedpdf/embed-pdf-viewer/pull/1162) by [@bobsingor](https://github.com/bobsingor) – Fill in a field, or draw a mark into a signature field and sign it, after another signature, and that signature now stays valid in Acrobat and in `analyze()`. A fill records nobody now, so `importValues()` needs only what a fill needs, no longer `doc.forms.import`.
+
 ## 3.4.0
 
 ### Minor Changes

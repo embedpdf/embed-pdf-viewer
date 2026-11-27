@@ -1,5 +1,13 @@
 # @cloudpdf/sdk
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field that anyone fills in: `FormField` has `forAnyone`, and `FormFieldDraft` and `FormFieldPatch` take it. It needs a server of version 3.5: an older one refuses a draft or a patch that names it.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – A push button's image and a widget's layout: `WidgetAnnotation`, `WidgetPlacement` and `WidgetPatch` have `layout` (`'caption'`, `'image'`, `'caption-below'`, `'caption-above'`, `'caption-right'`, `'caption-left'`, `'caption-over'`, or `null` for a widget that isn't a push button's), a push button's `FormField` has `hasImage`, and `ChangeOp` has `forms.setButtonImage` (`{ field, resources: { image } }`, the image's part key or `null`). They need a server of version 3.5.
+
 ## 3.4.0
 
 ### Minor Changes

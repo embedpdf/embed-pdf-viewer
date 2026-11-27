@@ -1,5 +1,19 @@
 # @cloudpdf/contract
 
+## 3.5.0
+
+### Minor Changes
+
+- [#1163](https://github.com/embedpdf/embed-pdf-viewer/pull/1163) by [@bobsingor](https://github.com/bobsingor) – A form field that anyone fills in. `FormField` has `forAnyone` (a boolean), and `FormFieldDraft` and `FormFieldPatch` take it; the `forms.create` and `forms.update` ops of `doc.changes` carry it the same way. It arrives in 3.5: a server older than that refuses a draft or a patch that names it with `InvalidArg`, so a client sends it only to a server that has it.
+
+- [#1165](https://github.com/embedpdf/embed-pdf-viewer/pull/1165) by [@bobsingor](https://github.com/bobsingor) – A push button's image and a widget's layout.
+  - `WidgetAnnotation` has `layout`: `'caption'`, `'image'`, `'caption-below'`, `'caption-above'`, `'caption-right'`, `'caption-left'` or `'caption-over'` for a push button's widget, `null` for any other. `WidgetPlacement` and `WidgetPatch` take it.
+  - A push button's `FormField` has `hasImage`.
+  - `doc.changes` has the op `forms.setButtonImage`: `{ field, resources: { image } }`, the image's part key (a PNG, a JPEG or a one-page PDF), or `null` to take it out. Its item is the field as it is now, with its widgets.
+  - A form bundle's widget names a push button's image as its `image` resource.
+
+  All of it arrives in 3.5. A server older than that refuses a placement or a patch that names `layout`, and the op `forms.setButtonImage`, so a client sends them only to a server that has them.
+
 ## 3.4.0
 
 ### Minor Changes
