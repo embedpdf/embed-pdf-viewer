@@ -24,7 +24,7 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormMutator } from './FormMutator';
 import { createPlannedFields } from './internal/createPlannedFields';
-import { restoreFieldCreation, restoreFieldFill } from './internal/fieldAttribution';
+import { restoreFieldCreation } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
 import { readFieldAt } from './internal/readFormSnapshot';
 import { readFieldLocks } from './internal/signatureLocks';
@@ -116,15 +116,12 @@ export class FormImporter {
         actor: request.actor,
         groupOf: request.groupOf,
         signal,
-        // Who made and filled each field, as the bundle has it.
+        // Who made each field, as the bundle has it. Who filled it in
+        // travels nowhere: a fill records nobody.
         made: (objectNumber, at) => {
           if (!restores) return;
-          const planned = plan.creates[at]!;
-          const source = bundle.fields[planned.field]!.data;
+          const source = bundle.fields[plan.creates[at]!.field]!.data;
           restoreFieldCreation(this.runtime, docPtr, objectNumber, source, importedBy);
-          if (planned.value) {
-            restoreFieldFill(this.runtime, docPtr, objectNumber, source, importedBy);
-          }
         },
       },
     );
@@ -178,36 +175,17 @@ export class FormImporter {
     };
   }
 
-  /**
-   * One write of a values import: the value, then, for `'restore'`, who
-   * filled it in as the bundle has it. `'stamp'` leaves the session as the
-   * filler, as `setValue` stamps it.
-   */
+  /** One write of a values import: the value, as `setValue` writes it. */
   writeValue(
     write: PlannedValueWrite<FormField<PdfCoordinates>>,
-    bundle: WireFormBundle,
-    attribution: 'restore' | 'stamp',
-    actor: AnnotationActor,
     signal: AbortSignal,
   ): FormField<PdfCoordinates> {
     new FormMutator(this.runtime, this.session, this.fonts).setValue(
       write.target.ref,
       write.value,
       signal,
-      actor,
     );
-    const objectNumber = objectNumberOf(write.target.ref);
-    if (attribution === 'restore') {
-      restoreFieldFill(
-        this.runtime,
-        this.session.requireDocPtr(),
-        objectNumber,
-        bundle.fields[write.field]!.data,
-        actor.userId ?? null,
-      );
-      this.session.invalidateDerived();
-    }
-    return this.readField(objectNumber);
+    return this.readField(objectNumberOf(write.target.ref));
   }
 
   /** The full name of every field of the form. */

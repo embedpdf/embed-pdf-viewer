@@ -63,9 +63,7 @@ import {
   type OrderChange,
 } from './internal/calculationOrder';
 import {
-  clearFieldFill,
   stampFieldCreation,
-  stampFieldFill,
   writeFieldGroup,
   writeFieldPurpose,
 } from './internal/fieldAttribution';
@@ -131,16 +129,15 @@ export class FormMutator {
   ) {}
 
   /**
-   * Set a field's value, as `actor` filled it in: what engine-core's rules
-   * (`fieldAfterValue`) leave the field holding. A write that changes the
-   * field names who filled it in; one that leaves it as it was writes
-   * nothing.
+   * Set a field's value: what engine-core's rules (`fieldAfterValue`) leave
+   * the field holding. The value and its drawing are all it writes, as every
+   * PDF app does, so a signature made before it keeps its verdict; one that
+   * leaves the field as it was writes nothing.
    */
   setValue(
     ref: FormFieldRef,
     value: FormFieldValue,
     signal: AbortSignal,
-    actor: AnnotationActor,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
@@ -151,7 +148,6 @@ export class FormMutator {
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
     const after = fieldAfterValue({ field: before, widgets: [] }, value).field;
     const changed = this.writeFieldAfter(resolved.fieldObjectNumber, before, after);
-    if (changed) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
     return this.readBack(resolved.fieldObjectNumber, changed ?? []);
   }
 
@@ -248,7 +244,6 @@ export class FormMutator {
     signal: AbortSignal,
   ): FieldWriteResult<FormResetResult<PdfCoordinates>> {
     throwIfAborted(signal);
-    const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const targets =
       refs === undefined ? this.wholeFormTargets(model) : this.namedTargets(model, refs);
@@ -261,10 +256,7 @@ export class FormMutator {
       .flatMap((before) => {
         const after = fieldAfterReset({ field: before, widgets: [] }).field;
         const changed = this.writeFieldAfter(fieldObjectNumberOf(before), before, after);
-        if (!changed) return [];
-        // Back at its default, the value was filled in by nobody.
-        clearFieldFill(this.runtime, docPtr, fieldObjectNumberOf(before));
-        return [{ before, changed }];
+        return changed ? [{ before, changed }] : [];
       });
     if (written.length > 0) this.session.invalidateDerived();
 
@@ -592,7 +584,7 @@ export class FormMutator {
     }
     for (const widget of before.widgets) {
       if (mark === null) clearWidgetMark(this.runtime, docPtr, widget);
-      else bakeWidgetAppearance(this.runtime, docPtr, widget, mark, { recordFit: true });
+      else bakeWidgetAppearance(this.runtime, docPtr, widget, mark);
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };

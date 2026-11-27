@@ -563,11 +563,12 @@ export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
 /**
  * `forms.importValues`: a bundle's values, filled into the fields of the
  * same name (see `FormImporter.planValues`). Each field's reverse puts back
- * its value and who filled it, as a `setValue`'s does.
+ * its value, as a `setValue`'s does. A fill records nobody, so the import
+ * restores no one and takes no `doc.forms.import`, whatever `attribution`
+ * says.
  */
 export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
   authorizeSomeFill(ctx);
-  const rights = importRights(ctx, op);
   const importer = new FormImporter(ctx.runtime, ctx.session, ctx.fonts);
   const plan = importer.planValues(op.bundle, op.limits, ctx.signal, (field) =>
     allowsFieldWrite(ctx.authority, field.groupId, 'fill'),
@@ -577,7 +578,7 @@ export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
   for (const write of plan.writes) {
     const before = { objectNumber: numberOf(write.target.ref), field: write.target };
     const pending = captureBefore(ctx.runtime, ctx.session, objectsOf(before));
-    const field = importer.writeValue(write, op.bundle, op.attribution, op.actor ?? {}, ctx.signal);
+    const field = importer.writeValue(write, ctx.signal);
     const objects = captureAfter(ctx.runtime, ctx.session, pending);
     fields.push(field);
     reverse.push({
@@ -592,7 +593,6 @@ export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
           },
         ],
       },
-      ...(rights ? { rights } : {}),
     });
   }
   return {
@@ -950,7 +950,6 @@ function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue
     ref,
     value,
     ctx.signal,
-    ctx.authority.identity,
   );
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   const item: ChangeItem<PdfCoordinates> = { type: 'forms.setValue', ...rows(ctx, result) };

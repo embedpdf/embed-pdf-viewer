@@ -254,9 +254,7 @@ export class SignatureMutator {
       }
       const mark = signatureAppearanceBytes(input.appearance ?? null);
       if (mark && field?.widget) {
-        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark, {
-          recordFit: false,
-        });
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark);
       }
 
       const store = this.storeFor();

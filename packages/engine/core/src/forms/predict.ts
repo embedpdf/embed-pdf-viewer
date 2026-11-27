@@ -6,7 +6,7 @@
  * checks every op on both engines).
  *
  * What these can't know is left as it was, and a read after the write tells:
- * dates and who filled a field in, the fonts a document's own default
+ * dates and who created a field, the fonts a document's own default
  * appearance names, and a `/V` an ancestor field holds (a cleared value then
  * reads as an empty string, not as none). Scripts written through `actions`
  * are left to that read too, with the format they give the field; a `format`

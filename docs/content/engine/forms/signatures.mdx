@@ -685,6 +685,10 @@ The mark is a PNG, a JPEG or a one-page PDF, as [`appearance`](#options) is when
 widgets read `hasMark: true`, and their style can't change (see
 [Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
 
+The mark is a drawing and nothing more: the engine writes nothing else into the field, and reads
+`hasMark` from the drawing itself. So signing the field later, with this mark or another, leaves
+every signature made before it as it was.
+
 To take the mark out again, pass `null`:
 
 ```ts
@@ -1011,6 +1015,9 @@ console.log(analysis.verdict);
 With `'forbidden'`, the signature itself still checks out, but PDF apps such as Acrobat report
 that the document was changed after signing. For what `since` and `until` take, see
 [Analyzing in detail](#analyzing-in-detail).
+
+A fill writes only the field's value and its drawing, so filling in a field that a signature
+didn't [lock](#lock-fields) reads `'permitted'` for that signature, whoever fills it in.
 
 ## Events
 

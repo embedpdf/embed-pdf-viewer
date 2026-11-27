@@ -10,7 +10,6 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 
 import { CloseStack } from '../../../document-session/lifecycle/PdfDocumentOpener';
 import { withAppearanceDocument } from '../../annotations/internal/appearanceDocument';
-import { readAppearanceFit, writeAppearanceFit } from '../../annotations/internal/appearanceFit';
 
 /** `EPDF_STAMP_FIT_CONTAIN`: uniform scale, letterboxed and centred in the rect. */
 const FIT_CONTAIN = 0;
@@ -30,18 +29,17 @@ const FIT_CONTAIN = 0;
  * into the widget's rect. Without the second call the page sits in its own
  * box and the viewer's BBox→/Rect mapping stretches it to the rect's aspect.
  *
- * `recordFit`, for a mark drawn in without signing, records the fit as a
- * stamp records its own: the widget then reads as having a mark in it
- * (`hasMark`), which its style never draws over. A signature's mark needs
- * no record (the field's value says it's signed), and a signing changes no
- * other key of its widget.
+ * The drawing is all a mark writes: the widget reads as having one
+ * (`hasMark`) because its appearance is our wrapper (`EPDFAnnot_GetDrawing`),
+ * and nothing of ours goes into the widget's dictionary. A signature made
+ * before seals that dictionary, and Acrobat reads a change to it as the
+ * document altered; a new appearance it doesn't count as a change at all.
  */
 export function bakeWidgetAppearance(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
   widget: FormWidget,
   mark: SignatureAppearanceBytes,
-  { recordFit }: { recordFit: boolean },
 ): void {
   const { mem, fn } = runtime;
   const { bytes } = mark;
@@ -74,22 +72,22 @@ export function bakeWidgetAppearance(
         'the appearance page could not be fitted into the widget',
       );
     }
-    if (recordFit) writeAppearanceFit(fn, mem, annotPtr, 'contain');
   });
 }
 
 /**
- * Take a mark that was drawn in without signing out of a widget: its fit
- * record goes, so the widget reads as having no mark (`hasMark`), and the
- * widget draws its field's box again, in its style, in place of the mark.
- * A widget that records no mark is left as it is: what it shows isn't a
- * mark of ours to take out.
+ * Take a mark that was drawn in without signing out of a widget: the widget
+ * draws its field's box again, in its style, in place of the mark, and then
+ * reads as having no mark (`hasMark`). A widget whose appearance isn't our
+ * wrapper is left as it is: what it shows isn't a mark of ours to take out.
+ * The `/EMBD_Metadata/AppearanceFit` an older version wrote beside a mark is
+ * left too: nothing reads it, and taking it out would change the widget's
+ * dictionary.
  */
 export function clearWidgetMark(runtime: PdfRuntimeModule, docPtr: Ptr, widget: FormWidget): void {
-  const { mem, fn } = runtime;
+  const { fn } = runtime;
   withWidgetAnnotation(runtime, docPtr, widget, (annotPtr) => {
-    if (readAppearanceFit(fn, mem, annotPtr) === null) return;
-    writeAppearanceFit(fn, mem, annotPtr, null);
+    if (fn.EPDFAnnot_GetDrawing(annotPtr) === 0) return;
     if (!fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)) {
       throw new EngineError(
         EngineErrorCode.Unknown,
