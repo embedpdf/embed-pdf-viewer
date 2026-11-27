@@ -89,6 +89,7 @@ import type {
   WidgetDeleteStep,
   WidgetRestoreStep,
 } from '../ChangeRecord';
+import { fieldLocksOf } from '../../forms/internal/signatureLocks';
 
 type Op<T extends ChangeOp['type']> = Extract<
   ChangeOp<PdfCoordinates, WireAnnotationResources>,
@@ -1220,7 +1221,13 @@ interface ReadField {
 function readField(ctx: ChangeContext, ref: FormFieldRef): ReadField {
   const model = acquireFormModel(ctx.runtime, ctx.session);
   const resolved = resolveFieldRef(ctx.runtime, model, ref);
-  const field = readFieldAt(ctx.runtime, model, resolved.fieldIndex, ctx.session.requireDocPtr());
+  const field = readFieldAt(
+    ctx.runtime,
+    model,
+    resolved.fieldIndex,
+    ctx.session.requireDocPtr(),
+    fieldLocksOf(ctx.runtime, ctx.session),
+  );
   return { objectNumber: resolved.fieldObjectNumber, field };
 }
 
@@ -1272,7 +1279,13 @@ function allFields(ctx: ChangeContext): ReadField[] {
   const count = ctx.runtime.fn.EPDFForm_CountFields(model);
   const fields: ReadField[] = [];
   for (let index = 0; index < count; index++) {
-    const field = readFieldAt(ctx.runtime, model, index, ctx.session.requireDocPtr());
+    const field = readFieldAt(
+      ctx.runtime,
+      model,
+      index,
+      ctx.session.requireDocPtr(),
+      fieldLocksOf(ctx.runtime, ctx.session),
+    );
     if (field.ref.kind === 'objectNumber')
       fields.push({ objectNumber: field.ref.objectNumber, field });
   }

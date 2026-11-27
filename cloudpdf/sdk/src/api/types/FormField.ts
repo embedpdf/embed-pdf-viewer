@@ -31,6 +31,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -72,6 +73,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -119,6 +121,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -167,6 +170,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -215,6 +219,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -262,6 +267,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -296,6 +302,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;
@@ -329,6 +336,7 @@ export namespace FormField {
         actions?: CloudPDF.PdfFieldActions | undefined;
         groupId: string | null;
         assignment: CloudPDF.FieldAssignment;
+        lockedBy: CloudPDF.FieldSignatureLock | null;
         purpose: string | null;
         createdBy: string | null;
         createdAt: string | null;

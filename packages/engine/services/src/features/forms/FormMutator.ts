@@ -52,7 +52,7 @@ import { fontWriteContext, type FontRegistrar } from '../fonts';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
-import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
+import { assertFieldNotLocked, fieldLocksOf, readFieldLocks } from './internal/signatureLocks';
 import { formMutationMeta, redrawnByValue } from './internal/formMutationMeta';
 import { bakeWidgetAppearance, clearWidgetMark } from '../signature/internal/appearance';
 import { readWidgetIcon, setWidgetIcon } from './internal/buttonImage';
@@ -153,7 +153,13 @@ export class FormMutator {
     this.assertWritable(resolved);
 
     const docPtr = this.session.requireDocPtr();
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      docPtr,
+      fieldLocksOf(this.runtime, this.session),
+    );
     const after = fieldAfterValue({ field: before, widgets: [] }, value).field;
     const changed = this.writeFieldAfter(resolved.fieldObjectNumber, before, after);
     return this.readBack(resolved.fieldObjectNumber, changed ?? []);
@@ -207,7 +213,13 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const docPtr = this.session.requireDocPtr();
-    const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const field = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      docPtr,
+      fieldLocksOf(this.runtime, this.session),
+    );
     if (field.kind !== 'text' && field.kind !== 'combobox') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -300,7 +312,13 @@ export class FormMutator {
     const targets: FormField<PdfCoordinates>[] = [];
     const count = this.runtime.fn.EPDFForm_CountFields(model);
     for (let index = 0; index < count; index++) {
-      const field = readFieldAt(this.runtime, model, index, docPtr);
+      const field = readFieldAt(
+        this.runtime,
+        model,
+        index,
+        docPtr,
+        fieldLocksOf(this.runtime, this.session),
+      );
       if (!VALUE_FAMILIES.has(field.kind) || field.ref.kind !== 'objectNumber') continue;
       if (locks?.(field.name)) continue;
       targets.push(field);
@@ -315,7 +333,13 @@ export class FormMutator {
     const targets: FormField<PdfCoordinates>[] = [];
     for (const ref of refs) {
       const resolved = resolveFieldRef(this.runtime, model, ref);
-      const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+      const field = readFieldAt(
+        this.runtime,
+        model,
+        resolved.fieldIndex,
+        docPtr,
+        fieldLocksOf(this.runtime, this.session),
+      );
       if (!VALUE_FAMILIES.has(field.kind) || seen.has(resolved.fieldObjectNumber)) continue;
       this.assertWritable(resolved);
       seen.add(resolved.fieldObjectNumber);
@@ -567,7 +591,13 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      docPtr,
+      fieldLocksOf(this.runtime, this.session),
+    );
     if (before.kind !== 'signature') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -624,7 +654,13 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      docPtr,
+      fieldLocksOf(this.runtime, this.session),
+    );
     if (before.kind !== 'pushbutton') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -668,6 +704,7 @@ export class FormMutator {
       model,
       resolved.fieldIndex,
       this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
     );
     assertPatchFitsFamily(patch, before.kind);
     // Who fills the field in: `assignment`, or the `groupId` shorthand, from any assignment.
@@ -846,6 +883,7 @@ export class FormMutator {
       model,
       resolved.fieldIndex,
       this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
     );
     const removedWidgets = before.widgets.map((w) => formWidget(w.objectNumber, w.page));
 
@@ -898,7 +936,13 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      docPtr,
+      fieldLocksOf(this.runtime, this.session),
+    );
     const fitted = placedWidgetOf(fitWidgetToFamily(before.kind, placement));
     const pageIndex = this.preflightPlacement(fitted);
     const onState = onStateOf(before.kind, fitted);
@@ -1047,7 +1091,13 @@ export class FormMutator {
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    return readFieldAt(this.runtime, fresh, fieldIndex, this.session.requireDocPtr());
+    return readFieldAt(
+      this.runtime,
+      fresh,
+      fieldIndex,
+      this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
+    );
   }
 
   private assertWritable(resolved: ResolvedField): void {
@@ -1173,6 +1223,7 @@ export class FormMutator {
       fresh,
       fieldIndex,
       this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
     );
     const changedSet = new Set(changedObjNums);
     const changedWidgets: FormWidget[] = field.widgets

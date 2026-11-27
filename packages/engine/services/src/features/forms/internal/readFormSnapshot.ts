@@ -14,6 +14,7 @@ import type {
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
 import {
+  fieldSignatureLockOf,
   formatOfActions,
   formWidget,
   groupIdOfAssignment,
@@ -25,6 +26,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 import { PageIndexLookup, readButtonHasImage } from './buttonImage';
+import type { FieldLockLookup } from './signatureLocks';
 import { readFieldAssignment, readFieldAttribution, readFieldPurpose } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -136,12 +138,16 @@ function readOptions(runtime: PdfRuntimeModule, model: Ptr, fieldIndex: number):
   return options;
 }
 
-/** Read one field of the native model into its per-kind DTO. */
+/**
+ * Read one field of the native model into its per-kind DTO. `locks` says
+ * which signature locked it (`fieldLocksOf`), `null` where none is known.
+ */
 export function readFieldAt(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
   docPtr: Ptr,
+  locks: FieldLockLookup | null,
   actionBudget = new ActionReadBudgetTracker(),
   pages = new PageIndexLookup(runtime, docPtr),
 ): FormField<PdfCoordinates> {
@@ -179,6 +185,7 @@ export function readFieldAt(
     ...(actions ? { actions } : {}),
     groupId: groupIdOfAssignment(assignment),
     assignment,
+    lockedBy: fieldSignatureLockOf(locks?.(name) ?? null),
     purpose: readFieldPurpose(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
     // Deprecated: a fill records nobody (see fieldAttribution.ts).
@@ -287,6 +294,7 @@ export function readFormFields(
   runtime: PdfRuntimeModule,
   model: Ptr,
   docPtr: Ptr,
+  locks: FieldLockLookup | null,
 ): Omit<FormSnapshot<PdfCoordinates>, 'widgets'> {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
@@ -294,7 +302,7 @@ export function readFormFields(
   const actionBudget = new ActionReadBudgetTracker();
   const pages = new PageIndexLookup(runtime, docPtr);
   for (let i = 0; i < count; i++) {
-    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget, pages));
+    fields.push(readFieldAt(runtime, model, i, docPtr, locks, actionBudget, pages));
   }
   const calculationOrder: FormSnapshot<PdfCoordinates>['calculationOrder'] = [];
   const calculationCount = fn.EPDFForm_CountCalculationOrder(model);

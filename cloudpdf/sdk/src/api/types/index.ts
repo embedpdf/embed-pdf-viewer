@@ -103,6 +103,7 @@ export * from "./FieldAssignment.js";
 export * from "./FieldLockSpec.js";
 export * from "./FieldPosition.js";
 export * from "./FieldScriptWrite.js";
+export * from "./FieldSignatureLock.js";
 export * from "./FoldersCreateResponse.js";
 export * from "./FoldersGetResponse.js";
 export * from "./FoldersListResponse.js";

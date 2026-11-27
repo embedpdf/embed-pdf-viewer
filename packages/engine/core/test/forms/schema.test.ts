@@ -20,6 +20,7 @@ const BASE = {
   mappingName: null,
   groupId: null,
   assignment: { kind: 'unassigned' },
+  lockedBy: null,
   purpose: null,
   createdBy: null,
   createdAt: null,
@@ -181,6 +182,11 @@ describe('form schemas', () => {
     });
     const anyone = { ...RADIO, assignment: { kind: 'anyone' } };
     expect(FormFieldDTOSchema.parse(anyone)).toEqual(anyone);
+    // Nor a lock: a field from before `lockedBy` reads as locked by nothing.
+    const { lockedBy: _lockedBy, ...unlocked } = RADIO as unknown as Record<string, unknown>;
+    expect(FormFieldDTOSchema.parse(unlocked)).toEqual(RADIO);
+    const locked = { ...RADIO, lockedBy: { signatureIndex: 1, source: 'lock' } };
+    expect(FormFieldDTOSchema.parse(locked)).toEqual(locked);
     // Closed: an assignment this client doesn't know is no field it can read.
     const unknown = { ...RADIO, assignment: { kind: 'everyone' } };
     expect(FormFieldDTOSchema.safeParse(unknown).success).toBe(false);

@@ -23,6 +23,7 @@ import { collectPageAnnotations } from '../../annotations/internal/read/collectP
 import type { FontRegistrar } from '../../fonts/FontRegistrar';
 import { acquireFormModel } from './formModelCache';
 import { readFormFields } from './readFormSnapshot';
+import { fieldLocksOf } from './signatureLocks';
 
 /**
  * The whole form, as `doc.forms.list()` returns it: the fields from the
@@ -39,6 +40,7 @@ export function readForm(
     runtime,
     model,
     session.requireDocPtr(),
+    fieldLocksOf(runtime, session),
   );
   const widgets = readFormWidgets(runtime, session, signal, fonts);
   return { formKind, needsAppearances, fields, widgets, calculationOrder };

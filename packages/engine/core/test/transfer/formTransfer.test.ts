@@ -52,6 +52,7 @@ function textField(
     valueEntry: { kind: 'scalar', value: `${name} value` },
     defaultValueEntry: { kind: 'none' },
     assignment: { kind: 'unassigned' },
+    lockedBy: null,
     purpose: null,
     createdBy: 'alice',
     createdAt: '2026-10-08T10:42:00Z',

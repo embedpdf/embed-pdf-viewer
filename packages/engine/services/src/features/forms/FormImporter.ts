@@ -32,7 +32,7 @@ import {
 import { restoreFieldCreation } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
 import { readFieldAt } from './internal/readFormSnapshot';
-import { readFieldLocks } from './internal/signatureLocks';
+import { fieldLocksOf, readFieldLocks } from './internal/signatureLocks';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { readUtf16String } from '../../runtime/memory/strings';
 import { throwIfAborted } from '../../shared/abort';
@@ -231,14 +231,20 @@ export class FormImporter {
     const docPtr = this.session.requireDocPtr();
     const count = this.runtime.fn.EPDFForm_CountFields(model);
     return Array.from({ length: count }, (_, index) =>
-      readFieldAt(this.runtime, model, index, docPtr),
+      readFieldAt(this.runtime, model, index, docPtr, fieldLocksOf(this.runtime, this.session)),
     );
   }
 
   private readField(objectNumber: number): FormField<PdfCoordinates> {
     const model = acquireFormModel(this.runtime, this.session);
     const index = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, objectNumber);
-    return readFieldAt(this.runtime, model, index, this.session.requireDocPtr());
+    return readFieldAt(
+      this.runtime,
+      model,
+      index,
+      this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
+    );
   }
 }
 

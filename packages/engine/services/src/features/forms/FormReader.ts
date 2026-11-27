@@ -13,6 +13,7 @@ import { readFieldAt } from './internal/readFormSnapshot';
 import { resolveFieldRef } from './internal/resolveFieldRef';
 import { readForm } from './internal/widgetRows';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
+import { fieldLocksOf } from './internal/signatureLocks';
 
 /**
  * Read side of the forms feature. Field reads go through the session's
@@ -36,6 +37,12 @@ export class FormReader {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const { fieldIndex } = resolveFieldRef(this.runtime, model, ref);
-    return readFieldAt(this.runtime, model, fieldIndex, this.session.requireDocPtr());
+    return readFieldAt(
+      this.runtime,
+      model,
+      fieldIndex,
+      this.session.requireDocPtr(),
+      fieldLocksOf(this.runtime, this.session),
+    );
   }
 }

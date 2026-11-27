@@ -42,6 +42,7 @@ Every field has these:
 | `groupId`       | The group the field belongs to, such as `'buyer'`, or `null`. See [Signers and groups](/docs/engine/forms/groups).                  |
 | `purpose`       | What the value means, such as `'email'`, or `null`. See [Purpose](/docs/engine/forms/authoring#purpose).                            |
 | `assignment`    | Who fills it in: one group, anyone, or no one in particular. See [Who fills a field in](/docs/engine/forms/groups#who-fills-a-field-in). |
+| `lockedBy`      | The signature that locked it, `{ signatureIndex, source }`, or `null`. See [Lock fields](/docs/engine/forms/signatures#lock-fields). |
 | `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                                                       |
 
 A document without a form returns an empty `fields`. The list's `formKind` says what the document

@@ -5,6 +5,8 @@ export {
   deriveProtection,
   describeProtection,
   fieldLockFor,
+  fieldLockRefusing,
+  fieldSignatureLockOf,
   isProtectableCapability,
   levelAllows,
   levelFromPermission,

@@ -319,7 +319,8 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
   const formModel = fn.EPDFForm_LoadModel(docPtr);
   if (formModel !== NULL_PTR) {
     try {
-      const snapshot = readFormFields(runtime, formModel, docPtr);
+      // A revision's fields, for their names and kinds: no lock is read here.
+      const snapshot = readFormFields(runtime, formModel, docPtr, null);
       // The snapshot lists the model's fields in model order.
       snapshot.fields.forEach((f, index) => {
         fields.push({

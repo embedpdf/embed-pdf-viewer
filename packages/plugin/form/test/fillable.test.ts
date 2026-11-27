@@ -33,6 +33,7 @@ const textField: FormField = {
   mappingName: null,
   groupId: null,
   assignment: { kind: 'unassigned' },
+  lockedBy: null,
   purpose: null,
   createdBy: null,
   createdAt: null,

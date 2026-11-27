@@ -247,7 +247,9 @@ export interface DocumentSecurityService {
    *     its `groupId` alone): a `fields:fill` / `fields:sign` scope for its
    *     group, or, without one, `doc.forms.fill` / `doc.sign` for every
    *     field. A field anyone fills in takes any of them, whatever group it
-   *     names;
+   *     names. A field a signed signature's lock covers (by its `name`,
+   *     `FormField.lockedBy`) takes neither: signing it is refused whatever
+   *     the policy, filling it in under `signedDocumentPolicy: 'protect'`;
    *   - `set-group` takes the destination group (`fields:set-group:` ladder;
    *     the caller's own default group is always assignable). Taking a field
    *     out of its group has no destination: it takes form design alone
@@ -259,7 +261,11 @@ export interface DocumentSecurityService {
    */
   allowsField(
     action: 'fill' | 'sign',
-    field: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+    field: {
+      readonly groupId: string | null;
+      readonly assignment?: FieldAssignment;
+      readonly name?: string;
+    },
   ): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
 

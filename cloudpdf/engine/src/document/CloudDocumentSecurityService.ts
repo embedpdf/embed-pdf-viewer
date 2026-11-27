@@ -6,6 +6,7 @@ import {
   checkPluginPermission,
   checkFieldAction,
   checkSetGroup,
+  fieldLockRefusing,
   collabTargetOf,
   permissionFlagsOf,
   type DocCapability,
@@ -206,16 +207,31 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /** Per-field form authorization mirrors: the checks the server's writes run, over the same inputs. */
   allowsField(
     action: 'fill' | 'sign',
-    field: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+    field: {
+      readonly groupId: string | null;
+      readonly assignment?: FieldAssignment;
+      readonly name?: string;
+    },
   ): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
   allowsField(
     action: 'fill' | 'sign' | 'set-group',
-    target: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+    target: {
+      readonly groupId: string | null;
+      readonly assignment?: FieldAssignment;
+      readonly name?: string;
+    },
   ): boolean {
     if (action === 'set-group') {
       const groupId = target.groupId ?? '';
       return checkSetGroup('fields', groupId, this.identity?.groupId, this.rawScope());
+    }
+    // The server enforces the document's signatures: a lock refuses a fill as a signing.
+    if (
+      target.name !== undefined &&
+      fieldLockRefusing(action, target.name, this.protection, true)
+    ) {
+      return false;
     }
     return checkFieldAction(
       action,

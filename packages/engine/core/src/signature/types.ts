@@ -160,10 +160,16 @@ export interface Signature {
   seedValue: SignatureSeedValue | null;
 }
 
-/** A lock an earlier signature established on the current bytes. */
-export interface DocumentFieldLock {
+/** Which signed signature locked a form field, and by what (`FormField.lockedBy`). */
+export interface FieldSignatureLock {
+  /** The signature whose lock covers the field: its `index` in `signatures.list()`. */
   signatureIndex: number;
+  /** `fieldmdp`: the signature's FieldMDP lock; `lock`: the `/Lock` of the field it signed. */
   source: 'fieldmdp' | 'lock';
+}
+
+/** A lock a signed signature put on the current bytes, with the fields it covers. */
+export interface DocumentFieldLock extends FieldSignatureLock {
   spec: FieldLockSpec;
 }
 

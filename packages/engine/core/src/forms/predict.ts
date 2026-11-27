@@ -237,6 +237,8 @@ export function formFieldOfDraft(
     defaultValueEntry: { kind: 'none' } as FormValueEntry,
     groupId: groupIdOfAssignment(assignment),
     assignment,
+    // The engine reads a lock that covers the new field back; prediction knows none.
+    lockedBy: null,
     purpose: checkedPurpose(draft.purpose),
     createdBy: context.createdBy ?? null,
     createdAt: context.createdAt ?? null,

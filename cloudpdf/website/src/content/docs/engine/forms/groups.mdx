@@ -239,5 +239,9 @@ unassigned field isn't, and an empty list is no field at all. A field anyone fil
 user's to fill in unless `fill` is that empty list. A user may give fields to anyone when
 `setGroup` is `{ all: true }`.
 
+The lists go by group, so they can't say that one field of a group is locked: a field a
+signature locked (`lockedBy`) is no one's to fill in or sign. Ask `allowsField()` with the field
+for that.
+
 The engine checks every write the same way, so these answers never disagree with a call. See
 [Permissions](/docs/engine/concepts/permissions#form-fields).

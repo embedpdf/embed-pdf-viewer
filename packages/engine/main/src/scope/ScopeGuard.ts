@@ -13,12 +13,14 @@ import {
   permissionFlagsOf,
   describeProtection,
   type DocCapability,
+  type DocumentFieldLock,
   type DocumentProtection,
   EngineError,
   EngineErrorCode,
   expandRawScope,
   type FieldAssignment,
   type FieldRights,
+  fieldLockRefusing,
   fieldRightsOf,
   type FieldWriteAction,
   PermissionDenied,
@@ -43,9 +45,12 @@ import type { HandleScopeContext } from './HandleScopeContext';
  */
 export class ScopeGuard {
   private protection: DocumentProtection | null;
+  /** The document's protection whatever the policy: what a signing still can't do. */
+  private documentProtection: DocumentProtection | null;
 
   constructor(private ctx: HandleScopeContext) {
     this.protection = ctx.signedDocumentPolicy === 'protect' ? ctx.protection : null;
+    this.documentProtection = ctx.protection;
   }
 
   /**
@@ -70,6 +75,17 @@ export class ScopeGuard {
    */
   setProtection(protection: DocumentProtection | null): void {
     this.protection = this.ctx.signedDocumentPolicy === 'protect' ? protection : null;
+    this.documentProtection = protection;
+  }
+
+  /**
+   * The lock an earlier signature put on field `name` that refuses `action`
+   * here, or `null` (`fieldLockRefusing`): a signing under any policy, a
+   * fill under `protect`.
+   */
+  fieldLockRefusing(action: FieldWriteAction, name: string): DocumentFieldLock | null {
+    const enforced = this.ctx.signedDocumentPolicy === 'protect';
+    return fieldLockRefusing(action, name, this.documentProtection, enforced);
   }
 
   /** Who the handle acts for, as supplied to `open()`. */
