@@ -27,7 +27,7 @@ import {
   EpdfKernelHost,
   type EmbedPdfFeature,
 } from '@embedpdf/angular/runtime';
-import { withInteraction } from '@embedpdf/angular/interaction';
+import { InteractionToken, withInteraction } from '@embedpdf/angular/interaction';
 import { withRender } from '@embedpdf/angular/render';
 import { EpdfForm, EpdfFormLayer, FormToken, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
@@ -194,6 +194,26 @@ describe('<epdf-form-layer> over fields made from code', () => {
         (node) => node.componentInstance instanceof FormPage,
       );
       expect((shell.componentInstance as FormPage).presses).toBe(0);
+
+      // Under a tool that neither fills nor designs (zoom, a stamp, a pen), the controls still
+      // show, their edges too, but the layer is inert: no pointer and no input, so the tool works
+      // over them. Back on the pointer, they take input again.
+      const interaction = kernelOf(fixture).capability(InteractionToken);
+      const agree = () =>
+        element(fixture).querySelector<HTMLElement>('[role="checkbox"][aria-label="agree"]')!;
+      expect(agree().closest('[inert]')).toBeNull();
+      interaction.activateTool('zoom');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(agree().closest('[inert]')).not.toBeNull();
+      });
+      expect(host.getLayerMode()).toBe('show');
+      expect(agree().style.boxShadow).toContain('#ea580c');
+      interaction.activateTool('pointer');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(agree().closest('[inert]')).toBeNull();
+      });
     },
   );
 });

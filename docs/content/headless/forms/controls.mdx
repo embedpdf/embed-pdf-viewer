@@ -190,6 +190,7 @@ a page, and a control gets its box as `widget`:
 | `purpose`     | What the field is for, such as `'name'`, `'email'` or `'date-signed'`, or `null`. See [What a field is for](building#what-a-field-is-for) |
 | `format`      | The shape of its value: `{ kind: 'date', pattern }`, `{ kind: 'time', pattern }`, `{ kind: 'other' }` for a format only the PDF's script knows, or `null`. Always `null` for a box that isn't a text box or a dropdown. See [Dates](../forms#dates) |
 | `placeholder` | What it shows while it's empty and `yours`, or `null`: its purpose's label, such as "Email", in the viewer's language. A text box, a dropdown, a signature field and an image field have one; a signature box with a mark drawn in it has none |
+| `placeholderAlign` | Where the placeholder sits across the box, where the value will: `'left'`, `'center'` or `'right'`. A text box and a dropdown align it as they align their text; a signature field and an image field centre it |
 | `hint`        | A sentence about it, for its tooltip and screen readers (`aria-description`), or `null`. The date of signing says "Filled in when you sign" to the person whose date it is |
 | `box`, `rotation`, `rect` | Where it is; see [Turned fields](../forms#turned-fields)                               |
 
@@ -201,9 +202,12 @@ image box `hasImage`.
 
 ### Design mode
 
-Controls fill forms in. They show while the active tool fills forms, as the layer's own do. In
-[design mode](building#design-mode) fields are boxes people select and move, drawn by the
-annotation layer, and your controls stand down with the layer's own.
+Controls fill forms in. They take input while the active tool fills forms (the `pointer` and `pan`
+tools do), as the layer's own do. In [design mode](building#design-mode) fields are boxes people
+select and move, drawn by the annotation layer, and your controls stand down with the layer's own.
+Under any other tool, such as a stamp or a pen, your controls show as the layer's own do, and like
+them take no input and no pointer: the layer makes their boxes `inert`, so the tool works over
+them.
 
 ### A field's tint
 
@@ -218,8 +222,10 @@ your own. A lent field has the same `accent` on the annotation layer in design m
 An empty field with a [purpose](building#what-a-field-is-for) shows what it's for while it's
 `yours`: a text box, a dropdown, a signature field and an image field do, since a checkbox, a
 radio button and a list have no room for it. Another person's field and a read-only one show none. A signature box with a mark drawn in it shows the mark alone, before it is signed too. The
-placeholder is part of the layer's own control, so a control that keeps `native` shows it, and one
-that draws the box alone reads `widget.placeholder` and draws its own. The
+placeholder sits where the value will: in a text box and a dropdown, where the field aligns its
+text; in a signature field and an image field, in the middle, where the mark and the picture go.
+It is part of the layer's own control, so a control that keeps `native` shows it, and one
+that draws the box alone reads `widget.placeholder` and `widget.placeholderAlign` and draws its own. The
 layer's text box also carries the browser's `autocomplete` for the purposes the web knows; your
 own control reads `widget.purpose` for that. In design mode the placeholder shows on the field
 too, so whoever builds the form sees what each field is for.

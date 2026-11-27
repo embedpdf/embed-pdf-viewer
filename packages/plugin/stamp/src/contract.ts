@@ -421,7 +421,11 @@ export interface StampCapability extends SettingsApi<StampSettings> {
    * Fires `onArmChanged`.
    */
   armAsset(assetId: string, options?: StampArmOptions): Promise<void>;
-  /** Disarm the stamp without placing it. Fires `onArmChanged` when one was armed. */
+  /**
+   * Disarm the stamp without placing it, and go back to the tool that was active before
+   * `armAsset()` (the default tool when that one is gone). Fires `onArmChanged` when one was
+   * armed.
+   */
   disarm(documentId?: string): void;
   /** The stamp the next click on the document places, or null. */
   getArmedAsset(documentId?: string): StampAsset | null;

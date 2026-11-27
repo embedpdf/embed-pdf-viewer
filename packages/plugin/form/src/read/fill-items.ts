@@ -108,6 +108,12 @@ interface FormWidgetItemBase extends WidgetPlace {
    */
   placeholder: string | null;
   /**
+   * Where the placeholder sits across the box: where the value will. A text field and a
+   * dropdown align it as they align their text (`look.textAlign`); a signature field and an
+   * image field centre it, where the mark and the picture go.
+   */
+  placeholderAlign: 'left' | 'center' | 'right';
+  /**
    * A sentence about the field for people, as its tooltip and for screen readers
    * (`aria-description`), in the viewer's language; `null` for none. The day of signing has one
    * for the person whose date it is: it is filled in when they sign.
@@ -220,6 +226,23 @@ export function placeholderOf(
 }
 
 /**
+ * Where a box's placeholder sits across it: where the value will. A field of typed text keeps
+ * its own alignment (`textAlign`, the field's `/Q`); a signature field and an image field
+ * (`imageField`) centre it, as the mark and the picture are centred. The form layer and design
+ * mode both read it; design mode passes no `textAlign`, so a lent field of typed text follows
+ * its record's alignment as it is restyled.
+ */
+export function placeholderAlignOf<Align extends 'left' | 'center' | 'right' | undefined>(
+  field: FormField,
+  imageField: boolean,
+  textAlign: Align,
+): 'center' | Align {
+  return field.kind === 'signature' || (field.kind === 'pushbutton' && imageField)
+    ? 'center'
+    : textAlign;
+}
+
+/**
  * Whether the field still takes a value: it holds one (a push button doesn't, but an image
  * field, `imageField`, holds its image), it isn't read-only, nor a signed signature.
  */
@@ -285,6 +308,7 @@ export function projectWidget(
     placeholder: yours
       ? placeholderOf(field, dress.purposeLabel ?? null, widget.hasMark, imageField)
       : null,
+    placeholderAlign: placeholderAlignOf(field, imageField, widget.look.textAlign),
     hint: canFill && field.purpose === 'date-signed' ? (dress.signingDateHint ?? null) : null,
     accent: yours ? (dress.tint ?? null) : null,
     box: widget.box,

@@ -45,7 +45,7 @@ export interface FormServices {
   readonly tabOrder: TabOrder;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
-  /** Whether the widgets are lent to the annotation plugin now (design mode). */
+  /** Whether the widgets are lent to the annotation plugin now (design mode); the layer's mode. */
   readonly design: FormDesign;
   /** The texts this session's format scripts wrote, for the painter. */
   readonly formatted: FormattedTexts;

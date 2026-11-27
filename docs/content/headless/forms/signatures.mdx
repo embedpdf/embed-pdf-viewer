@@ -46,8 +46,12 @@ a mark from a signature library:
 - **over an empty signature field**, the click signs it;
 - **over an [image field](building#image-fields) the person fills in**, such as their initials,
   the mark goes in as its picture, in place of any picture it holds;
-- **over a signed field, or an image field that isn't theirs to fill in**, nothing happens;
+- **over a signed field, or a signature or image field that isn't theirs**, nothing happens and
+  the mark stays armed;
 - **anywhere else**, the mark is placed as a stamp, even over a button that does something.
+
+A mark that goes into a field is disarmed, and the tool goes back to the one people had before
+they armed it, so the fields take input again. A mark placed as a stamp stays armed for the next.
 
 `placeMark()` does the same from code:
 

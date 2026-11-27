@@ -76,6 +76,7 @@ export function createFormController(ctx: FormContext) {
         return field !== null && rights.mayFill(field);
       },
       canDesign: () => ctx.allows('doc.forms.modify'),
+      getLayerMode: services.design.mode,
       listPurposes: services.purposes.list,
       canRestoreAttribution: () => ctx.allows('doc.forms.import'),
       canWriteScripts: () => ctx.allows('doc.forms.script'),

@@ -68,8 +68,18 @@ export interface FormToolDefinition {
   field?: FormToolField;
 }
 
-/** Palette tools keep widgets editable right after placement. */
-export const PLACE_TAGS = ['form-place', 'annotation-edit'] as const;
+/**
+ * The tag of the form's design tools (`form-edit` and every field tool): while the active tool
+ * carries it, the form lends its widgets to the annotation plugin (services/design.ts). An app's
+ * tool that carries it designs the form too.
+ */
+export const FORM_DESIGN_TAG = 'form-design';
+
+/**
+ * A field tool places fields (`form-place`), keeps widgets editable right after placement
+ * (`annotation-edit`), and is design mode ({@link FORM_DESIGN_TAG}).
+ */
+export const PLACE_TAGS = ['form-place', 'annotation-edit', FORM_DESIGN_TAG] as const;
 
 const FIELD_CHROME: WidgetAppearance = {
   interiorColor: '#ffffff',

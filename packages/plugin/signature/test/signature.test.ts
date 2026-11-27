@@ -1317,18 +1317,25 @@ describe('the armed mark over a field', () => {
       sig: signatureField(),
       text: signatureField({ kind: 'text', name: 'name' } as Partial<FormField>),
       signed: signatureField({ valueEntry: { kind: 'unsupported' } }),
+      // Another person's signature field: its box is `disabled` for this user.
+      theirs: signatureField({ name: 'their_signature' } as Partial<FormField>),
     };
+    const objectNumberOf = (at: string) => (at === 'theirs' ? 10 : 9);
     let where: keyof typeof hits | 'nothing' = 'sig';
     const form = {
       getWidgetAt: () =>
         where === 'nothing'
           ? null
           : {
-              annotObjectNumber: 9,
+              annotObjectNumber: objectNumberOf(where),
               field: hits[where],
               box: { x: 0, y: 0, width: 1, height: 1 },
               imageBox: false,
             },
+      listWidgets: () => [
+        { annotObjectNumber: 9, disabled: false },
+        { annotObjectNumber: 10, disabled: true },
+      ],
     } as never;
     const handler = createArmedMarkHandler('doc-1', signature, form, stamp as never);
     expect(handler.enabledFor({ id: 'stamp', enables: new Set() } as never)).toBe(true);
@@ -1351,6 +1358,12 @@ describe('the armed mark over a field', () => {
     where = 'signed';
     expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
     expect(placeMark).toHaveBeenCalledTimes(1);
+    // Another person's field takes no mark from this user, by the image boxes' rule: consumed,
+    // nothing written (no refused write to log), and the mark stays armed.
+    where = 'theirs';
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(placeMark).toHaveBeenCalledTimes(1);
+    expect(stamp.disarm).toHaveBeenCalledTimes(1);
 
     // A plain stamp (any other library) never captures.
     stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });

@@ -46,7 +46,7 @@
   } from '@embedpdf/web';
   import type { FormColors } from '@embedpdf/web';
   import { usePage } from '../runtime/page';
-  import { useCapability } from '../runtime/readers.svelte';
+  import { useCapability, useSelector } from '../runtime/readers.svelte';
   import { isEmbedded } from './widget';
 
   let {
@@ -73,6 +73,7 @@
 
   const page = usePage();
   const form = useCapability(FormHostToken);
+  const filling = useSelector(FormHostToken, (host) => host.getLayerMode() === 'fill');
   const embedded = isEmbedded();
   // Where the box goes: the widget's frame on the page, or the place it fills inside a control
   // of the app's, at the frame's size on screen and unturned (the app's box is turned).
@@ -111,7 +112,8 @@
   /** The form's cursor in this box; runs again when the widget or what it takes changes. */
   function fieldFocus(box: HTMLElement): (() => void) | undefined {
     const widget = item.annotationRef;
-    if (embedded || !widget || item.disabled) return undefined;
+    // While the layer only shows its controls (an `inert` layer), no box lends the cursor a way in.
+    if (embedded || !widget || item.disabled || !filling.current) return undefined;
     const radio = item.control === 'toggle' && item.kind === 'radio';
     return bindFieldFocus(box, form, widget, { radio, custom, focusable });
   }

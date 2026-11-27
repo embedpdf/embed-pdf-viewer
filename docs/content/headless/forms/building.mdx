@@ -48,8 +48,8 @@ change to a signed document.
 
 ## Design mode
 
-The `form-edit` tool is design mode: fields stop being fillable and become boxes you can select, move
-and resize. The `pointer` tool makes them fillable again:
+The form's own tools are design mode: `form-edit` and the field tools. Fields stop being fillable
+and become boxes you can select, move and resize. The `pointer` tool makes them fillable again:
 
 ```ts
 interaction.activateTool('form-edit'); // design the form
@@ -64,7 +64,13 @@ undo. Like every change, it shows at once and the engine's answer follows.
 
 A field just placed is selected at once, before the engine answers, and the tool goes back to
 `form-edit` rather than the default pointer, so design mode goes on. Without `canDesign()` nothing is
-lent: the fields stay fillable boxes the annotation tools leave alone.
+lent, and the fields show as they do under any other tool.
+
+Design mode is the tools that carry the `form-design` tag: `form-edit` and every field tool do, and
+so can a tool of your own. Under any other tool that doesn't fill forms in, such as a stamp, a pen
+or zoom, nobody designs the form, whatever their permissions: fields show as they do while filling,
+tints and placeholders included, but take no input and no pointer, so the tool works over them. A
+stamp lands on a field, and a pen draws across one.
 
 ## Place fields for a signer
 

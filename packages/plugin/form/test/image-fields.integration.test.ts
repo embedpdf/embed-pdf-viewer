@@ -362,9 +362,11 @@ describe('a picture in an image field', () => {
       const { form } = buyer;
       const missing = () => form.validate().missing.map((field) => field.name);
       expect(missing()).toEqual(['buyer_initials']);
+      // In the middle of the box, where the picture goes, whatever alignment the button has.
       expect(buyer.boxOf('buyer_initials')).toMatchObject({
         required: true,
         placeholder: 'Initials',
+        placeholderAlign: 'center',
       });
       // No identity value is a picture: it is neither written nor listed.
       const prefilled = await form.prefill();

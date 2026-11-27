@@ -757,11 +757,16 @@ export interface StampPlacement {
 export interface AnnotationStampsCapability {
   /**
    * Arm a stamp's bytes so the next click places them, as the `stamp` tool
-   * does after picking a file. Rejects `invalid-input` for bytes that aren't
-   * PNG, JPEG or a one-page PDF.
+   * does after picking a file, and switch to the `stamp` tool. It stays armed
+   * while it's placed. Rejects `invalid-input` for bytes that aren't PNG, JPEG
+   * or a one-page PDF.
    */
   arm(stamp: StampInput, options?: OperationOptions): Promise<void>;
-  /** Disarm the stamp. */
+  /**
+   * Disarm the stamp, and go back to the tool that was active when it was
+   * armed (the default tool when that one is gone). Switching to another tool
+   * disarms it too, and that tool stays.
+   */
   disarm(): void;
   /** Whether a stamp is armed. */
   isArmed(): boolean;

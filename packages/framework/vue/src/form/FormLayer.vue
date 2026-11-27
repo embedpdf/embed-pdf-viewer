@@ -14,16 +14,18 @@
     signature → "sign here", or the signed field's details, with the
              signature plugin.
 
-  The controls show while the active tool fills forms (the `pointer` and `pan`
-  tools do), and stand down in design mode, where fields are boxes you select
-  and move. What the viewer draws itself (the focus ring, the edge of a field
+  The controls take input while the active tool fills forms (the `pointer` and
+  `pan` tools do), and stand down in design mode, where fields are boxes you
+  select and move. Under any other tool (a stamp, a pen) they show but are
+  `inert`, so the tool works over them (the form plugin's `getLayerMode()`).
+  What the viewer draws itself (the focus ring, the edge of a field
   without a border, the editor) takes its colors from the form settings, which
   the `--epdf-form-*` CSS variables override. The colors, the field looks, the
   boxes' and controls' styles, and the toggle, text-field and list-box
   policies are `@embedpdf/web`'s, the same for every framework.
 
   `controls` draws some boxes with components of yours (`FieldControl`), which
-  show and stand down with the layer's own; UI attached to a box uses
+  show, take input and stand down with the layer's own; UI attached to a box uses
   `useFormWidgetAnchor()` and `<Anchored>`.
 -->
 <script setup lang="ts">
@@ -33,7 +35,6 @@ import { annotationKey, shallowEqual } from '@embedpdf/core';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // Loading a page's widgets and listing them as controls are host reads.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { fieldControlFor } from '@embedpdf/web';
 import { usePaintsPagePart } from '../page-layers';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
@@ -61,11 +62,8 @@ usePaintsPagePart(
   'formFields',
 );
 const colors = useFormColors();
-const active = useOptionalSelector(
-  InteractionToken,
-  (interaction) => interaction.activeToolEnables('form-fill'),
-  false,
-);
+// What the layer does now: fill, show (inert) or stand down for design mode.
+const mode = useOptionalSelector(FormHostToken, (lens) => lens.getLayerMode(), 'design');
 // The same list until a widget on this page changes.
 const items = useOptionalSelector(
   FormHostToken,
@@ -86,8 +84,8 @@ watch(
 /** One control per widget of a field: a radio group has a widget per button. */
 const keyOf = (item: FormWidgetItem) => `${item.key}:${item.annotObjectNumber}`;
 
-// The controls show while the active tool fills forms, yours with the layer's own.
-const shown = computed(() => (active.value ? items.value : NO_WIDGETS));
+// The controls show unless the fields are designed, yours with the layer's own.
+const shown = computed(() => (mode.value === 'design' ? NO_WIDGETS : items.value));
 /** The boxes a control of yours draws, each with its control. */
 const custom = computed(() => {
   const drawn = new Map<FormWidgetItem, FieldControl>();
@@ -123,7 +121,10 @@ const Pictures: FunctionalComponent = () => h(FieldPictures, { looks: pictures.v
 </script>
 
 <template>
-  <div :style="{ position: 'absolute', inset: '0', pointerEvents: 'none' }">
+  <div
+    :style="{ position: 'absolute', inset: '0', pointerEvents: 'none' }"
+    :inert="mode === 'show' || undefined"
+  >
     <Pictures />
     <template v-for="item in shown" :key="keyOf(item)">
       <CustomControl

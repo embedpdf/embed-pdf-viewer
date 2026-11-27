@@ -82,6 +82,14 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
   );
   /** The same, as the capability or `null`: writes, drafts, activation. */
   protected readonly form = this.formBinding.capability;
+  /**
+   * Whether the layer fills now: while it only shows its controls (an `inert` layer), no box
+   * lends the cursor a way in.
+   */
+  private readonly filling = this.formBinding.select(
+    (form) => form.getLayerMode() === 'fill',
+    false,
+  );
   /** Whether this is the layer's control inside a control of the app's: it only fills its place. */
   protected readonly embedded = inject(EPDF_FORM_EMBEDDED);
 
@@ -139,7 +147,7 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
       const item = this.item();
       const form = this.form();
       const widget = item.annotationRef;
-      if (!form || !widget || item.disabled) return;
+      if (!form || !widget || item.disabled || !this.filling()) return;
       const radio = item.control === 'toggle' && item.kind === 'radio';
       const focusable = this.focusable();
       onCleanup(

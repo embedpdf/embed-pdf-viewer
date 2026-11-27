@@ -30,7 +30,7 @@ import {
   type FormWidgetLook,
   type PageWidgets,
 } from '../src/model';
-import { fillItems, projectWidget } from '../src/read/fill-items';
+import { fillItems, placeholderAlignOf, projectWidget } from '../src/read/fill-items';
 
 const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormField => ({
   ref: { kind: 'objectNumber', objectNumber: 4 },
@@ -489,6 +489,21 @@ const radio = (over: Partial<Extract<FormField, { kind: 'radio' }>> = {}): FormF
     { ...formWidget(22, toPageRef(3)), onState: '1', exportValue: 'Pay yearly', checked: true },
   ],
   ...over,
+});
+
+describe('where a placeholder sits', () => {
+  test('a field of typed text keeps its own alignment; a signature and an image field centre it', () => {
+    expect(placeholderAlignOf(text(), false, 'right')).toBe('right');
+    expect(placeholderAlignOf(text(), false, 'left')).toBe('left');
+    expect(placeholderAlignOf(signature(), false, 'left')).toBe('center');
+    const button = { ...text(), kind: 'pushbutton' } as unknown as FormField;
+    expect(placeholderAlignOf(button, true, 'left')).toBe('center');
+    // A push button that isn't an image field keeps its alignment (it has no placeholder anyway).
+    expect(placeholderAlignOf(button, false, 'left')).toBe('left');
+    // Design mode passes none: a lent field of typed text follows its record.
+    expect(placeholderAlignOf(text(), false, undefined)).toBeUndefined();
+    expect(placeholderAlignOf(signature(), false, undefined)).toBe('center');
+  });
 });
 
 describe('radio buttons', () => {

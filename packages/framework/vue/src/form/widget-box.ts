@@ -20,7 +20,7 @@ import {
   widgetBoxStyleOf,
 } from '@embedpdf/web';
 import type { FormColors, PixelRect } from '@embedpdf/web';
-import { useCapability } from '../runtime/capabilities';
+import { useCapability, useSelector } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
 
 const EMBEDDED: InjectionKey<boolean> = Symbol('embedpdf:embedded-form-control');
@@ -84,6 +84,7 @@ export function useWidgetBox(
   const custom = options.custom ?? false;
   const edge = !custom && (options.edge ?? true);
   const embedded = inject(EMBEDDED, false);
+  const filling = useSelector(FormHostToken, (host) => host.getLayerMode() === 'fill');
 
   watch(
     element,
@@ -112,7 +113,9 @@ export function useWidgetBox(
     [
       element,
       () => item().annotationRef,
-      () => !embedded && !item().disabled,
+      // While the layer only shows its controls (an `inert` layer), no box lends the cursor
+      // a way in.
+      () => !embedded && !item().disabled && filling.value,
       () => {
         const control = item();
         return control.control === 'toggle' && control.kind === 'radio';

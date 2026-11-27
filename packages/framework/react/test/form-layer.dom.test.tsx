@@ -13,7 +13,7 @@ import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { createLocalEngine } from '@embedpdf/engine';
 import { formPlugin, FormToken, toFieldRef } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { interactionPlugin } from '@embedpdf/plugin-interaction';
+import { interactionPlugin, InteractionToken } from '@embedpdf/plugin-interaction';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 
@@ -163,6 +163,26 @@ describe('<FormLayer> over fields made from code', () => {
         pageBelow.removeEventListener('pointerdown', onPagePress);
         expect(events).toContain('mouseDown');
         expect(pagePresses).toHaveLength(0);
+
+        // Under a tool that neither fills nor designs (zoom, a stamp, a pen), the controls still
+        // show, their edges too, but the layer is inert: no pointer and no input, so the tool
+        // works over them. Back on the pointer, they take input again.
+        const interaction = kernel!.capability(InteractionToken);
+        expect(host.getLayerMode()).toBe('fill');
+        expect(checkbox.closest('[inert]')).toBeNull();
+        act(() => interaction.activateTool('zoom'));
+        expect(host.getLayerMode()).toBe('show');
+        const shown = await waitFor(() => {
+          const box = screen.getByRole('checkbox', { name: 'agree' });
+          expect(box.closest('[inert]')).not.toBeNull();
+          return box;
+        });
+        expect(shown.style.boxShadow).toContain('#ea580c');
+        expect(screen.getByLabelText('name')).toBeTruthy();
+        act(() => interaction.activateTool('pointer'));
+        await waitFor(() =>
+          expect(screen.getByRole('checkbox', { name: 'agree' }).closest('[inert]')).toBeNull(),
+        );
       } finally {
         view.unmount();
         await engine.destroy();

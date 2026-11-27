@@ -1,8 +1,8 @@
 /**
  * Wiring to sibling plugins. With the interaction hub and the stamp plugin
  * present, an armed mark from a `signatures` library dropped over an
- * unsigned signature field, or an image field the user fills in, goes into
- * the field instead of onto the page.
+ * unsigned signature field the user signs, or an image field the user fills
+ * in, goes into the field instead of onto the page.
  */
 import { FormToken } from '@embedpdf/plugin-form/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';

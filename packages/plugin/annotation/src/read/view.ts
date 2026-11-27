@@ -147,13 +147,17 @@ export function createView(
   const sameOutline = (left: RecordOutline | null, right: RecordOutline | null): boolean =>
     left === right || (left !== null && right !== null && left.color === right.color);
 
-  /** The same placeholder: none on both sides, or the same words in the same color. */
+  /** The same placeholder: none on both sides, or the same words in the same color and place. */
   const samePlaceholder = (
     left: RecordPlaceholder | null,
     right: RecordPlaceholder | null,
   ): boolean =>
     left === right ||
-    (left !== null && right !== null && left.text === right.text && left.color === right.color);
+    (left !== null &&
+      right !== null &&
+      left.text === right.text &&
+      left.color === right.color &&
+      left.align === right.align);
 
   /**
    * A lent record as the model has it, cached per shown row, the confirmed row it was made from,

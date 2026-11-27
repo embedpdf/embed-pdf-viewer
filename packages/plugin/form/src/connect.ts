@@ -15,7 +15,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import type { FormHostCapability } from './host-contract';
 import type { FormContext } from './services';
-import { PLACE_TAGS, type FormToolDefinition } from './tools/definitions';
+import { FORM_DESIGN_TAG, PLACE_TAGS, type FormToolDefinition } from './tools/definitions';
 import { createPlaceHandler } from './tools/handlers';
 
 export function connectForm(
@@ -38,14 +38,14 @@ export function connectForm(
       enables: new Set(['form-fill', 'link-nav']),
     }),
   );
-  // Design mode's resting tool: without 'form-fill' the widget behavior
-  // disengages, and widgets select, move and resize like any annotation.
-  // Palette tools add drag-to-place on top of it.
+  // Design mode's resting tool: it carries 'form-design', so the widgets are
+  // lent, and without 'form-fill' they select, move and resize like any
+  // annotation. Palette tools add drag-to-place on top of it.
   ctx.cleanup(
     interaction.registerTool({
       id: 'form-edit',
       cursor: 'default',
-      enables: new Set(['annotation-edit', 'annotation-marquee']),
+      enables: new Set(['annotation-edit', 'annotation-marquee', FORM_DESIGN_TAG]),
     }),
   );
 
@@ -80,8 +80,9 @@ export function connectForm(
     interaction.registerHandler(createPlaceHandler(form, interaction, annotation, tools)),
   );
 
-  // Design mode: the widgets are lent to the annotation plugin, which selects,
-  // moves, restyles and deletes them with its own tools (write/lending.ts).
+  // Design mode: under the form's design tools the widgets are lent to the annotation
+  // plugin, which selects, moves, restyles and deletes them with its own tools
+  // (write/lending.ts, services/design.ts).
   if (annotation && ctx.allows('doc.forms.modify')) {
     ctx.cleanup(annotation.lend(lender));
   }
