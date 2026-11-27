@@ -697,6 +697,10 @@ The field is empty again: its widgets read `hasMark: false` and show the field's
 style, which can change again. Undo brings the mark back. A field that has no mark is left as
 it is.
 
+A mark is stored once in the file, however many places show it: the same picture in ten
+signature fields, as a stamp and as a [push button's image](/docs/engine/forms/authoring#a-button-with-an-image)
+is one picture, as it is for stamps. A mark that is signed is stored the same way.
+
 Once a field is signed, its look is part of what the signature seals, so
 `setSignatureAppearance()` fails with `ProtectedDocument`, for a mark and for `null`. To sign
 with a mark, pass `appearance` to `sign()` or `prepare()`.
@@ -1124,6 +1128,13 @@ signatures), and `downloadRevision(index)` returns the file exactly as it was at
   even when a later revision hides it.
 - Missing evidence is never a pass: a value the engine can't read makes the verdict
   `'indeterminate'`.
+- A push button's [image](/docs/engine/forms/authoring#a-button-with-an-image) counts as filling
+  in, as Acrobat counts it: putting one in or taking it out (`setButtonImage()`) is permitted
+  wherever filling in is, after an approval signature and after a certification for form filling.
+  A field a signature locked stays forbidden, and so does a change to the button's caption,
+  colors or `layout`, which is design.
+- A mark drawn into an unsigned signature field (`setSignatureAppearance()`) is not filling in:
+  after another signature it is `'forbidden'`, and Acrobat calls that signature invalid.
 - The rules follow what Acrobat reports.
 - `exploratoryLevel` asks what a level would allow; the answer (`mode: 'exploratory'`) isn't a
   verdict.

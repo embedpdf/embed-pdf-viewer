@@ -70,6 +70,7 @@ import { PageRefSchema } from '../identity/PageRef.schema';
 import type { ChangeItemType } from '../mutation/Change';
 import {
   AnnotationResourceKeysSchema,
+  ButtonImageResourceKeysSchema,
   FieldAppearanceResourceKeysSchema,
   FileResourceKeysSchema,
   SourceResourceKeysSchema,
@@ -218,6 +219,15 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
      * multipart part; `null` takes the field's mark out.
      */
     resources: FieldAppearanceResourceKeysSchema,
+  }),
+  op({
+    type: z.literal('forms.setButtonImage'),
+    field: FormFieldRefSchema,
+    /**
+     * The push button's image (a PNG, a JPEG or a one-page PDF), as the key
+     * of its multipart part; `null` takes the field's image out.
+     */
+    resources: ButtonImageResourceKeysSchema,
   }),
   op({
     type: z.literal('metadata.update'),
@@ -396,6 +406,7 @@ export const ChangeItemSchema = closed(
       meta: FormMutationMetaSchema,
     }),
     itemOf('forms.setSignatureAppearance', FormFieldUpdateResultSchema),
+    itemOf('forms.setButtonImage', FormFieldUpdateResultSchema),
     itemOf('forms.addWidget', FormWidgetLinkResultSchema),
     itemOf('forms.removeWidget', FormWidgetLinkResultSchema),
     itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),

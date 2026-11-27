@@ -237,6 +237,10 @@ await doc.forms.import(plain);
 
 A date or a time format needs no such step: an older server reads it from the field's scripts.
 
+A server older than version 3.5 keeps no push button image and no widget
+[`layout`](/docs/engine/forms/authoring#a-button-with-an-image) but `'caption'`. An import of a
+bundle with a widget whose layout is another, or that names an image, fails the same way.
+
 </Engine>
 
 ## Permissions
@@ -258,13 +262,16 @@ import takes what the import took. See [Permissions](/docs/engine/concepts/permi
 
 ```ts
 bundle.fields; // [{ data }, …]: each field as a read returns it
-bundle.widgets; // [{ data, resources: {} }, …]: each widget as the form's rows read it
+bundle.widgets; // [{ data, resources }, …]: each widget as the form's rows read it
 bundle.calculationOrder; // the calculation order among the fields
 bundle.pages; // [{ page, position, size }, …]
 ```
 
 A bundle is plain data: the fields in the form's order, then their widgets in their fields'
-order. A widget is drawn from its data, so a form bundle carries no bytes yet.
+order. A widget is drawn from its data, so its `resources` are empty, but for a push button's
+image: such a widget names it as `{ image }`, a one-page PDF in `bundle.resources`. An
+image several widgets show is in the bundle once, and an import places it once in the
+document. It is the button's value: `values: false` leaves it out.
 
 ### The round trip
 

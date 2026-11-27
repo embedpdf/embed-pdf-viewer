@@ -91,6 +91,7 @@ function widgetRow(
     fontSize: 12,
     fontColor: '#000000',
     caption: null,
+    layout: null,
     actions: null,
     invisible: false,
     hidden: false,

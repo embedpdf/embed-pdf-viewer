@@ -1,5 +1,5 @@
 import type { AnnotationImportOp, ChangeItemType, FormImportOp } from '../mutation/Change';
-import { lacksWhatArrivedIn } from './apiVersion';
+import { BUTTON_IMAGE_AND_LAYOUT_SINCE, lacksWhatArrivedIn } from './apiVersion';
 import { CHANGE_KINDS } from './changeSchemas';
 
 /**
@@ -22,6 +22,7 @@ export const CHANGE_KIND_SINCE: Partial<Record<ChangeKind, string>> = {
   'pages.setScale': '3.1',
   'annotations.copy': '3.2',
   'forms.copy': '3.2',
+  'forms.setButtonImage': BUTTON_IMAGE_AND_LAYOUT_SINCE,
 };
 
 /** The version every kind without a row in {@link CHANGE_KIND_SINCE} arrived in. */

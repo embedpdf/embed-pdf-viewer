@@ -221,6 +221,7 @@ export { DEFAULT_LAYER_NAME, wirePaths, wireTemplates } from './wire/paths';
 export {
   AnnotationResourceKeysSchema,
   AppearanceResourceKeysSchema,
+  ButtonImageResourceKeysSchema,
   FieldAppearanceResourceKeysSchema,
   FileResourceKeysSchema,
   ImageResourceKeysSchema,
@@ -367,6 +368,7 @@ export {
   DrawnBorderStyleSchema,
   WidgetBorderStyleSchema,
   WidgetCheckStyleSchema,
+  WidgetLayoutSchema,
   StandardFontSchema,
   TextAlignmentSchema,
   FreeTextIntentSchema,
@@ -485,6 +487,7 @@ export {
 export {
   API_VERSION,
   FIELD_PURPOSE_AND_FORMAT_SINCE,
+  BUTTON_IMAGE_AND_LAYOUT_SINCE,
   MARK_IMAGE_OR_NONE_SINCE,
   VALIDATION_INFO_SINCE,
   apiVersionOf,

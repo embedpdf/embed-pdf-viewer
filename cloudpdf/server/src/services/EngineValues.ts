@@ -44,8 +44,9 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   annotationsAll: 1,
   annotationsExport: 1,
   // 2: a field's purpose and format (3.4).
-  form: 2,
-  formExport: 2,
+  // 3: a push button's hasImage, a widget's layout, a push button's image in a bundle (3.5).
+  form: 3,
+  formExport: 3,
   metadata: 1,
   outline: 1,
   attachments: 1,

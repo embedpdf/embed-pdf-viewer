@@ -1,4 +1,5 @@
 import type { WidgetPatch } from '../annotation/kinds/widget';
+import type { ResourceBytes } from '../annotation/resources';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormField } from '../forms/field';
@@ -215,6 +216,28 @@ export interface DocumentFormsService {
   ): AbortablePromise<FormFieldUpdateResult>;
 
   /**
+   * Put an image in every widget of a push button, or take it out again:
+   * an image field, as Acrobat makes one (initials, a second signature
+   * spot). The image is a PNG, a JPEG or a one-page PDF, fitted whole
+   * inside each widget's border, and the document holds it once however
+   * many widgets show it. It is one part of the button's look, which is
+   * drawn from the image, the caption and the layout: each widget shows it
+   * as its `layout` says, which is left as it is. `null` takes the image
+   * out of every widget, which shows its box again; a field with no image
+   * is left as it is. The field then reads `hasImage`. A field of another
+   * kind is refused with `InvalidArg`, one a signature locked with
+   * `ProtectedDocument`. It is filling in: gated by `doc.forms.fill`, or
+   * `fields:fill` for the field's group. One change with one undo step, as
+   * the op `forms.setButtonImage` (its `opId` undoes it). Emits
+   * `forms.updated`.
+   */
+  setButtonImage(
+    ref: FormFieldRef,
+    image: ResourceBytes | null,
+    options?: WriteOptions,
+  ): AbortablePromise<FormFieldUpdateResult>;
+
+  /**
    * Delete a terminal field and cascade: every widget is removed from its
    * page, the field leaves the tree, and empty ancestors are pruned.
    * Emits `forms.deleted`.
@@ -224,7 +247,10 @@ export interface DocumentFormsService {
   /**
    * Show the field in one more place: a new widget, placed and styled like
    * an entry of a draft's `widgets`, in one change. A radio button needs
-   * its `exportValue`. Adding a widget to a legacy merged field splits it:
+   * its `exportValue`. A push button's new place gets the field's image
+   * (see `setButtonImage`), as a text field's shows its value, and shows it
+   * as the placement's `layout` says: give `layout: 'image'` to show it
+   * alone. Adding a widget to a legacy merged field splits it:
    * the field keeps its object number and its widget moves to a new one
    * (`options.splitObjectNumber`, or the next free one). Emits
    * `forms.widgetAdded`.

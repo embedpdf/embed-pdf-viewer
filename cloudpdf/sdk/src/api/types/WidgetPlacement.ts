@@ -20,6 +20,7 @@ export interface WidgetPlacement {
     textAlign?: WidgetPlacement.TextAlign | undefined;
     caption?: (string | null) | undefined;
     checkStyle?: (WidgetPlacement.CheckStyle | null) | undefined;
+    layout?: (WidgetPlacement.Layout | null) | undefined;
 }
 
 export namespace WidgetPlacement {
@@ -60,4 +61,14 @@ export namespace WidgetPlacement {
         Diamond: "diamond",
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
+    export const Layout = {
+        Caption: "caption",
+        Image: "image",
+        CaptionBelow: "caption-below",
+        CaptionAbove: "caption-above",
+        CaptionRight: "caption-right",
+        CaptionLeft: "caption-left",
+        CaptionOver: "caption-over",
+    } as const;
+    export type Layout = (typeof Layout)[keyof typeof Layout];
 }

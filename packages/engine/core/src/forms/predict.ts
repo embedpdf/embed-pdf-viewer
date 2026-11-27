@@ -322,6 +322,10 @@ export function formFieldOfDraft(
       };
       break;
     }
+    case 'pushbutton':
+      // A created button holds no image: `setButtonImage()` puts one in.
+      field = { ...base, kind: 'pushbutton', hasImage: false, widgets };
+      break;
     default:
       field = { ...base, kind: draft.kind, widgets };
   }
@@ -653,6 +657,7 @@ function widgetRowOfPlacement(
     hasMark: false,
     appearanceState: toggle ? 'Off' : null,
     caption: draft.kind === 'pushbutton' ? (placement.caption ?? null) : null,
+    layout: draft.kind === 'pushbutton' ? (placement.layout ?? 'caption') : null,
   } as WidgetAnnotation;
 }
 

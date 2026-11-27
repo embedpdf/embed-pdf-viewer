@@ -100,7 +100,7 @@ export interface FormFieldCreateResult<
   meta: FormMutationMeta;
 }
 
-/** Result of `update` and `setSignatureAppearance`. */
+/** Result of `update`, `setSignatureAppearance` and `setButtonImage`. */
 export interface FormFieldUpdateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {

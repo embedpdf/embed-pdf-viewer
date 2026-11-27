@@ -44,6 +44,7 @@ import { widgetBorderStyleFromCode, widgetBorderStyleToCode } from '../shapeBord
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { KEEP_FONT_CODE } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
+import { widgetLayoutToCode } from '../widgetLayout';
 import {
   clearBorderDashPattern,
   setAnnotRect,
@@ -159,6 +160,17 @@ export function applyWidgetStyle(
     fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, NULL_PTR);
   } else if (mkText !== undefined) {
     withUtf16String(mem, mkText, (text) => fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, text));
+  }
+
+  // `/MK /TP`: only a push button's widget gets here with a layout, never
+  // with `null` (`fitWidgetToFamily`).
+  if (style.layout) {
+    if (!fn.EPDFAnnot_SetMKTextPosition(annotPtr, widgetLayoutToCode(style.layout))) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        "the widget's layout (/MK /TP) could not be written",
+      );
+    }
   }
 }
 

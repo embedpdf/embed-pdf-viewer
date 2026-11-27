@@ -66,6 +66,7 @@ error. The document is as it was before the call.
 | `forms.reorderWidgets`         | `page`, `widgets`, `position`                             | `doc.forms.reorderWidgets(widgets, position)`                                   |
 | `forms.reorderCalculations`    | `fields`, `position`                                      | `doc.forms.reorderCalculations(fields, position)`                               |
 | `forms.setSignatureAppearance` | `field`, `appearance`                                     | `doc.forms.setSignatureAppearance(field, appearance)`                           |
+| `forms.setButtonImage`         | `field`, `image`                                          | `doc.forms.setButtonImage(field, image)`                                        |
 | `forms.setDisplay`             | `field`, `display`                                        | Shows or hides a field's widgets, as a form script does                         |
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
 | `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
@@ -87,11 +88,12 @@ error. The document is as it was before the call.
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
 
-`pages.setScale` arrived in 3.1, and `annotations.copy` and `forms.copy` in 3.2. Every other op
-is as old as 3.0.
+`pages.setScale` arrived in 3.1, `annotations.copy` and `forms.copy` in 3.2, and
+`forms.setButtonImage` in 3.5. Every other op is as old as 3.0.
 
 `forms.setSignatureAppearance` takes its `appearance` as the call does: a PNG, a JPEG or a
 one-page PDF, or `null` to take the mark out. An image and `null` arrived in 3.4.
+`forms.setButtonImage` takes a push button's `image` the same way, `null` taking it out.
 
 ### What comes back
 

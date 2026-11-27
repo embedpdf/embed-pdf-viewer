@@ -140,6 +140,12 @@ function opsOf(
           const key = resources.appearance;
           return { ...rest, appearance: key === null ? null : new Uint8Array(bytesOf(key)) };
         }
+        case 'forms.setButtonImage': {
+          const { resources, ...rest } = op;
+          // `null` names no part: the button's image is taken out.
+          const key = resources.image;
+          return { ...rest, image: key === null ? null : new Uint8Array(bytesOf(key)) };
+        }
         case 'pages.insert': {
           const { resources, ...rest } = op;
           return { ...rest, source: new Uint8Array(bytesOf(resources.source)) };

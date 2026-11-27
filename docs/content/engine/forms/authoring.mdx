@@ -63,7 +63,7 @@ Each kind adds its own settings:
 | `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                                           |
 | `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text), `format`                                              |
 | `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)                                      |
-| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                                                      |
+| `pushbutton` | Only widgets, each with its `caption` and `layout`. See [A push button](#a-push-button).                                         |
 | `signature`  | Only widgets, each drawn as its box until a mark is in it. Signing it is on [Digital signatures](/docs/engine/forms/signatures). |
 
 `format` makes a text field or a dropdown a date or a time field; see
@@ -135,6 +135,64 @@ font. `setValue()` refuses a push button with `InvalidArg`. A button that only g
 resets the form or shows and hides fields needs `doc.forms.modify` alone; one that runs a script,
 submits the form or opens a web address needs `doc.forms.script` too.
 
+### A button with an image
+
+A push button can show an image: someone's initials, a second signature, a photo. Acrobat calls
+it an image field. Give its widget the layout `'image'`, then put the image in with
+`setButtonImage()`:
+
+```ts
+const { field } = await doc.forms.create({
+  kind: 'pushbutton',
+  name: 'initials_page_1',
+  required: true,
+  widgets: [{ page: page.ref, rect: { x: 480, y: 740, width: 72, height: 36 }, layout: 'image' }],
+});
+
+const { field: filled } = await doc.forms.setButtonImage(field.ref, png);
+filled.hasImage; // true
+
+await doc.forms.setButtonImage(field.ref, null); // take it out
+```
+
+The image is a PNG, a JPEG or a one-page PDF, as a `Uint8Array` or a `Blob`: what a
+[stamp](/docs/engine/annotations/stamps) takes. `null` takes the image out, and the button shows
+its box again. The image is one part of the button's look, which is drawn from the image, the
+caption and the layout.
+
+- **Every widget of the field shows it.** A field with a widget on each of three pages shows the
+  same image three times, and the file holds the image once. A widget you
+  [add later](#add-a-widget) gets it too.
+- **It fits inside the border,** whole and in the middle, as Acrobat fits one.
+- **Where it shows** is each widget's `layout`:
+
+  | `layout`          | The widget shows                      |
+  | :---------------- | :------------------------------------ |
+  | `'caption'`       | Its caption alone. The default.       |
+  | `'image'`         | Its image alone                       |
+  | `'caption-below'` | Its caption below the image           |
+  | `'caption-above'` | Its caption above the image           |
+  | `'caption-right'` | Its caption to the right of the image |
+  | `'caption-left'`  | Its caption to the left of the image  |
+  | `'caption-over'`  | Its caption over the image            |
+
+  `setButtonImage()` leaves the layout as it is. On a widget whose layout is `'caption'` the image
+  is kept and not shown, as in Acrobat.
+- **`hasImage`** says whether the field holds an image: `true` when one of its widgets has one.
+- **It is filling in, not design.** `setButtonImage()` needs the right to fill the field in, as
+  `setValue()` does: `doc.forms.fill`, or `fields:fill` for the field's group (see
+  [Signers and groups](/docs/engine/forms/groups)). On a field a signature locked it fails with
+  `ProtectedDocument`, and on any other kind of field with `InvalidArg`. A signature that allows
+  filling in stays valid after it, in the engine's
+  [analysis](/docs/engine/forms/signatures#how-changes-are-judged) and in Acrobat.
+- **One undo** puts back the image the field had before, or none.
+- **Other PDF apps see an image field.** The image is each widget's icon (`/MK /I`), and the
+  engine draws the widget's look from it, as Acrobat writes one. A button made in Acrobat with an
+  icon reads with its layout and `hasImage: true`.
+
+It resolves what `update()` resolves: the field as it is now, `widgets`, the rows of its widgets,
+and `meta`.
+
 ### The widget's look
 
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
@@ -152,6 +210,7 @@ fields you change later with `doc.forms.updateWidget()`:
 | `fontColor`     | Text color                                                                                                   |
 | `textAlign`     | `'left'`, `'center'` or `'right'`                                                                            |
 | `caption`       | A push button's caption; other widgets take none                                                             |
+| `layout`        | Where a push button shows its caption and its image; see [A button with an image](#a-button-with-an-image) |
 | `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                                 |
 
 ```ts
@@ -438,6 +497,12 @@ Reading still works against it, an exported bundle included: `format` is read fr
 scripts as described above, and `purpose` reads `null`. An [`import()`](import-export) of a bundle
 in which a field has a purpose fails the same way: such a server would make the field without it.
 
+A push button's image and a widget's `layout` need a server of version 3.5. Against an older
+one, `setButtonImage()`, a `create()`, `addWidget()` or `updateWidget()` that names a `layout`, and an
+import of a bundle with a button that shows an image fail with `NotImplemented` before anything
+is sent. Reading still works: an older server's widgets read `layout: 'caption'` for a push
+button's and `null` for the rest, and its push buttons `hasImage: false`.
+
 </Engine>
 
 ## Scripts and calculations
@@ -511,6 +576,19 @@ const { field: updated } = await doc.forms.addWidget(field.ref, {
 The field now shows in both places, with the same value. For a radio group, pass the new
 button's `exportValue` in the same object; a checkbox widget gets `'Yes'` when you leave it out.
 
+A push button that holds an [image](#a-button-with-an-image) puts it in the new place too, as a
+text field shows its value there. Where it shows is the new place's own `layout`, which you give
+here: without one the place shows its caption alone and keeps the image without showing it.
+For a second place of the same initials:
+
+```ts
+await doc.forms.addWidget(initials.ref, {
+  page: lastPage.ref,
+  rect: { x: 480, y: 740, width: 72, height: 36 },
+  layout: 'image',
+});
+```
+
 ## Copy a field
 
 `copy()` makes a new field from each field you name, with all of its widgets, as
@@ -523,7 +601,8 @@ const { fields } = await doc.forms.copy([field.ref], {
 ```
 
 A copy has its original's settings (its `purpose` and `format` too), scripts, default value and
-value, and each widget's place, look, flags and actions. Its name is the original's with the next free number: `email` becomes
+value, and each widget's place, look, flags and actions. A push button's copy has its image,
+which counts as its value. Its name is the original's with the next free number: `email` becomes
 `email_2`, `text_1` becomes `text_2`, `billing.name` becomes `billing.name_2`. A radio group's
 copy keeps its buttons' values. It is in its original's group (`groupId`), which you must be
 allowed to put fields in, and in no group when its original is in none.
@@ -535,7 +614,8 @@ allowed to put fields in, and in no group when its original is in none.
 | `values`  | Whether a copy gets its original's value.                     | `true`           |
 | `widgets` | Copy only these widgets of the fields.                        | all of them      |
 
-With `values: false` a copy has no value, as a created field has none. It keeps its default
+With `values: false` a copy has no value, as a created field has none, and a push button's copy
+no image. It keeps its default
 value, which is what a reset puts back. A signature never comes along: a signed field's copy is
 unsigned.
 
@@ -722,7 +802,7 @@ repair can't be undone, and it ends undo for every change made before it; see
 | Event                                      | Fired by                                   |
 | :----------------------------------------- | :----------------------------------------- |
 | `forms.created`                            | `create()`                                 |
-| `forms.updated`                            | `update()`, and `setSignatureAppearance()` |
+| `forms.updated`                            | `update()`, `setSignatureAppearance()` and `setButtonImage()` |
 | `forms.deleted`                            | `delete()`                                 |
 | `forms.widgetAdded`, `forms.widgetRemoved` | `addWidget()`, `removeWidget()`            |
 | `forms.widgetDeleted`                      | `deleteWidget()`                           |
@@ -745,7 +825,9 @@ Writing a script, or a widget action that submits the form or opens a web addres
 `doc.forms.script`: it runs for everyone who fills the form in (see
 [Scripts in forms](/docs/engine/concepts/permissions#scripts-in-forms)). Removing one doesn't, and
 widget actions that go to a page, reset the form or show and hide fields need `doc.forms.modify`
-alone. So does a field's [`format`](#dates-and-times): the engine writes its scripts itself. See [Permissions](/docs/engine/concepts/permissions).
+alone. So does a field's [`format`](#dates-and-times): the engine writes its scripts itself.
+Putting an image in a push button is filling it in: [`setButtonImage()`](#a-button-with-an-image)
+needs `doc.forms.fill`, or `fields:fill` for the field's group. See [Permissions](/docs/engine/concepts/permissions).
 
 A certified document doesn't allow changes to its fields: these calls fail with
 `ProtectedDocument`. See

@@ -26,6 +26,7 @@ import {
   type CandidateStore,
   scratchPath,
 } from './internal/candidateStore';
+import { DrawingIndex } from '../../document-session/DrawingIndex';
 import { bakeWidgetAppearance } from './internal/appearance';
 import { assertSealedSignature, type SealExpectation } from './internal/sealCheck';
 import { createTimestampField } from './internal/timestampField';
@@ -254,9 +255,16 @@ export class SignatureMutator {
       }
       const mark = signatureAppearanceBytes(input.appearance ?? null);
       if (mark && field?.widget) {
-        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, mark, {
-          recordFit: false,
-        });
+        // The candidate is a document of its own, so its drawings are found
+        // in it: a mark the document already shows is placed again.
+        bakeWidgetAppearance(
+          this.runtime,
+          candidate.docPtr,
+          new DrawingIndex(),
+          field.widget,
+          mark,
+          { recordFit: false },
+        );
       }
 
       const store = this.storeFor();

@@ -1874,6 +1874,7 @@ export namespace AnnotationDraft {
         textAlign?: AnnotationDraftWidget.TextAlign | undefined;
         caption?: (string | null) | undefined;
         checkStyle?: (AnnotationDraftWidget.CheckStyle | null) | undefined;
+        layout?: (AnnotationDraftWidget.Layout | null) | undefined;
         field?: unknown | undefined;
         fieldKind?: unknown | undefined;
         hasMark?: unknown | undefined;
@@ -1950,6 +1951,16 @@ export namespace AnnotationDraft {
             Diamond: "diamond",
         } as const;
         export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
+        export const Layout = {
+            Caption: "caption",
+            Image: "image",
+            CaptionBelow: "caption-below",
+            CaptionAbove: "caption-above",
+            CaptionRight: "caption-right",
+            CaptionLeft: "caption-left",
+            CaptionOver: "caption-over",
+        } as const;
+        export type Layout = (typeof Layout)[keyof typeof Layout];
     }
 
     export interface Redact {

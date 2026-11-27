@@ -210,9 +210,18 @@ export interface ListBoxField<C extends Coordinates = PageCoordinates> extends F
   topIndex: number;
 }
 
-/** A push button: pure trigger, holds no value. Never written or exported. */
+/**
+ * A push button: a trigger, which holds no value, or an image (an image
+ * field, its widgets' `layout` showing it). Never written by `setValue()`;
+ * its image is set with `setButtonImage()`.
+ */
 export interface PushButtonField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   kind: 'pushbutton';
+  /**
+   * Whether it holds an image: one of its widgets has an icon (`/MK /I`),
+   * one `setButtonImage()` put in or another app made.
+   */
+  hasImage: boolean;
 }
 
 /**

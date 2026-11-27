@@ -24,7 +24,7 @@ import { StrikeoutKind } from './strikeout';
 import { TextKind } from './text';
 import { UnderlineKind } from './underline';
 import { UnsupportedKind } from './unsupported';
-import { WidgetKind } from './widget';
+import { WidgetKind, withWidgetLayout } from './widget';
 
 export * from './highlight';
 export * from './underline';
@@ -163,6 +163,7 @@ export const AnnotationSchema: z.ZodType<Annotation> = withCatchAll(
     rawSubtypeName:
       typeof annotation.rawSubtypeName === 'string' ? annotation.rawSubtypeName : null,
   }),
+  (annotation) => (annotation.subtype === 'widget' ? withWidgetLayout(annotation) : annotation),
 ).describe(
   'An annotation, by its `subtype`. A newer server can add subtypes: read one your client ' +
     "doesn't know as `unsupported`, keeping the fields every annotation has, with " +

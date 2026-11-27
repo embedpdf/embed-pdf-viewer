@@ -23,6 +23,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsReorderWidgets
     | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
+    | CloudPDF.ChangeOp.FormsSetButtonImage
     | CloudPDF.ChangeOp.MetadataUpdate
     | CloudPDF.ChangeOp.MetadataUpdateCustom
     | CloudPDF.ChangeOp.OutlineCreate
@@ -218,6 +219,18 @@ export namespace ChangeOp {
     export namespace ChangeOpFormsSetSignatureAppearance {
         export interface Resources {
             appearance: string | null;
+        }
+    }
+
+    export interface FormsSetButtonImage {
+        type: "forms.setButtonImage";
+        field: CloudPDF.FormFieldRef;
+        resources: ChangeOpFormsSetButtonImage.Resources;
+    }
+
+    export namespace ChangeOpFormsSetButtonImage {
+        export interface Resources {
+            image: string | null;
         }
     }
 

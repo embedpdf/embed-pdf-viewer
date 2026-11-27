@@ -76,6 +76,7 @@ const pushbutton = (fieldObjectNumber: number, name: string): FormField => ({
   ref: ref(fieldObjectNumber),
   name,
   kind: 'pushbutton',
+  hasImage: false,
   origin: 'acroform',
   readOnly: false,
   required: false,

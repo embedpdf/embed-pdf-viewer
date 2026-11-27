@@ -92,7 +92,7 @@ import {
   PdfLinkTargetSchema,
   PdfLinkTargetWritableSchema,
 } from '../annotation/kinds';
-import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import { WidgetDeclaration, WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
 import type { Identity } from '../auth/scope/types';
 import {
   ANNOTATION_APPEARANCE_MODES,
@@ -1305,7 +1305,7 @@ export const FormWireComponents = {
   FormFieldPatch: FormFieldPatchSchema,
   FieldPosition: FieldPositionSchema,
   WidgetPlacement: WidgetPlacementSchema,
-  WidgetAnnotation: WidgetDTOSchema,
+  WidgetAnnotation: WidgetDeclaration.readSchema,
   WidgetPatch: WidgetPatchSchema,
   FormMutationMeta: FormMutationMetaSchema,
 } as const satisfies Record<string, z.ZodType>;

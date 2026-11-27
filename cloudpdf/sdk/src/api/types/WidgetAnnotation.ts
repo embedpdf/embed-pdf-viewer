@@ -48,6 +48,7 @@ export interface WidgetAnnotation {
     textAlign: WidgetAnnotation.TextAlign;
     caption: string | null;
     checkStyle: WidgetAnnotation.CheckStyle | null;
+    layout: WidgetAnnotation.Layout | null;
     field: CloudPDF.FormFieldRef | null;
     /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
     fieldKind: WidgetAnnotation.FieldKind;
@@ -130,6 +131,16 @@ export namespace WidgetAnnotation {
         Diamond: "diamond",
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
+    export const Layout = {
+        Caption: "caption",
+        Image: "image",
+        CaptionBelow: "caption-below",
+        CaptionAbove: "caption-above",
+        CaptionRight: "caption-right",
+        CaptionLeft: "caption-left",
+        CaptionOver: "caption-over",
+    } as const;
+    export type Layout = (typeof Layout)[keyof typeof Layout];
     /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
     export const FieldKind = {
         Text: "text",

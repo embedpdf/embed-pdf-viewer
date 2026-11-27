@@ -52,6 +52,9 @@ import { acquireFormModel } from './internal/formModelCache';
 import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
 import { formMutationMeta, redrawnByValue } from './internal/formMutationMeta';
 import { bakeWidgetAppearance, clearWidgetMark } from '../signature/internal/appearance';
+import { readWidgetIcon, setWidgetIcon } from './internal/buttonImage';
+import { exactBuffer, pictureFormatOf } from '../annotations/internal/pictureFormat';
+import { drawingFor } from '../annotations/internal/write/stampDrawing';
 import {
   readSignaturesFromModel,
   withSignatureModel,
@@ -590,9 +593,59 @@ export class FormMutator {
         `'${before.name}' has no widget to draw into`,
       );
     }
+    const drawings = this.session.drawingIndex();
     for (const widget of before.widgets) {
       if (mark === null) clearWidgetMark(this.runtime, docPtr, widget);
-      else bakeWidgetAppearance(this.runtime, docPtr, widget, mark, { recordFit: true });
+      else bakeWidgetAppearance(this.runtime, docPtr, drawings, widget, mark, { recordFit: true });
+    }
+    this.session.invalidateDerived();
+    return { field: this.readBackField(resolved.fieldObjectNumber) };
+  }
+
+  /**
+   * Put an image (a PNG, a JPEG or a one-page PDF) in every widget of a
+   * push button, or take it out (`null`): an image field, as Acrobat writes
+   * one. The image is a drawing of the document (`drawingFor`), found
+   * again when the document holds it already, and each widget names it as
+   * its icon (`/MK /I`) and draws its look from it, as its `layout` says;
+   * the layout is left as it is. `null` takes the icon out of each widget
+   * that has one, which draws its box again. A field locked by a signature
+   * is refused (`assertWritable`).
+   */
+  setButtonImage(
+    ref: FormFieldRef,
+    image: Uint8Array | null,
+    signal: AbortSignal,
+  ): { field: FormField<PdfCoordinates> } {
+    throwIfAborted(signal);
+    const { fn, mem } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const model = acquireFormModel(this.runtime, this.session);
+    const resolved = resolveFieldRef(this.runtime, model, ref);
+    this.assertWritable(resolved);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    if (before.kind !== 'pushbutton') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' is a ${before.kind} field, not a push button`,
+      );
+    }
+    const widgets = before.widgets.filter((widget) => widget.ref !== null);
+    if (image !== null && widgets.length === 0) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' has no widget to show an image in`,
+      );
+    }
+    let drawing = 0;
+    if (image !== null) {
+      const bytes = exactBuffer(image);
+      const format = pictureFormatOf(fn, mem, bytes, "a push button's image", false, 'image');
+      drawing = drawingFor(fn, mem, docPtr, this.session.drawingIndex(), bytes, format);
+    }
+    throwIfAborted(signal);
+    for (const widget of widgets) {
+      setWidgetIcon(this.runtime, this.session, widget.ref!, drawing);
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };
@@ -813,7 +866,10 @@ export class FormMutator {
   /**
    * Show a field in one more place: create the widget where the placement
    * says, styled by it, and add it to the field, as one change. A failure
-   * after the first write rolls the page and the form back.
+   * after the first write rolls the page and the form back. A push button's
+   * new place gets the field's image, as a text field's shows its value;
+   * its layout is the placement's, so a caption box holds the image
+   * without showing it.
    */
   addWidget(
     ref: FormFieldRef,
@@ -836,6 +892,9 @@ export class FormMutator {
     const fitted = placedWidgetOf(fitWidgetToFamily(before.kind, placement));
     const pageIndex = this.preflightPlacement(fitted);
     const onState = onStateOf(before.kind, fitted);
+    // Read before a merged field splits below: the drawing is its own object
+    // and keeps its number.
+    const image = before.kind === 'pushbutton' && before.hasImage ? this.imageOf(before) : 0;
     // A merged field/widget splits: its widget half becomes a new widget, at
     // a new number in the same place in that page's /Annots.
     const mergedPage =
@@ -867,11 +926,20 @@ export class FormMutator {
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
     }
+    const widget = formWidget(widgetObjectNumber, placement.page);
+    if (image !== 0) setWidgetIcon(this.runtime, this.session, widget.ref!, image);
     this.session.invalidateDerived();
-    return {
-      field: this.readBackField(resolved.fieldObjectNumber),
-      widget: formWidget(widgetObjectNumber, placement.page),
-    };
+    return { field: this.readBackField(resolved.fieldObjectNumber), widget };
+  }
+
+  /** The drawing a push button's image is (`/MK /I`): the first of its places' that has one, or 0. */
+  private imageOf(field: FormField<PdfCoordinates>): number {
+    for (const widget of field.widgets) {
+      if (widget.ref === null) continue;
+      const drawing = readWidgetIcon(this.runtime, this.session, widget.ref);
+      if (drawing !== 0) return drawing;
+    }
+    return 0;
   }
 
   detachWidget(

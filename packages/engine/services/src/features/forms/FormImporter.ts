@@ -23,7 +23,7 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormMutator } from './FormMutator';
-import { createPlannedFields } from './internal/createPlannedFields';
+import { createPlannedFields, type PlannedImage } from './internal/createPlannedFields';
 import { restoreFieldCreation, restoreFieldFill } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
 import { readFieldAt } from './internal/readFormSnapshot';
@@ -106,11 +106,22 @@ export class FormImporter {
     const docPtr = this.session.requireDocPtr();
     const importedBy = request.actor.userId ?? null;
     const restores = request.attribution === 'restore';
+    // A push button's image is its value: with values, each widget that
+    // names one in the bundle places it.
+    const creates = plan.creates.map((planned) => {
+      if (!request.values || planned.draft.kind !== 'pushbutton') return planned;
+      const images = planned.widgets.map((row): PlannedImage | null => {
+        const id = bundle.widgets[row]?.resources.image;
+        const bytes = id === undefined ? undefined : bundle.resources[id as never];
+        return bytes ? { bytes } : null;
+      });
+      return images.some(Boolean) ? { ...planned, images } : planned;
+    });
     const made = createPlannedFields(
       this.runtime,
       this.session,
       this.fonts,
-      plan.creates,
+      creates,
       plan.calculationOrder,
       {
         actor: request.actor,

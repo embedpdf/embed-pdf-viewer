@@ -116,6 +116,8 @@ export function widgetPlacementOf(
     fontSize: row.fontSize,
     fontColor: row.fontColor,
     caption: field.kind === 'pushbutton' ? row.caption : null,
+    // The PDF's own default, `caption`, needs no write; an older bundle's row has none.
+    layout: field.kind === 'pushbutton' && row.layout !== 'caption' ? row.layout : null,
   };
   return {
     page: mapPage(row.page),

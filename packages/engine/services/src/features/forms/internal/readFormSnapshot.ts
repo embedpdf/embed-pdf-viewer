@@ -18,6 +18,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
+import { PageIndexLookup, readButtonHasImage } from './buttonImage';
 import { readFieldAttribution, readFieldGroup, readFieldPurpose } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -136,6 +137,7 @@ export function readFieldAt(
   fieldIndex: number,
   docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
+  pages = new PageIndexLookup(runtime, docPtr),
 ): FormField<PdfCoordinates> {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
@@ -240,7 +242,15 @@ export function readFieldAt(
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }
-    case 'pushbutton':
+    case 'pushbutton': {
+      const widgets = readPlainWidgets(runtime, model, fieldIndex);
+      return {
+        ...base,
+        kind: 'pushbutton',
+        hasImage: readButtonHasImage(runtime, docPtr, widgets, pages),
+        widgets,
+      };
+    }
     case 'signature': {
       return { ...base, kind: family, widgets: readPlainWidgets(runtime, model, fieldIndex) };
     }
@@ -270,8 +280,9 @@ export function readFormFields(
   const count = fn.EPDFForm_CountFields(model);
   const fields: FormField<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
+  const pages = new PageIndexLookup(runtime, docPtr);
   for (let i = 0; i < count; i++) {
-    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));
+    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget, pages));
   }
   const calculationOrder: FormSnapshot<PdfCoordinates>['calculationOrder'] = [];
   const calculationCount = fn.EPDFForm_CountCalculationOrder(model);

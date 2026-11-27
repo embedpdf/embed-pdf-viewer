@@ -14,6 +14,7 @@ import { readI32 } from '../../../../runtime/memory/structs';
 import { readAppearanceFit } from '../appearanceFit';
 import { widgetBorderStyleFromCode } from '../shapeBorderStyle';
 import { textAlignmentFromCode } from '../textAlignment';
+import { widgetLayoutFromCode } from '../widgetLayout';
 import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readBorderStyle,
@@ -101,6 +102,8 @@ export function readWidget(
       fn.EPDFAnnot_GetMKText(annotPtr, MK_CAPTION, buf, capacity),
     ),
     checkStyle: null,
+    // `/MK /TP` as stored; the field join keeps it for a push button's widget only.
+    layout: widgetLayoutFromCode(fn.EPDFAnnot_GetMKTextPosition(annotPtr)),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,

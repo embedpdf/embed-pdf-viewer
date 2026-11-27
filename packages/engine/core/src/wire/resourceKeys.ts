@@ -25,6 +25,14 @@ export const FieldAppearanceResourceKeysSchema = z
   .object({ appearance: ResourceKeySchema.nullable() })
   .strict();
 
+/**
+ * A push button's image: its part, or `null` for none, which takes out the
+ * one the field has.
+ */
+export const ButtonImageResourceKeysSchema = z
+  .object({ image: ResourceKeySchema.nullable() })
+  .strict();
+
 /** An attachment's file. */
 export const FileResourceKeysSchema = z.object({ file: ResourceKeySchema }).strict();
 

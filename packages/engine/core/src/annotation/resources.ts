@@ -58,16 +58,29 @@ export async function resolveAnnotationResources(
   for (const role of ANNOTATION_RESOURCE_ROLE_NAMES) {
     const data = resources[role];
     if (data === undefined) continue;
-    const bytes = await ownedBytes(data);
-    if (role === 'appearance' && !sniffBinaryMetadata(bytes)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        'the appearance resource must be PNG, JPEG or one-page PDF bytes',
-      );
-    }
-    wire[role] = bytes;
+    wire[role] =
+      role === 'appearance'
+        ? await resolvePictureBytes(data, 'the appearance resource')
+        : await ownedBytes(data);
   }
   return wire;
+}
+
+/**
+ * Bytes a picture is drawn from (a stamp's appearance, a push button's
+ * image), owned as `resolveAnnotationResources` owns them, and refused with
+ * `InvalidArg` naming `what` unless they are PNG, JPEG or PDF. The format
+ * comes from the bytes.
+ */
+export async function resolvePictureBytes(data: ResourceBytes, what: string): Promise<ArrayBuffer> {
+  const bytes = await ownedBytes(data);
+  if (!sniffBinaryMetadata(bytes)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${what} must be PNG, JPEG or one-page PDF bytes`,
+    );
+  }
+  return bytes;
 }
 
 /**

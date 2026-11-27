@@ -407,7 +407,7 @@ class StepContext {
   claimSubtree(
     side: Side,
     roots: Set<number>,
-    accept: (label: string) => boolean,
+    accept: (label: string, parent: number) => boolean,
     rule: string,
   ): void {
     // Two sets, never merged: an edge from a root is inside the subtree
@@ -425,7 +425,7 @@ class StepContext {
         const edges = c.usage[side];
         if (edges.length === 0) continue;
         const inside = edges.filter(
-          (e) => (roots.has(e.parent) && accept(e.label)) || joined.has(e.parent),
+          (e) => (roots.has(e.parent) && accept(e.label, e.parent)) || joined.has(e.parent),
         );
         if (inside.length === 0) continue;
         for (const e of inside) this.claimEdge(c, side, e, rule);
@@ -1014,17 +1014,42 @@ function readOnlyOnlyChange(c: ObjectChange, effectiveBefore?: number): boolean 
   return (before | FF_READ_ONLY) === after;
 }
 
+/**
+ * Did a push button's `/MK` change in its image (`/I`) and nothing else? An
+ * image is filling the button in, as Acrobat counts it: "not modified" after
+ * an approval signature, "permitted by the certifying party" after a P=2
+ * certification (Acrobat 26, Nov 26 2026). Its caption, colors and layout
+ * (`/CA`, `/BC`, `/BG`, `/TP`) are design. An `/MK` held by reference is not
+ * read through, so a change of it stays design.
+ */
+function imageOnlyMkChange(c: ObjectChange): boolean {
+  const before = dictEntries(c.value.old)?.MK ?? null;
+  const after = dictEntries(c.value.new)?.MK ?? null;
+  if ((before && before.t !== 'dict') || (after && after.t !== 'dict')) return false;
+  const changed = changedKeys(before, after);
+  return changed.size > 0 && [...changed].every((key) => key === 'I');
+}
+
+/** A push button's image under its field or widget: the `/MK /I` drawing and what it holds. */
+const isButtonImage = (label: string) => label === 'MK/I' || label.startsWith('MK/I/');
+const isAppearance = (label: string) => label === 'AP' || label.startsWith('AP/');
+
 function ruleFormFill(ctx: StepContext): void {
   const rule = 'form-fill';
   const fieldKeys = fieldKeysFor(ctx.level);
   const widgetKeys = widgetKeysFor(ctx.level);
   const parents = new Set<number>();
+  /** The push buttons among `parents`: their image is claimed with their appearance. */
+  const buttons = new Set<number>();
   const fields = new Map<number, RevisionField>([
     ...ctx.before.fieldByObj,
     ...ctx.after.fieldByObj,
   ]);
   for (const [num, field] of fields) {
     if (field.kind === 'signature') continue;
+    const isButton = field.kind === 'pushbutton';
+    /** `/MK` as filling in: a push button's image, and no other part of it. */
+    const imageOnly = (c: ObjectChange) => isButton && imageOnlyMkChange(c);
     const fc = ctx.byNum.get(num);
     const widgetChanges = field.widgets
       .filter((w) => w !== num)
@@ -1035,7 +1060,6 @@ function ruleFormFill(ctx: StepContext): void {
     // widget's /AP. Form filling at P=2 covers it (pyHanko agrees); what the
     // subtree may contain is still judged by the claim below.
     const owners = new Set([num, ...field.widgets]);
-    const isAp = (label: string) => label === 'AP' || label.startsWith('AP/');
     // An appearance object shared with another field's /AP is nobody's
     // regeneration (pyHanko: "used in multiple contexts"); its foreign edge
     // stays unexplained unless that field is filled in the same step.
@@ -1044,10 +1068,10 @@ function ruleFormFill(ctx: StepContext): void {
         ? ctx.changes.filter(
             (c) =>
               SIDES.some((side) =>
-                c.usage[side].some((e) => owners.has(e.parent) && isAp(e.label)),
+                c.usage[side].some((e) => owners.has(e.parent) && isAppearance(e.label)),
               ) &&
               SIDES.every((side) =>
-                c.usage[side].every((e) => !isAp(e.label) || owners.has(e.parent)),
+                c.usage[side].every((e) => !isAppearance(e.label) || owners.has(e.parent)),
               ),
           )
         : [];
@@ -1068,7 +1092,8 @@ function ruleFormFill(ctx: StepContext): void {
     let ok = true;
     if (fc && !ctx.isIdentical(fc)) {
       const changed = changedKeys(fc.value.old, fc.value.new);
-      const bad = [...changed].filter((k) => !fieldKeys.has(k));
+      const image = changed.has('MK') && imageOnly(fc);
+      const bad = [...changed].filter((k) => !fieldKeys.has(k) && !(k === 'MK' && image));
       if (bad.length > 0) {
         ctx.forbidden(fc, rule, `field "${field.name}" keys changed: ${bad.join(', ')}`);
         ctx.claimStable(fc, rule, false);
@@ -1085,20 +1110,30 @@ function ruleFormFill(ctx: StepContext): void {
       } else {
         ctx.claimStable(fc, rule);
         const properties = [...changed].filter(
-          (k) => k !== 'V' && k !== 'AP' && k !== 'AS' && k !== 'I' && k !== 'RV',
+          (k) =>
+            k !== 'V' &&
+            k !== 'AP' &&
+            k !== 'AS' &&
+            k !== 'I' &&
+            k !== 'RV' &&
+            !(k === 'MK' && image),
         );
         ctx.permitted(
           fc,
           rule,
           properties.length > 0
             ? `field "${field.name}" ${changed.has('V') || changed.has('AS') ? 'filled, ' : ''}properties changed: ${properties.join(', ')}`
-            : `field "${field.name}" filled`,
+            : image
+              ? `push button "${field.name}" image changed`
+              : `field "${field.name}" filled`,
         );
       }
     }
     for (const wc of widgetChanges) {
       if (ctx.isIdentical(wc)) continue;
-      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter((k) => !widgetKeys.has(k));
+      const changed = changedKeys(wc.value.old, wc.value.new);
+      const image = changed.has('MK') && imageOnly(wc);
+      const bad = [...changed].filter((k) => !widgetKeys.has(k) && !(k === 'MK' && image));
       if (bad.length > 0) {
         ctx.forbidden(wc, rule, `widget of "${field.name}" keys changed: ${bad.join(', ')}`);
         ctx.claimStable(wc, rule, false);
@@ -1106,15 +1141,26 @@ function ruleFormFill(ctx: StepContext): void {
         continue;
       }
       ctx.claimStable(wc, rule);
-      ctx.permitted(wc, rule, `widget of "${field.name}" appearance`);
+      ctx.permitted(wc, rule, `widget of "${field.name}" ${image ? 'image' : 'appearance'}`);
     }
     if (ok) {
       parents.add(num);
       for (const w of field.widgets) parents.add(w);
+      if (isButton) {
+        buttons.add(num);
+        for (const w of field.widgets) buttons.add(w);
+      }
     }
   }
+  // The appearances, and a push button's image (`/MK /I`), which its
+  // appearance draws: the drawing, and what it holds.
   for (const side of SIDES)
-    ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
+    ctx.claimSubtree(
+      side,
+      parents,
+      (label, parent) => isAppearance(label) || (buttons.has(parent) && isButtonImage(label)),
+      rule,
+    );
 }
 
 /**

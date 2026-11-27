@@ -71,7 +71,8 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     }
     case 'forms.setDisplay':
     case 'forms.setAppearanceText':
-    case 'forms.setSignatureAppearance': {
+    case 'forms.setSignatureAppearance':
+    case 'forms.setButtonImage': {
       const { type: _type, ...result } = item;
       return [{ type: 'forms.updated', ...result }];
     }
