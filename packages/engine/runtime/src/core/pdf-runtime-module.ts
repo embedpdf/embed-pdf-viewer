@@ -43,6 +43,12 @@ export interface PdfRuntimeFileAccess {
    * Browser base documents should prefer EPDF_LoadMemBaseDocument64().
    */
   fromMemory(bytes: Uint8Array | ArrayBuffer): PdfFileAccessHandle;
+  /**
+   * Wasm only: range-read an HTTP(S) URL as PDFium asks for bytes. The server
+   * must answer `Range` with `206`. Throws when range loading is unavailable,
+   * so the caller can download the file instead.
+   */
+  fromHttpRange(url: string): PdfFileAccessHandle;
   /** Native/node only: range-reads a local file without loading it into JS. */
   fromNodeFile(path: string): PdfFileAccessHandle;
   /** Native/node only: the bytes `[offset, offset + length)` of a local file (short at EOF). */

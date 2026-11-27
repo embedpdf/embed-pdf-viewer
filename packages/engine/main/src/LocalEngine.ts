@@ -138,6 +138,10 @@ export class LocalEngine implements LocalEngineContract {
       return AbortablePromise.rejectReason(error); // an invalid scope string
     }
 
+    if (input.kind === 'url') {
+      return this.openUrl(input, options);
+    }
+
     if (input.kind === 'bytes') {
       return this.openBytes(input, options);
     }
@@ -153,7 +157,7 @@ export class LocalEngine implements LocalEngineContract {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `local engine only supports OpenInput.kind === 'bytes', 'layerBytes' or 'layerFile' (got '${input.kind}')`,
+        `local engine only supports OpenInput.kind === 'url', 'bytes', 'layerBytes' or 'layerFile' (got '${input.kind}')`,
       ),
     );
   }
@@ -197,6 +201,37 @@ export class LocalEngine implements LocalEngineContract {
           },
           transfer,
         ),
+    });
+
+    return this.openResult(submission, options);
+  }
+
+  /** PDFium range-reads the URL in the wasm worker. The file is not copied across first. */
+  private openUrl(
+    input: Extract<OpenInput, { kind: 'url' }>,
+    options?: OpenOptions,
+  ): AbortablePromise<LocalDocumentHandle> {
+    const queue = this.queue;
+    const password = options?.password ?? null;
+    const docId = input.id ?? generateUuid();
+    const signedDocumentPolicy = this.signedDocumentPolicy;
+    const url =
+      typeof location !== 'undefined' && location.href
+        ? new URL(input.url, location.href).href
+        : new URL(input.url).href;
+
+    const submission = queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'open.httpRange',
+          effect: 'open',
+          jobId,
+          docId,
+          url,
+          password,
+          signedDocumentPolicy,
+          reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
+        }),
     });
 
     return this.openResult(submission, options);
