@@ -110,10 +110,11 @@ const NO_RECT = { x: 0, y: 0, left: 0, top: 0, right: 0, bottom: 0, width: 0, he
         [style.height.px]="layout().shadow.height"
         [style.box-shadow]="shadow()"
       ></div>
-      <!-- The page: its background and its layers as one box, the only thing that turns. -->
+      <!-- The page: its background and its layers as one box, the only thing that turns. A
+           stacking context of its own: what a layer raises stays inside the page. -->
       <div
         #content
-        style="position: absolute; user-select: none; -webkit-user-select: none"
+        style="position: absolute; user-select: none; -webkit-user-select: none; isolation: isolate"
         [style.left.px]="layout().content.left"
         [style.top.px]="layout().content.top"
         [style.width.px]="layout().content.width"

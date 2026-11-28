@@ -53,6 +53,7 @@ import type {
   LinkNavItem,
   TextItem,
   ImageGhost,
+  ImageGhostPlace,
 } from './contract';
 import { AnnotationToken as PublicAnnotationToken } from './token';
 import type { ResolvedTool } from './tools/definitions';
@@ -429,6 +430,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): void;
   clearGhost(): void;
+  /**
+   * Show the armed stamp's ghost in a box instead of at the pointer: where a sibling plugin's
+   * click there puts the stamp (the signature plugin's mark, fitted into a field). The handler
+   * that would take the click calls it on hover, as `hoverGhostAt`'s does; `null` gives the
+   * ghost back to the pointer. A new or dropped arm and a tool change clear it.
+   */
+  hoverGhostIn(place: ImageGhostPlace | null): void;
   /**
    * A sibling plugin's placement gesture with one of this plugin's tools (the
    * form palette's drag-to-place): its press and the pointer now, and

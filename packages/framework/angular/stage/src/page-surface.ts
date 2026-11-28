@@ -58,10 +58,12 @@ import type { EpdfPageTemplateContext } from './templates';
       [style.box-shadow]="shadow()"
     ></div>
     <!-- The page: its background and content as one box, the only thing that turns. The layers
-         draw their own selection, so the browser's is off for the whole page. -->
+         draw their own selection, so the browser's is off for the whole page. A stacking context
+         of its own: what a layer raises (a preview above the fields) stays inside the page, under
+         the next page and the overlays. -->
     <div
       #content
-      style="position: absolute; user-select: none; -webkit-user-select: none"
+      style="position: absolute; user-select: none; -webkit-user-select: none; isolation: isolate"
       [style.left.px]="layout().content.left"
       [style.top.px]="layout().content.top"
       [style.width.px]="layout().content.width"

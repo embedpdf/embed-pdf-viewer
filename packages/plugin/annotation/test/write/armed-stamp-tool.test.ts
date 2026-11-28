@@ -112,3 +112,42 @@ describe('the armed stamp and its tool', () => {
     expect(tool()).toBe('stamp');
   });
 });
+
+describe('the armed stamp’s preview in a box', () => {
+  it('shows in the box a sibling gives it instead of at the pointer, until it gives the pointer back', async () => {
+    const { harness, arm } = await connected();
+    await arm();
+    const annotation = harness.capability;
+    annotation.hoverGhostAt('stamp', PAGE, { x: 300, y: 400 });
+    const atPointer = annotation.getImageGhost(PAGE);
+    expect(atPointer).not.toBeNull();
+
+    const field = { page: PAGE, box: { x: 100, y: 200, width: 120, height: 60 }, rot: 90 };
+    annotation.hoverGhostIn(field);
+    expect(annotation.getImageGhost(PAGE)).toEqual({ ...field, opacity: atPointer!.opacity });
+    // The same place: the same ghost, so nothing paints again.
+    expect(annotation.getImageGhost(PAGE)).toBe(annotation.getImageGhost(PAGE));
+
+    annotation.hoverGhostIn(null);
+    expect(annotation.getImageGhost(PAGE)).toEqual(atPointer);
+  });
+
+  it('goes with a disarm and with a tool change', async () => {
+    const { harness, interaction, arm } = await connected();
+    const annotation = harness.capability;
+    const field = { page: PAGE, box: { x: 100, y: 200, width: 120, height: 60 }, rot: 0 };
+
+    await arm();
+    annotation.hoverGhostIn(field);
+    expect(annotation.getImageGhost(PAGE)).not.toBeNull();
+    annotation.stamps.disarm();
+    await arm();
+    expect(annotation.getImageGhost(PAGE)).toBeNull();
+
+    annotation.hoverGhostIn(field);
+    expect(annotation.getImageGhost(PAGE)).not.toBeNull();
+    interaction.activateTool('ink');
+    await arm();
+    expect(annotation.getImageGhost(PAGE)).toBeNull();
+  });
+});

@@ -69,8 +69,9 @@ export function connectAnnotation(
     // a shape that needs more clicks, goes with the tool it was made with.
     annotation.finishInkDraft();
     annotation.cancel();
-    // A ghost belongs to the tool that showed it.
+    // A ghost belongs to the tool that showed it, and so does one a sibling put in a box.
     annotation.clearGhost();
+    annotation.hoverGhostIn(null);
     // Annotations whose behavior just engaged (form widgets under a fill
     // tool) leave the selection, so no chrome is stranded on a fill control.
     annotation.pruneEngagedSelection();

@@ -16,6 +16,7 @@ import type { EditableKinds, Id, Point, Session, SnapSettings } from '@embedpdf/
 import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
+import type { ImageGhostPlace } from './contract';
 import type { EditorSelection } from './rich-text';
 
 /** Where the active tool's ghost is: the pointer on a page, and how that page shows there. */
@@ -55,6 +56,12 @@ export interface AnnotationModel {
    */
   readonly ghostAt: GhostPointer | null;
   /**
+   * Where a sibling plugin's click would put the armed stamp instead (the signature plugin's
+   * mark into a field), while the pointer is there: the armed stamp's ghost shows in that box,
+   * not at the pointer (tools/ghost.ts).
+   */
+  readonly ghostIn: ImageGhostPlace | null;
+  /**
    * A placement a sibling plugin's gesture is making with one of this
    * plugin's tools (the form palette's drag-to-place). Once it is a drag it
    * paints as a drawing in progress (tools/ghost.ts).
@@ -75,6 +82,7 @@ export const initialAnnotationModel = (): AnnotationModel => ({
   session: initialSession,
   vector: {},
   ghostAt: null,
+  ghostIn: null,
   placing: null,
   textSelection: null,
 });
@@ -156,6 +164,11 @@ export const setGhostAt = (
   state: AnnotationModel,
   ghostAt: GhostPointer | null,
 ): AnnotationModel => (state.ghostAt === ghostAt ? state : { ...state, ghostAt });
+
+export const setGhostIn = (
+  state: AnnotationModel,
+  ghostIn: ImageGhostPlace | null,
+): AnnotationModel => (state.ghostIn === ghostIn ? state : { ...state, ghostIn });
 
 export const setPlacing = (
   state: AnnotationModel,

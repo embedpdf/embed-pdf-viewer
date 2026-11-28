@@ -300,6 +300,13 @@ export interface ImageGhost {
 }
 
 /**
+ * Where the armed stamp's ghost shows in place of the pointer: the box a sibling plugin's click
+ * would put the stamp in (the signature plugin's mark in a field), and its turn, as
+ * {@link ImageGhost} has them.
+ */
+export type ImageGhostPlace = Pick<ImageGhost, 'page' | 'box' | 'rot'>;
+
+/**
  * One clickable link area on a page (page space): a standalone link
  * annotation, or one segment of a parent's attached link. See
  * {@link AnnotationHostCapability.listLinkItems}.

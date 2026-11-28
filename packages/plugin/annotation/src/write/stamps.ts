@@ -24,7 +24,7 @@ import {
 } from '../contract';
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
-import { setGhostAt } from '../model';
+import { setGhostAt, setGhostIn } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Applied } from '../services/store';
 import { appliedAnnotationOf } from './outcomes';
@@ -170,6 +170,7 @@ export function createStamps(
   /** A new or dropped payload invalidates the ghost drawn for the old one, and wakes readers. */
   const armChanged = (): void => {
     ctx.state.update(setGhostAt, null);
+    ctx.state.update(setGhostIn, null);
     ctx.notify();
   };
 

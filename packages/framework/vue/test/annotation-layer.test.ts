@@ -96,6 +96,23 @@ describe('AnnotationLayer', () => {
     }
   }, 30_000);
 
+  it('a tool’s preview rises above the layers after it; what is made stays in their order', async () => {
+    const { annotation, close } = await mountLayer(() => h(AnnotationLayer));
+    try {
+      /** The frames raised above the layers after this one (the form's fields among them). */
+      const raised = () => all('div').filter((element) => element.style.zIndex === '1');
+      await eventually(() => expect(all('svg').length).toBeGreaterThan(0));
+      expect(raised()).toHaveLength(0);
+      const page = annotation.list()[0]!.page;
+      annotation.hoverGhostAt('note', page, { x: 300, y: 300 });
+      await eventually(() => expect(raised()).toHaveLength(1));
+      annotation.clearGhost();
+      await eventually(() => expect(raised()).toHaveLength(0));
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
   it('an interactive renderer takes the pointer; one that only draws stays inert', async () => {
     const Widget = ({ interactive }: AnnotationRendererProps) =>
       h('button', { 'data-testid': 'widget' }, interactive ? 'live' : 'drawn');

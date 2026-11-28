@@ -72,6 +72,7 @@ FilePromptRequest [InterfaceDeclaration]: export interface FilePromptRequest{ to
 FlagKey [TypeAliasDeclaration] (from packages/core/annotation/src/kinds/define.ts): export type FlagKey = | 'invisible' | 'hidden' | 'print' | 'noZoom' | 'noRotate' | 'noView' | 'readOnly' | 'locked' | 'toggleNoView' | 'lockedContents';
 HandleRole [TypeAliasDeclaration] (from packages/core/annotation/src/types.ts): export type HandleRole = 'corner' | 'side' | 'point';
 ImageGhost [InterfaceDeclaration]: export interface ImageGhost{ readonly page: PageRef; readonly box: Rect; readonly rot: number; readonly opacity: number; }
+ImageGhostPlace [TypeAliasDeclaration]: export type ImageGhostPlace = Pick<ImageGhost, 'page' | 'box' | 'rot'>;
 LineEnding [TypeAliasDeclaration] (from packages/engine/core/src/annotation/primitives.ts): export type LineEnding = | 'none' | 'square' | 'circle' | 'diamond' | 'open-arrow' | 'closed-arrow' | 'butt' | 'r-open-arrow' | 'r-closed-arrow' | 'slash';
 LineEndings [InterfaceDeclaration] (from packages/engine/core/src/annotation/primitives.ts): export interface LineEndings{ start: LineEnding; end: LineEnding; }
 LineStyle [TypeAliasDeclaration]: export type LineStyle = 'solid' | 'dashed';

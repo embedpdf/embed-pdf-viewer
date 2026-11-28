@@ -350,6 +350,29 @@ describe('<epdf-annotation-layer>', () => {
     expect(asked).toContain('pan');
   }, 30_000);
 
+  it('a tool’s preview rises above the layers after it; what is made stays in their order', async () => {
+    const { fixture, annotation, root, page } = await mountPage('<epdf-annotation-layer />');
+    /** The frames raised above the layers after this one (the form's fields among them). */
+    const raised = () =>
+      [...root.querySelectorAll<HTMLElement>('div')].filter(
+        (element) => element.style.zIndex === '1',
+      );
+    await vi.waitFor(() => expect(root.querySelectorAll('svg').length).toBeGreaterThan(0));
+    expect(raised()).toHaveLength(0);
+    annotation.hoverGhostAt('note', page, { x: 300, y: 300 });
+    await vi.waitFor(async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(raised()).toHaveLength(1);
+    });
+    annotation.clearGhost();
+    await vi.waitFor(async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(raised()).toHaveLength(0);
+    });
+  });
+
   it('a look draws into a frame placed and turned like the annotation', async () => {
     const { annotation, fixture, all } = await mountPage(
       `<epdf-annotation-layer>

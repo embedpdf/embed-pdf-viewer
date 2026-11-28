@@ -80,6 +80,8 @@ import {
   ownTextBoxOf,
   pickRequestedFile,
   pictureOrPainting,
+  PREVIEW_Z_INDEX,
+  previewZIndexOf,
   rasterInFrame,
   recordAccentStyleOf,
   recordOutlineStyleOf,
@@ -312,6 +314,8 @@ function AnnotationFrame({
         mixBlendMode: item.blend,
         // An interactive renderer takes the pointer: the layer's own `none` ends here.
         pointerEvents: interactive ? 'auto' : 'none',
+        // A preview and a drawing in progress rise above the form's fields.
+        zIndex: previewZIndexOf(item.source),
       }}
     >
       {children}
@@ -427,6 +431,8 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
         maxWidth: 'none',
         maxHeight: 'none',
         pointerEvents: 'none',
+        // Above the form's fields: over a field, the mark shows in it as the fill draws it.
+        zIndex: PREVIEW_Z_INDEX,
         opacity: ghostOpacity(ghost.opacity),
         ...(ghost.rot ? { transform: `rotate(${ghost.rot}deg)`, transformOrigin: 'center' } : {}),
       }}

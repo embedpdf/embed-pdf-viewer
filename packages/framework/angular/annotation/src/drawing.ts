@@ -13,6 +13,7 @@ import { MITER_LIMIT, scene, type RenderItem } from '@embedpdf/core-annotation';
 import {
   frameInPixels,
   ghostOpacity,
+  previewZIndexOf,
   rasterInFrame,
   recordAccentStyleOf,
   recordOutlineStyleOf,
@@ -30,7 +31,8 @@ import { injectChromeSettings } from './settings';
  * annotation (`item.frame`), inside the page layer that the page itself turns. Its blend is on
  * the box: a turned box groups what is in it, so blending an element inside would stop
  * blending with the page. It takes the pointer only for a look that does (`interactive`), and
- * `inert` keeps the pointer and the focus out of a look that only draws.
+ * `inert` keeps the pointer and the focus out of a look that only draws. A preview and a drawing
+ * in progress (`frameSource` `ghost` or `draft`) rise above the form's fields.
  */
 @Directive({
   selector: '[epdfAnnotationFrame]',
@@ -45,6 +47,7 @@ import { injectChromeSettings } from './settings';
     // An interactive look takes the pointer: the layer's own `none` ends here.
     '[style.pointer-events]': "interactive() ? 'auto' : 'none'",
     '[attr.inert]': "inert() ? '' : null",
+    '[style.z-index]': 'zIndex() ?? null',
   },
 })
 export class EpdfAnnotationFrame {
@@ -52,6 +55,12 @@ export class EpdfAnnotationFrame {
   readonly blend = input<string | undefined>(undefined, { alias: 'frameBlend' });
   readonly interactive = input(false, { alias: 'frameInteractive' });
   readonly inert = input(false, { alias: 'frameInert' });
+  /** How the item paints (`RenderItem.source`): a preview or a drawing in progress rises. */
+  readonly source = input<string | undefined>(undefined, { alias: 'frameSource' });
+  protected readonly zIndex = computed(() => {
+    const source = this.source();
+    return source === undefined ? undefined : previewZIndexOf(source);
+  });
 }
 
 /**

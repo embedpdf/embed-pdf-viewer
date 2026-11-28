@@ -7,7 +7,7 @@
 import { computed } from 'vue';
 import type { CSSProperties } from 'vue';
 import type { RenderItem } from '@embedpdf/core-annotation';
-import { frameInPixels } from '@embedpdf/web';
+import { frameInPixels, previewZIndexOf } from '@embedpdf/web';
 import type { PageContextValue } from '../runtime/page';
 
 const props = withDefaults(
@@ -38,6 +38,8 @@ const style = computed((): CSSProperties => {
     // an inner element would stop blending with the page.
     mixBlendMode: props.item.blend as CSSProperties['mixBlendMode'],
     pointerEvents: props.interactive ? 'auto' : 'none',
+    // A preview and a drawing in progress rise above the form's fields.
+    zIndex: previewZIndexOf(props.item.source),
   };
 });
 </script>

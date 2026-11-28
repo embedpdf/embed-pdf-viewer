@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   fontProgramsOf,
   ghostOpacity,
+  PREVIEW_Z_INDEX,
+  previewZIndexOf,
   sceneViewBox,
   styleText,
   svgShapesOf,
@@ -282,5 +284,14 @@ describe('sceneViewBox', () => {
 describe('ghostOpacity', () => {
   it('lets the CSS variable win over the tool’s opacity', () => {
     expect(ghostOpacity(0.5)).toBe('var(--epdf-ghost-opacity, 0.5)');
+  });
+});
+
+describe('previewZIndexOf', () => {
+  it('raises a preview and a drawing in progress, and leaves what is made in the layers’ order', () => {
+    expect(previewZIndexOf('ghost')).toBe(PREVIEW_Z_INDEX);
+    expect(previewZIndexOf('draft')).toBe(PREVIEW_Z_INDEX);
+    expect(previewZIndexOf('vector')).toBeUndefined();
+    expect(previewZIndexOf('baked')).toBeUndefined();
   });
 });

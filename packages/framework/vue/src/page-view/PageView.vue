@@ -191,6 +191,8 @@ const boxes = computed(() => {
       ...pixelBox(layout.content),
       background: paint('page-background', look.value.background),
       transform: layout.turn ?? undefined,
+      // A stacking context of its own: what a layer raises stays inside the page.
+      isolation: 'isolate',
       // Selection highlights are drawn by the layers: no native text or image selection.
       userSelect: 'none',
       WebkitUserSelect: 'none',

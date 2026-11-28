@@ -6,7 +6,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { RenderItem } from '@embedpdf/core-annotation';
-  import { frameInPixels } from '@embedpdf/web';
+  import { frameInPixels, previewZIndexOf } from '@embedpdf/web';
   import type { PageContextValue } from '../runtime/page';
 
   let {
@@ -29,7 +29,8 @@
 </script>
 
 <!-- The blend is on the frame: a turned frame groups what is inside it, so blending on an inner
-     element would stop blending with the page. -->
+     element would stop blending with the page. A preview and a drawing in progress rise above
+     the form's fields. -->
 <div
   {inert}
   style:position="absolute"
@@ -41,6 +42,7 @@
   style:transform-origin="center"
   style:mix-blend-mode={item.blend}
   style:pointer-events={interactive ? 'auto' : 'none'}
+  style:z-index={previewZIndexOf(item.source)}
 >
   {@render children()}
 </div>

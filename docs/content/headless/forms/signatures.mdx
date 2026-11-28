@@ -53,6 +53,11 @@ a mark from a signature library:
 A mark that goes into a field is disarmed, and the tool goes back to the one people had before
 they armed it, so the fields take input again. A mark placed as a stamp stays armed for the next.
 
+The mark's preview shows what a click does. Over a field it goes into, it sits in the field as the
+field will draw it: fitted whole and centred, inside the border of an image field, turned with a
+turned field, above the field's tint. Over a field that isn't theirs there's no preview, and the
+pointer says no (`not-allowed`). Anywhere else it follows the pointer, as a stamp's does.
+
 `placeMark()` does the same from code:
 
 ```ts

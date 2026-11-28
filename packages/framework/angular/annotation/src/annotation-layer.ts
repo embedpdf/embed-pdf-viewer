@@ -60,6 +60,7 @@ import {
   loadObjectUrl,
   lookFrameOf,
   pictureOrPainting,
+  PREVIEW_Z_INDEX,
   rectInPixels,
   registerRendererBehaviors,
   shownAppearance,
@@ -138,7 +139,11 @@ interface Drawn {
         <!-- A sibling plugin's controls place themselves in the layer and take the input;
              the annotation's own drawing keeps its frame. -->
         <ng-template #framedNative>
-          <div [epdfAnnotationFrame]="drawn.frame" [frameBlend]="drawn.item.blend">
+          <div
+            [epdfAnnotationFrame]="drawn.frame"
+            [frameBlend]="drawn.item.blend"
+            [frameSource]="drawn.item.source"
+          >
             <ng-container [ngTemplateOutlet]="native" />
           </div>
         </ng-template>
@@ -152,7 +157,7 @@ interface Drawn {
             native: framedNative,
             hovered: drawn.item.hovered ?? false,
             selected: drawn.item.selected,
-            interactive: true
+            interactive: true,
           }"
         />
       } @else {
@@ -160,6 +165,7 @@ interface Drawn {
           <div
             [epdfAnnotationFrame]="drawn.frame"
             [frameBlend]="drawn.item.blend"
+            [frameSource]="drawn.item.source"
             [frameInteractive]="drawn.interactive"
             [frameInert]="drawn.inert"
           >
@@ -175,7 +181,7 @@ interface Drawn {
                   appearance: drawn.appearance,
                   hovered: drawn.item.hovered ?? false,
                   selected: drawn.item.selected,
-                  interactive: drawn.interactive
+                  interactive: drawn.interactive,
                 }"
               />
             </ng-template>
@@ -199,6 +205,7 @@ interface Drawn {
           <div
             [epdfAnnotationFrame]="drawn.frame"
             [frameBlend]="drawn.item.blend"
+            [frameSource]="drawn.item.source"
             [frameInert]="drawn.inert"
           >
             <ng-container [ngTemplateOutlet]="native" />
@@ -210,11 +217,13 @@ interface Drawn {
       <div [epdfFreeTextBox]="text" [outline]="textOutline()"></div>
     }
     @if (ghost(); as ghost) {
-      <!-- The armed stamp, see-through, in the box a click would place it in. -->
+      <!-- The armed stamp, see-through, in the box a click would place it in, above the form's
+           fields: over a field, the mark shows in it as the fill draws it. -->
       <img
         alt=""
         draggable="false"
         style="position: absolute; max-width: none; max-height: none; pointer-events: none; transform-origin: center"
+        [style.z-index]="previewZIndex"
         [attr.src]="ghost.url"
         [style.left.px]="ghost.box.left"
         [style.top.px]="ghost.box.top"
@@ -231,6 +240,8 @@ interface Drawn {
   `,
 })
 export class EpdfAnnotationLayer {
+  /** The armed stamp's preview rises above the form's fields. */
+  protected readonly previewZIndex = PREVIEW_Z_INDEX;
   protected readonly page = injectPage('<epdf-annotation-layer>');
   private readonly injector = inject(Injector);
   private readonly annotation = annotationHostOf(this.page, '<epdf-annotation-layer>');
