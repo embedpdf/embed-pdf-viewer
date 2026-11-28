@@ -70,6 +70,7 @@ import {
   FormFieldPatchSchema,
   FormFieldWidgetSchema,
   FormValueEntrySchema,
+  FieldAssignmentSchema,
   FormWidgetSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
@@ -1296,6 +1297,7 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
 export const FormWireComponents = {
   FormFieldRef: FormFieldRefSchema,
   FormField: FormFieldDTOSchema,
+  FieldAssignment: FieldAssignmentSchema,
   FormFieldFormat: FormFieldFormatSchema,
   FormFieldFormatWritable: FormFieldFormatWritableSchema,
   FormValueEntry: FormValueEntrySchema,

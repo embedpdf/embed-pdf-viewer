@@ -32,7 +32,7 @@ import { assertServerTakesMark, exactBuffer, markPart } from './signatureMark';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { ChangeSender, CloudWrites, SentChange } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
-import { forAnyoneTheServerLacks, type ForAnyoneWrite } from './anyoneFields';
+import { anyoneTheServerLacks, assignmentForServer, type AssignmentWrite } from './fieldAssignment';
 import {
   fieldFactsTheServerLacks,
   widgetLayoutTheServerLacks,
@@ -90,8 +90,8 @@ export class CloudDocumentChanges {
       });
     }
     // A kind of op the server doesn't have yet is refused here, alone, and so
-    // is a field's purpose, format or `forAnyone`, or a widget's layout, on its
-    // way to a server older than them.
+    // is a field's purpose or format, a field anyone fills in, or a widget's
+    // layout, on its way to a server older than them.
     const lacking = isUndoChange(change)
       ? null
       : (opsTheServerLacks(
@@ -99,7 +99,7 @@ export class CloudDocumentChanges {
           change.ops.map((op) => op.type),
         ) ??
         fieldFactsTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
-        forAnyoneTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
+        anyoneTheServerLacks(this.serverVersion(), ...change.ops.flatMap(fieldWritesOf)) ??
         widgetLayoutTheServerLacks(this.serverVersion(), ...change.ops.flatMap(widgetWritesOf)));
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<ChangeResult>(async (signal) => {
@@ -185,7 +185,8 @@ async function sentChangeOf(
       { details: { limit: 'ops', max: CHANGE_REQUEST_LIMITS.ops, value: change.ops.length } },
     );
   }
-  const sent: SentChange = { opId, change: (await resolveChangeResources(change)).change };
+  const resolved = (await resolveChangeResources(change)).change;
+  const sent: SentChange = { opId, change: assignmentsForServer(resolved, serverVersion) };
   // A mark the server can't take as it is meant is refused here, alone.
   if (!isUndoChange(sent.change)) {
     for (const op of sent.change.ops) {
@@ -271,7 +272,7 @@ function changeRequestOf(changes: readonly SentChange[]): {
  */
 function fieldWritesOf(
   op: Extract<Change, { ops: unknown }>['ops'][number],
-): (FieldWrite & ForAnyoneWrite)[] {
+): (FieldWrite & AssignmentWrite)[] {
   switch (op.type) {
     case 'forms.create':
       return [op.draft];
@@ -282,6 +283,34 @@ function fieldWritesOf(
     default:
       return [];
   }
+}
+
+/**
+ * `change` as a server of `serverVersion` reads it: each field write's
+ * assignment as {@link assignmentForServer} sends it.
+ */
+function assignmentsForServer<Sent extends Change<PageCoordinates, unknown>>(
+  change: Sent,
+  serverVersion: string | null,
+): Sent {
+  if (isUndoChange(change)) return change;
+  const ops = change.ops.map((op) => {
+    switch (op.type) {
+      case 'forms.create':
+        return { ...op, draft: assignmentForServer(serverVersion, op.draft) };
+      case 'forms.update':
+        return {
+          ...op,
+          patch: assignmentForServer(serverVersion, op.patch),
+          ...(op.expect ? { expect: assignmentForServer(serverVersion, op.expect) } : {}),
+        };
+      case 'forms.delete':
+        return op.expect ? { ...op, expect: assignmentForServer(serverVersion, op.expect) } : op;
+      default:
+        return op;
+    }
+  });
+  return ops.every((op, at) => op === change.ops[at]) ? change : ({ ...change, ops } as Sent);
 }
 
 /**

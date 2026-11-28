@@ -204,16 +204,22 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   }
 
   /** Per-field form authorization mirrors: the checks the server's writes run, over the same inputs. */
-  allowsField(action: 'fill' | 'sign', field: FieldAssignment): boolean;
+  allowsField(
+    action: 'fill' | 'sign',
+    field: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+  ): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
-  allowsField(action: 'fill' | 'sign' | 'set-group', target: FieldAssignment): boolean {
+  allowsField(
+    action: 'fill' | 'sign' | 'set-group',
+    target: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+  ): boolean {
     if (action === 'set-group') {
       const groupId = target.groupId ?? '';
       return checkSetGroup('fields', groupId, this.identity?.groupId, this.rawScope());
     }
     return checkFieldAction(
       action,
-      target,
+      target.assignment ?? target.groupId,
       this.rawScope(),
       this.permissionFlags(),
       this.protection,

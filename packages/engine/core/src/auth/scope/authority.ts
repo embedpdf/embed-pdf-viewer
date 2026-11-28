@@ -10,8 +10,8 @@ import {
   checkSetEveryGroup,
   checkSetGroup,
   collabTargetOf,
-  type FieldAssignment,
 } from './resolver';
+import { groupIdOfAssignment, type FieldAssignment } from '../../forms/assignment';
 import type { AnnotationActor, DocCapability, Identity, PdfPermissionFlags } from './types';
 import { describeProtection, protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
@@ -248,8 +248,8 @@ export function authorizeAnnotationDelete(
 export type FieldWriteAction = 'fill' | 'sign';
 
 /**
- * Check that the caller may `action` (fill in, or sign) `field`: the field,
- * or its group id (`null` for a field in no group). `ProtectedDocument`
+ * Check that the caller may `action` (fill in, or sign) `field`: its
+ * assignment, or its group id (`null` for a field in no group). `ProtectedDocument`
  * when a signature in the document took the capability away,
  * `PermissionDenied` naming the scope it would take when the grants don't
  * reach the field: its group's, or for a field in no group and one anyone
@@ -262,7 +262,8 @@ export function authorizeFieldWrite(
 ): void {
   authorizeUnprotected(authority, fieldCapability(action));
   if (!allowsFieldWrite(authority, field, action)) {
-    const groupId = typeof field === 'string' || field === null ? field : field.groupId;
+    const groupId =
+      typeof field === 'string' || field === null ? field : groupIdOfAssignment(field);
     throw new PermissionDenied(
       groupId === null ? fieldCapability(action) : `fields:${action}:group=${groupId}`,
       'target',
@@ -312,14 +313,18 @@ export function authorizeFieldGroup(authority: ChangeAuthority, groupId: string 
 }
 
 /**
- * Check that the caller may make a form field one anyone fills in
- * (`forAnyone`). Every group's signers then fill it in, so it takes the right
- * to put fields in every group, `fields:set-group:all`. `false` takes no
- * right of its own: whoever may design the form may make a field one
- * group's or the sender's again.
+ * Check that the caller may give a form field `assignment`. A group takes
+ * what {@link authorizeFieldGroup} says; `anyone` lets every group's
+ * signers fill the field in, so it takes the right to put fields in every
+ * group, `fields:set-group:all`; `unassigned` takes no right of its own:
+ * whoever may design the form may leave a field to no one in particular.
  */
-export function authorizeForAnyone(authority: ChangeAuthority, forAnyone: boolean): void {
-  if (!forAnyone) return;
+export function authorizeFieldAssignment(
+  authority: ChangeAuthority,
+  assignment: FieldAssignment,
+): void {
+  if (assignment.kind === 'group') return authorizeFieldGroup(authority, assignment.groupId);
+  if (assignment.kind === 'unassigned') return;
   const { grants } = authority;
   if (grants && !checkSetEveryGroup('fields', grants.scope)) {
     throw new PermissionDenied('fields:set-group:all', 'target');

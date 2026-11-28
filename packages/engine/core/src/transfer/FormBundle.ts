@@ -19,7 +19,7 @@ import {
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormField } from '../forms/field';
 import { withWidgetLayout } from '../annotation/kinds/widget/layout';
-import { withForAnyone } from '../forms/anyone';
+import { withAssignment } from '../forms/assignment';
 import { withButtonImage } from '../forms/buttonImage';
 import { withPurposeAndFormat } from '../forms/format';
 import type { FormFieldRef } from '../identity/FormFieldRef';
@@ -95,8 +95,8 @@ const WIDGET_ROW_FIELDS = ['data', 'resources'] as const;
  * `bundle` with every row whole. A bundle written before a field had a
  * `purpose` and a `format` (a file kept from an earlier version, an export
  * from an older server) holds fields without them: each gets both, as a
- * read gives them (`withPurposeAndFormat`), and `forAnyone: false` when it is
- * older than that too (`withForAnyone`). One written before a push button
+ * read gives them (`withPurposeAndFormat`), and its `assignment` from its
+ * group when it is older than that too (`withAssignment`). One written before a push button
  * had `hasImage` and a widget its `layout` gets those as such a read gives
  * them too (`withButtonImage`, `withWidgetLayout`). A bundle that has them
  * all comes back as it is.
@@ -108,7 +108,7 @@ export function completeFormBundle<
   },
 >(bundle: Bundle): Bundle {
   const fields = completedRows(bundle.fields, (data) =>
-    withForAnyone(withButtonImage(withPurposeAndFormat(data))),
+    withAssignment(withButtonImage(withPurposeAndFormat(data))),
   );
   const widgets = bundle.widgets && completedRows(bundle.widgets, withWidgetLayout);
   if (fields === bundle.fields && widgets === bundle.widgets) return bundle;

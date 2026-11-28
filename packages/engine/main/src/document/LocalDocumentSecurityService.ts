@@ -115,13 +115,19 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
   }
 
   /** Per-field form authorization mirrors: the guard's own field checks. */
-  allowsField(action: 'fill' | 'sign', field: FieldAssignment): boolean;
+  allowsField(
+    action: 'fill' | 'sign',
+    field: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+  ): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
-  allowsField(action: 'fill' | 'sign' | 'set-group', target: FieldAssignment): boolean {
+  allowsField(
+    action: 'fill' | 'sign' | 'set-group',
+    target: { readonly groupId: string | null; readonly assignment?: FieldAssignment },
+  ): boolean {
     const guard = this.guard;
     if (!guard) return false;
     if (action === 'set-group') return guard.canSetFieldGroup(target.groupId ?? '');
-    return guard.canFieldWrite(target, action);
+    return guard.canFieldWrite(target.assignment ?? target.groupId, action);
   }
 
   /** The guard's field rights; none without a scope context. */

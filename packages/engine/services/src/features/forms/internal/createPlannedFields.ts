@@ -1,6 +1,9 @@
 import {
+  assignmentOfGroup,
+  groupIdOfAssignment,
   pdfFormFieldDraftOf,
   type AnnotationActor,
+  type FieldAssignment,
   type FormField,
   type FormFieldDraft,
   type FormFieldRef,
@@ -63,10 +66,9 @@ export interface CreatedFields extends FormWidgetRows<PdfCoordinates> {
 
 /**
  * The fields of a plan, written through the form's own `createField` and
- * `setValue`: each with its widgets on their pages and their flags, in the
- * group `groupOf` gives it and for anyone when `forAnyoneOf` says so, with its
- * value when it has one; then the calculation order among them, appended to
- * the form's in the order given.
+ * `setValue`: each with its widgets on their pages and their flags, for whom
+ * `assignmentOf` says, with its value when it has one; then the calculation
+ * order among them, appended to the form's in the order given.
  * `made` runs after each field is written, for what only its caller knows
  * (who made and filled an imported field).
  */
@@ -78,10 +80,8 @@ export function createPlannedFields(
   calculationOrder: readonly number[],
   write: {
     readonly actor: AnnotationActor;
-    /** The group a field goes in, given the one its source had (`null` for none). */
-    readonly groupOf: (groupId: string | null) => string | null;
-    /** Whether a field is one anyone fills in, given whether its source was; left out, as it was. */
-    readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
+    /** Who a field is for, given who its source was for ({@link assignmentHook}). */
+    readonly assignmentOf: (assignment: FieldAssignment) => FieldAssignment;
     readonly signal: AbortSignal;
     readonly made?: (objectNumber: number, at: number) => void;
   },
@@ -91,18 +91,11 @@ export function createPlannedFields(
   const boxOf = visibleBoxReader(runtime, session);
   const forms = new FormMutator(runtime, session, fonts);
   const created = creates.map((planned, at) => {
-    const {
-      groupId: sourceGroup,
-      forAnyone: sourceForAnyone,
-      ...draft
-    } = pdfFormFieldDraftOf(planned.draft, boxOf);
-    const groupId = write.groupOf(sourceGroup ?? null);
-    const forAnyone = write.forAnyoneOf
-      ? write.forAnyoneOf(sourceForAnyone === true)
-      : sourceForAnyone === true;
+    const { groupId, assignment: source, ...draft } = pdfFormFieldDraftOf(planned.draft, boxOf);
+    const assignment = write.assignmentOf(source ?? assignmentOfGroup(groupId ?? null));
     const [objectNumber, ...widgetObjectNumbers] = planned.objectNumbers ?? [];
     const { field } = forms.createField(
-      { ...draft, groupId, ...(forAnyone ? { forAnyone } : {}) },
+      { ...draft, assignment },
       write.signal,
       write.actor,
       objectNumber === undefined ? {} : { objectNumber, widgetObjectNumbers },
@@ -185,4 +178,23 @@ function objectNumberOf(ref: FormFieldRef): number {
 
 function fieldRef(objectNumber: number): FormFieldRef {
   return { kind: 'objectNumber', objectNumber };
+}
+
+/**
+ * Who a copied or imported field is for, as its request says: `assignmentOf`
+ * says it whole; without it, `groupOf` (the hook that came before it) gives
+ * a group's or an unassigned field's group, and a field anyone fills in
+ * stays one; without either, as its source was.
+ */
+export function assignmentHook(request: {
+  readonly groupOf?: (groupId: string | null) => string | null;
+  readonly assignmentOf?: (assignment: FieldAssignment) => FieldAssignment;
+}): (assignment: FieldAssignment) => FieldAssignment {
+  const { groupOf, assignmentOf } = request;
+  if (assignmentOf) return assignmentOf;
+  if (!groupOf) return (assignment) => assignment;
+  return (assignment) =>
+    assignment.kind === 'anyone'
+      ? assignment
+      : assignmentOfGroup(groupOf(groupIdOfAssignment(assignment)));
 }

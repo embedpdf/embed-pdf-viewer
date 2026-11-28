@@ -161,10 +161,8 @@ export function fieldDraftOf(
     noExport: field.noExport,
     ...(field.alternateName !== null ? { alternateName: field.alternateName } : {}),
     ...(field.mappingName !== null ? { mappingName: field.mappingName } : {}),
-    // The group the field was in, or that anyone fills it in; its writer
-    // decides whether it keeps either.
-    ...(field.groupId !== null ? { groupId: field.groupId } : {}),
-    ...(field.forAnyone ? { forAnyone: true } : {}),
+    // Who filled the field in; its writer decides whether it keeps that.
+    assignment: field.assignment,
     ...(isFieldPurpose(field.purpose) ? { purpose: field.purpose } : {}),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     widgets,

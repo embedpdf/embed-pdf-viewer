@@ -49,9 +49,9 @@ and [add a widget](#add-a-widget) later.
 | `noExport`      | Left out when the form is submitted.                                                                                                                      | `false`    |
 | `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                                   | none       |
 | `mappingName`   | A second name, for other apps that export the form's data.                                                                                                | none       |
-| `groupId`       | The group it goes in: who fills it in. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | no group   |
+| `groupId`       | The group it goes in, the shorthand for `assignment`. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | no group   |
 | `purpose`       | What its value means, such as `'email'`; see [Purpose](#purpose).                                                                                         | none       |
-| `forAnyone`        | Every signer may fill it in, not one group's. Takes `fields:set-group:all` (see [Fields anyone fills in](/docs/engine/forms/groups#fields-anyone-fills-in)). | `false`    |
+| `assignment`    | Who fills it in: a group, anyone (which takes `fields:set-group:all`), or no one in particular. Not with `groupId` (see [Who fills a field in](/docs/engine/forms/groups#who-fills-a-field-in)). | unassigned |
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
@@ -252,7 +252,8 @@ await doc.forms.update(field.ref, { required: true, maxLength: 80 });
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
 `{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip,
 `{ groupId: null }` for no group, `{ purpose: null }` for no purpose, `{ format: null }` for no
-format. `{ forAnyone: false }` makes a field one group's or the sender's again.
+format. `{ assignment: { kind: 'unassigned' } }` leaves a field to no one in particular, from any
+assignment: see [Who fills a field in](/docs/engine/forms/groups#who-fills-a-field-in).
 
 You can change the settings in the tables above, except the kind and the widgets. A signature
 field takes the settings every field has: `name`, `readOnly`, `required`, `noExport`,
@@ -590,9 +591,9 @@ A copy has its original's settings (its `purpose` and `format` too), scripts, de
 value, and each widget's place, look, flags and actions. A push button's copy has its image,
 which counts as its value. Its name is the original's with the next free number: `email` becomes
 `email_2`, `text_1` becomes `text_2`, `billing.name` becomes `billing.name_2`. A radio group's
-copy keeps its buttons' values. It is in its original's group (`groupId`), which you must be
-allowed to put fields in, and in no group when its original is in none. The copy of a `forAnyone`
-field is `forAnyone` too, which takes `fields:set-group:all`.
+copy keeps its buttons' values. It has its original's assignment, which you must be allowed to
+give: its group, which you must be allowed to put fields in, anyone, which takes
+`fields:set-group:all`, or none.
 
 | Option    | What it does                                                  | Default          |
 | :-------- | :------------------------------------------------------------ | :--------------- |

@@ -1,3 +1,4 @@
+import type { FieldAssignment } from './assignment';
 import type { FormFieldOptionInput } from './draft';
 import type { FormFieldFormatWritable } from './format';
 import type { FieldActionsPatch } from '../dto/PdfAction';
@@ -21,18 +22,18 @@ interface FormFieldPatchBase {
   alternateName?: string | null;
   mappingName?: string | null;
   /**
-   * Move the field to another group: the session's own, or one it has
-   * `fields:set-group` for. `null` takes the field out of its group, which
-   * takes no `fields:set-group` right: form design is enough.
+   * Move the field to a group, the shorthand for `assignment`: a group id is
+   * `{ kind: 'group', groupId }`, and `null` is `{ kind: 'unassigned' }`,
+   * whatever the field's assignment was. Not with `assignment`.
    */
   groupId?: string | null;
   /**
-   * Every signer may fill the field in. `true` takes `fields:set-group:all`
-   * and a field the update leaves in no group: to move a field from a
-   * group, send `groupId: null` with it. `false` takes form design alone.
-   * A signature field is never one.
+   * Who fills the field in, from any assignment. A group takes
+   * `fields:set-group` for it, except the session's own; `anyone` takes
+   * `fields:set-group:all` and fails with `InvalidArg` on a signature field;
+   * `unassigned` takes form design alone. Not with `groupId`.
    */
-  forAnyone?: boolean;
+  assignment?: FieldAssignment;
   /** What the field's value means; `null` takes the purpose away. */
   purpose?: string | null;
   /**

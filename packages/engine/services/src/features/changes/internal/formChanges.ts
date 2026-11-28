@@ -3,14 +3,16 @@ import {
   allowsFieldWrite,
   allowsSomeFieldWrite,
   annotationKey,
+  assignmentAfter,
+  assignmentsEqual,
   authorizeCapability,
-  authorizeForAnyone,
-  authorizeFieldGroup,
+  authorizeFieldAssignment,
   authorizeFieldWrite,
   authorizeUnprotected,
   fieldValueOf,
   EngineError,
   EngineErrorCode,
+  draftAssignment,
   draftWritesScripts,
   fieldScriptOf,
   signatureAppearanceBytes,
@@ -24,6 +26,7 @@ import {
   type FormImportOp,
   isSkippedItem,
   isWritableFormat,
+  type FieldAssignment,
   type FormField,
   type FormFieldFormat,
   type FormFieldPatch,
@@ -151,7 +154,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
     ? op.fields.map((ref) => readField(ctx, ref))
     : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.kind));
   // A reset fills in every field it puts back: each must be the caller's to fill.
-  for (const target of targets) authorizeFieldWrite(ctx.authority, target.field, 'fill');
+  for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.assignment, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
   const result = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).reset(
     op.fields ? [...op.fields] : undefined,
@@ -189,13 +192,13 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
 export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (draftWritesScripts(op.draft)) authorizeCapability(ctx.authority, 'doc.forms.script');
-  const groupId = newFieldGroup(ctx, op.draft.groupId);
-  authorizeForAnyone(ctx.authority, op.draft.forAnyone === true);
+  // A field is in no group until the draft names one, whatever the caller's own group is.
+  authorizeFieldAssignment(ctx.authority, draftAssignment(op.draft));
   const { field, calculationOrder } = new FormMutator(
     ctx.runtime,
     ctx.session,
     ctx.fonts,
-  ).createField({ ...op.draft, groupId }, ctx.signal, ctx.authority.identity, {
+  ).createField(op.draft, ctx.signal, ctx.authority.identity, {
     ...(op.objectNumber !== undefined ? { objectNumber: op.objectNumber } : {}),
     ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
   });
@@ -224,11 +227,9 @@ export function copyFields(ctx: ChangeContext, op: Op<'forms.copy'>): Done {
       ...(op.objectNumbers ? { objectNumbers: op.objectNumbers } : {}),
       actor: ctx.authority.identity,
       mayScript: allowsCapability(ctx.authority, 'doc.forms.script'),
-      // A copy is the caller's own create: it keeps its source's group when
-      // the caller may set it, and is in none when its source is; the same
-      // for a source anyone fills in.
-      groupOf: (groupId) => newFieldGroup(ctx, groupId),
-      forAnyoneOf: (forAnyone) => newFieldForAnyone(ctx, forAnyone),
+      // A copy is the caller's own create: it keeps its source's assignment
+      // when the caller may give it.
+      assignmentOf: (assignment) => newFieldAssignment(ctx, assignment),
       limits: ctx.limits,
     },
     ctx.signal,
@@ -252,14 +253,12 @@ export function updateField(ctx: ChangeContext, op: Op<'forms.update'>, opIndex:
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (writesScripts(op.patch.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const before = readField(ctx, op.field);
-  if (op.patch.groupId !== undefined) {
-    // Taking the field out of its group (`null`) is form design, checked above.
-    const groupId = namedGroup(op.patch.groupId);
-    if (groupId !== before.field.groupId) authorizeFieldGroup(ctx.authority, groupId);
+  // A new assignment takes its right (none for `unassigned`: form design,
+  // checked above); the one the field has takes none.
+  const assignment = assignmentAfter(op.patch, before.field);
+  if (!assignmentsEqual(assignment, before.field.assignment)) {
+    authorizeFieldAssignment(ctx.authority, assignment);
   }
-  // As for a group: making a field one anyone fills in takes a right, undoing it doesn't.
-  if (op.patch.forAnyone === true && !before.field.forAnyone)
-    authorizeForAnyone(ctx.authority, true);
   assertExpected(opIndex, propertiesOf(before.field), op.expect);
   return writeUpdate(ctx, before, op.patch);
 }
@@ -523,7 +522,7 @@ export function setSignatureAppearance(
   op: Op<'forms.setSignatureAppearance'>,
 ): Done {
   const before = readField(ctx, op.field);
-  authorizeFieldWrite(ctx.authority, before.field, 'sign');
+  authorizeFieldWrite(ctx.authority, before.field.assignment, 'sign');
   return recordRevert(ctx, before, 'forms.setSignatureAppearance', () =>
     new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setSignatureAppearance(
       op.field,
@@ -541,7 +540,7 @@ export function setSignatureAppearance(
  */
 export function setButtonImage(ctx: ChangeContext, op: Op<'forms.setButtonImage'>): Done {
   const before = readField(ctx, op.field);
-  authorizeFieldWrite(ctx.authority, before.field, 'fill');
+  authorizeFieldWrite(ctx.authority, before.field.assignment, 'fill');
   return recordRevert(ctx, before, 'forms.setButtonImage', () =>
     new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setButtonImage(
       op.field,
@@ -579,11 +578,9 @@ export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
       actor: op.actor ?? {},
       limits: op.limits,
       mayScript: (op.mayScript ?? false) && allowsCapability(ctx.authority, 'doc.forms.script'),
-      // A restoring import keeps each field's group, and whether anyone
-      // fills it in, under the import's rights; a copy is the caller's own
-      // create.
-      groupOf: (groupId) => (rights ? groupId : newFieldGroup(ctx, groupId)),
-      forAnyoneOf: (forAnyone) => (rights ? forAnyone : newFieldForAnyone(ctx, forAnyone)),
+      // A restoring import keeps each field's assignment under the import's
+      // rights; a copy is the caller's own create.
+      assignmentOf: (assignment) => (rights ? assignment : newFieldAssignment(ctx, assignment)),
     },
     ctx.signal,
   );
@@ -609,7 +606,7 @@ export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
   authorizeSomeFill(ctx);
   const importer = new FormImporter(ctx.runtime, ctx.session, ctx.fonts);
   const plan = importer.planValues(op.bundle, op.limits, ctx.signal, (field) =>
-    allowsFieldWrite(ctx.authority, field, 'fill'),
+    allowsFieldWrite(ctx.authority, field.assignment, 'fill'),
   );
   const fields: FormField<PdfCoordinates>[] = [];
   const reverse: ReverseStep[] = [];
@@ -670,12 +667,12 @@ function importRights(ctx: ChangeContext, op: FormImportOp): StepRights | undefi
  * own, so the script's output travels with its input.
  */
 function authorizeFill(ctx: ChangeContext, target: ReadField): void {
-  if (allowsFieldWrite(ctx.authority, target.field, 'fill')) return;
+  if (allowsFieldWrite(ctx.authority, target.field.assignment, 'fill')) return;
   if (isCalculated(ctx, target) && ctx.fillsOwnField()) {
     authorizeUnprotected(ctx.authority, 'doc.forms.fill');
     return;
   }
-  authorizeFieldWrite(ctx.authority, target.field, 'fill');
+  authorizeFieldWrite(ctx.authority, target.field.assignment, 'fill');
 }
 
 /**
@@ -683,12 +680,12 @@ function authorizeFill(ctx: ChangeContext, target: ReadField): void {
  * caller may fill the field in, or the change fills in a field of their own.
  */
 function authorizeScriptOutput(ctx: ChangeContext, target: ReadField): void {
-  if (allowsFieldWrite(ctx.authority, target.field, 'fill')) return;
+  if (allowsFieldWrite(ctx.authority, target.field.assignment, 'fill')) return;
   if (ctx.fillsOwnField()) {
     authorizeUnprotected(ctx.authority, 'doc.forms.fill');
     return;
   }
-  authorizeFieldWrite(ctx.authority, target.field, 'fill');
+  authorizeFieldWrite(ctx.authority, target.field.assignment, 'fill');
 }
 
 /** Check that the caller may fill in some field, before the write knows which. */
@@ -711,46 +708,19 @@ function authorizeRevertedFills(
   for (const objectNumber of step.subject.fields) {
     const target = tryReadFieldByNumber(ctx, objectNumber);
     if (!target) continue;
-    if (action === 'sign') authorizeFieldWrite(ctx.authority, target.field, 'sign');
+    if (action === 'sign') authorizeFieldWrite(ctx.authority, target.field.assignment, 'sign');
     else authorizeFill(ctx, target);
   }
 }
 
 /**
- * The group a new field goes in: the one the write names, and none when it
- * names none, whatever the caller's own group is. Another group than the
- * caller's own takes `fields:set-group` for it.
+ * Who a new field is for, as its source was: checked as a create giving it
+ * that assignment would be. Another group than the caller's own takes
+ * `fields:set-group` for it, and `anyone` `fields:set-group:all`.
  */
-function newFieldGroup(ctx: ChangeContext, named: string | null | undefined): string | null {
-  const groupId = namedGroup(named);
-  authorizeFieldGroup(ctx.authority, groupId);
-  return groupId;
-}
-
-/**
- * Whether a new field is one anyone fills in, as its source is: checked as
- * a create marking it would be.
- */
-function newFieldForAnyone(ctx: ChangeContext, forAnyone: boolean): boolean {
-  authorizeForAnyone(ctx.authority, forAnyone);
-  return forAnyone;
-}
-
-/**
- * The group a write names for a field: `null` for none, which a draft also
- * says by leaving it out. A group's id is 1 to 256 characters, so an empty
- * one is refused, not read as no group.
- */
-function namedGroup(named: string | null | undefined): string | null {
-  if (named === undefined || named === null) return null;
-  if (typeof named !== 'string' || named.length < 1 || named.length > 256) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      "a field's groupId is 1 to 256 characters, or null for no group",
-      { details: { field: 'groupId' } },
-    );
-  }
-  return named;
+function newFieldAssignment(ctx: ChangeContext, assignment: FieldAssignment): FieldAssignment {
+  authorizeFieldAssignment(ctx.authority, assignment);
+  return assignment;
 }
 
 /** Whether a script calculates the field: it has a calculate script and is in the calculation order. */
@@ -768,7 +738,7 @@ export function opsFillOwnField<C extends Coordinates>(
   return ops.some((op) => {
     if (op.type !== 'forms.setValue' && op.type !== 'forms.setAppearanceText') return false;
     const target = tryReadField(ctx, op.field);
-    return target !== null && allowsFieldWrite(ctx.authority, target.field, 'fill');
+    return target !== null && allowsFieldWrite(ctx.authority, target.field.assignment, 'fill');
   });
 }
 
@@ -781,7 +751,7 @@ export function stepsFillOwnField(ctx: ChangeContext, steps: readonly ReverseSte
       'fields' in step.subject &&
       step.subject.fields.some((objectNumber) => {
         const target = tryReadFieldByNumber(ctx, objectNumber);
-        return target !== null && allowsFieldWrite(ctx.authority, target.field, 'fill');
+        return target !== null && allowsFieldWrite(ctx.authority, target.field.assignment, 'fill');
       }),
   );
 }
@@ -834,20 +804,12 @@ export function revertForm(
 }
 
 /**
- * Who fills a field in, told in two members: the group it belongs to and
- * whether it is for anyone. An update's undo puts them back together, and
- * only while both still hold what the update left: a field another update
- * gave to someone since stays theirs, where putting one member back alone
- * would make a field that is both a group's and for anyone.
- */
-const ASSIGNMENT: readonly string[] = ['groupId', 'forAnyone'];
-
-/**
  * The second chance of a field update's undo: each property that still holds
  * what the update set goes back, through an ordinary update. A rename goes
- * back only while no sibling has taken the old name, the scripts only when
- * all of them can ({@link scriptsCanGoBack}), and who fills the field in only
- * as a whole ({@link ASSIGNMENT}).
+ * back only while no sibling has taken the old name, and the scripts only
+ * when all of them can ({@link scriptsCanGoBack}). Who fills the field in is
+ * one property, `assignment`: a field another update gave to someone since
+ * stays theirs.
  */
 function revertProperties(
   ctx: ChangeContext,
@@ -865,12 +827,9 @@ function revertProperties(
       (key !== 'name' || nameIsFree(ctx, current.field.name, String(restore.name))) &&
       (key !== 'actions' || scriptsCanGoBack(left.actions, restore.actions)),
   );
-  // An assignment someone changed since stays: neither of its members goes back.
-  const assignmentHolds = ASSIGNMENT.every((key) => !keys.includes(key) || holds.includes(key));
-  const kept = assignmentHolds ? holds : holds.filter((key) => !ASSIGNMENT.includes(key));
-  if (kept.length === 0) return leftAlone(ctx, 'forms.update');
-  const done = writeUpdate(ctx, current, pick(restore, kept) as FormFieldPatch);
-  const skipped = keys.filter((key) => !kept.includes(key));
+  if (holds.length === 0) return leftAlone(ctx, 'forms.update');
+  const done = writeUpdate(ctx, current, pick(restore, holds) as FormFieldPatch);
+  const skipped = keys.filter((key) => !holds.includes(key));
   const item = done.item;
   if (skipped.length === 0 || isSkippedItem(item) || item.type !== 'forms.update') return done;
   return { ...done, item: { ...item, skipped } };
@@ -1080,28 +1039,33 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
     (after) => {
       const was = propertiesOf(before.field) as Record<string, unknown>;
       const is = propertiesOf(after) as Record<string, unknown>;
-      // A format is the field's format and keystroke scripts, so what a
-      // format write changed is its `actions`. Its undo puts those back by
-      // the rule of any script write: a script someone wrote since is never
-      // removed, and a format no write can name (`other`) comes back as the
-      // scripts it was.
-      const named = Object.keys(patch).map((key) => (key === 'format' ? 'actions' : key));
+      const named = Object.keys(patch).map(propertyWritten);
       const changed = [...new Set(named)].filter(
         (key) => key !== 'kind' && !valuesEqual(was[key], is[key]),
       );
-      // Who fills the field in goes back whole ({@link ASSIGNMENT}).
-      const keys = changed.some((key) => ASSIGNMENT.includes(key))
-        ? [...new Set([...changed, ...ASSIGNMENT])]
-        : changed;
       return {
         kind: 'properties',
         objectNumber: before.objectNumber,
-        restore: pick(was, keys) as FormFieldPatch,
-        left: pick(is, keys) as FormFieldPatch,
+        restore: pick(was, changed) as FormFieldPatch,
+        left: pick(is, changed) as FormFieldPatch,
       };
     },
   );
   return withOrderChange(ctx, done, order);
+}
+
+/**
+ * The property a patch member changes, as an update's undo puts it back. A
+ * format is the field's format and keystroke scripts, so what a format write
+ * changed is its `actions`: its undo puts those back by the rule of any
+ * script write, so a script someone wrote since is never removed, and a
+ * format no write can name (`other`) comes back as the scripts it was. A
+ * group is the shorthand for an assignment, which goes back whole.
+ */
+function propertyWritten(member: string): string {
+  if (member === 'format') return 'actions';
+  if (member === 'groupId') return 'assignment';
+  return member;
 }
 
 /**
@@ -1341,9 +1305,9 @@ function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
     noExport: field.noExport,
     alternateName: field.alternateName,
     mappingName: field.mappingName,
-    // `null` for a field in no group: putting that back takes the field out of its group.
+    // What an op may expect; an undo puts `assignment` back, which says the group too.
     groupId: field.groupId,
-    forAnyone: field.forAnyone,
+    assignment: field.assignment,
     purpose: field.purpose,
     actions: scriptsOf(field),
   };

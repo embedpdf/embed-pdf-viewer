@@ -1,5 +1,5 @@
 import { EngineError, EngineErrorCode, isFieldPurpose } from '@embedpdf/engine-core/runtime';
-import type { AnnotationActor, IsoDateTime } from '@embedpdf/engine-core/runtime';
+import type { AnnotationActor, FieldAssignment, IsoDateTime } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratch } from '../../../runtime/memory/scratch';
@@ -32,9 +32,9 @@ import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/w
  *
  * The engine stamps the attribution from the session's identity, never from
  * what a caller sends. An anonymous session names nobody: it stamps no
- * creation. The group is what the caller sets, with the authority to set
- * it, and so are `forAnyone` and the purpose, which the engine keeps and
- * reads nothing into.
+ * creation. The assignment (`/GroupID`, `/ForAnyone`) is what the caller
+ * sets, with the authority to set it, and so is the purpose, which the
+ * engine keeps and reads nothing into.
  */
 export interface FieldAttribution {
   readonly createdBy: string | null;
@@ -108,24 +108,27 @@ export function writeFieldGroup(
 }
 
 /**
- * Whether anyone fills in field `fieldIndex` of a loaded form model. Never
- * a field in a group, nor a signature field: an entry another tool left on
- * one reads as `false`, so the field is that group's or its signer's.
+ * Who fills in field `fieldIndex` of a loaded form model: its group, else
+ * anyone when its `ForAnyone` entry says so, else no one in particular. An
+ * entry another tool left beside a group or on a signature field counts for
+ * nothing: the field is that group's, or its signer's.
  */
-export function readFieldForAnyone(
+export function readFieldAssignment(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
-): boolean {
-  if (!readForAnyoneEntry(runtime, model, fieldIndex)) return false;
-  if (FAMILY_SIGNATURE === runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)) return false;
-  return readFieldGroup(runtime, model, fieldIndex) === null;
+): FieldAssignment {
+  const groupId = readFieldGroup(runtime, model, fieldIndex);
+  if (groupId !== null) return { kind: 'group', groupId };
+  const signature = FAMILY_SIGNATURE === runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex);
+  if (!signature && readForAnyoneEntry(runtime, model, fieldIndex)) return { kind: 'anyone' };
+  return { kind: 'unassigned' };
 }
 
 /**
  * The field's `ForAnyone` entry as it is stored, beside a group or on a
  * signature field too: what a write compares with what the field should
- * hold, so an entry that reads as `false` never comes back.
+ * hold, so an entry that counts for nothing never comes back.
  */
 export function readForAnyoneEntry(
   runtime: PdfRuntimeModule,

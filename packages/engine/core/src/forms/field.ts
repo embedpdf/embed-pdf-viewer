@@ -2,6 +2,7 @@ import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
+import type { FieldAssignment } from './assignment';
 import type { FormFieldFormat } from './format';
 import type { FormValueEntry } from './value-entry';
 
@@ -105,18 +106,16 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions<C['destination']>;
   /**
-   * The group the field belongs to: who fills it in (the buyer's fields).
-   * `fields:` scopes grant filling in and signing by group. `null` for a
-   * field in no group.
+   * The group the field belongs to (the buyer's fields), as `assignment`
+   * says: its id for a group's field, `null` for any other. `fields:`
+   * scopes grant filling in and signing by group.
    */
   groupId: string | null;
   /**
-   * Every signer may fill the field in: a user who may fill in some field
-   * fills in this one, whatever group their permission names. Such a field
-   * is in no group and is never a signature field. A signing that names no
-   * lock locks it once it holds a value.
+   * Who fills the field in: one group's signers, anyone, or no one in
+   * particular (the users who may fill in every field).
    */
-  forAnyone: boolean;
+  assignment: FieldAssignment;
   /**
    * What the field's value means: `email`, `date-signed`, or a name an app
    * made up. The engine keeps it and reads nothing into it. `null` for a

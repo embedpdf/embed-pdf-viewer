@@ -1,3 +1,4 @@
+import type { FieldAssignment } from './assignment';
 import type { FormFieldFormatWritable } from './format';
 import type { WidgetStyleDraftFields } from '../annotation/kinds/widget.shared';
 import { writesScripts, type FieldActionsPatch, type WidgetActionsPatch } from '../dto/PdfAction';
@@ -78,17 +79,19 @@ interface FormFieldDraftBase {
   /** /TM — the export mapping name. */
   mappingName?: string;
   /**
-   * The group the field goes in: who fills it in. Left out or `null`, the
-   * field is in no group. The session's own group (`identity.groupId`) takes
-   * no right of its own; another takes `fields:set-group` for it.
+   * The group the field goes in, the shorthand for `assignment`: a group id
+   * is `{ kind: 'group', groupId }`, and `null` is `{ kind: 'unassigned' }`.
+   * Not with `assignment`.
    */
   groupId?: string | null;
   /**
-   * Every signer may fill the field in, not one group's. Not with a
-   * `groupId`, and not on a signature field. Takes `fields:set-group:all`,
-   * since it reaches every group. Left out, `false`.
+   * Who fills the field in. Left out, `unassigned`. A group takes
+   * `fields:set-group` for it, except the session's own
+   * (`identity.groupId`); `anyone` takes `fields:set-group:all`, since it
+   * reaches every group, and is never a signature field's. Not with
+   * `groupId`.
    */
-  forAnyone?: boolean;
+  assignment?: FieldAssignment;
   /**
    * What the field's value means: `email`, `date-signed`, or a name of
    * your own, 1 to 256 characters with no space at its start or end. Left

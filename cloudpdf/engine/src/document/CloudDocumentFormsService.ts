@@ -79,7 +79,11 @@ import type { CloudManifest } from './CloudDocumentHandle';
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
-import { forAnyoneTheServerLacks, bundleForAnyoneTheServerLacks } from './anyoneFields';
+import {
+  anyoneTheServerLacks,
+  assignmentForServer,
+  bundleAnyoneTheServerLacks,
+} from './fieldAssignment';
 import {
   bundleImageTheServerLacks,
   bundlePurposeTheServerLacks,
@@ -269,10 +273,10 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
         const manifest = await this.checkedManifest(bundle);
         // A server older than purposes would drop one without saying so, one
         // older than fields anyone fills in would make such a field an
-        // ordinary one, and one older than button images would drop those.
+        // unassigned one, and one older than button images would drop those.
         const lacking =
           bundlePurposeTheServerLacks(this.http.serverVersion, manifest) ??
-          bundleForAnyoneTheServerLacks(this.http.serverVersion, manifest) ??
+          bundleAnyoneTheServerLacks(this.http.serverVersion, manifest) ??
           bundleImageTheServerLacks(this.http.serverVersion, manifest);
         if (lacking) throw lacking;
         const body: FormImportBody = {
@@ -349,10 +353,11 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
   ): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.rejectIfClosed<FormFieldCreateResult>();
     if (rejected) return rejected;
-    // A purpose, a format, `forAnyone` and a layout are never sent to a server older than them.
+    // A purpose, a format, a field anyone fills in and a layout are never
+    // sent to a server older than them; any other assignment goes as a group.
     const lacking =
       fieldFactsTheServerLacks(this.http.serverVersion, draft) ??
-      forAnyoneTheServerLacks(this.http.serverVersion, draft) ??
+      anyoneTheServerLacks(this.http.serverVersion, draft) ??
       widgetLayoutTheServerLacks(this.http.serverVersion, ...(draft.widgets ?? []));
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
@@ -368,7 +373,7 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
                 objectNumber,
                 widgetObjectNumbers,
               }),
-              draft,
+              assignmentForServer(this.http.serverVersion, draft),
               (raw) => FormFieldCreateResultSchema.parse(raw),
               signal,
               sent,
@@ -390,7 +395,7 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
     if (rejected) return rejected;
     const lacking =
       fieldFactsTheServerLacks(this.http.serverVersion, patch) ??
-      forAnyoneTheServerLacks(this.http.serverVersion, patch);
+      anyoneTheServerLacks(this.http.serverVersion, patch);
     if (lacking) return AbortablePromise.rejectReason(lacking);
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
@@ -398,7 +403,7 @@ export class CloudDocumentFormsService implements Omit<DocumentFormsService, For
         const result = await write.send((sent) =>
           this.http.patchJson(
             wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
-            patch,
+            assignmentForServer(this.http.serverVersion, patch),
             (raw) => FormFieldUpdateResultSchema.parse(raw),
             signal,
             sent,

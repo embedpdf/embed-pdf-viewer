@@ -29,7 +29,7 @@ const field = (
   alternateName: null,
   mappingName: null,
   groupId: null,
-  forAnyone: false,
+  assignment: { kind: 'unassigned' },
   purpose: null,
   createdBy: null,
   createdAt: null,

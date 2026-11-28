@@ -6,6 +6,7 @@ import {
   type AnnotationActor,
   type AnnotationRef,
   type BundleLimits,
+  type FieldAssignment,
   type FormCopyResult,
   type FormFieldRef,
   type PageRef,
@@ -16,7 +17,11 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormReader } from './FormReader';
 import { readWidgetIcon } from './internal/buttonImage';
-import { createPlannedFields, type PlannedImage } from './internal/createPlannedFields';
+import {
+  assignmentHook,
+  createPlannedFields,
+  type PlannedImage,
+} from './internal/createPlannedFields';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -41,15 +46,16 @@ export interface FormCopyRequest {
   readonly mayScript: boolean;
   /**
    * The group a copy goes in, given the one its source is in (`null` for
-   * none): checked by the caller, which refuses one it may not set.
+   * none): checked by the caller, which refuses one it may not set. Only
+   * without `assignmentOf`; a source anyone fills in then stays one.
    */
-  readonly groupOf: (groupId: string | null) => string | null;
+  readonly groupOf?: (groupId: string | null) => string | null;
   /**
-   * Whether a copy is one anyone fills in, given whether its source is:
-   * checked by the caller, which refuses one it may not mark. Left out, the
-   * copy is as its source.
+   * Who a copy is for, given who its source is for: checked by the caller,
+   * which refuses an assignment it may not give. Left out, `groupOf`
+   * decides, and without either the copy is as its source.
    */
-  readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
+  readonly assignmentOf?: (assignment: FieldAssignment) => FieldAssignment;
   /** What the copy may carry: `fields` names as many fields as a bundle holds items. */
   readonly limits: BundleLimits;
 }
@@ -134,8 +140,7 @@ export class FormCopier {
       plan.calculationOrder,
       {
         actor: request.actor,
-        groupOf: request.groupOf,
-        ...(request.forAnyoneOf ? { forAnyoneOf: request.forAnyoneOf } : {}),
+        assignmentOf: assignmentHook(request),
         signal,
       },
     );

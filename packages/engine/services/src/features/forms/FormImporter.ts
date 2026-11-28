@@ -1,9 +1,11 @@
 import {
   type AnnotationActor,
   assertFormBundleManifest,
+  completeFormBundle,
   type BundleImportPages,
   type BundleLimits,
   EngineError,
+  type FieldAssignment,
   fieldValueWriteOf,
   type FormField,
   type FormFieldRef,
@@ -23,7 +25,11 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormMutator } from './FormMutator';
-import { createPlannedFields, type PlannedImage } from './internal/createPlannedFields';
+import {
+  assignmentHook,
+  createPlannedFields,
+  type PlannedImage,
+} from './internal/createPlannedFields';
 import { restoreFieldCreation } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
 import { readFieldAt } from './internal/readFormSnapshot';
@@ -51,15 +57,16 @@ export interface FormImportRequest {
   readonly mayScript: boolean;
   /**
    * The group a field goes in, given the one it had in the bundle (`null`
-   * for none): checked by the caller, which refuses one it may not set.
+   * for none): checked by the caller, which refuses one it may not set. Only
+   * without `assignmentOf`; a field anyone fills in then stays one.
    */
-  readonly groupOf: (groupId: string | null) => string | null;
+  readonly groupOf?: (groupId: string | null) => string | null;
   /**
-   * Whether a field is one anyone fills in, given whether it was in the
-   * bundle: checked by the caller, which refuses one it may not mark. Left
-   * out, the field is as it was.
+   * Who a field is for, given who it was for in the bundle: checked by the
+   * caller, which refuses an assignment it may not give. Left out, `groupOf`
+   * decides, and without either the field is as it was.
    */
-  readonly forAnyoneOf?: (forAnyone: boolean) => boolean;
+  readonly assignmentOf?: (assignment: FieldAssignment) => FieldAssignment;
 }
 
 /** What a values import writes, decided before the first write. */
@@ -94,8 +101,10 @@ export class FormImporter {
    */
   import(request: FormImportRequest, signal: AbortSignal): FormImportResult<PdfCoordinates> {
     throwIfAborted(signal);
-    const { bundle } = request;
-    checkWireBundle(this.runtime, 'form', bundle, request.limits, assertFormBundleManifest);
+    checkWireBundle(this.runtime, 'form', request.bundle, request.limits, assertFormBundleManifest);
+    // A bundle an earlier version wrote imports as today's, as a file read
+    // gives it: a field without an assignment is its group's, or unassigned.
+    const bundle = completeFormBundle(request.bundle);
     const names = this.fieldNames();
     const plan = planFormImport({
       bundle,
@@ -131,8 +140,7 @@ export class FormImporter {
       plan.calculationOrder,
       {
         actor: request.actor,
-        groupOf: request.groupOf,
-        ...(request.forAnyoneOf ? { forAnyoneOf: request.forAnyoneOf } : {}),
+        assignmentOf: assignmentHook(request),
         signal,
         // Who made each field, as the bundle has it. Who filled it in
         // travels nowhere: a fill records nobody.

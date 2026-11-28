@@ -132,8 +132,12 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
       }),
     },
     { name: 'text in a comb', draft: text({ maxLength: 6, comb: true }) },
-    { name: 'text anyone fills in', draft: text({ forAnyone: true }) },
-    { name: 'text not for anyone by name', draft: text({ forAnyone: false, groupId: 'buyer' }) },
+    { name: 'text anyone fills in', draft: text({ assignment: { kind: 'anyone' } }) },
+    {
+      name: "text in a group's assignment",
+      draft: text({ assignment: { kind: 'group', groupId: 'buyer' } }),
+    },
+    { name: 'text unassigned by name', draft: text({ assignment: { kind: 'unassigned' } }) },
     { name: 'text with a purpose', draft: text({ purpose: 'email' }) },
     { name: 'text with no purpose by name', draft: text({ purpose: null }) },
     {
@@ -413,21 +417,41 @@ const CASES: readonly PredictionCase[] = [
   {
     name: 'update: for anyone',
     draft: text(),
-    op: { type: 'update', patch: { forAnyone: true } },
+    op: { type: 'update', patch: { assignment: { kind: 'anyone' } } },
   },
   {
     name: 'update: from a group to anyone',
     draft: text({ groupId: 'buyer' }),
-    op: { type: 'update', patch: { groupId: null, forAnyone: true } },
+    op: { type: 'update', patch: { assignment: { kind: 'anyone' } } },
   },
   {
     name: 'update: from anyone to a group',
-    draft: text({ forAnyone: true }),
-    op: { type: 'update', patch: { groupId: 'buyer', forAnyone: false } },
+    draft: text({ assignment: { kind: 'anyone' } }),
+    op: { type: 'update', patch: { assignment: { kind: 'group', groupId: 'buyer' } } },
   },
   {
-    name: 'update: forAnyone, and something else',
-    draft: text({ forAnyone: true }),
+    name: 'update: from a group to unassigned',
+    draft: text({ groupId: 'buyer' }),
+    op: { type: 'update', patch: { assignment: { kind: 'unassigned' } } },
+  },
+  {
+    name: 'update: a group for a field anyone fills in, by the groupId shorthand',
+    draft: text({ assignment: { kind: 'anyone' } }),
+    op: { type: 'update', patch: { groupId: 'buyer' } },
+  },
+  {
+    name: 'update: no group for a field anyone fills in, by the groupId shorthand',
+    draft: text({ assignment: { kind: 'anyone' } }),
+    op: { type: 'update', patch: { groupId: null } },
+  },
+  {
+    name: 'update: the assignment a field has',
+    draft: text({ assignment: { kind: 'anyone' } }),
+    op: { type: 'update', patch: { assignment: { kind: 'anyone' } } },
+  },
+  {
+    name: 'update: anyone, and something else',
+    draft: text({ assignment: { kind: 'anyone' } }),
     op: { type: 'update', patch: { required: true } },
   },
   {
@@ -618,19 +642,29 @@ const REFUSALS: readonly PredictionCase[] = [
     op: { type: 'update', patch: { purpose: ' email ' } },
   },
   {
-    name: 'forAnyone on a field in a group',
-    draft: text({ groupId: 'buyer' }),
-    op: { type: 'update', patch: { forAnyone: true } },
+    name: 'an assignment and a groupId in one update',
+    draft: text(),
+    op: { type: 'update', patch: { groupId: 'buyer', assignment: { kind: 'anyone' } } },
   },
   {
-    name: 'a group for a field anyone fills in',
-    draft: text({ forAnyone: true }),
-    op: { type: 'update', patch: { groupId: 'buyer' } },
+    name: 'a group with an empty id',
+    draft: text(),
+    op: { type: 'update', patch: { assignment: { kind: 'group', groupId: '' } } },
   },
   {
     name: 'a signature field for anyone',
     draft: (page, name) => ({ kind: 'signature', name, widgets: [{ page, rect: box(72) }] }),
-    op: { type: 'update', patch: { forAnyone: true } },
+    op: { type: 'update', patch: { assignment: { kind: 'anyone' } } },
+  },
+  {
+    name: "a group's signature field for anyone",
+    draft: (page, name) => ({
+      kind: 'signature',
+      name,
+      groupId: 'buyer',
+      widgets: [{ page, rect: box(72) }],
+    }),
+    op: { type: 'update', patch: { assignment: { kind: 'anyone' } } },
   },
   {
     name: 'a pattern with a letter group of its own',

@@ -19,9 +19,10 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
-  checkedForAnyone,
+  assignmentAfter,
   checkedPurpose,
   defaultEntryOfDraft,
+  draftAssignment,
   EngineError,
   EngineErrorCode,
   fieldAfterReset,
@@ -31,6 +32,7 @@ import {
   formatWriteOf,
   formFieldAfter,
   formWidget,
+  groupIdOfAssignment,
   isAtDefault,
   placedWidgetOf,
   reorderedList,
@@ -377,10 +379,7 @@ export class FormMutator {
     // The default is checked against the draft before anything is written,
     // and so are who fills it in, the purpose and the format.
     defaultEntryOfDraft(draft);
-    const forAnyone = checkedForAnyone(draft.forAnyone, {
-      kind: draft.kind,
-      groupId: draft.groupId ?? null,
-    });
+    const assignment = draftAssignment(draft);
     const purpose = checkedPurpose(draft.purpose);
     const format = formatWriteOf(draft, draft.kind) ?? null;
     if ('maxLength' in draft && draft.maxLength !== undefined) {
@@ -419,11 +418,13 @@ export class FormMutator {
       );
     }
     stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
-    // A draft that names no group (`null`, or nothing) leaves the field in none.
-    if (draft.groupId !== undefined && draft.groupId !== null) {
-      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
+    // An unassigned field holds neither entry.
+    if (assignment.kind === 'group') {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, assignment.groupId);
     }
-    if (forAnyone) writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, true);
+    if (assignment.kind === 'anyone') {
+      writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, true);
+    }
     if (purpose !== null) writeFieldPurpose(this.runtime, docPtr, fieldObjectNumber, purpose);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
@@ -669,12 +670,10 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.kind);
-    // Checked on the field as the patch leaves it: one in a group is no one else's.
-    const forAnyone = checkedForAnyone(
-      patch.forAnyone,
-      { kind: before.kind, groupId: patch.groupId !== undefined ? patch.groupId : before.groupId },
-      before.forAnyone,
-    );
+    // Who fills the field in: `assignment`, or the `groupId` shorthand, from any assignment.
+    const assignment = assignmentAfter(patch, before);
+    const groupId = groupIdOfAssignment(assignment);
+    const forAnyone = assignment.kind === 'anyone';
     // The entry as stored, read before any write: one another tool left beside
     // a group reads as `false`, and goes once the field is taken out of it.
     const storedForAnyone = readForAnyoneEntry(this.runtime, model, resolved.fieldIndex);
@@ -726,8 +725,8 @@ export class FormMutator {
         'mapping name rejected',
       );
     }
-    if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
-      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
+    if (groupId !== before.groupId) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, groupId);
     }
     if (forAnyone !== storedForAnyone)
       writeFieldForAnyone(this.runtime, docPtr, fieldObjectNumber, forAnyone);
@@ -1205,7 +1204,7 @@ const PATCH_BASE_MEMBERS = [
   'alternateName',
   'mappingName',
   'groupId',
-  'forAnyone',
+  'assignment',
   'purpose',
   'actions',
 ];

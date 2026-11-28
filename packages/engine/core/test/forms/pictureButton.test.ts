@@ -27,7 +27,7 @@ const BUTTON = {
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   groupId: null,
-  forAnyone: false,
+  assignment: { kind: 'unassigned' },
   purpose: null,
   createdBy: null,
   createdAt: null,

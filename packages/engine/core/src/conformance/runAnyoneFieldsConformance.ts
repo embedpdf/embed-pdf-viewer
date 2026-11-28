@@ -6,25 +6,31 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import type { FieldAssignment } from '../forms/assignment';
+import type { FormField } from '../forms/field';
+import type { FormFieldPatch } from '../forms/patch';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import type { FieldLockSpec } from '../signature/types';
 
 /**
- * Fields anyone fills in (`forAnyone`): every signer's, not one group's. On a
- * form with two signers, Dana and Ada, the same on every engine:
- *   - the fact reads from the field's `/EMBD_Metadata`, and never on a field
- *     in a group or a signature field;
+ * Who fills a field in (`assignment`), and fields anyone fills in: every
+ * signer's, not one group's. On a form with two signers, Dana and Ada, the
+ * same on every engine:
+ *   - the assignment reads from the field's `/EMBD_Metadata`, and a field in
+ *     a group or a signature field is never for anyone;
  *   - every token that may fill in some field fills one in; a token that may
  *     fill in none can't, and a group's token still can't fill in the
  *     sender's fields;
- *   - marking a field takes `fields:set-group:all`, and a field in a group or
- *     a signature field is refused;
+ *   - an assignment, or the `groupId` shorthand, works from any assignment;
+ *     anyone takes `fields:set-group:all`, a group its own right; both
+ *     members in one write, or anyone on a signature field, is refused; an
+ *     undo puts the assignment back whole;
  *   - a signing that names no lock locks every such field that holds a value,
  *     whoever filled it in (an image field holds one once it holds a
  *     picture), and leaves an empty one open for the next signer;
  *     a signing that names a lock decides for itself;
- *   - a copy, an export and an import keep the fact;
+ *   - a copy, an export and an import keep the assignment;
  *   - what a signature allows: filling in a field it left open is permitted,
  *     changing one it locked is forbidden.
  *
@@ -184,6 +190,9 @@ export interface AnyoneFieldsConformanceOptions {
 }
 
 const PAGE = toPageRef(3);
+const ANYONE: FieldAssignment = { kind: 'anyone' };
+const UNASSIGNED: FieldAssignment = { kind: 'unassigned' };
+const inGroup = (groupId: string): FieldAssignment => ({ kind: 'group', groupId });
 const field = (name: string): FormFieldRef => ({ kind: 'fqn', name });
 /** A DER `SEQUENCE`: what a completion takes as a CMS, without judging it. */
 const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
@@ -280,23 +289,23 @@ export function runAnyoneFieldsConformance(
       { page: PAGE, rect: { x, y, width: 100, height: 20 } },
     ];
 
-    test("the fact reads from a field's /EMBD_Metadata, never with a group or on a signature field", async () => {
+    test("the assignment reads from a field's /EMBD_Metadata, never anyone beside a group or on a signature field", async () => {
       await as('everything', async (doc) => {
         const { fields } = await doc.forms.list();
-        expect(Object.fromEntries(fields.map((f) => [f.name, [f.groupId, f.forAnyone]]))).toEqual({
-          dana_name: ['dana', false],
-          dana_sig: ['dana', false],
-          ada_name: ['ada', false],
-          ada_sig: ['ada', false],
-          reference: [null, true],
-          notes: [null, true],
-          delivery: [null, true],
-          sender_note: [null, false],
-          witness_sig: [null, false],
+        expect(Object.fromEntries(fields.map((f) => [f.name, [f.groupId, f.assignment]]))).toEqual({
+          dana_name: ['dana', inGroup('dana')],
+          dana_sig: ['dana', inGroup('dana')],
+          ada_name: ['ada', inGroup('ada')],
+          ada_sig: ['ada', inGroup('ada')],
+          reference: [null, ANYONE],
+          notes: [null, ANYONE],
+          delivery: [null, ANYONE],
+          sender_note: [null, UNASSIGNED],
+          witness_sig: [null, UNASSIGNED],
           // Another tool's entry beside a group: the field is that group's.
-          both: ['dana', false],
+          both: ['dana', inGroup('dana')],
           // A signature field is signed by one signer.
-          sig_marked: [null, false],
+          sig_marked: [null, UNASSIGNED],
         });
       });
     });
@@ -411,10 +420,10 @@ export function runAnyoneFieldsConformance(
           kind: 'checkbox',
           name: 'agree',
           required: true,
-          forAnyone: true,
+          assignment: ANYONE,
           widgets: widgetsAt(20, 200),
         });
-        expect([made.required, made.forAnyone, made.groupId]).toEqual([true, true, null]);
+        expect([made.required, made.assignment, made.groupId]).toEqual([true, ANYONE, null]);
       });
       // Empty, Dana's signing leaves it open; Ada checks it and her signing locks it.
       const afterDana = await handOn(
@@ -448,7 +457,7 @@ export function runAnyoneFieldsConformance(
           await doc.forms.create({
             kind: 'pushbutton',
             name,
-            forAnyone: true,
+            assignment: ANYONE,
             widgets: widgetsAt(x).map((widget) => ({ ...widget, layout: 'image' as const })),
           });
         }
@@ -566,61 +575,129 @@ export function runAnyoneFieldsConformance(
       );
     });
 
-    test('a field in a group, or a signature field, is never for anyone', async () => {
+    test('a field is for one of three, and a signature field is never for anyone', async () => {
       await as('everything', async (doc) => {
-        const invalid = async (attempt: Promise<unknown>, named = true) => {
+        const invalid = async (attempt: Promise<unknown>, member: string | null = 'assignment') => {
           const error = await refusal(attempt);
           expect(codeOf(error)).toBe(EngineErrorCode.InvalidArg);
-          if (named) expect((error as EngineError).details).toMatchObject({ field: 'forAnyone' });
+          if (member) expect((error as EngineError).details).toMatchObject({ field: member });
         };
+        // An assignment and the groupId shorthand in one write.
         await invalid(
-          doc.forms.create({ kind: 'text', name: 'x', groupId: 'dana', forAnyone: true }),
+          doc.forms.create({ kind: 'text', name: 'x', groupId: 'dana', assignment: ANYONE }),
         );
-        await invalid(doc.forms.create({ kind: 'signature', name: 'x', forAnyone: true }));
-        await invalid(doc.forms.update(field('dana_name'), { forAnyone: true }));
-        await invalid(doc.forms.update(field('witness_sig'), { forAnyone: true }));
-        // A group for such a field without taking `forAnyone` away.
-        await invalid(doc.forms.update(field('reference'), { groupId: 'dana' }));
+        await invalid(
+          doc.forms.update(field('reference'), { groupId: 'ada', assignment: inGroup('ada') }),
+        );
+        await invalid(doc.forms.create({ kind: 'signature', name: 'x', assignment: ANYONE }));
+        await invalid(doc.forms.update(field('witness_sig'), { assignment: ANYONE }));
+        // A signature field in a group keeps its group: nothing is written.
+        await invalid(doc.forms.update(field('dana_sig'), { assignment: ANYONE }));
+        expect((await doc.forms.get(field('dana_sig'))).assignment).toEqual(inGroup('dana'));
+        await invalid(
+          doc.forms.update(field('reference'), { assignment: { kind: 'group', groupId: '' } }),
+        );
         // Refused by the request's schema on the wire, by the engine locally.
         await invalid(
-          doc.forms.update(field('reference'), { forAnyone: 'yes' as unknown as boolean }),
-          false,
+          doc.forms.update(field('reference'), {
+            assignment: { kind: 'everyone' } as unknown as FieldAssignment,
+          }),
+          null,
         );
-        // Moved both ways in one update each.
-        await doc.forms.update(field('reference'), { groupId: 'dana', forAnyone: false });
-        expect(await doc.forms.get(field('reference'))).toMatchObject({
-          groupId: 'dana',
-          forAnyone: false,
-        });
-        await doc.forms.update(field('reference'), { groupId: null, forAnyone: true });
-        expect(await doc.forms.get(field('reference'))).toMatchObject({
-          groupId: null,
-          forAnyone: true,
-        });
-        // `false` on a signature field changes nothing.
-        await doc.forms.update(field('witness_sig'), { forAnyone: false });
+        expect((await doc.forms.get(field('reference'))).assignment).toEqual(ANYONE);
+        // `unassigned` on a signature field changes nothing.
+        await doc.forms.update(field('witness_sig'), { assignment: UNASSIGNED });
         // Another tool's entry beside a group doesn't come back with the group gone.
         await doc.forms.update(field('both'), { groupId: null });
-        expect((await doc.forms.get(field('both'))).forAnyone).toBe(false);
+        expect((await doc.forms.get(field('both'))).assignment).toEqual(UNASSIGNED);
       });
     });
 
-    test('marking one takes fields:set-group:all; unmarking takes form design', async () => {
+    test('an assignment, or the groupId shorthand, works from any assignment', async () => {
+      await as('sender', async (doc) => {
+        const assign = async (name: string, patch: FormFieldPatch) => {
+          const { field: updated } = await doc.forms.update(field(name), patch);
+          const read = await doc.forms.get(field(name));
+          expect(updated).toMatchObject({ groupId: read.groupId, assignment: read.assignment });
+          // `groupId` reads the group, and `null` for anyone and unassigned.
+          const { assignment } = read;
+          expect(read.groupId).toBe(assignment.kind === 'group' ? assignment.groupId : null);
+          return assignment;
+        };
+        // From a group to anyone, to another group, to unassigned, and to anyone again.
+        expect(await assign('dana_name', { assignment: ANYONE })).toEqual(ANYONE);
+        expect(await assign('dana_name', { assignment: inGroup('ada') })).toEqual(inGroup('ada'));
+        expect(await assign('dana_name', { assignment: UNASSIGNED })).toEqual(UNASSIGNED);
+        expect(await assign('dana_name', { assignment: ANYONE })).toEqual(ANYONE);
+        // The shorthand from anyone: a group id is that group, `null` unassigned.
+        expect(await assign('reference', { groupId: 'ada' })).toEqual(inGroup('ada'));
+        expect(await assign('notes', { groupId: null })).toEqual(UNASSIGNED);
+        // In a batch, as on its own; another tool's entry beside a group counts for nothing.
+        await doc.apply({
+          ops: [
+            { type: 'forms.update', field: field('ada_name'), patch: { assignment: UNASSIGNED } },
+            { type: 'forms.update', field: field('both'), patch: { assignment: ANYONE } },
+          ],
+        });
+        expect((await doc.forms.get(field('ada_name'))).assignment).toEqual(UNASSIGNED);
+        expect((await doc.forms.get(field('both'))).assignment).toEqual(ANYONE);
+        // A create takes either member too; with neither, the field is unassigned.
+        const created = async (
+          name: string,
+          draft: Pick<FormFieldPatch, 'groupId' | 'assignment'>,
+        ) =>
+          (await doc.forms.create({ kind: 'text', name, widgets: widgetsAt(20, 100), ...draft }))
+            .field.assignment;
+        expect(await created('c1', {})).toEqual(UNASSIGNED);
+        expect(await created('c2', { groupId: 'dana' })).toEqual(inGroup('dana'));
+        expect(await created('c3', { groupId: null })).toEqual(UNASSIGNED);
+        expect(await created('c4', { assignment: inGroup('ada') })).toEqual(inGroup('ada'));
+        expect(await created('c5', { assignment: ANYONE })).toEqual(ANYONE);
+      });
+    });
+
+    test('anyone takes fields:set-group:all, a group its own right, unassigned form design', async () => {
       await as('designer', async (doc) => {
-        const refused = await refusal(
-          doc.forms.create({ kind: 'text', name: 'x', forAnyone: true, widgets: widgetsAt(20) }),
+        const required = async (attempt: Promise<unknown>) => {
+          const refused = await refusal(attempt);
+          expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
+          return (refused as EngineError).details?.required;
+        };
+        expect(
+          await required(
+            doc.forms.create({
+              kind: 'text',
+              name: 'x',
+              assignment: ANYONE,
+              widgets: widgetsAt(20),
+            }),
+          ),
+        ).toBe('fields:set-group:all');
+        expect(await required(doc.forms.update(field('sender_note'), { assignment: ANYONE }))).toBe(
+          'fields:set-group:all',
         );
-        expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
-        expect((refused as EngineError).details).toMatchObject({
-          required: 'fields:set-group:all',
-        });
-        const update = await refusal(doc.forms.update(field('sender_note'), { forAnyone: true }));
-        expect((update as EngineError).details).toMatchObject({
-          required: 'fields:set-group:all',
-        });
-        // `false` takes form design alone, as no group does.
-        await doc.forms.update(field('reference'), { forAnyone: false });
-        expect((await doc.forms.get(field('reference'))).forAnyone).toBe(false);
+        // From a group to anyone takes the same; nothing is written.
+        expect(await required(doc.forms.update(field('dana_name'), { assignment: ANYONE }))).toBe(
+          'fields:set-group:all',
+        );
+        expect((await doc.forms.get(field('dana_name'))).assignment).toEqual(inGroup('dana'));
+        // A group takes that group's right, from anyone too, by either member.
+        expect(
+          await required(doc.forms.update(field('delivery'), { assignment: inGroup('ada') })),
+        ).toBe('fields:set-group:group=ada');
+        expect(await required(doc.forms.update(field('delivery'), { groupId: 'ada' }))).toBe(
+          'fields:set-group:group=ada',
+        );
+        expect((await doc.forms.get(field('delivery'))).assignment).toEqual(ANYONE);
+        await doc.forms.update(field('notes'), { assignment: inGroup('dana') });
+        expect((await doc.forms.get(field('notes'))).assignment).toEqual(inGroup('dana'));
+        // Unassigned takes form design alone, from anyone and from a group she can't set.
+        await doc.forms.update(field('reference'), { assignment: UNASSIGNED });
+        await doc.forms.update(field('ada_name'), { groupId: null });
+        expect((await doc.forms.get(field('reference'))).assignment).toEqual(UNASSIGNED);
+        expect((await doc.forms.get(field('ada_name'))).assignment).toEqual(UNASSIGNED);
+        // The assignment a field has already takes no right.
+        await doc.forms.update(field('delivery'), { assignment: ANYONE, required: true });
         expect(doc.security.fieldRights().setGroup).toEqual({ all: false, groups: ['dana'] });
       });
       await as('sender', async (doc) => {
@@ -628,50 +705,43 @@ export function runAnyoneFieldsConformance(
         const { field: made } = await doc.forms.create({
           kind: 'text',
           name: 'x',
-          forAnyone: true,
+          assignment: ANYONE,
           widgets: widgetsAt(20),
         });
-        expect(made.forAnyone).toBe(true);
+        expect(made.assignment).toEqual(ANYONE);
       });
     });
 
-    test('an undo puts the fact back, also after a later change to the field', async () => {
+    test('an undo puts the assignment back whole, also after a later change to the field', async () => {
       await as('sender', async (doc) => {
-        const marked = await doc.apply({
-          ops: [{ type: 'forms.update', field: field('sender_note'), patch: { forAnyone: true } }],
-        });
-        expect((await doc.forms.get(field('sender_note'))).forAnyone).toBe(true);
-        await doc.apply({ undoOf: marked.meta.opId });
-        expect((await doc.forms.get(field('sender_note'))).forAnyone).toBe(false);
-
-        const moved = await doc.apply({
-          ops: [
-            {
-              type: 'forms.update',
-              field: field('dana_name'),
-              patch: { groupId: null, forAnyone: true },
-            },
-          ],
-        });
-        await doc.forms.update(field('dana_name'), { required: true });
-        await doc.apply({ undoOf: moved.meta.opId });
-        expect(await doc.forms.get(field('dana_name'))).toMatchObject({
-          groupId: 'dana',
-          forAnyone: false,
-          required: true,
-        });
+        const undoes = async (name: string, patch: FormFieldPatch, was: FieldAssignment) => {
+          const done = await doc.apply({
+            ops: [{ type: 'forms.update', field: field(name), patch }],
+          });
+          await doc.forms.update(field(name), { required: true });
+          await doc.apply({ undoOf: done.meta.opId });
+          expect(await doc.forms.get(field(name))).toMatchObject({
+            assignment: was,
+            groupId: was.kind === 'group' ? was.groupId : null,
+            required: true,
+          });
+        };
+        await undoes('sender_note', { assignment: ANYONE }, UNASSIGNED);
+        await undoes('dana_name', { assignment: ANYONE }, inGroup('dana'));
+        await undoes('reference', { groupId: 'ada' }, ANYONE);
+        await undoes('notes', { groupId: null }, ANYONE);
       });
     });
 
     test('an undo leaves a newer assignment as it is and puts the rest back', async () => {
       await as('sender', async (doc) => {
-        // One update takes `reference` from anyone and gives it a label…
+        // One update leaves `reference` to the sender and gives it a label…
         const edited = await doc.apply({
           ops: [
             {
               type: 'forms.update',
               field: field('reference'),
-              patch: { forAnyone: false, alternateName: 'Order number' },
+              patch: { assignment: UNASSIGNED, alternateName: 'Order number' },
             },
           ],
         });
@@ -679,16 +749,15 @@ export function runAnyoneFieldsConformance(
         await doc.forms.update(field('reference'), { groupId: 'ada' });
         const undone = await doc.apply({ undoOf: edited.meta.opId });
         expect(await doc.forms.get(field('reference'))).toMatchObject({
-          groupId: 'ada',
-          forAnyone: false,
+          assignment: inGroup('ada'),
           alternateName: null,
         });
         const item = undone.items[0] as { skipped?: readonly string[] };
-        expect([...(item.skipped ?? [])].sort()).toEqual(['forAnyone', 'groupId']);
+        expect(item.skipped).toEqual(['assignment']);
       });
     });
 
-    test('an update that expects the fact applies only where it holds', async () => {
+    test('an update that expects an assignment applies only where it holds', async () => {
       await as('sender', async (doc) => {
         const expecting = (name: string) =>
           doc.apply({
@@ -697,7 +766,7 @@ export function runAnyoneFieldsConformance(
                 type: 'forms.update',
                 field: field(name),
                 patch: { required: true },
-                expect: { forAnyone: true },
+                expect: { assignment: ANYONE },
               },
             ],
           });
@@ -709,13 +778,10 @@ export function runAnyoneFieldsConformance(
       });
     });
 
-    test('a copy keeps the fact, which takes the right to mark it', async () => {
+    test('a copy keeps its assignment, which takes the right to give it', async () => {
       await as('sender', async (doc) => {
         const copied = await doc.forms.copy([field('reference'), field('sender_note')]);
-        expect(copied.fields.map((f) => [f.groupId, f.forAnyone])).toEqual([
-          [null, true],
-          [null, false],
-        ]);
+        expect(copied.fields.map((f) => f.assignment)).toEqual([ANYONE, UNASSIGNED]);
       });
       await as('designer', async (doc) => {
         const refused = await refusal(doc.forms.copy([field('reference')]));
@@ -726,35 +792,46 @@ export function runAnyoneFieldsConformance(
       });
     });
 
-    test('an export carries the fact, and an import keeps it under the right rights', async () => {
+    test('an export carries the assignment, and an import keeps it under the right rights', async () => {
       let everyone: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
       let plain: Awaited<ReturnType<DocumentHandle['forms']['export']>> | null = null;
       await as('everything', async (doc) => {
         everyone = await doc.forms.export();
         plain = await doc.forms.export({ fields: [field('sender_note')] });
       });
-      const marked = Object.fromEntries(
-        everyone!.fields.map(({ data }) => [data.name, data.forAnyone]),
+      const carried = Object.fromEntries(
+        everyone!.fields.map(({ data }) => [data.name, data.assignment]),
       );
-      expect(marked).toMatchObject({ reference: true, notes: true, sender_note: false });
+      expect(carried).toMatchObject({
+        dana_name: inGroup('dana'),
+        reference: ANYONE,
+        notes: ANYONE,
+        sender_note: UNASSIGNED,
+      });
       const blank = await handOn('everything', async (doc) => {
         for (const { ref } of (await doc.forms.list()).fields) await doc.forms.delete(ref);
       });
+      const assignments = (fields: readonly FormField[]) =>
+        Object.fromEntries(fields.map((f) => [f.name, f.assignment]));
       await as(
         'sender',
         async (doc) => {
           const copied = await doc.forms.import(everyone!, { attribution: 'stamp' });
-          const facts = Object.fromEntries(copied.fields.map((f) => [f.name, f.forAnyone]));
-          expect(facts).toMatchObject({ reference: true, delivery: true, sender_note: false });
+          expect(assignments(copied.fields)).toMatchObject({
+            ada_name: inGroup('ada'),
+            reference: ANYONE,
+            delivery: ANYONE,
+            sender_note: UNASSIGNED,
+          });
         },
         blank,
       );
       await as(
         'designer',
         async (doc) => {
-          // A field of no group, not for anyone, she may copy in.
+          // An unassigned field she may copy in.
           const copied = await doc.forms.import(plain!, { attribution: 'stamp' });
-          expect(copied.fields.map((f) => f.forAnyone)).toEqual([false]);
+          expect(copied.fields.map((f) => f.assignment)).toEqual([UNASSIGNED]);
           const refused = await refusal(doc.forms.import(everyone!, { attribution: 'stamp' }));
           expect(codeOf(refused)).toBe(EngineErrorCode.Forbidden);
         },
@@ -764,11 +841,41 @@ export function runAnyoneFieldsConformance(
         'everything',
         async (doc) => {
           const restored = await doc.forms.import(everyone!, { attribution: 'restore' });
-          const facts = Object.fromEntries(restored.fields.map((f) => [f.name, f.forAnyone]));
-          expect(facts).toMatchObject({ reference: true, notes: true, sender_note: false });
+          expect(assignments(restored.fields)).toMatchObject({
+            reference: ANYONE,
+            notes: ANYONE,
+            sender_note: UNASSIGNED,
+          });
         },
         blank,
       );
+      // A bundle an earlier version wrote, passed as it is: no row has an
+      // assignment, so each field is its group's, or unassigned.
+      const older = {
+        ...everyone!,
+        fields: everyone!.fields.map(({ data, ...row }) => {
+          const { assignment: _left, ...earlier } = data;
+          return { ...row, data: earlier };
+        }),
+      } as unknown as NonNullable<typeof everyone>;
+      for (const [token, attribution] of [
+        ['everything', 'restore'],
+        ['sender', 'stamp'],
+      ] as const) {
+        await as(
+          token,
+          async (doc) => {
+            const imported = await doc.forms.import(older, { attribution });
+            expect(assignments(imported.fields)).toMatchObject({
+              dana_name: inGroup('dana'),
+              ada_name: inGroup('ada'),
+              reference: UNASSIGNED,
+              sender_note: UNASSIGNED,
+            });
+          },
+          blank,
+        );
+      }
     });
 
     test('after a signature, filling one it left open is permitted; changing one it locked is forbidden', async () => {

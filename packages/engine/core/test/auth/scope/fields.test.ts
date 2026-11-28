@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowsFieldWrite,
   allowsSomeFieldWrite,
-  authorizeForAnyone,
+  authorizeFieldAssignment,
   authorizeFieldGroup,
   authorizeFieldWrite,
   type ChangeAuthority,
@@ -168,7 +168,7 @@ describe('putting a field in a group', () => {
 });
 
 describe('a field anyone fills in', () => {
-  const forAnyone = { groupId: null, forAnyone: true };
+  const anyone = { kind: 'anyone' } as const;
   const grants = (scope: string[]) => ({ scope, permissionFlags: NO_BITS });
 
   it('is filled in by every scope that fills in some field, whatever group it names', () => {
@@ -180,23 +180,21 @@ describe('a field anyone fills in', () => {
       ['doc.forms.fill', 'fields:fill:group=dana'],
       ['*'],
     ]) {
-      expect(checkFieldAction('fill', forAnyone, scope, NO_BITS)).toBe(true);
+      expect(checkFieldAction('fill', anyone, scope, NO_BITS)).toBe(true);
     }
     // One that fills in no field, or only signs, fills in none.
     for (const scope of [['doc.open'], ['doc.forms.read'], ['fields:sign:group=dana'], []]) {
-      expect(checkFieldAction('fill', forAnyone, scope, NO_BITS)).toBe(false);
+      expect(checkFieldAction('fill', anyone, scope, NO_BITS)).toBe(false);
     }
   });
 
   it('leaves a field of a group and the sender’s fields as they were', () => {
     const dana = ['fields:fill:group=dana'];
-    expect(checkFieldAction('fill', { groupId: 'dana' }, dana, NO_BITS)).toBe(true);
-    expect(checkFieldAction('fill', { groupId: 'ada' }, dana, NO_BITS)).toBe(false);
-    expect(checkFieldAction('fill', { groupId: null }, dana, NO_BITS)).toBe(false);
-    expect(checkFieldAction('fill', { groupId: null, forAnyone: false }, dana, NO_BITS)).toBe(
-      false,
-    );
-    // A group id alone reads as a field of that group.
+    const group = (groupId: string) => ({ kind: 'group', groupId }) as const;
+    expect(checkFieldAction('fill', group('dana'), dana, NO_BITS)).toBe(true);
+    expect(checkFieldAction('fill', group('ada'), dana, NO_BITS)).toBe(false);
+    expect(checkFieldAction('fill', { kind: 'unassigned' }, dana, NO_BITS)).toBe(false);
+    // A group id alone reads as a field of that group, and `null` as an unassigned one.
     expect(checkFieldAction('fill', 'dana', dana, NO_BITS)).toBe(true);
     expect(checkFieldAction('fill', null, dana, NO_BITS)).toBe(false);
   });
@@ -208,7 +206,7 @@ describe('a field anyone fills in', () => {
       certification: { signatureIndex: 0, permission: 1 },
       fieldLocks: [],
     } as unknown as Parameters<typeof checkFieldAction>[4];
-    expect(checkFieldAction('fill', forAnyone, ['fields:fill:all'], NO_BITS, locked)).toBe(false);
+    expect(checkFieldAction('fill', anyone, ['fields:fill:all'], NO_BITS, locked)).toBe(false);
   });
 
   it('is refused naming the broad capability', () => {
@@ -217,21 +215,20 @@ describe('a field anyone fills in', () => {
       grants: grants(['doc.open']),
       protection: null,
     };
-    expect(allowsFieldWrite(authority, forAnyone, 'fill')).toBe(false);
-    expect(() => authorizeFieldWrite(authority, forAnyone, 'fill')).toThrow(PermissionDenied);
+    expect(allowsFieldWrite(authority, anyone, 'fill')).toBe(false);
+    expect(() => authorizeFieldWrite(authority, anyone, 'fill')).toThrow(PermissionDenied);
     try {
-      authorizeFieldWrite(authority, forAnyone, 'fill');
+      authorizeFieldWrite(authority, anyone, 'fill');
     } catch (error) {
       expect((error as PermissionDenied).required).toBe('doc.forms.fill');
     }
     const dana = { ...authority, grants: grants(['fields:fill:group=dana']) };
-    expect(allowsFieldWrite(dana, forAnyone, 'fill')).toBe(true);
-    expect(() => authorizeFieldWrite(dana, forAnyone, 'fill')).not.toThrow();
-    // A field read is an assignment.
-    expect(allowsFieldWrite(dana, { groupId: 'ada', forAnyone: false }, 'fill')).toBe(false);
+    expect(allowsFieldWrite(dana, anyone, 'fill')).toBe(true);
+    expect(() => authorizeFieldWrite(dana, anyone, 'fill')).not.toThrow();
+    expect(allowsFieldWrite(dana, { kind: 'group', groupId: 'ada' }, 'fill')).toBe(false);
   });
 
-  it('is marked with fields:set-group:all; unmarked with no right of its own', () => {
+  it('takes fields:set-group:all; unassigned takes no right of its own', () => {
     expect(checkSetEveryGroup('fields', ['fields:set-group:all'])).toBe(true);
     expect(checkSetEveryGroup('fields', ['fields:*:all'])).toBe(true);
     expect(checkSetEveryGroup('fields', ['*'])).toBe(true);
@@ -244,16 +241,21 @@ describe('a field anyone fills in', () => {
       grants: grants(['doc.forms.modify', 'fields:set-group:group=dana']),
       protection: null,
     };
-    expect(() => authorizeForAnyone(designer, false)).not.toThrow();
-    expect(() => authorizeForAnyone(designer, true)).toThrow(PermissionDenied);
-    try {
-      authorizeForAnyone(designer, true);
-    } catch (error) {
-      expect((error as PermissionDenied).required).toBe('fields:set-group:all');
-    }
+    const required = (assignment: Parameters<typeof authorizeFieldAssignment>[1]) => {
+      try {
+        authorizeFieldAssignment(designer, assignment);
+        return null;
+      } catch (error) {
+        return (error as PermissionDenied).required;
+      }
+    };
+    expect(required({ kind: 'unassigned' })).toBe(null);
+    expect(required({ kind: 'group', groupId: 'dana' })).toBe(null);
+    expect(required({ kind: 'group', groupId: 'ada' })).toBe('fields:set-group:group=ada');
+    expect(required(anyone)).toBe('fields:set-group:all');
     const sender = { ...designer, grants: grants(['doc.forms.modify', 'fields:set-group:all']) };
-    expect(() => authorizeForAnyone(sender, true)).not.toThrow();
-    expect(() => authorizeForAnyone({ ...designer, grants: null }, true)).not.toThrow();
+    expect(() => authorizeFieldAssignment(sender, anyone)).not.toThrow();
+    expect(() => authorizeFieldAssignment({ ...designer, grants: null }, anyone)).not.toThrow();
     // The lists say the same: a designer may mark one where `setGroup` is every group.
     expect(fieldRightsOf(sender.grants!.scope, NO_BITS, null, undefined).setGroup).toEqual({
       all: true,

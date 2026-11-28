@@ -200,13 +200,13 @@ const scope = ['doc.open', 'doc.render', 'fields:fill:group=buyer', 'fields:sign
 
 A `fields:fill:…` permission replaces `doc.forms.fill` for filling in, and `fields:sign:…`
 replaces `doc.sign` for signing, so `['doc.forms.fill', 'fields:fill:group=buyer']` fills in the
-buyer's fields only. A field in no group is then left to users without a `fields:fill` permission.
+buyer's fields only. An unassigned field is then left to users without a `fields:fill` permission.
 Any `fields:` permission lets the user read the form: groups limit what they change, never what
 they see.
 
-A field marked `forAnyone` is for every signer: any user who may fill in some field may fill it in,
-whatever group their permission names. Marking one takes `fields:set-group:all`, since it reaches
-every group.
+A field anyone fills in (`assignment: { kind: 'anyone' }`) is for every signer: any user who may
+fill in some field may fill it in, whatever group their permission names. Giving a field to anyone
+takes `fields:set-group:all`, since it reaches every group.
 
 A field a script calculates, such as a total, is filled in together with the field it's
 calculated from. Writing it is allowed when the same change also fills in one of the user's own
@@ -339,9 +339,10 @@ field is usually made for someone else. `annotations:set-group:group=<id>` and
 `fields:fill:group=<id>` fill in that group's fields.
 
 A user's own group takes no `set-group` permission. An annotation's group can be changed, never
-removed. A field's can be removed (`groupId: null`), which takes `doc.forms.modify` alone. A field
-in no group can be for anyone instead (`forAnyone: true`): every user with a `fields:fill`
-permission, or `doc.forms.fill`, fills it in.
+removed. A field's can be removed (`groupId: null`, or `assignment: { kind: 'unassigned' }`),
+which takes `doc.forms.modify` alone. A field can be for anyone instead of one group
+(`assignment: { kind: 'anyone' }`): every user with a `fields:fill` permission, or
+`doc.forms.fill`, fills it in.
 
 A `group=<id>` permission names the group it covers: the user doesn't need to be in it. To give
 someone several groups, give them one permission per group.

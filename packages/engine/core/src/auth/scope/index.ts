@@ -51,7 +51,7 @@ export {
   authorizeAnnotationUpdate,
   allowsFieldWrite,
   allowsSomeFieldWrite,
-  authorizeForAnyone,
+  authorizeFieldAssignment,
   authorizeFieldGroup,
   authorizeFieldWrite,
 } from './authority';
@@ -66,7 +66,6 @@ export {
   checkFieldAction,
   checkPluginPermission,
   fieldRightsOf,
-  type FieldAssignment,
   type FieldGroupRight,
   type FieldRights,
   checkSetGroup,

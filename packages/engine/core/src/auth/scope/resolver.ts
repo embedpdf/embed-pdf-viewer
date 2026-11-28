@@ -9,6 +9,7 @@ import type {
   ParsedScope,
   PdfPermissionFlags,
 } from './types';
+import { assignmentOfGroup, type FieldAssignment } from '../../forms/assignment';
 import { protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
 
@@ -290,30 +291,19 @@ export function checkSetEveryGroup(entity: CollabEntity, rawScope: ReadonlyArray
     );
 }
 
-/**
- * Whose a form field is, as the field rights read it: its group, and whether
- * anyone fills it in. A field read (`FormField`) is one.
- */
-export interface FieldAssignment {
-  /** The field's group; `null` for a field in no group. */
-  readonly groupId: string | null;
-  /** Every signer may fill the field in (`FormField.forAnyone`). Left out, `false`. */
-  readonly forAnyone?: boolean;
-}
-
-/** `field` as an assignment: a group id alone (or `null`) is a field of that group. */
+/** `field` as an assignment: a group id alone is that group's field, and `null` an unassigned one. */
 function assignmentOf(field: FieldAssignment | string | null): FieldAssignment {
-  return field !== null && typeof field === 'object' ? field : { groupId: field };
+  return field !== null && typeof field === 'object' ? field : assignmentOfGroup(field);
 }
 
 /**
  * True iff the scope lets the caller `action` (fill in, or sign) the form
- * `field`: the field itself, or its group id (`null` for a field in no
- * group).
+ * `field`: its assignment (`FormField.assignment`), or the group id that
+ * came before it (`null` for a field in no group).
  *
  * Narrowing, per action, as for annotations:
  *   1. wildcard `*` → allow;
- *   2. a field anyone fills in (`forAnyone`) → allow when the scope lets the
+ *   2. a field anyone fills in (`anyone`) → allow when the scope lets the
  *      caller `action` some field ({@link checkAnyFieldAction}), whatever
  *      group its scopes name;
  *   3. if any `fields:<action>` scope exists (or `fields:*`) → only those
@@ -332,8 +322,11 @@ export function checkFieldAction(
   permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null = null,
 ): boolean {
-  const { groupId, forAnyone } = assignmentOf(field);
-  if (forAnyone) return checkAnyFieldAction(action, rawScope, permissionFlags, protection);
+  const assignment = assignmentOf(field);
+  if (assignment.kind === 'anyone') {
+    return checkAnyFieldAction(action, rawScope, permissionFlags, protection);
+  }
+  const groupId = assignment.kind === 'group' ? assignment.groupId : null;
   const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
   if (protectedCapabilities(protection).has(broad)) return false;
   const parsed = rawScope.map(parseScope);
