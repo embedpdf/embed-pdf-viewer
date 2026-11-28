@@ -63,6 +63,8 @@ export const es: EmbedpdfStrings = {
       'form-organization': 'Campo de organización',
       'form-organization-title': 'Campo de cargo',
       'form-date-signed': 'Campo de fecha de firma',
+      'form-initials': 'Campo de iniciales',
+      'form-image': 'Campo de imagen',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

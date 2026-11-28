@@ -58,6 +58,8 @@ export const nl: EmbedpdfStrings = {
       'form-organization': 'Organisatieveld',
       'form-organization-title': 'Functieveld',
       'form-date-signed': 'Veld voor de datum van ondertekening',
+      'form-initials': 'Veld voor initialen',
+      'form-image': 'Afbeeldingsveld',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

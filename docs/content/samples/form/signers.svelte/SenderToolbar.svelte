@@ -9,6 +9,7 @@
     ['form-text', 'Text'],
     ['form-checkbox', 'Checkbox'],
     ['form-signature', 'Signature'],
+    ['form-initials', 'Initials'],
   ] as const;
 
   const form = useForm();

@@ -1,4 +1,8 @@
-/** Visual fills: the mark becomes the widget's appearance, nothing is sealed; a clear takes it out. */
+/**
+ * Visual fills: the mark becomes the widget's appearance, nothing is sealed; a clear takes it
+ * out. An image field (a push button) takes the mark as its picture, through the form plugin's
+ * `setButtonImage()`: filling in, with the right to fill it in, and one step to undo.
+ */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
@@ -14,7 +18,8 @@ export function createFills(
     store,
     marks,
     authority,
-  }: Pick<SignatureServices, 'events' | 'store' | 'marks' | 'authority'>,
+    siblings,
+  }: Pick<SignatureServices, 'events' | 'store' | 'marks' | 'authority' | 'siblings'>,
   { findSignature }: Pick<SignatureReads, 'findSignature'>,
   target: { clearIfTarget(field: FormFieldRef): void },
 ) {
@@ -56,6 +61,21 @@ export function createFills(
     });
   };
 
+  /**
+   * Put a mark into an image field as its picture: the form plugin's write, so the form's right
+   * (`canFill`) gates it and the app's undo takes it back.
+   */
+  const fillImageField = async (
+    field: FormFieldRef,
+    mark: Mark,
+    options?: OperationOptions,
+  ): Promise<void> =>
+    withBusy(async () => {
+      await siblings.form.setButtonImage(field, { source: await markBytes(mark) }, options);
+      target.clearIfTarget(field);
+      filled.emit({ field });
+    });
+
   const clearField = async (field: FormFieldRef, options?: OperationOptions): Promise<void> => {
     authority.assertAllowedField('sign', field, 'signature.clearField');
     return withBusy(async () => {
@@ -66,6 +86,7 @@ export function createFills(
 
   return {
     fillField,
+    fillImageField,
     api: {
       fillField: verb(fillField),
       clearField: verb(clearField),

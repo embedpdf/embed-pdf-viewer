@@ -65,6 +65,7 @@ const FIELD_TOOLS = [
   ['form-text', 'Text'],
   ['form-checkbox', 'Checkbox'],
   ['form-signature', 'Signature'],
+  ['form-initials', 'Initials'],
 ] as const;
 
 // The color a field anyone fills in shows in: the form's `fields.anyoneTintColor`.

@@ -59,6 +59,8 @@ export const en = {
       'form-organization': 'Organization field',
       'form-organization-title': 'Title field',
       'form-date-signed': 'Date signed field',
+      'form-initials': 'Initials field',
+      'form-image': 'Image field',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

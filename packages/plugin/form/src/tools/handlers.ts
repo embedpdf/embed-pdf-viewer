@@ -123,7 +123,12 @@ function kindDraft(
         ],
       };
     case 'pushbutton':
-      return { kind: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
+      // An image field shows its image alone: a caption would only show if its layout changed.
+      return {
+        kind: 'pushbutton',
+        name,
+        widgets: [widget.layout === 'image' ? widget : { ...widget, caption: 'Button' }],
+      };
     default:
       return { kind: tool.fieldKind, name, widgets: [widget] };
   }

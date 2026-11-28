@@ -478,4 +478,79 @@ describe('what a field is for', () => {
       }
     },
   );
+
+  it(
+    "an image field's box: says what it's for, a press makes it the target, and it holds the picture put in",
+    { timeout: 60_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(blank));
+      const wasmBinary = new Uint8Array(await readFile(wasmPath));
+      const engine = (await createLocalEngine({
+        runtime: { prefer: 'wasm', wasmBinary },
+      })) as unknown as Engine;
+      const page = signal<PageContextValue | null>(null);
+      const { kernel, view } = await viewerWith(
+        [interactionPlugin(), annotationPlugin(), formPlugin(), signaturePlugin()],
+        FormDesignHarness,
+        { page },
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        const signature = kernel.capability(SignatureToken);
+        await form.refresh();
+        const ref = kernel.documents.getPage(0, 'blank')!.ref;
+        const { field } = await form.create({
+          kind: 'pushbutton',
+          name: 'initials',
+          purpose: 'initials',
+          widgets: [{ page: ref, rect: { x: 72, y: 100, width: 72, height: 36 }, layout: 'image' }],
+        });
+        page.value = makePageContext(
+          'blank',
+          'test-view',
+          ref,
+          0,
+          { top: 0, right: 0, bottom: 0, left: 0 },
+          pageTransform({ pageSize: { width: 612, height: 792 }, rotation: 0, scale: 1, dpr: 1 }),
+          () => new DOMRect(0, 0, 612, 792),
+        );
+        flushSync();
+
+        // A button named after the field, empty, saying what it's for.
+        const button = (await waitFor(() => view.getByLabelText('initials'))) as HTMLElement;
+        expect(button.tagName).toBe('BUTTON');
+        const box = button.parentElement as HTMLElement;
+        expect(box.querySelector(PLACEHOLDER)!.textContent!.trim()).toBe('Initials');
+        expect(button.hasAttribute('data-has-image')).toBe(false);
+        // A press makes it the target, as a signature box's does; nothing else runs.
+        await fireEvent.click(button);
+        expect(signature.getTarget()).toEqual(field.ref);
+
+        // The card's mark goes in as its picture: the box says so, and its placeholder goes.
+        await signature.placeMark(
+          { source: new Uint8Array(await readFile(artwork)) },
+          { field: field.ref },
+        );
+        flushSync();
+        await waitFor(() =>
+          expect(view.getByLabelText('initials').hasAttribute('data-has-image')).toBe(true),
+        );
+        expect(signature.getTarget()).toBeNull();
+        expect(form.listWidgets(ref)[0]).toMatchObject({ control: 'image', hasImage: true });
+        expect(
+          view.getByLabelText('initials').parentElement!.querySelector(PLACEHOLDER),
+        ).toBeNull();
+      } finally {
+        view.unmount();
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
 });

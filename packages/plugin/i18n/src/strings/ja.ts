@@ -58,6 +58,8 @@ export const ja: EmbedpdfStrings = {
       'form-organization': '組織フィールド',
       'form-organization-title': '役職フィールド',
       'form-date-signed': '署名日フィールド',
+      'form-initials': 'イニシャルフィールド',
+      'form-image': '画像フィールド',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

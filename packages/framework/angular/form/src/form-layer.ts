@@ -51,6 +51,7 @@ import {
   FormComboControl,
   FormListControl,
   FormSignatureControl,
+  FormImageControl,
   FormTextControl,
   FormToggleControl,
 } from './controls';
@@ -81,6 +82,7 @@ const NO_BOXES: readonly DrawnBox[] = Object.freeze([]);
     FormListControl,
     FormButtonControl,
     FormSignatureControl,
+    FormImageControl,
     FormCustomControl,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,6 +119,9 @@ const NO_BOXES: readonly DrawnBox[] = Object.freeze([]);
             }
             @case ('signature') {
               <div epdfFormSignature [item]="box.item" [colors]="colors()"></div>
+            }
+            @case ('image') {
+              <div epdfFormImage [item]="box.item" [colors]="colors()"></div>
             }
           }
         }

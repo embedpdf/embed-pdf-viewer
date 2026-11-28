@@ -91,6 +91,36 @@ field's `value` in Acrobat.
 
 <Example name="form/fill" />
 
+## Image fields
+
+An [image field](forms/building#image-fields) holds a picture: initials, a second signature, a
+photo. Put a picture in, or take it out:
+
+```ts
+await form.setButtonImage(initials.ref, { source: png }); // a PNG, a JPEG or a one-page PDF
+await form.setButtonImage(initials.ref, null); // empty again
+```
+
+`source` takes what a stamp's does: a `Uint8Array`, a `Blob`, or `{ data, mimeType }`. It
+resolves `{ field }`.
+
+- **It's filling in.** It takes what `setValue()` takes, `form.canFill(ref)`, so a signer puts
+  pictures into their own image fields and the ones [anyone fills in](#fields-anyone-fills-in).
+- **One change, one step to undo.** The box says it holds a picture (`empty` is `false`) at once,
+  and the picture shows once the engine has drawn it.
+- **An empty one is empty.** A required image field is on the list of
+  [what's still to fill in](#check-required-fields) until it holds a picture.
+- **`prefill()` leaves it alone:** the app knows no picture for a purpose.
+- **Signing locks it** once it holds a picture, as it locks a filled-in text field: a field
+  anyone fills in, filled by one signer, is locked by their signature.
+
+With the [signature plugin](forms/signatures#sign-here-in-a-form), pressing an empty or a filled
+image field makes it the target, as pressing a signature field does. Your card puts the
+person's mark in with `signature.placeMark(mark, { field })`, which always puts a mark into an
+image field as its picture: it never signs it. An armed mark
+[clicked on the field](forms/signatures#let-people-click-to-sign) goes in the same way. Without
+the signature plugin, the press does nothing, and your own UI calls `setButtonImage()`.
+
 ## Check required fields
 
 A form marks some fields as required. Check them before you submit or download:
@@ -413,6 +443,7 @@ on [Building forms](forms/building#methods).
 | `getWidgetAt(page, point)` | The field box under a point on a page, with its field and its place (`box`, `rotation` and `rect`), or `null`                                  |
 | `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
 | `setValues(entries)`       | Fills in several fields, each `{ ref, value }`, as one change with one recalculation; a field you may not fill in, or a value it can't take, fails on its own. Resolves `{ applied, skipped, failed }`. |
+| `setButtonImage(ref, image)` | Puts a picture into an image field, `{ source }`, or takes it out, `null`, as one step to undo. Resolves `{ field }`. [Image fields](#image-fields) |
 | `importValues(values)`     | Fills in fields by full name from a plain object, as one change with one recalculation. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `prefill()`                | Fills in the user's empty fields whose purpose the app has a value for, as one change. Resolves `{ applied, skipped, failed }`. [Values the app already knows](#values-the-app-already-knows) |
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |

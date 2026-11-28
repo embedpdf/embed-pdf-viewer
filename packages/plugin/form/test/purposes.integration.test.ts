@@ -537,11 +537,16 @@ describe('what a field is for, on a real engine', () => {
       const signature = await sender.place('form-signature', { x: 120, y: 300 });
       const dropdown = await sender.place('form-combobox', { x: 120, y: 400 });
       expect(text).toMatchObject({ purpose: null, format: null, required: false, readOnly: false });
-      expect(signature).toMatchObject({ kind: 'signature', purpose: null, required: false });
       expect(dropdown).toMatchObject({ purpose: null, format: null });
+      // The signature tool's field says what it's for, and an empty one says so.
+      expect(signature).toMatchObject({ kind: 'signature', purpose: 'signature', required: false });
       sender.interaction.activateTool('pointer');
       for (const item of sender.form.listWidgets(sender.page)) {
-        expect(item).toMatchObject({ purpose: null, format: null, placeholder: null });
+        if (sender.form.get(item.fieldRef)?.name === signature.name) {
+          expect(item).toMatchObject({ purpose: 'signature', placeholder: 'Signature' });
+        } else {
+          expect(item).toMatchObject({ purpose: null, format: null, placeholder: null });
+        }
       }
     } finally {
       sender.destroy();

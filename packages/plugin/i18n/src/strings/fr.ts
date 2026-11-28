@@ -63,6 +63,8 @@ export const fr: EmbedpdfStrings = {
       'form-organization': 'Champ d’organisation',
       'form-organization-title': 'Champ de fonction',
       'form-date-signed': 'Champ de date de signature',
+      'form-initials': 'Champ d’initiales',
+      'form-image': 'Champ d’image',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

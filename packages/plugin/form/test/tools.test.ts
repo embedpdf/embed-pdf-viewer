@@ -14,7 +14,7 @@ const PAGE: PageRef = toPageRef(3);
 const WIDGET = { page: PAGE, rect: { x: 10, y: 10, width: 160, height: 24 } };
 
 describe('the field tools', () => {
-  it('keeps the seven tools it had as they were, and adds one per kind of value', () => {
+  it('keeps the seven tools it had, adds one per kind of value and two image tools', () => {
     expect(FORM_TOOLS.map((tool) => tool.id)).toEqual([
       'form-text',
       'form-checkbox',
@@ -23,14 +23,17 @@ describe('the field tools', () => {
       'form-listbox',
       'form-button',
       'form-signature',
+      'form-initials',
+      'form-image',
       'form-name',
       'form-email',
       'form-organization',
       'form-organization-title',
       'form-date-signed',
     ]);
-    // The first seven say nothing about what their fields start with.
-    for (const tool of FORM_TOOLS.slice(0, 7)) expect(tool).not.toHaveProperty('field');
+    // The first six say nothing about what their fields start with; the signature tool's
+    // fields say what they're for.
+    for (const tool of FORM_TOOLS.slice(0, 6)) expect(tool).not.toHaveProperty('field');
     expect(toolDraft(FORM_TOOL_BY_ID.get('form-text')!, 'text_1', WIDGET)).toEqual({
       kind: 'text',
       name: 'text_1',
@@ -40,6 +43,37 @@ describe('the field tools', () => {
       kind: 'signature',
       name: 'signature_1',
       widgets: [WIDGET],
+      purpose: 'signature',
+    });
+  });
+
+  it('places an image field: a push button whose box shows its image alone, with no caption', () => {
+    const initials = FORM_TOOL_BY_ID.get('form-initials')!;
+    const image = FORM_TOOL_BY_ID.get('form-image')!;
+    expect(initials).toMatchObject({
+      fieldKind: 'pushbutton',
+      clickCreate: { width: 72, height: 36 },
+      defaults: { layout: 'image' },
+      field: { purpose: 'initials' },
+    });
+    expect(image).toMatchObject({
+      fieldKind: 'pushbutton',
+      clickCreate: { width: 120, height: 90 },
+      defaults: { layout: 'image' },
+    });
+    expect(image).not.toHaveProperty('field');
+    const placed = { ...WIDGET, layout: 'image' as const };
+    expect(toolDraft(initials, 'pushbutton_1', placed)).toEqual({
+      kind: 'pushbutton',
+      name: 'pushbutton_1',
+      widgets: [placed],
+      purpose: 'initials',
+    });
+    // A button that isn't an image field keeps its caption.
+    expect(toolDraft(FORM_TOOL_BY_ID.get('form-button')!, 'pushbutton_2', WIDGET)).toEqual({
+      kind: 'pushbutton',
+      name: 'pushbutton_2',
+      widgets: [{ ...WIDGET, caption: 'Button' }],
     });
   });
 

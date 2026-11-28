@@ -58,12 +58,16 @@ export function createPlacement(
   { sign }: { sign(input: SignFieldInput, options?: OperationOptions): Promise<SignFieldResult> },
   {
     fillField,
-  }: { fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void> },
+    fillImageField,
+  }: {
+    fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
+    fillImageField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
+  },
 ) {
   const { signRequested } = events;
   const { documentId } = store;
   const { mode } = authority;
-  const { stamp, annotation } = siblings;
+  const { stamp, annotation, form } = siblings;
   const settings = ctx.settings();
 
   const placeMark = async (
@@ -90,6 +94,12 @@ export function createPlacement(
       }
       const placed = await annotations.stamps.place({ source: mark.source }, target, options);
       return { status: 'placed', annotation: placed.annotation.ref };
+    }
+    // An image field (a push button) is no signature: whatever the mode, the mark goes in as its
+    // picture. It never signs or asks.
+    if (form.get(target.field)?.kind === 'pushbutton') {
+      await fillImageField(target.field, mark, options);
+      return { status: 'filled', field: target.field };
     }
     switch (mode()) {
       case 'sign':

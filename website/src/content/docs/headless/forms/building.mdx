@@ -98,12 +98,14 @@ design the form may leave a field in none, or take it out of its group.
 <Example name="form/signers" />
 
 > **Try it:** as the sender, click the borrower's Name box to place a text field for Dana, then
-> pick Signature and click her Signature box. Pick Ada and do the same under "Approved by": each
-> field shows in its signer's color. Pick **Anyone**: Signature turns off. Place a text field in
-> the "Return by" box; it shows in cyan. Then open the form as Dana. Her fields and the
-> Anyone field stand out, both take her typing, and Ada's show as the PDF has them. Click Dana's
-> signature field, or Tab to it and press Space, draw a signature in the card and press Sign.
-> Open it as Ada: the Anyone field is hers to fill in too.
+> pick Signature and click her Signature box. Pick **Initials** and click beside it: an image
+> field for her initials. Pick Ada and do the same under "Approved by": each field shows in its
+> signer's color. Pick **Anyone**: Signature turns off. Place a text field in the "Return by"
+> box; it shows in cyan. Then open the form as Dana. Her fields and the Anyone field stand out,
+> both take her typing, and Ada's show as the PDF has them. Click Dana's signature field, or Tab
+> to it and press Space, draw a signature in the card and press Sign. Click her initials box and
+> do the same: the drawing goes in as its picture. Open it as Ada: the Anyone field is hers to
+> fill in too.
 
 The signers can sign because the example also has the [signature plugin](signatures): an empty
 signature field is a button, and pressing it makes the field the
@@ -284,6 +286,44 @@ formPlugin({
 
 The list is read when a document opens.
 
+## Image fields
+
+An image field holds a picture the person puts in: their initials, a second signature, a photo.
+It's what Acrobat's Image field tool makes: a push button whose box shows its picture alone, and
+that does nothing else when pressed. Two tools place one:
+
+| Tool            | Places                                                | A click makes |
+| :-------------- | :---------------------------------------------------- | :------------ |
+| `form-initials` | An image field for the person's initials (`initials`) | 72 × 36       |
+| `form-image`    | An image field                                        | 120 × 90      |
+
+`form-signature` places its field with the purpose `signature` too, so an empty one says
+"Signature". Before you click, each tool shows the field it places, see-through: an empty box in
+the color of the [group you place for](#place-fields-for-a-signer), with "Initials" or
+"Signature" in it.
+
+From code, a push button whose box has `layout: 'image'` is an image field:
+
+```ts
+await form.create({
+  kind: 'pushbutton',
+  name: 'initials_1',
+  purpose: 'initials',
+  widgets: [{ page: page.ref, rect: { x: 400, y: 700, width: 72, height: 36 }, layout: 'image' }],
+});
+```
+
+- **A button that does something stays a button.** The box shows a picture alone
+  (`layout: 'image'`), and no action is set on any of the box's events. The one action allowed
+  is Acrobat's own on a press, which asks for a picture (`event.target.buttonImportIcon()`).
+  So an icon-only print or submit button keeps its action.
+- **Never by its name, nor by its picture.** A field named `_af_image` with a caption is a
+  button, and an image field without a picture yet is still an image field.
+- **One more place shows the same picture.** [`addWidget()`](#one-more-button-for-a-group) copies
+  the last box's look, its `layout` among it.
+
+How people fill one in is on [Filling forms](../forms#image-fields).
+
 ## Change a field's settings
 
 <Fw only={['react', 'vue', 'svelte']}>
@@ -427,7 +467,8 @@ Without a place, it goes next in line: below the last button if they stand in a 
 if in a row, at the same size and the same spacing, starting a new column where the page ends. It
 looks like the field's last button, and a radio group's new choice gets the next free `Choice<n>`.
 Pass what you want instead: `form.addWidget(plan.ref, { rect, exportValue: 'yearly' })` takes
-everything an entry of `create()`'s `widgets` takes.
+everything an entry of `create()`'s `widgets` takes. An [image field](#image-fields)'s new place
+shows its picture, as its last box does.
 
 ## Copy fields
 

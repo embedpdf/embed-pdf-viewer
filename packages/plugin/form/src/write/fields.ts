@@ -64,6 +64,7 @@ const LOOK = [
   'textAlign',
   'caption',
   'checkStyle',
+  'layout',
   'rotation',
 ] as const;
 

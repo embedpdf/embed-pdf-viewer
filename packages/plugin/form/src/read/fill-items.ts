@@ -47,6 +47,7 @@ import { isEmpty } from './fields';
 import type { GroupLook } from '../services/groups';
 import {
   fieldKeyOf,
+  isImageField,
   type FieldIndex,
   type FieldKey,
   type FormWidgetLook,
@@ -80,7 +81,8 @@ interface FormWidgetItemBase extends WidgetPlace {
   /**
    * The field is the user's to fill in: the session may fill it in (`canFill`), the box takes
    * input (the `fillable` setting lets people, so it isn't `disabled`), and the field still
-   * takes a value (it isn't a push button, read-only, nor a signed signature). A field a
+   * takes a value (it isn't a push button, unless an image field, nor read-only, nor a signed
+   * signature). A field a
    * signature locked is read-only. The viewer paints only such a box: its tint, its edge and
    * its placeholder. Every other box looks as the PDF has it.
    */
@@ -172,6 +174,13 @@ export type FormWidgetItem = FormWidgetItemBase &
       }
     | { control: 'button' }
     /**
+     * An image field's box: a push button's box that shows its image alone and does nothing of
+     * its own (`layout: 'image'`, no action but Acrobat's import-icon script). `hasImage`: the
+     * field holds an image, which the box shows. With the signature plugin, a press makes the
+     * field the target; it runs no script.
+     */
+    | { control: 'image'; hasImage: boolean }
+    /**
      * A signature field's widget. `signed`: it carries a `/V` (a signature
      * dictionary), so the field is final and its appearance sealed, and the
      * control shows what the signature says rather than signing. Unsigned, it
@@ -190,28 +199,32 @@ const ownedLabel = (name: string, owner: string | null): string =>
 
 /**
  * What a box shows while its field is empty: the label of the field's purpose, for a field
- * whose box has room for a few words (a text field, a dropdown, a signature field). `null` for
- * a field that holds something, a box with a mark drawn in it (`hasMark`: a signature field is
- * empty until it is signed, and the mark is in its box before that), another kind of field,
- * and a purpose without a label.
+ * whose box has room for a few words (a text field, a dropdown, a signature field, an image
+ * field: `imageField`). `null` for a field that holds something, a box with a mark drawn in it
+ * (`hasMark`: a signature field is empty until it is signed, and the mark is in its box before
+ * that), another kind of field, and a purpose without a label.
  */
 export function placeholderOf(
   field: FormField,
   purposeLabel: string | null,
   hasMark: boolean,
+  imageField = false,
 ): string | null {
-  if (purposeLabel === null || hasMark || !isEmpty(field)) return null;
-  return field.kind === 'text' || field.kind === 'combobox' || field.kind === 'signature'
+  if (purposeLabel === null || hasMark || !isEmpty(field, imageField)) return null;
+  return field.kind === 'text' ||
+    field.kind === 'combobox' ||
+    field.kind === 'signature' ||
+    (field.kind === 'pushbutton' && imageField)
     ? purposeLabel
     : null;
 }
 
 /**
- * Whether the field still takes a value: it holds one (a push button doesn't), it isn't
- * read-only, nor a signed signature.
+ * Whether the field still takes a value: it holds one (a push button doesn't, but an image
+ * field, `imageField`, holds its image), it isn't read-only, nor a signed signature.
  */
-export const takesValue = (field: FormField): boolean =>
-  field.kind !== 'pushbutton' &&
+export const takesValue = (field: FormField, imageField = false): boolean =>
+  (field.kind !== 'pushbutton' || imageField) &&
   !field.readOnly &&
   !(field.kind === 'signature' && field.valueEntry.kind !== 'none');
 
@@ -227,6 +240,8 @@ export interface WidgetDress {
   readonly purposeLabel?: string | null;
   /** What the day of signing tells the person whose date it is, in the viewer's language. */
   readonly signingDateHint?: string | null;
+  /** The field is an image field (`isImageField`): it takes an image as its value. */
+  readonly imageField?: boolean;
 }
 
 const UNDRESSED: WidgetDress = Object.freeze({});
@@ -251,7 +266,8 @@ export function projectWidget(
   const owner = dress.owner ?? null;
   const inGroup = dress.inGroup ?? null;
   // `fillable` holds `canFill`: the session may fill it in, and people do by hand.
-  const yours = fillable && takesValue(field);
+  const imageField = dress.imageField ?? false;
+  const yours = fillable && takesValue(field, imageField);
   const base: FormWidgetItemBase = {
     key,
     fieldRef: field.ref,
@@ -263,10 +279,12 @@ export function projectWidget(
     canFill,
     yours,
     required: field.required,
-    empty: isEmpty(field),
+    empty: isEmpty(field, imageField),
     purpose: field.purpose,
     format: takesFormat(field.kind) ? (field as { format: FormFieldFormat | null }).format : null,
-    placeholder: yours ? placeholderOf(field, dress.purposeLabel ?? null, widget.hasMark) : null,
+    placeholder: yours
+      ? placeholderOf(field, dress.purposeLabel ?? null, widget.hasMark, imageField)
+      : null,
     hint: canFill && field.purpose === 'date-signed' ? (dress.signingDateHint ?? null) : null,
     accent: yours ? (dress.tint ?? null) : null,
     box: widget.box,
@@ -335,7 +353,9 @@ export function projectWidget(
         selected: field.selectedValues,
       };
     case 'pushbutton':
-      return { ...base, control: 'button' };
+      return widget.imageBox
+        ? { ...base, control: 'image', hasImage: field.hasImage }
+        : { ...base, control: 'button' };
     case 'signature':
       return { ...base, control: 'signature', signed: field.valueEntry.kind !== 'none' };
     default:
@@ -407,6 +427,7 @@ export function fillItems(
           tint: sources.tintOf?.(field) ?? null,
           purposeLabel: sources.purposeLabelOf?.(field.purpose) ?? null,
           signingDateHint: sources.signingDateHint ?? null,
+          imageField: isImageField(index, field),
         },
       );
       if (item) items.push(item);

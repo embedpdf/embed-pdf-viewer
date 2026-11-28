@@ -43,7 +43,14 @@ import {
 import type { AnnotationLender } from '@embedpdf/plugin-annotation/contract/host';
 
 import type { DuplicatePlacement } from './duplicate';
-import { fieldForWidget, fieldKeyOf, hasArea, widgetRowOf } from '../model';
+import {
+  fieldForWidget,
+  fieldKeyOf,
+  hasArea,
+  isImageBox,
+  isImageField,
+  widgetRowOf,
+} from '../model';
 import { placeholderOf, takesValue } from '../read/fill-items';
 import type { FormContext, FormServices } from '../services';
 import { undoLookOf } from '../sync/predict';
@@ -145,14 +152,18 @@ export function createWidgetLender(
 
   /**
    * A field's tint while it is designed: its group's color, else `fields.anyoneTintColor` for a
-   * field anyone fills in, else `fields.tintColor` for a field that takes a value; `null` for
-   * none.
+   * field anyone fills in, else `fields.tintColor` for a field that takes a value (an image
+   * field among them: `imageField`); `null` for none.
    */
-  function tintIn(field: FormField): RecordAccent | null {
-    return field.assignment.kind !== 'unassigned' || takesValue(field)
+  function tintIn(field: FormField, imageField: boolean): RecordAccent | null {
+    return field.assignment.kind !== 'unassigned' || takesValue(field, imageField)
       ? groups.tintOf(field)
       : null;
   }
+
+  /** Whether a field is an image field: by the form, or by its own box, a tool's ghost's. */
+  const imageFieldOf = (field: FormField, row: WidgetAnnotation): boolean =>
+    isImageBox(row) || isImageField(fields.view(), field);
 
   /** The `fields.border` edge of a box with no border of its own and no tint, so it shows. */
   function outlineIn(row: WidgetAnnotation, tint: RecordAccent | null): RecordOutline | null {
@@ -162,13 +173,18 @@ export function createWidgetLender(
 
   /** What an empty box is for, in the placeholder color. */
   function placeholderIn(field: FormField, row: WidgetAnnotation): RecordPlaceholder | null {
-    const text = placeholderOf(field, purposes.labelOf(field.purpose), row.hasMark);
+    const text = placeholderOf(
+      field,
+      purposes.labelOf(field.purpose),
+      row.hasMark,
+      imageFieldOf(field, row),
+    );
     return text === null ? null : { text, color: ctx.settings().get().fields.placeholder };
   }
 
   /** Everything the lender paints over a box: a placed field's, and a tool's ghost's. */
   function paintOver(field: FormField, row: WidgetAnnotation): LentPaint {
-    const tint = tintIn(field);
+    const tint = tintIn(field, imageFieldOf(field, row));
     const painter = looks.painterIn(row, field);
     const outline = outlineIn(row, tint);
     const placeholder = placeholderIn(field, row);
@@ -220,8 +236,8 @@ export function createWidgetLender(
     // confirmed (a restyle, a resize, a field just placed), and until its new picture is there.
     isPending: looks.isPending,
     accentOf: (record) => {
-      const field = fieldForWidget(fields.view(), objectNumberOf(record.ref));
-      return field ? tintIn(field) : null;
+      const lent = lentOf(record);
+      return lent ? tintIn(lent.field, imageFieldOf(lent.field, lent.row)) : null;
     },
     placeholderOf: (record) => {
       const lent = lentOf(record);
@@ -229,7 +245,9 @@ export function createWidgetLender(
     },
     outlineOf: (record) => {
       const lent = lentOf(record);
-      return lent ? outlineIn(lent.row, tintIn(lent.field)) : null;
+      return lent
+        ? outlineIn(lent.row, tintIn(lent.field, imageFieldOf(lent.field, lent.row)))
+        : null;
     },
     painter: (record) =>
       record.subtype === 'widget' ? looks.painterOf(record as WidgetAnnotation) : null,

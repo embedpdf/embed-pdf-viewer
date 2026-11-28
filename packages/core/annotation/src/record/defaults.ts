@@ -46,6 +46,8 @@ const WIDGET_APPEARANCE_FIELDS = [
   'fontSize',
   'fontColor',
   'textAlign',
+  // Where a push button shows its caption and its image: an image field's tool places `image`.
+  'layout',
 ] as const;
 
 /**

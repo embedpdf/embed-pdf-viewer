@@ -129,6 +129,14 @@ function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
         if (!field) return index;
         return upsertWidgets(index, widgetsAfterDisplay(rowsOfField(index, field), op.display));
       }
+      // The engine predicts no image; the field holds one, or none, as the op says. The picture
+      // shows once the engine has drawn it.
+      case 'forms.setButtonImage': {
+        const field = fieldByRef(index, op.field);
+        return field?.kind === 'pushbutton'
+          ? upsertFields(index, [{ ...field, hasImage: op.image !== null }])
+          : index;
+      }
       case 'forms.restore':
         return withFields(index, [op]);
       case 'forms.restoreWidget': {
@@ -360,6 +368,7 @@ export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): F
       case 'forms.setValue':
       case 'forms.setDisplay':
       case 'forms.setAppearanceText':
+      case 'forms.setButtonImage':
         add(fieldByRef(index, op.field));
         break;
       case 'forms.reset':

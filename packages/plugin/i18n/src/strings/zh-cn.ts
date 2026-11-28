@@ -53,6 +53,8 @@ export const zhCN: EmbedpdfStrings = {
       'form-organization': '组织字段',
       'form-organization-title': '职位字段',
       'form-date-signed': '签署日期字段',
+      'form-initials': '姓名首字母字段',
+      'form-image': '图像字段',
     },
   },
   // What an empty form field shows for its purpose, and what a settings panel lists it as.

@@ -11,6 +11,7 @@ export const FormToken = createCapabilityToken<FormCapability>('form', {
   promises: {
     setValue: true,
     setValues: true,
+    setButtonImage: true,
     importValues: true,
     prefill: true,
     reset: true,

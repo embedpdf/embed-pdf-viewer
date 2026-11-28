@@ -9,6 +9,8 @@
  *   button → a native click target over the picture that runs its action.
  *   signature → "sign here", or the signed field's details, with the
  *            signature plugin.
+ *   image  → an image field: with the signature plugin, a press makes it the
+ *            target its picture goes to.
  *
  * A function, not a component around the control: `<component :is>` draws
  * the control itself, so a box costs one component, as it does to mount and
@@ -18,6 +20,7 @@ import type { Component } from 'vue';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 import ButtonControl from './ButtonControl.vue';
 import ComboControl from './ComboControl.vue';
+import ImageControl from './ImageControl.vue';
 import ListControl from './ListControl.vue';
 import SignatureControl from './SignatureControl.vue';
 import TextControl from './TextControl.vue';
@@ -36,5 +39,7 @@ export function nativeControlOf(item: FormWidgetItem): Component {
       return ButtonControl;
     case 'signature':
       return SignatureControl;
+    case 'image':
+      return ImageControl;
   }
 }

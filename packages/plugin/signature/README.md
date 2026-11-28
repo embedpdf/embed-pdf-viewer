@@ -36,8 +36,9 @@ await signature.placeMark({ assetId }, { page, center: { x: 120, y: 90 } }); // 
 ```
 
 With the interaction hub and the stamp plugin present, a mark armed from a
-`signatures` library and clicked over an unsigned signature field goes into
-the field; anywhere else it is placed as a stamp.
+`signatures` library and clicked over an unsigned signature field, or over an
+image field the person fills in, goes into the field; anywhere else it is
+placed as a stamp.
 
 Requires `@embedpdf/plugin-form`; optional `@embedpdf/plugin-stamp`,
 `@embedpdf/plugin-annotation`, `@embedpdf/plugin-interaction`. See the docs

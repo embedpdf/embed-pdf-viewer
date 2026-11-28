@@ -1254,6 +1254,52 @@ describe('the destination rule', () => {
   });
 });
 
+describe('an image field', () => {
+  const INITIALS: FormFieldRef = { kind: 'fqn', name: 'initials' };
+
+  it('takes the mark as its picture through the form, in every mode: it never signs or asks', async () => {
+    const doc = await openDoc();
+    const stamp = stampStub(artwork);
+    try {
+      for (const mode of ['sign', 'visual', 'ask'] as const) {
+        const setButtonImage = vi.fn(async () => ({ field: {} }));
+        const { signature } = makeSignature(
+          doc,
+          { mode },
+          {
+            stamp,
+            form: {
+              getFieldForWidget: () => null,
+              // A push button: the field an image field is.
+              get: (ref: FormFieldRef) =>
+                ref === INITIALS ? { groupId: null, kind: 'pushbutton' } : { groupId: null },
+              setButtonImage,
+            },
+          },
+        );
+        const seen: SignatureChange[] = [];
+        collectEvents(signature, seen);
+        signature.setTarget(INITIALS);
+        const result = await signature.placeMark(
+          { assetId: 'people:signature' },
+          { field: INITIALS },
+        );
+        expect(result).toEqual({ status: 'filled', field: INITIALS });
+        // The asset's bytes, as the stamp plugin has them, through the form's own write.
+        expect(setButtonImage).toHaveBeenCalledWith(INITIALS, { source: artwork }, undefined);
+        expect(seen.some((event) => event.type === 'filled')).toBe(true);
+        expect(seen.some((event) => event.type === 'ask')).toBe(false);
+        // A field that took its mark is no longer the target.
+        expect(signature.getTarget()).toBeNull();
+      }
+      // Nothing was signed.
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
+    } finally {
+      await doc.close();
+    }
+  });
+});
+
 describe('the armed mark over a field', () => {
   const sample = (pageObjectNumber: number, point: { x: number; y: number }): PointerSample =>
     ({
@@ -1277,7 +1323,12 @@ describe('the armed mark over a field', () => {
       getWidgetAt: () =>
         where === 'nothing'
           ? null
-          : { annotObjectNumber: 9, field: hits[where], box: { x: 0, y: 0, width: 1, height: 1 } },
+          : {
+              annotObjectNumber: 9,
+              field: hits[where],
+              box: { x: 0, y: 0, width: 1, height: 1 },
+              imageBox: false,
+            },
     } as never;
     const handler = createArmedMarkHandler('doc-1', signature, form, stamp as never);
     expect(handler.enabledFor({ id: 'stamp', enables: new Set() } as never)).toBe(true);
@@ -1307,6 +1358,57 @@ describe('the armed mark over a field', () => {
     expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
     stamp.getArmedAsset.mockReturnValue(null as never);
     expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+  });
+
+  it('fills an image box the user fills in, consumes one they may not, and leaves an action button a stamp', () => {
+    const placeMark = vi.fn(async () => {});
+    const signature = { placeMark, getSignature: () => null } as never;
+    const stamp = stampStub(artwork);
+    const button = (objectNumber: number, name: string) =>
+      signatureField({
+        ref: { kind: 'objectNumber', objectNumber },
+        name,
+        kind: 'pushbutton',
+        hasImage: false,
+        widgets: [{ objectNumber, page: toPageRef(3) }],
+      } as Partial<FormField>);
+    const box = { x: 0, y: 0, width: 1, height: 1 };
+    const hits = {
+      mine: { annotObjectNumber: 9, field: button(9, 'initials'), imageBox: true },
+      theirs: { annotObjectNumber: 10, field: button(10, 'their_initials'), imageBox: true },
+      reset: { annotObjectNumber: 11, field: button(11, 'reset'), imageBox: false },
+    };
+    // Their initials' box is `disabled` for this user, as the press reads it.
+    const disabled: Record<number, boolean> = { 9: false, 10: true, 11: false };
+    let where: keyof typeof hits = 'theirs';
+    const form = {
+      getWidgetAt: () => ({ ...hits[where], box, rotation: 0, rect: box }),
+      listWidgets: () =>
+        Object.entries(disabled).map(([objectNumber, off]) => ({
+          annotObjectNumber: Number(objectNumber),
+          disabled: off,
+        })),
+    } as never;
+    const handler = createArmedMarkHandler('doc-1', signature, form, stamp as never);
+
+    // An image box that isn't theirs: consumed, nothing placed, the mark stays armed.
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(placeMark).not.toHaveBeenCalled();
+    expect(stamp.disarm).not.toHaveBeenCalled();
+
+    // An action button: declined, the click places a stamp.
+    where = 'reset';
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
+    expect(placeMark).not.toHaveBeenCalled();
+
+    // Their own image box: the mark goes in as its picture, the tool disarms.
+    where = 'mine';
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(placeMark).toHaveBeenCalledWith(
+      { assetId: 'people:signature' },
+      { field: hits.mine.field.ref },
+    );
+    expect(stamp.disarm).toHaveBeenCalledWith('doc-1');
   });
 });
 

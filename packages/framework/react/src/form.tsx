@@ -610,6 +610,46 @@ const SignatureControl = React.memo(function SignatureControl({
   );
 });
 
+/**
+ * An image field's box: with the signature plugin, a press makes the field the target, where
+ * the next mark the person picks goes in as its picture, empty or filled, as a signature box's
+ * press does. It runs no script. Without the signature plugin, the box is only its picture.
+ */
+const ImageControl = React.memo(function ImageControl({
+  item,
+  page,
+  colors,
+}: ControlProps<'image'>) {
+  const signature = useOptionalCapability(SignatureToken);
+  const actionable = signature !== null && !item.disabled;
+  return (
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      focusable={actionable}
+      style={{ cursor: actionable ? 'pointer' : 'default' }}
+    >
+      {actionable ? (
+        <button
+          type="button"
+          aria-label={item.label}
+          data-has-image={item.hasImage ? '' : undefined}
+          onClick={() => signature.setTarget(item.fieldRef)}
+          style={{
+            ...FORM_CONTROL_FILL,
+            padding: 0,
+            border: 0,
+            background: 'transparent',
+            cursor: 'inherit',
+          }}
+        />
+      ) : null}
+      {item.placeholder !== null ? <FieldPlaceholder item={item} page={page} /> : null}
+    </WidgetBox>
+  );
+});
+
 // ── controls of the app's own ───────────────────────────────────────────────
 
 /**
@@ -680,6 +720,8 @@ function nativeControlOf(
       return <ButtonControl key={key} item={item} page={page} colors={colors} />;
     case 'signature':
       return <SignatureControl key={key} item={item} page={page} colors={colors} />;
+    case 'image':
+      return <ImageControl key={key} item={item} page={page} colors={colors} />;
   }
 }
 

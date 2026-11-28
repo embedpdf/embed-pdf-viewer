@@ -17,7 +17,8 @@ import { initialSignatureModel } from './model';
  *
  * With the interaction hub and the stamp plugin present, an armed mark from
  * a `signatures` library dropped over an unsigned signature field goes into
- * the field (sign, visual fill or ask, by mode) instead of onto the page.
+ * the field (sign, visual fill or ask, by mode) instead of onto the page, and
+ * one dropped over an image field the user fills in becomes its picture.
  * `config` is the settings the app registers, over {@link SIGNATURE_DEFAULTS}.
  */
 export const signaturePlugin = (config?: SignatureConfig) =>
