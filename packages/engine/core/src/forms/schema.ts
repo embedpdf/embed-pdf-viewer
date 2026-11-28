@@ -11,6 +11,8 @@ import { isDatePattern, isTimePattern } from './datePattern';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import { withAssignment, type FieldAssignment } from './assignment';
 import { withButtonImage } from './buttonImage';
+import { withLockedBy } from './lockedBy';
+import type { FieldSignatureLock } from '../signature/types';
 import { withPurposeAndFormat, type FormFieldFormat, type FormFieldFormatWritable } from './format';
 import type { FormFieldPatch } from './patch';
 import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
@@ -134,6 +136,16 @@ export const FieldAssignmentSchema: z.ZodType<FieldAssignment> = closed(
   ]),
 );
 
+/**
+ * Which signed signature locked a field, and by what. No `.describe()`: a
+ * nullable member written with a description beside the reference would
+ * give each SDK a type of its own for every kind of field.
+ */
+export const FieldSignatureLockSchema: z.ZodType<FieldSignatureLock> = z.object({
+  signatureIndex: z.number().int().nonnegative(),
+  source: closed(z.enum(['fieldmdp', 'lock'])),
+});
+
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
   name: z.string(),
@@ -148,6 +160,7 @@ const FormFieldBaseShape = {
   actions: PdfFieldActionsSchema.optional(),
   groupId: z.string().nullable(),
   assignment: FieldAssignmentSchema,
+  lockedBy: FieldSignatureLockSchema.nullable(),
   purpose: z.string().nullable(),
   createdBy: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
@@ -225,7 +238,7 @@ export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
-  (field) => withAssignment(withButtonImage(withPurposeAndFormat(field))),
+  (field) => withLockedBy(withAssignment(withButtonImage(withPurposeAndFormat(field)))),
 ).describe(
   'A form field, by its `family`. A newer server can add families: read one your client ' +
     "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +

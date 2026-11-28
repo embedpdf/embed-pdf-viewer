@@ -71,6 +71,7 @@ import {
   FormFieldWidgetSchema,
   FormValueEntrySchema,
   FieldAssignmentSchema,
+  FieldSignatureLockSchema,
   FormWidgetSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
@@ -1298,6 +1299,7 @@ export const FormWireComponents = {
   FormFieldRef: FormFieldRefSchema,
   FormField: FormFieldDTOSchema,
   FieldAssignment: FieldAssignmentSchema,
+  FieldSignatureLock: FieldSignatureLockSchema,
   FormFieldFormat: FormFieldFormatSchema,
   FormFieldFormatWritable: FormFieldFormatWritableSchema,
   FormValueEntry: FormValueEntrySchema,

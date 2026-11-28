@@ -223,6 +223,7 @@ export type {
   MeasureFromRatioOptions,
   FormFieldRef,
   FormField,
+  FieldSignatureLock,
   FormFieldFormat,
   FormFieldFormatWritable,
   FormBundle,

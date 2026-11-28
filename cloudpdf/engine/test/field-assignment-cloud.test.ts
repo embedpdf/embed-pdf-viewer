@@ -53,7 +53,8 @@ interface SentWrite {
 
 /**
  * `value` with every form field in it, at any depth, as an older server
- * answers it: without `assignment`. A field is the object with a `valueEntry`.
+ * answers it: without `assignment` and `lockedBy`. A field is the object with
+ * a `valueEntry`.
  */
 function withoutAssignment(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(withoutAssignment);
@@ -61,7 +62,7 @@ function withoutAssignment(value: unknown): unknown {
   const isField = 'valueEntry' in value;
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => !isField || key !== 'assignment')
+      .filter(([key]) => !isField || (key !== 'assignment' && key !== 'lockedBy'))
       .map(([key, member]) => [key, withoutAssignment(member)]),
   );
 }
@@ -266,8 +267,11 @@ describe('field assignments, on the wire', () => {
         reference: UNASSIGNED,
         sender_note: UNASSIGNED,
       });
+      // Nor does it name a lock: no field reads as locked.
+      expect(fields.every((f) => f.lockedBy === null)).toBe(true);
       const { field } = await doc.forms.update(named('reference'), { required: true });
       expect(field.assignment).toEqual(UNASSIGNED);
+      expect(field.lockedBy).toBe(null);
       const bundle = await doc.forms.export({ fields: [named('dana_name'), named('notes')] });
       expect(bundle.fields.map(({ data }) => [data.name, data.assignment])).toEqual([
         ['dana_name', inGroup('dana')],

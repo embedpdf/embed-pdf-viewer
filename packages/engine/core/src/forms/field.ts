@@ -3,6 +3,7 @@ import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FieldAssignment } from './assignment';
+import type { FieldSignatureLock } from '../signature/types';
 import type { FormFieldFormat } from './format';
 import type { FormValueEntry } from './value-entry';
 
@@ -116,6 +117,13 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
    * particular (the users who may fill in every field).
    */
   assignment: FieldAssignment;
+  /**
+   * The signed signature whose lock covers the field, and by what; `null`
+   * for a field no signature locked. A locked field takes no more input:
+   * under `signedDocumentPolicy: 'protect'` every write to it fails with
+   * `ProtectedDocument`, and `doc.security.allowsField()` says so.
+   */
+  lockedBy: FieldSignatureLock | null;
   /**
    * What the field's value means: `email`, `date-signed`, or a name an app
    * made up. The engine keeps it and reads nothing into it. `null` for a

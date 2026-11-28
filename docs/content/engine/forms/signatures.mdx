@@ -655,6 +655,23 @@ await sign(doc, {
 covers the fields in its group: `'invoice'` locks `invoice.total` too. Once signed, writing a
 locked field fails with `ProtectedDocument`, and an import skips it.
 
+Each field a signature locked says which one: `lockedBy` is the signature's index in
+`signatures.list()` and what covers the field, its FieldMDP (`'fieldmdp'`) or the signed field's
+own `/Lock` (`'lock'`); `null` for a field nothing locked. It says so whether or not the field is
+marked read-only: this engine's signing marks the fields it locks read-only, another app's may
+not.
+
+```ts
+const field = await doc.forms.get(ref);
+field.lockedBy; // { signatureIndex: 0, source: 'fieldmdp' }
+doc.security.allowsField('fill', field); // false
+```
+
+`allowsField('fill', field)` answers `false` for a locked field, and `allowsField('sign', field)`
+for a locked signature field, which can't be signed. Both follow a signing at once, also for a
+field you read before it. Pass the field itself: `allowsField()` finds a lock by the field's
+`name`, so an object with only a `groupId` isn't known to be locked.
+
 When you name no `lock`, a signing locks two kinds of field (see
 [Signers and groups](/docs/engine/forms/groups)):
 
@@ -1268,7 +1285,10 @@ license, and `inlinedDependencies` in its `package.json` has the versions.
 
 For tools that must produce or test invalid files, create the engine with
 `localEngine({ signedDocumentPolicy: 'permit' })`: the engine then refuses nothing a signature
-forbids. `judged` and every verdict stay the same.
+forbids. `judged` and every verdict stay the same. A field still names the signature that locked
+it (`lockedBy`), and `allowsField('fill', field)` answers `true`. A locked signature field still
+can't be signed: the runtime authors no signature into it, so `allowsField('sign', field)` stays
+`false`.
 
 It is also how to add a document timestamp or validation data after a level `1` certification,
 as the PDF standard allows. Acrobat will report that certification as invalid.

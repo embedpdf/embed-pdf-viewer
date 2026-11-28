@@ -48,9 +48,11 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   // 4: a push button's hasImage, a widget's layout, a push button's image in a bundle
   // (3.5, after 3 was already served without them). 5: a field's `assignment` in
   // place of `forAnyone` (3.5, after 4 may have been served with `forAnyone`, which a
-  // client of this version would read as no field anyone fills in).
-  form: 5,
-  formExport: 5,
+  // client of this version would read as no field anyone fills in). 6: the signature
+  // that locked a field (`lockedBy`), which answers cached under 5 lack, so a client of
+  // this version would read a locked field as open.
+  form: 6,
+  formExport: 6,
   metadata: 1,
   outline: 1,
   attachments: 1,

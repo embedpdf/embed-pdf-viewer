@@ -21712,6 +21712,14 @@
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
               },
+              "lockedBy": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FieldSignatureLock"
+                  }
+                ],
+                "nullable": true
+              },
               "purpose": {
                 "type": "string",
                 "nullable": true
@@ -21799,6 +21807,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -21859,6 +21868,9 @@
               },
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
+              },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -21944,6 +21956,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22000,6 +22013,9 @@
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
               },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22054,6 +22070,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22110,6 +22127,9 @@
               },
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
+              },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22190,6 +22210,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22248,6 +22269,9 @@
               },
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
+              },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
               },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
@@ -22316,6 +22340,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22375,6 +22400,9 @@
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
               },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22420,6 +22448,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22475,6 +22504,9 @@
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
               },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22517,6 +22549,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22571,6 +22604,9 @@
               "assignment": {
                 "$ref": "#/components/schemas/FieldAssignment"
               },
+              "lockedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/lockedBy"
+              },
               "purpose": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/purpose"
               },
@@ -22616,6 +22652,7 @@
               "defaultValueEntry",
               "groupId",
               "assignment",
+              "lockedBy",
               "purpose",
               "createdBy",
               "createdAt",
@@ -22671,6 +22708,21 @@
             "additionalProperties": false
           }
         ]
+      },
+      "FieldSignatureLock": {
+        "type": "object",
+        "properties": {
+          "signatureIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string",
+            "enum": ["fieldmdp", "lock"]
+          }
+        },
+        "required": ["signatureIndex", "source"],
+        "additionalProperties": false
       },
       "FormFieldFormat": {
         "anyOf": [

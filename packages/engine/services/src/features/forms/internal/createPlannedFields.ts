@@ -30,6 +30,7 @@ import { pictureFormatOf } from '../../annotations/internal/pictureFormat';
 import { drawingFor } from '../../annotations/internal/write/stampDrawing';
 import { FormMutator } from '../FormMutator';
 import { setWidgetIcon } from './buttonImage';
+import { fieldLocksOf } from './signatureLocks';
 
 /**
  * A push button's image a planned create gives one of its widgets: a
@@ -125,7 +126,13 @@ export function createPlannedFields(
   const fields = created.map((objectNumber) => {
     const model = acquireFormModel(runtime, session);
     const index = runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, objectNumber);
-    return readFieldAt(runtime, model, index, session.requireDocPtr());
+    return readFieldAt(
+      runtime,
+      model,
+      index,
+      session.requireDocPtr(),
+      fieldLocksOf(runtime, session),
+    );
   });
   return withWidgetRows(
     runtime,

@@ -248,6 +248,12 @@ export {
   type AnyoneFieldsSigning,
 } from './conformance/runAnyoneFieldsConformance';
 export {
+  FIELD_LOCKS_PDF,
+  runFieldLocksConformance,
+  type FieldLocksConformanceOptions,
+  type FieldLocksSigning,
+} from './conformance/runFieldLocksConformance';
+export {
   FIELD_PURPOSE_FORMAT_PDF,
   FIELD_PURPOSE_FORMAT_TOKENS,
   runFieldPurposeFormatConformance,

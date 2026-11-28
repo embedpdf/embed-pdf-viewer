@@ -5,6 +5,7 @@ import type {
   DocumentFieldLock,
   DocumentProtection,
   FieldLockSpec,
+  FieldSignatureLock,
   ModificationLevel,
   Signature,
 } from './types';
@@ -138,6 +139,29 @@ export function fieldLockFor(
     if (lockCovers(lock.spec, fieldName)) return lock;
   }
   return null;
+}
+
+/**
+ * The lock that refuses `action` on form field `fieldName`, or `null`: a
+ * signed signature's lock that covers the field ({@link fieldLockFor}). A
+ * signing is refused whatever the policy, as the runtime authors no
+ * signature into a locked field. A fill is refused only where the engine
+ * enforces the document's signatures (`enforced`: `signedDocumentPolicy:
+ * 'protect'`), as every write then is.
+ */
+export function fieldLockRefusing(
+  action: 'fill' | 'sign',
+  fieldName: string,
+  protection: DocumentProtection | null,
+  enforced: boolean,
+): DocumentFieldLock | null {
+  if (protection === null || (action === 'fill' && !enforced)) return null;
+  return fieldLockFor(protection, fieldName);
+}
+
+/** `lock` as a field reads it (`FormField.lockedBy`): which signature, and by what. */
+export function fieldSignatureLockOf(lock: DocumentFieldLock | null): FieldSignatureLock | null {
+  return lock === null ? null : { signatureIndex: lock.signatureIndex, source: lock.source };
 }
 
 /**

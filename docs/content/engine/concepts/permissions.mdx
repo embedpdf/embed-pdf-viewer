@@ -219,6 +219,10 @@ doc.security.allowsField('sign', field); // …sign it?
 doc.security.allowsField('set-group', { groupId: 'buyer' }); // …put fields in this group?
 ```
 
+A field a signature locked (`field.lockedBy`) answers `false` to `fill` and `sign`, whatever the
+user's permissions: the document's own signatures come first (see
+[Lock fields](/docs/engine/forms/signatures#lock-fields)).
+
 ## The PDF's own restrictions
 
 A PDF can restrict itself: a file protected with an owner password may forbid printing or
