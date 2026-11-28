@@ -2,7 +2,7 @@
 '@embedpdf/engine': minor
 ---
 
-A form field's `assignment` says who fills it in: one group's signers, anyone, or no one in particular. `doc.forms.create()` and `doc.forms.update()` take it, every read returns `field.assignment`, and `doc.security.allowsField('fill', field)` answers for it. Every signer may fill in a field anyone fills in, whatever group their permission names.
+A form field's `assignment` says who fills it in: one group's signers, anyone, or no one in particular. `doc.forms.create()` and `doc.forms.update()` take it, every read returns `field.assignment` (a `FieldAssignment`, which this package exports), and `doc.security.allowsField('fill', field)` answers for it. Every signer may fill in a field anyone fills in, whatever group their permission names.
 
 ```ts
 await doc.forms.create({

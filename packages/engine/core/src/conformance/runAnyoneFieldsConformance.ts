@@ -849,6 +849,33 @@ export function runAnyoneFieldsConformance(
         },
         blank,
       );
+      // A bundle an earlier version wrote, passed as it is: no row has an
+      // assignment, so each field is its group's, or unassigned.
+      const older = {
+        ...everyone!,
+        fields: everyone!.fields.map(({ data, ...row }) => {
+          const { assignment: _left, ...earlier } = data;
+          return { ...row, data: earlier };
+        }),
+      } as unknown as NonNullable<typeof everyone>;
+      for (const [token, attribution] of [
+        ['everything', 'restore'],
+        ['sender', 'stamp'],
+      ] as const) {
+        await as(
+          token,
+          async (doc) => {
+            const imported = await doc.forms.import(older, { attribution });
+            expect(assignments(imported.fields)).toMatchObject({
+              dana_name: inGroup('dana'),
+              ada_name: inGroup('ada'),
+              reference: UNASSIGNED,
+              sender_note: UNASSIGNED,
+            });
+          },
+          blank,
+        );
+      }
     });
 
     test('after a signature, filling one it left open is permitted; changing one it locked is forbidden', async () => {

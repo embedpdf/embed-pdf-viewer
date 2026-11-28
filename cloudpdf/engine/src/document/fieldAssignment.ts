@@ -34,17 +34,20 @@ export function anyoneTheServerLacks(
  * `write` as a server of `serverVersion` reads it. One older than
  * `assignment` ({@link FIELD_ASSIGNMENT_SINCE}) refuses a member it doesn't
  * know, so a group's or an unassigned field's assignment goes as the
- * `groupId` that came before it, which says the same. A write that names
- * both, or none, goes as it is.
+ * `groupId` that came before it, which says the same. Any other write goes
+ * as it is: one that names both members or neither, and one whose
+ * assignment is none of the two, such as a misspelt kind, which such a
+ * server then refuses rather than reading it as no group.
  */
 export function assignmentForServer<Write extends AssignmentWrite>(
   serverVersion: string | null,
   write: Write,
 ): Write {
   if (write?.assignment === undefined || write.groupId !== undefined) return write;
+  if (!isGroupOrUnassigned(write.assignment)) return write;
   if (serverLacks(serverVersion, '', FIELD_ASSIGNMENT_SINCE) === null) return write;
   const { assignment, ...rest } = write;
-  return { ...rest, groupId: groupIdOfAssignment(assignment as FieldAssignment) } as Write;
+  return { ...rest, groupId: groupIdOfAssignment(assignment) } as Write;
 }
 
 /**
@@ -63,6 +66,12 @@ export function bundleAnyoneTheServerLacks(
   return serverLacks(serverVersion, 'a field anyone fills in', FIELD_ASSIGNMENT_SINCE, {
     field: 'assignment',
   });
+}
+
+/** Whether `assignment` is a well-formed group's or unassigned one: what a `groupId` can say. */
+function isGroupOrUnassigned(assignment: unknown): assignment is FieldAssignment {
+  const { kind, groupId } = (assignment ?? {}) as { kind?: unknown; groupId?: unknown };
+  return kind === 'unassigned' || (kind === 'group' && typeof groupId === 'string');
 }
 
 function isAnyone(assignment: unknown): boolean {

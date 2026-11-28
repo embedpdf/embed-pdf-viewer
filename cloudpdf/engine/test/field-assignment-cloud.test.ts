@@ -224,6 +224,13 @@ describe('field assignments, on the wire', () => {
       expect(JSON.stringify(sent.at(-1)!.body)).not.toContain('assignment');
       expect((await doc.forms.get(made.ref)).assignment).toEqual(inGroup('ada'));
 
+      // A misspelt kind goes as it is, for the server to refuse: never as no group.
+      const misspelt = { kind: 'unasigned' } as unknown as FieldAssignment;
+      const typo = await refusal(doc.forms.update(made.ref, { assignment: misspelt }));
+      expect(EngineError.is(typo) && typo.code).toBe(EngineErrorCode.InvalidArg);
+      expect(sent.at(-1)!.body).toEqual({ assignment: misspelt });
+      expect((await doc.forms.get(made.ref)).assignment).toEqual(inGroup('ada'));
+
       // A write that names neither goes out as it always did.
       await doc.forms.create({ kind: 'text', name: 'plain' });
       expect(sent.at(-1)!.body).toEqual({ kind: 'text', name: 'plain' });

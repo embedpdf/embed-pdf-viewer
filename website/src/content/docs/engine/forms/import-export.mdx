@@ -61,7 +61,8 @@ const again = await FormTransfer.parse(text);
 `parse()` checks the [limits](#limits) first, then the format, the version and the shape. Anything
 else is refused with `InvalidArg`.
 
-A file kept from an earlier version reads as today's bundle. A field written before fields had a
+A bundle kept from an earlier version reads as today's, whether you read it from a file or pass
+it to `import()` as you kept it. A field written before fields had a
 [`purpose`](/docs/engine/forms/authoring#purpose) and a
 [`format`](/docs/engine/forms/authoring#dates-and-times) gets both: `purpose: null`, and the
 format its scripts give. One written before a field's

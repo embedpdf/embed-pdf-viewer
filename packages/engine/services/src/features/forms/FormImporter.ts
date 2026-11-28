@@ -1,6 +1,7 @@
 import {
   type AnnotationActor,
   assertFormBundleManifest,
+  completeFormBundle,
   type BundleImportPages,
   type BundleLimits,
   EngineError,
@@ -100,8 +101,10 @@ export class FormImporter {
    */
   import(request: FormImportRequest, signal: AbortSignal): FormImportResult<PdfCoordinates> {
     throwIfAborted(signal);
-    const { bundle } = request;
-    checkWireBundle(this.runtime, 'form', bundle, request.limits, assertFormBundleManifest);
+    checkWireBundle(this.runtime, 'form', request.bundle, request.limits, assertFormBundleManifest);
+    // A bundle an earlier version wrote imports as today's, as a file read
+    // gives it: a field without an assignment is its group's, or unassigned.
+    const bundle = completeFormBundle(request.bundle);
     const names = this.fieldNames();
     const plan = planFormImport({
       bundle,
