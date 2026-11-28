@@ -66,7 +66,6 @@ import {
   type ShownWidget,
   type WidgetPainting,
 } from '@embedpdf/plugin-form/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
@@ -105,6 +104,7 @@ export type { FieldControlFrame } from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
 import { FormFocusRing } from './form-focus-ring';
+import { INERT } from './inert';
 import { usePaintsPagePart } from './page-layers';
 import {
   shallowArray,
@@ -259,7 +259,9 @@ function WidgetBox({
   const wrap = useIsolated<HTMLDivElement>(onPress, !embedded);
   const frame = rectInPixels(item.box, page.transform);
   const widget = item.annotationRef;
-  const takesInput = !item.disabled && !embedded;
+  // While the layer only shows its controls (an `inert` layer), no box lends the cursor a way in.
+  const filling = useSelector(FormHostToken, (host) => host.getLayerMode() === 'fill');
+  const takesInput = !item.disabled && !embedded && filling;
   const radio = item.control === 'toggle' && item.kind === 'radio';
   useEffect(
     () =>
@@ -819,18 +821,18 @@ function sameCustomControl(before: CustomControlProps, after: CustomControlProps
  * them in with. Put it above the page's picture (`<RenderLayer>`, and
  * `<AnnotationLayer>` when the annotation plugin is registered); while it's
  * there, the render layer leaves the fields out of the page's picture. The
- * controls show while the active tool fills forms (the `pointer` and `pan`
- * tools do), and stand down in design mode, where fields are boxes you
- * select and move. `controls` draws some boxes with components of yours,
- * which show and stand down with the layer's own.
+ * controls take input while the active tool fills forms (the `pointer` and
+ * `pan` tools do), and stand down in design mode, where fields are boxes you
+ * select and move. Under any other tool (a stamp, a pen) they show but are
+ * `inert`, so the tool works over them (the form plugin's `getLayerMode()`).
+ * `controls` draws some boxes with components of yours, which show, take
+ * input and stand down with the layer's own.
  */
 export function FormLayer({ controls }: FormLayerProps) {
   const page = usePage();
   const form = useCapability(FormHostToken);
   const colors = useFormColors();
-  const active = useSelector(InteractionToken, (interaction) =>
-    interaction.activeToolEnables('form-fill'),
-  );
+  const mode = useSelector(FormHostToken, (host) => host.getLayerMode());
   usePaintsPagePart(page.ref, 'formFields');
 
   useEffect(() => {
@@ -843,7 +845,7 @@ export function FormLayer({ controls }: FormLayerProps) {
     shallowArray,
   );
   const looks = useFieldLooks(page);
-  const shown = active ? items : NO_ITEMS;
+  const shown = mode === 'design' ? NO_ITEMS : items;
   // The boxes a control of the app's draws, by widget: each draws its field's picture itself.
   const custom = useMemo(() => {
     const drawn = new Map<string, FieldControl>();
@@ -866,7 +868,10 @@ export function FormLayer({ controls }: FormLayerProps) {
   );
 
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+    <div
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      {...(mode === 'show' ? INERT : {})}
+    >
       <FieldPictures page={page} looks={pictures} />
       {shown.map((item) => {
         const key = `${item.key}:${item.annotObjectNumber}`;

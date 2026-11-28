@@ -181,6 +181,8 @@ export type {
 export {
   fontProgramsOf,
   ghostOpacity,
+  PREVIEW_Z_INDEX,
+  previewZIndexOf,
   sceneViewBox,
   styleText,
   svgShapesOf,

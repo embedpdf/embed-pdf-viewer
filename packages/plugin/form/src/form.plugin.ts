@@ -18,9 +18,11 @@ import { initialFormModel } from './model';
  * widget geometry is read from the engine's widget records. The active tool
  * is the mode switch: while it carries 'form-fill' (the built-in pointer and
  * pan tools do, so filling is the resting state), the form layer draws and
- * fills every widget. Design mode is the 'form-edit' and palette tools: with
- * the annotation plugin present, the form lends it the widgets, which its
- * tools then select, move, restyle and delete. The render plugin draws the
+ * fills every widget. Design mode is the tools that carry 'form-design' (the
+ * 'form-edit' and palette tools): with the annotation plugin present, the form
+ * lends it the widgets, which its tools then select, move, restyle and delete.
+ * Under any other tool the form layer shows the controls but takes no input, so
+ * the tool works over the fields. The render plugin draws the
  * widgets' pictures in both modes. With the fonts plugin, a text field in a
  * font of its own is edited in that font's program. With the Stage, `focus()` and
  * `focusNext()` bring the box they go to into view. With the i18n plugin, what an empty field

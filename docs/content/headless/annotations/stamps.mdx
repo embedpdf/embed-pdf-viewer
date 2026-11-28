@@ -69,6 +69,12 @@ Both update when stamps are added, renamed or removed.<Fw only={['react', 'vue',
 is the armed stamp, to show which button is on.</Fw><Fw only="angular"> `stamp.armedAsset()` is the armed stamp, to
 show which button is on.</Fw>
 
+Arming switches to the `stamp` tool, and the stamp stays armed while people place it, one click
+after another. `disarm()` goes back to the tool that was on before `armAsset()`, or to the default
+tool when that one is gone, and so does a signature mark that
+[goes into a field](../forms/signatures#let-people-click-to-sign). Switching to another tool
+disarms the stamp too, and that tool stays.
+
 ## Library kinds
 
 A library says what it holds: `kind` is `'stamps'` (the default), `'signatures'` (a person's marks;
@@ -250,7 +256,7 @@ Everything `useStamp()` gives you.
 | `moveAsset(assetId, { libraryId })`                            | Moves a stamp to another library. Resolves `{ asset }`, which has a new id there.                                                                                             |
 | `duplicateAsset(assetId, { label? })`                          | Copies a stamp within its library. Resolves `{ asset }`.                                                                                                                      |
 | `armAsset(assetId, { targetWidth? })`                          | Arms a stamp: the next click on a page places it, with a preview under the pointer. [Show a stamp picker](#show-a-stamp-picker)                                               |
-| `disarm()`                                                     | Disarms the stamp without placing it                                                                                                                                          |
+| `disarm()`                                                     | Disarms the stamp without placing it, and goes back to the tool that was on before `armAsset()`                                                                                |
 | `placeAsset(assetId, { page, center, targetWidth?, rotation?, select? })` | Places a stamp without the pointer, its middle on `center`. Resolves `{ annotation }`. [Place a stamp with code](#place-a-stamp-with-code)                                   |
 | `placeAssetOnPages(assetId, pages, { center, … })`             | Places the same stamp at the same spot on several pages, or on `'all'`. Resolves `{ applied, skipped, failed }`: the placed stamps, and the pages that were skipped or failed. |
 | `canPlace()`, `canCreateFromAnnotations()`                     | Whether placing a stamp, and making one from annotations, are allowed. [Permissions](#permissions)                                                                           |

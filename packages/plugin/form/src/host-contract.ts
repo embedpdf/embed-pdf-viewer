@@ -64,6 +64,19 @@ export interface FormFocusTarget {
 }
 
 /**
+ * What the form layer does now, by the active tool:
+ * - `'fill'`: the tool fills forms (it carries `form-fill`: the pointer and pan tools do), and the
+ *   controls take input;
+ * - `'design'`: the form's widgets are lent to the annotation plugin, under a design tool (one
+ *   that carries `form-design`: `form-edit` and every field tool) for a session that may design;
+ *   the annotation layer draws and edits them, and the form layer draws no control;
+ * - `'show'`: any other tool, such as a stamp, a pen or zoom. The controls show as they do while
+ *   filling (tint, edge, placeholder) but take no input and no pointer, so the tool works over
+ *   them.
+ */
+export type FormLayerMode = 'fill' | 'design' | 'show';
+
+/**
  * The host lens: members for the framework layers and sibling plugins (the
  * widget event feed, the text being typed, and the actions plugin's
  * executors and sinks). Application code uses the public capability.
@@ -71,6 +84,8 @@ export interface FormFocusTarget {
 export interface FormHostCapability extends FormCapability {
   /** Load a page's widgets (one annotation read per page), so `listWidgets(page)` has them. */
   ensureLoaded(page: PageRef): Promise<void>;
+  /** What the form layer does now, by the active tool ({@link FormLayerMode}). */
+  getLayerMode(): FormLayerMode;
   /**
    * The widgets a page shows, in the order the page draws them, each with the appearance state it
    * shows and whether its look is `pending` (the view's isn't the confirmed one yet); hidden ones

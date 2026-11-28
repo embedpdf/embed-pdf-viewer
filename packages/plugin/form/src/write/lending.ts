@@ -1,11 +1,12 @@
 /**
  * Design mode: the form's widgets, lent to the annotation plugin
  * (`AnnotationLender`, its host contract). While the session may design and
- * the active tool doesn't fill, the annotation plugin shows the widgets among
- * its records and edits them with its tools: select, move, resize, restyle,
+ * the active tool is one of the form's design tools (it carries `form-design`,
+ * services/design.ts), the annotation plugin shows the widgets among its
+ * records and edits them with its tools: select, move, resize, restyle,
  * reorder, delete. Each edit comes back here as the form's ops, in the same
- * change as the rest of it. While the tool fills, nothing is lent, and the
- * form layer draws and fills every widget. A widget of no size is never lent:
+ * change as the rest of it. Under any other tool nothing is lent, and the
+ * form layer draws every widget. A widget of no size is never lent:
  * nobody can see it, so nobody should be able to select it by hand.
  *
  * Each lent widget carries its tint as its accent, `fields.tint` strong: its
@@ -51,7 +52,7 @@ import {
   isImageField,
   widgetRowOf,
 } from '../model';
-import { placeholderOf, takesValue } from '../read/fill-items';
+import { placeholderAlignOf, placeholderOf, takesValue } from '../read/fill-items';
 import type { FormContext, FormServices } from '../services';
 import { undoLookOf } from '../sync/predict';
 import { toolDraft, toolLookOf } from '../tools/handlers';
@@ -171,15 +172,20 @@ export function createWidgetLender(
     return { color: ctx.settings().get().fields.border };
   }
 
-  /** What an empty box is for, in the placeholder color. */
+  /**
+   * What an empty box is for, in the placeholder color, where the form layer puts it: centred in
+   * a signature field and an image field, as the record aligns its text in any other.
+   */
   function placeholderIn(field: FormField, row: WidgetAnnotation): RecordPlaceholder | null {
-    const text = placeholderOf(
-      field,
-      purposes.labelOf(field.purpose),
-      row.hasMark,
-      imageFieldOf(field, row),
-    );
-    return text === null ? null : { text, color: ctx.settings().get().fields.placeholder };
+    const imageField = imageFieldOf(field, row);
+    const text = placeholderOf(field, purposes.labelOf(field.purpose), row.hasMark, imageField);
+    if (text === null) return null;
+    const align = placeholderAlignOf(field, imageField, undefined);
+    return {
+      text,
+      color: ctx.settings().get().fields.placeholder,
+      ...(align ? { align } : {}),
+    };
   }
 
   /** Everything the lender paints over a box: a placed field's, and a tool's ghost's. */

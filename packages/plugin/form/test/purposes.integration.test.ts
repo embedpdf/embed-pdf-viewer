@@ -275,11 +275,13 @@ describe('what a field is for, on a real engine', () => {
       const field = form.get(ref('text_1'))!;
       expect(field.purpose).toBe('name');
       // Empty, it says what it is for; the words are the layer's, never the field's value.
+      // A field of typed text puts it where its text goes: as the field aligns it, left here.
       expect(signer.boxOf('text_1')).toMatchObject({
         purpose: 'name',
         format: null,
         empty: true,
         placeholder: 'Name',
+        placeholderAlign: 'left',
       });
 
       const result = await form.prefill();
@@ -670,8 +672,12 @@ describe('what a field is for, on a real engine', () => {
       const shown = () => signer.boxOf('sign')!.placeholder;
       const missing = () => form.validate().missing.map((field) => field.name);
 
-      // Empty: the box says what it is for.
-      expect(signer.boxOf('sign')).toMatchObject({ empty: true, placeholder: 'Signature' });
+      // Empty: the box says what it is for, in the middle, where the mark goes.
+      expect(signer.boxOf('sign')).toMatchObject({
+        empty: true,
+        placeholder: 'Signature',
+        placeholderAlign: 'center',
+      });
       expect(missing()).toEqual(['sign']);
 
       // With a mark in it, the box holds something to look at, and the word goes.
@@ -697,7 +703,8 @@ describe('what a field is for, on a real engine', () => {
           .listPageItems(page)
           .find((item) => item.id === annotationKey(signer.widgetOf(form.get(sign)!)))
           ?.placeholder ?? null;
-      const word = { text: 'Signature', color: FORM_DEFAULTS.fields.placeholder };
+      // Centred there too, as the form layer puts it.
+      const word = { text: 'Signature', color: FORM_DEFAULTS.fields.placeholder, align: 'center' };
       await vi.waitFor(() => expect(lent()).toEqual(word));
       const drawn = await draw();
       await vi.waitFor(() => expect(lent()).toBeNull());

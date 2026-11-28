@@ -12,8 +12,10 @@
     button    → a native click target over the picture that runs its action.
     signature → "sign here", or the signed field's details, with the signature plugin.
 
-  The controls show while the active tool fills forms (the `pointer` and `pan` tools do), and
-  stand down in design mode, where fields are boxes you select and move. What the viewer draws itself (the
+  The controls take input while the active tool fills forms (the `pointer` and `pan` tools do),
+  and stand down in design mode, where fields are boxes you select and move. Under any other tool
+  (a stamp, a pen) they show but are `inert`, so the tool works over them (the form plugin's
+  `getLayerMode()`). What the viewer draws itself (the
   focus ring, the edge of a field without a border, the editor) takes its colors from the form
   settings, which the `--epdf-form-*` CSS variables override. The colors, the field looks, the
   boxes' and controls' styles, and the toggle, text-field and list-box policies are
@@ -21,15 +23,14 @@
   Stage below (`WidgetBox.svelte`).
 
   `controls` draws some boxes with components of the app's own (`CustomControl.svelte`), which
-  show and stand down with the layer's own. A box one of them draws has its picture inside the
-  control's `native`, so the layer leaves it out of the pictures it draws itself.
+  show, take input and stand down with the layer's own. A box one of them draws has its picture
+  inside the control's `native`, so the layer leaves it out of the pictures it draws itself.
 -->
 <script lang="ts">
   import { annotationKey } from '@embedpdf/core';
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   // Loading a page's widgets and listing them as controls are host reads.
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-  import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
   import { fieldControlFor, rectInPixels } from '@embedpdf/web';
   import { usePage } from '../runtime/page';
   import { usePaintsPagePart } from '../runtime/page-layers.svelte';
@@ -54,11 +55,9 @@
   // While it's here with the form plugin, the page's picture leaves the fields to it.
   usePaintsPagePart(() => (form.current ? page.ref : null), 'formFields');
   const colors = useFormColors();
-  const active = useOptionalSelector(
-    InteractionToken,
-    (interaction) => interaction.activeToolEnables('form-fill'),
-    false,
-  );
+  // What the layer does now: fill, show (inert) or stand down for design mode.
+  const mode = useOptionalSelector(FormHostToken, (lens) => lens.getLayerMode(), 'design');
+  const active = $derived(mode.current !== 'design');
   // The same list until a widget on this page changes.
   const items = useOptionalSelector(
     FormHostToken,
@@ -85,7 +84,7 @@
    * again per box when the page's widgets or the active tool change.
    */
   const custom = $derived.by(() => {
-    if (!controls?.length || !active.current) return null;
+    if (!controls?.length || !active) return null;
     const drawn = new Map<string, FieldControl>();
     for (const item of items.current) {
       const control = fieldControlFor(item, controls);
@@ -113,13 +112,13 @@
     `${page.documentId}:${item.key}:${item.annotObjectNumber}`;
 </script>
 
-<div style="position: absolute; inset: 0; pointer-events: none">
+<div style="position: absolute; inset: 0; pointer-events: none" inert={mode.current === 'show'}>
   {#each looks.current as look (look.key)}
     {#if !custom?.has(look.key)}
       <FieldPicture {look} place={inPage(look)} />
     {/if}
   {/each}
-  {#if active.current}
+  {#if active}
     {#each items.current as item (keyOf(item))}
       {@const control = custom?.get(annotationKey(item.ref))}
       {#if control}

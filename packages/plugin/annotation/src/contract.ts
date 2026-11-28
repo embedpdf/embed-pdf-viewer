@@ -300,6 +300,13 @@ export interface ImageGhost {
 }
 
 /**
+ * Where the armed stamp's ghost shows in place of the pointer: the box a sibling plugin's click
+ * would put the stamp in (the signature plugin's mark in a field), and its turn, as
+ * {@link ImageGhost} has them.
+ */
+export type ImageGhostPlace = Pick<ImageGhost, 'page' | 'box' | 'rot'>;
+
+/**
  * One clickable link area on a page (page space): a standalone link
  * annotation, or one segment of a parent's attached link. See
  * {@link AnnotationHostCapability.listLinkItems}.
@@ -757,11 +764,16 @@ export interface StampPlacement {
 export interface AnnotationStampsCapability {
   /**
    * Arm a stamp's bytes so the next click places them, as the `stamp` tool
-   * does after picking a file. Rejects `invalid-input` for bytes that aren't
-   * PNG, JPEG or a one-page PDF.
+   * does after picking a file, and switch to the `stamp` tool. It stays armed
+   * while it's placed. Rejects `invalid-input` for bytes that aren't PNG, JPEG
+   * or a one-page PDF.
    */
   arm(stamp: StampInput, options?: OperationOptions): Promise<void>;
-  /** Disarm the stamp. */
+  /**
+   * Disarm the stamp, and go back to the tool that was active when it was
+   * armed (the default tool when that one is gone). Switching to another tool
+   * disarms it too, and that tool stays.
+   */
   disarm(): void;
   /** Whether a stamp is armed. */
   isArmed(): boolean;

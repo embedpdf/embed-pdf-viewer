@@ -16,10 +16,16 @@ import {
 import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { ImageGhost } from '../contract';
-import { setGhostAt, setPlacing, type ForeignPlacement, type GhostPointer } from '../model';
+import type { ImageGhost, ImageGhostPlace } from '../contract';
+import {
+  setGhostAt,
+  setGhostIn,
+  setPlacing,
+  type ForeignPlacement,
+  type GhostPointer,
+} from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import type { ResolvedTool } from './definitions';
+import { ARMED_STAMP_TOOL_ID, type ResolvedTool } from './definitions';
 import { viewEnv } from '../services/geometry';
 import { annotationOfTool, iconPlaceAt, isIconPlaceKind } from '../write/placement';
 import type { Stamps } from '../write/stamps';
@@ -69,6 +75,12 @@ function stillAClick(draft: Draft | null, placing: ForeignPlacement | null): boo
  * record it will be (`toolPaintOf`): its live drawing, accent, outline and
  * placeholder, through the same render path as a lent record, so the ghost is
  * the field it places, see-through.
+ *
+ * A sibling plugin whose click takes the armed stamp somewhere else (the
+ * signature plugin puts a mark into a field) shows it there with
+ * `hoverGhostIn`: the armed stamp's ghost then sits in that box instead of at
+ * the pointer, until the sibling gives the pointer back, the stamp is armed
+ * again or dropped, or the tool changes.
  */
 export function createGhost(
   ctx: Pick<AnnotationContext, 'state'>,
@@ -82,6 +94,11 @@ export function createGhost(
 ) {
   const clearGhost = (): void => {
     ctx.state.update(setGhostAt, null);
+  };
+
+  /** Show the armed stamp's ghost in a box instead of at the pointer; `null` gives it back. */
+  const hoverGhostIn = (place: ImageGhostPlace | null): void => {
+    ctx.state.update(setGhostIn, place);
   };
 
   /** Whether a click with `tool` places something: an armed stamp, an icon, or its click default. */
@@ -195,18 +212,31 @@ export function createGhost(
   /**
    * The armed stamp's ghost: its image in the box a click would place it in
    * (`fitStampBox` with the tool's upright turn, as the stamp placement fits
-   * it). The same object while nothing it depends on changes.
+   * it), or in the box a sibling's click would put it in (`ghostIn`). The same
+   * object while nothing it depends on changes.
    */
   let imageGhost: {
     ghostAt: GhostPointer;
     armed: object;
     value: ImageGhost | null;
   } | null = null;
+  let placedGhost: { place: ImageGhostPlace; value: ImageGhost | null } | null = null;
   const getImageGhost = (page: PageRef): ImageGhost | null => {
-    const { ghostAt, placing } = ctx.state.get();
+    const { ghostAt, ghostIn, placing } = ctx.state.get();
     const armed = stamps.armed();
-    if (!ghostAt || !armed || ghostAt.page.objectNumber !== page.objectNumber) return null;
-    if (!stillAClick(store.model().draft, placing)) return null;
+    if (!armed || !stillAClick(store.model().draft, placing)) return null;
+    if (ghostIn) {
+      if (ghostIn.page.objectNumber !== page.objectNumber) return null;
+      if (placedGhost?.place !== ghostIn) {
+        const tool = tools.get(ARMED_STAMP_TOOL_ID);
+        placedGhost = {
+          place: ghostIn,
+          value: tool?.ghost ? { ...ghostIn, opacity: tool.ghost.opacity } : null,
+        };
+      }
+      return placedGhost.value;
+    }
+    if (!ghostAt || ghostAt.page.objectNumber !== page.objectNumber) return null;
     if (imageGhost?.ghostAt !== ghostAt || imageGhost.armed !== armed) {
       const tool = tools.get(ghostAt.toolId);
       const size = geometry.sizeOf(page.objectNumber);
@@ -227,6 +257,7 @@ export function createGhost(
 
   const api = {
     hoverGhostAt,
+    hoverGhostIn,
     clearGhost,
     previewPlacement: (
       toolId: string,

@@ -1317,18 +1317,25 @@ describe('the armed mark over a field', () => {
       sig: signatureField(),
       text: signatureField({ kind: 'text', name: 'name' } as Partial<FormField>),
       signed: signatureField({ valueEntry: { kind: 'unsupported' } }),
+      // Another person's signature field: its box is `disabled` for this user.
+      theirs: signatureField({ name: 'their_signature' } as Partial<FormField>),
     };
+    const objectNumberOf = (at: string) => (at === 'theirs' ? 10 : 9);
     let where: keyof typeof hits | 'nothing' = 'sig';
     const form = {
       getWidgetAt: () =>
         where === 'nothing'
           ? null
           : {
-              annotObjectNumber: 9,
+              annotObjectNumber: objectNumberOf(where),
               field: hits[where],
               box: { x: 0, y: 0, width: 1, height: 1 },
               imageBox: false,
             },
+      listWidgets: () => [
+        { annotObjectNumber: 9, disabled: false },
+        { annotObjectNumber: 10, disabled: true },
+      ],
     } as never;
     const handler = createArmedMarkHandler('doc-1', signature, form, stamp as never);
     expect(handler.enabledFor({ id: 'stamp', enables: new Set() } as never)).toBe(true);
@@ -1351,6 +1358,12 @@ describe('the armed mark over a field', () => {
     where = 'signed';
     expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
     expect(placeMark).toHaveBeenCalledTimes(1);
+    // Another person's field takes no mark from this user, by the image boxes' rule: consumed,
+    // nothing written (no refused write to log), and the mark stays armed.
+    where = 'theirs';
+    expect(handler.onPointerDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(true);
+    expect(placeMark).toHaveBeenCalledTimes(1);
+    expect(stamp.disarm).toHaveBeenCalledTimes(1);
 
     // A plain stamp (any other library) never captures.
     stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
@@ -1409,6 +1422,85 @@ describe('the armed mark over a field', () => {
       { field: hits.mine.field.ref },
     );
     expect(stamp.disarm).toHaveBeenCalledWith('doc-1');
+  });
+
+  it('shows what a click does: the mark in a field it goes into, no preview and a no over one it doesn’t, the pointer’s elsewhere', () => {
+    const signature = { placeMark: vi.fn(), getSignature: () => null } as never;
+    const stamp = stampStub(artwork);
+    const hover = (point: { x: number; y: number }) =>
+      ({ ...sample(3, point), phase: 'move' }) as PointerSample;
+    // Dana's signature field (9), 200 × 50, and Ada's (10), not hers: `disabled` for her.
+    const box = { x: 100, y: 200, width: 200, height: 50 };
+    const look = { border: null, borderWidth: 1, borderStyle: 'solid' as const };
+    const items = [
+      { annotObjectNumber: 9, disabled: false, control: 'signature', box, rotation: 0, look },
+      { annotObjectNumber: 10, disabled: true, control: 'signature', box, rotation: 0, look },
+    ];
+    let where: 9 | 10 | null = 9;
+    const form = {
+      getWidgetAt: () =>
+        where === null
+          ? null
+          : {
+              annotObjectNumber: where,
+              field: signatureField({ ref: { kind: 'objectNumber', objectNumber: where } }),
+              box,
+              rotation: 0,
+              rect: box,
+              imageBox: false,
+            },
+      listWidgets: () => items,
+    } as never;
+    const places: unknown[] = [];
+    const cursors: Array<string | null> = [];
+    // The armed mark is twice as wide as it is tall.
+    const annotation = {
+      getArmedStamp: () => ({ width: 120, height: 60 }),
+      hoverGhostIn: (place: unknown) => places.push(place),
+    } as never;
+    const interaction = {
+      claimCursor: (_token: string, cursor: string | null) => cursors.push(cursor),
+    } as never;
+    const handler = createArmedMarkHandler(
+      'doc-1',
+      signature,
+      form,
+      stamp as never,
+      annotation,
+      interaction,
+    );
+
+    // Over Dana's field: the mark sits in it, fitted whole and centred (100 × 50 in 200 × 50).
+    handler.onHover!(hover({ x: 150, y: 220 }));
+    expect(places.at(-1)).toEqual({
+      page: toPageRef(3),
+      box: { x: 150, y: 200, width: 100, height: 50 },
+      rot: 0,
+    });
+    expect(cursors.at(-1)).toBeNull();
+    // The same box on the next move: the same place, so nothing paints again.
+    const first = places.at(-1);
+    handler.onHover!(hover({ x: 160, y: 225 }));
+    expect(places.at(-1)).toBe(first);
+
+    // Over Ada's: no preview in the field, and the cursor says no.
+    where = 10;
+    handler.onHover!(hover({ x: 150, y: 220 }));
+    expect(places.at(-1)).toBeNull();
+    expect(cursors.at(-1)).toBe('not-allowed');
+
+    // Anywhere else: the preview goes back to the pointer, and so does the cursor.
+    where = null;
+    handler.onHover!(hover({ x: 20, y: 20 }));
+    expect(places.at(-1)).toBeNull();
+    expect(cursors.at(-1)).toBeNull();
+
+    // A stamp that isn't a person's mark never snaps into a field.
+    where = 9;
+    stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
+    handler.onHover!(hover({ x: 150, y: 220 }));
+    expect(places.at(-1)).toBeNull();
+    expect(cursors.at(-1)).toBeNull();
   });
 });
 

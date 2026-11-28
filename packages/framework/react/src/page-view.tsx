@@ -194,6 +194,8 @@ export function PageView({
                   ...layout.content,
                   background: paint('page-background', look.background),
                   transform: layout.turn ?? undefined,
+                  // A stacking context of its own: what a layer raises stays inside the page.
+                  isolation: 'isolate',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                 }}

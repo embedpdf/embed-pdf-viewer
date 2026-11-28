@@ -24,7 +24,7 @@ import {
 } from '../contract';
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
-import { setGhostAt } from '../model';
+import { setGhostAt, setGhostIn } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Applied } from '../services/store';
 import { appliedAnnotationOf } from './outcomes';
@@ -162,9 +162,15 @@ export function createStamps(
   };
   /** The public face of the armed payload: a new object on every arm, null when disarmed. */
   let armedInfo: ArmedStampInfo | null = null;
+  /**
+   * The tool that was active when the stamp was armed, kept while it stays armed (a second arm
+   * keeps the first one's): disarming goes back to it.
+   */
+  let toolBefore: string | null = null;
   /** A new or dropped payload invalidates the ghost drawn for the old one, and wakes readers. */
   const armChanged = (): void => {
     ctx.state.update(setGhostAt, null);
+    ctx.state.update(setGhostIn, null);
     ctx.notify();
   };
 
@@ -189,15 +195,32 @@ export function createStamps(
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.subject !== undefined ? { subject: input.subject } : {}),
     };
+    const interaction = ctx.tryGet(InteractionToken);
+    if (interaction && toolBefore === null) toolBefore = interaction.getActiveToolId();
     armChanged();
-    ctx.tryGet(InteractionToken)?.activateTool(ARMED_STAMP_TOOL_ID);
+    interaction?.activateTool(ARMED_STAMP_TOOL_ID);
   };
 
+  /**
+   * Drop the armed payload. The armed stamp and its tool go together: while the stamp tool is
+   * still active (a `disarm()`, a mark that went into a field), the tool goes back to the one
+   * that was active at the arm, or to the default tool when that one is gone. Leaving the stamp
+   * tool for another drops the payload too (connect.ts), and the tool picked stays.
+   */
   const disarmStamp = (): void => {
     if (!armed) return;
+    const back = toolBefore;
     armed = null;
     armedInfo = null;
+    toolBefore = null;
     armChanged();
+    const interaction = ctx.tryGet(InteractionToken);
+    if (!interaction || back === null || interaction.getActiveToolId() !== ARMED_STAMP_TOOL_ID) {
+      return;
+    }
+    if (back === ARMED_STAMP_TOOL_ID) return;
+    if (interaction.hasTool(back)) interaction.activateTool(back);
+    else interaction.activateDefaultTool();
   };
 
   /** Place a stamp of `desired` PDF-point size centred on a page point — the

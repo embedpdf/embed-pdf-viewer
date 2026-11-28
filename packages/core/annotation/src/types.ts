@@ -871,6 +871,8 @@ export interface RecordPlaceholder {
   readonly text: string;
   /** The color they are written in: a CSS color. */
   readonly color: string;
+  /** Where they sit across the box; left out, where the record aligns its text. */
+  readonly align?: 'left' | 'center' | 'right';
 }
 
 /** Per-annotation render data — its content geometry + style + live state. */

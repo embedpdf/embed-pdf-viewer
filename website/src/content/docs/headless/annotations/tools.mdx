@@ -301,6 +301,11 @@ plugin's field tools, which show the field a click places (a radio button round,
 It's off for tools you mostly drag, like shapes and lines, since the size usually comes from the
 drag. `ghost: true` turns it on for them.
 
+The preview and a drawing in progress show above the form's fields, so a pen stroke or a stamp
+over a field stays in sight while you make it, tint and all. Each page keeps them inside it: the
+`<Stage>` and `<PageView>` page is its own stacking context (`isolation: isolate`), so nothing of
+a page's layers covers the page next to it or your UI around the Stage.
+
 The cursor and the preview do different jobs. The cursor says _which_ tool is active; the preview
 says _where_ the annotation will land. You can use either, or both.
 
@@ -356,7 +361,7 @@ What `useAnnotation()` gives you for tools and stamps: its `tools` and `stamps` 
 | `tools.getDefaults(id)`                 | The fields a tool's next annotation starts with. In a component, use `useAnnotationDefaults(id)`. [Let people change the defaults](#let-people-change-the-defaults)                                      |
 | `tools.updateDefaults(id, changes)`     | Changes a tool's defaults for the drawings that follow. They stay in this viewer and are never shared.                                                                                                   |
 | `tools.getProperties(id)`               | What a style panel for the tool shows: `{ properties, values, mixed }`, the same shape as for the [selection](selecting#a-style-panel)                                                                   |
-| `stamps.arm(stamp)`, `stamps.disarm()`  | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them. For stamps from a library, use [Stamps](stamps).                                     |
+| `stamps.arm(stamp)`, `stamps.disarm()`  | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them and goes back to the tool that was on before. For stamps from a library, use [Stamps](stamps). |
 | `stamps.isArmed()`                      | Whether a stamp is armed                                                                                                                                                                                 |
 | `stamps.place(stamp, { page, center })` | Places a stamp's bytes with its middle on `center`, without a click. Resolves `{ annotation }`.                                                                                                          |
 | `setFilePickerProvider(provider)`       | Sets the function that gives the `stamp` and `attachment` tools their file, and returns a function that removes it. In a component, use `useFilePickerProvider()`. [Stamps and files](#stamps-and-files) |

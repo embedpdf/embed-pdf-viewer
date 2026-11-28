@@ -69,14 +69,17 @@ export function connectAnnotation(
     // a shape that needs more clicks, goes with the tool it was made with.
     annotation.finishInkDraft();
     annotation.cancel();
-    // A ghost belongs to the tool that showed it.
+    // A ghost belongs to the tool that showed it, and so does one a sibling put in a box.
     annotation.clearGhost();
+    annotation.hoverGhostIn(null);
     // Annotations whose behavior just engaged (form widgets under a fill
     // tool) leave the selection, so no chrome is stranded on a fill control.
     annotation.pruneEngagedSelection();
     // Leaving the armed stamp's own tool drops the payload: the bytes belong
-    // to the tool, not the document. The legacy-free check is the tool id;
-    // embedder tools tagged 'annotation-stamp' also hold a payload.
+    // to the tool, not the document, and the tool picked stays (the disarm goes
+    // back to the tool from before the arm only while the stamp tool is active).
+    // The legacy-free check is the tool id; embedder tools tagged
+    // 'annotation-stamp' also hold a payload.
     const active = interaction.getActiveTool();
     if (active.id !== ARMED_STAMP_TOOL_ID && !active.enables.has('annotation-stamp')) {
       annotation.stamps.disarm();

@@ -92,6 +92,7 @@ GhostPolicy [TypeAliasDeclaration] (from packages/plugin/annotation/src/tools/de
 HandleProps [InterfaceDeclaration] (from packages/framework/svelte/src/annotation/props.ts): export interface HandleProps{ at: Point; size: number; rotation: number; kind: HandleRole; active: boolean; }
 HandleRole [TypeAliasDeclaration] (from packages/core/annotation/src/types.ts): export type HandleRole = 'corner' | 'side' | 'point';
 ImageGhost [InterfaceDeclaration] (from packages/plugin/annotation/src/contract.ts): export interface ImageGhost{ readonly page: PageRef; readonly box: Rect; readonly rot: number; readonly opacity: number; }
+ImageGhostPlace [TypeAliasDeclaration] (from packages/plugin/annotation/src/contract.ts): export type ImageGhostPlace = Pick<ImageGhost, 'page' | 'box' | 'rot'>;
 InkAuthoringOptions [InterfaceDeclaration] (from packages/plugin/annotation/src/tools/definitions.ts): export interface InkAuthoringOptions{ groupStrokesMs?: number; straighten?: InkStraightenOptions; }
 LineEnding [TypeAliasDeclaration] (from packages/engine/core/src/annotation/primitives.ts): export type LineEnding = | 'none' | 'square' | 'circle' | 'diamond' | 'open-arrow' | 'closed-arrow' | 'butt' | 'r-open-arrow' | 'r-closed-arrow' | 'slash';
 LineEndings [InterfaceDeclaration] (from packages/engine/core/src/annotation/primitives.ts): export interface LineEndings{ start: LineEnding; end: LineEnding; }

@@ -158,6 +158,35 @@ describe('what an empty field shows for its purpose', () => {
     ).toBe('flex-start');
   });
 
+  it('sits where the form plugin says the value will be, over the field’s own alignment', () => {
+    // A signature or image field's box: the plugin says the middle, whatever `/Q` says.
+    expect(
+      fieldPlaceholderStyleOf({ ...field, placeholderAlign: 'center' }, frame).justifyContent,
+    ).toBe('center');
+    // A text field's box: the plugin says its own alignment.
+    expect(
+      fieldPlaceholderStyleOf({ ...field, placeholderAlign: 'left' }, frame).justifyContent,
+    ).toBe('flex-start');
+  });
+
+  it('on a lent field sits where the placeholder says, else where the record aligns its text', () => {
+    const box = { width: 160 };
+    const pixels = { width: 320, height: 40 };
+    const record = { fontSize: 10, textAlign: 'right' };
+    expect(
+      recordPlaceholderStyleOf(
+        { text: 'Initials', color: 'tomato', align: 'center' },
+        record,
+        box,
+        pixels,
+      ).justifyContent,
+    ).toBe('center');
+    expect(
+      recordPlaceholderStyleOf({ text: 'Name', color: 'tomato' }, record, box, pixels)
+        .justifyContent,
+    ).toBe('flex-end');
+  });
+
   it('is 12 pt for a size that fits the box, and never taller than the box has room for', () => {
     const fitted = { ...field, look: { ...look, fontSize: 0 } };
     expect(fieldPlaceholderStyleOf(fitted, frame).fontSize).toBe('24px');

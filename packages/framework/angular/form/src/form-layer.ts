@@ -10,15 +10,16 @@
  *     <epdf-form-layer />
  *   </ng-template>
  *
- * It works with or without the annotation plugin. The controls show while the active tool fills
- * forms (the `pointer` and `pan` tools do), and stand down in design mode, where fields are
- * boxes you select and move. Each field becomes a real HTML control (`controls.ts`), placed and
- * styled like the field in the PDF, in the colors of the form settings, which the
- * `--epdf-form-*` CSS variables override.
+ * It works with or without the annotation plugin. The controls take input while the active tool
+ * fills forms (the `pointer` and `pan` tools do), and stand down in design mode, where fields are
+ * boxes you select and move. Under any other tool (a stamp, a pen) they show but are `inert`, so
+ * the tool works over them (the form plugin's `getLayerMode()`). Each field becomes a real HTML
+ * control (`controls.ts`), placed and styled like the field in the PDF, in the colors of the form
+ * settings, which the `--epdf-form-*` CSS variables override.
  *
  * An `<ng-template [epdfFieldControl]>` inside the layer draws the boxes its function matches
- * with a control of yours (`templates.ts`, `custom-control.ts`); it shows and stands down with
- * the layer's own.
+ * with a control of yours (`templates.ts`, `custom-control.ts`); it shows, takes input and stands
+ * down with the layer's own.
  */
 import {
   ChangeDetectionStrategy,
@@ -44,7 +45,6 @@ import {
   type FormWidgetItem,
 } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { InteractionToken as InteractionHostToken } from '@embedpdf/plugin-interaction/contract/host';
 import { fieldControlFor, formColorsOf } from '@embedpdf/web';
 import {
   FormButtonControl,
@@ -87,7 +87,10 @@ const NO_BOXES: readonly DrawnBox[] = Object.freeze([]);
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div style="position: absolute; inset: 0; pointer-events: none">
+    <div
+      style="position: absolute; inset: 0; pointer-events: none"
+      [attr.inert]="mode() === 'show' ? '' : null"
+    >
       <epdf-field-pictures [looks]="pictures" />
       <!-- One control per widget: a field with several boxes has one per box. -->
       @for (box of boxes(); track box.item.key + ':' + box.item.annotObjectNumber) {
@@ -144,11 +147,8 @@ export class EpdfFormLayer {
 
   private readonly form = this.bindTo(FormHostToken);
 
-  /** Whether the active tool fills forms: the layer draws nothing in design mode. */
-  protected readonly active = this.bindTo(InteractionHostToken).select(
-    (interaction) => interaction.activeToolEnables('form-fill'),
-    false,
-  );
+  /** What the layer does now: fill, show (inert) or draw no control in design mode. */
+  protected readonly mode = this.form.select((form) => form.getLayerMode(), 'design');
 
   /** The page's widgets: the same array while nothing on the page changes. */
   protected readonly widgets = this.form.select(
@@ -183,12 +183,12 @@ export class EpdfFormLayer {
   private readonly looks = injectFieldLooks();
 
   /**
-   * The boxes the layer draws controls for, while the active tool fills forms: each with the
+   * The boxes the layer draws controls for, unless the fields are designed: each with the
    * layer's own control, or with the first control of yours that matches it, which draws the
    * field's picture too.
    */
   protected readonly boxes = computed((): readonly DrawnBox[] => {
-    if (!this.active()) return NO_BOXES;
+    if (this.mode() === 'design') return NO_BOXES;
     const controls = this.controls();
     const widgets = this.widgets();
     if (controls.length === 0) {

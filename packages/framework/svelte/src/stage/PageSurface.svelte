@@ -120,10 +120,12 @@
     style:box-shadow={paint('page-shadow', look.current.shadow)}
   ></div>
   <!-- The page: its background and its layers as one box, the only thing the rotation turns.
-       Native text and image selection is off: the selection layer draws its own. -->
+       Native text and image selection is off: the selection layer draws its own. A stacking
+       context of its own: what a layer raises (a preview above the fields) stays inside the
+       page, under the next page and the overlays. -->
   <div
     bind:this={contentElement}
-    style="user-select: none; -webkit-user-select: none"
+    style="user-select: none; -webkit-user-select: none; isolation: isolate"
     style:position="absolute"
     style:left="{layout.content.left}px"
     style:top="{layout.content.top}px"

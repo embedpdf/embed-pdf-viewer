@@ -143,6 +143,9 @@ function PageSurface({
             ...layout.content,
             background: paint('page-background', look.background),
             transform: layout.turn ?? undefined,
+            // A stacking context of its own: what a layer raises (a preview above the fields)
+            // stays inside the page, under the next page and the overlays.
+            isolation: 'isolate',
             // We render our own selection highlights — suppress native text/image
             // selection (and the double-click image grab) on the whole page subtree.
             userSelect: 'none',

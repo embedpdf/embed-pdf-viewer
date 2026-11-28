@@ -15,7 +15,7 @@ import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import { FormToken, formPlugin, toFieldRef } from '../../src/form';
-import { interactionPlugin } from '../../src/interaction';
+import { InteractionToken, interactionPlugin } from '../../src/interaction';
 import { renderPlugin } from '../../src/render';
 import { makePageContext, type PageContextValue } from '../../src/runtime';
 import FormHarness from '../fixtures/FormHarness.svelte';
@@ -177,6 +177,26 @@ describe('<FormLayer> radio buttons', () => {
         expect(monthly.getAttribute('aria-setsize')).toBe('2');
         expect(yearly.getAttribute('aria-posinset')).toBe('2');
         expect(yearly.getAttribute('aria-setsize')).toBe('2');
+
+        // Under a tool that neither fills nor designs (zoom, a stamp, a pen), the buttons still
+        // show, but the layer is inert: no pointer and no input, so the tool works over them.
+        // Back on the pointer, they take input again.
+        const interaction = kernel.capability(InteractionToken);
+        const host = kernel.capability(FormHostToken);
+        expect(monthly.closest('[inert]')).toBeNull();
+        interaction.activateTool('zoom');
+        flushSync();
+        expect(host.getLayerMode()).toBe('show');
+        await waitFor(() =>
+          expect(
+            view.getByRole('radio', { name: 'Plan: Monthly', hidden: true }).closest('[inert]'),
+          ).not.toBeNull(),
+        );
+        interaction.activateTool('pointer');
+        flushSync();
+        await waitFor(() =>
+          expect(view.getByRole('radio', { name: 'Plan: Monthly' }).closest('[inert]')).toBeNull(),
+        );
       } finally {
         view.unmount();
         await kernel.destroy();

@@ -197,6 +197,26 @@ describe('the annotation layer', () => {
     }
   }, 30_000);
 
+  it('a tool’s preview rises above the layers after it; what is made stays in their order', async () => {
+    const { annotation, view, close } = await mount(() => <AnnotationLayer />);
+    try {
+      /** The frames raised above the layers after this one (the form's fields among them). */
+      const raised = () =>
+        [...view.container.querySelectorAll<HTMLElement>('div')].filter(
+          (element) => element.style.zIndex === '1',
+        );
+      await waitFor(() => expect(view.container.querySelectorAll('svg').length).toBeGreaterThan(0));
+      expect(raised()).toHaveLength(0);
+      const page = annotation.list()[0]!.page;
+      act(() => annotation.hoverGhostAt('note', page, { x: 300, y: 300 }));
+      await waitFor(() => expect(raised()).toHaveLength(1));
+      act(() => annotation.clearGhost());
+      await waitFor(() => expect(raised()).toHaveLength(0));
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
   it('a renderer draws into a frame placed and turned like the annotation', async () => {
     const renderers: AnnotationRenderer[] = [
       {

@@ -11,7 +11,7 @@
     AnnotationToken as AnnotationHostToken,
     previewBucket,
   } from '@embedpdf/plugin-annotation/contract/host';
-  import { ghostOpacity, loadObjectUrl, rectInPixels } from '@embedpdf/web';
+  import { ghostOpacity, loadObjectUrl, PREVIEW_Z_INDEX, rectInPixels } from '@embedpdf/web';
   import type { PageContextValue } from '../runtime/page';
   import { useOptionalCapability, useOptionalSelector } from '../runtime/readers.svelte';
 
@@ -59,7 +59,8 @@
 </script>
 
 {#if ghost.current && frame && url}
-  <!-- The same explicit size as a baked appearance: a global img reset must never clamp it. -->
+  <!-- The same explicit size as a baked appearance: a global img reset must never clamp it. Above
+       the form's fields: over a field, the mark shows in it as the fill draws it. -->
   <img
     src={url}
     alt=""
@@ -72,6 +73,7 @@
     style:max-width="none"
     style:max-height="none"
     style:pointer-events="none"
+    style:z-index={PREVIEW_Z_INDEX}
     style:opacity={ghostOpacity(ghost.current.opacity)}
     style:transform={ghost.current.rot ? `rotate(${ghost.current.rot}deg)` : undefined}
     style:transform-origin={ghost.current.rot ? 'center' : undefined}

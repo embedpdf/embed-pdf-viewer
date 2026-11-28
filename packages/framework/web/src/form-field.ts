@@ -294,6 +294,8 @@ export function listBoxStyleOf(
 export interface FieldPlaceholder {
   readonly text: string;
   readonly color: string;
+  /** Where the words sit across the box; left out, where the record aligns its text. */
+  readonly align?: 'left' | 'center' | 'right';
 }
 
 /**
@@ -376,20 +378,27 @@ function placeholderStyle(
 
 /**
  * The style of what an empty field shows for its purpose, filling the widget's box at `frame`:
- * in the field's own text size and alignment, at the top of a box for several lines. `color` is
+ * in the field's own text size, where its value will be (the form plugin's `placeholderAlign`:
+ * a field of typed text's own alignment, the middle of a signature or image field; left out,
+ * the field's text alignment), at the top of a box for several lines. `color` is
  * the form's `fields.placeholder` setting; `--epdf-form-field-placeholder` wins over it, and
  * left out it is the built-in color. The words are the layer's paint, not the field's value:
  * they take no pointer and no selection.
  */
 export function fieldPlaceholderStyleOf(
-  field: { box: { width: number }; look: FieldLook; multiline?: boolean },
+  field: {
+    box: { width: number };
+    look: FieldLook;
+    multiline?: boolean;
+    placeholderAlign?: 'left' | 'center' | 'right';
+  },
   frame: PixelRect,
   color?: string,
 ): FieldPlaceholderStyle {
   return placeholderStyle(
     {
       fontSize: field.look.fontSize,
-      textAlign: field.look.textAlign,
+      textAlign: field.placeholderAlign ?? field.look.textAlign,
       multiline: field.multiline ?? false,
     },
     frame.height,
@@ -400,9 +409,10 @@ export function fieldPlaceholderStyleOf(
 
 /**
  * {@link fieldPlaceholderStyleOf} for a lent field's placeholder, in the record's own text size
- * and alignment and the placeholder's own color. `box` is the record's frame in page points and
- * `frame` the same frame in pixels (`frameInPixels`): the words are as large as the form layer
- * writes them on the same field.
+ * and the placeholder's own color, where the placeholder says (`align`: the middle of a signature
+ * or image field), else as the record aligns its text. `box` is the record's frame in page points
+ * and `frame` the same frame in pixels (`frameInPixels`): the words are as large as the form layer
+ * writes them on the same field, in the same place.
  */
 export function recordPlaceholderStyleOf(
   placeholder: FieldPlaceholder,
@@ -410,7 +420,7 @@ export function recordPlaceholderStyleOf(
   box: { readonly width: number },
   frame: { readonly width: number; readonly height: number },
 ): FieldPlaceholderStyle {
-  const align = record?.textAlign;
+  const align = placeholder.align ?? record?.textAlign;
   return placeholderStyle(
     {
       fontSize: record?.fontSize ?? null,

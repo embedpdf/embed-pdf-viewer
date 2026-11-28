@@ -318,3 +318,17 @@ export function sceneViewBox(box: SceneBox): string | null {
 export function ghostOpacity(opacity: number): string {
   return paint('ghost-opacity', opacity);
 }
+
+/** The stacking of a preview over the page's later layers ({@link previewZIndexOf}). */
+export const PREVIEW_Z_INDEX = 1;
+
+/**
+ * The stacking of what isn't made yet, above the layers after the annotation layer: a tool's
+ * preview (`ghost`) and a drawing in progress (`draft`), and the armed stamp's preview, rise
+ * above the form's fields, so a field's tint doesn't hide them. `undefined` for anything else,
+ * which stacks in the order of the layers. A page surface is a stacking context of its own
+ * (`isolation: isolate`), so this stays inside its page.
+ */
+export function previewZIndexOf(source: string): number | undefined {
+  return source === 'ghost' || source === 'draft' ? PREVIEW_Z_INDEX : undefined;
+}

@@ -13,7 +13,7 @@ import {
   AnnotationToken as AnnotationHostToken,
   previewBucket,
 } from '@embedpdf/plugin-annotation/contract/host';
-import { ghostOpacity, loadObjectUrl, rectInPixels } from '@embedpdf/web';
+import { ghostOpacity, loadObjectUrl, PREVIEW_Z_INDEX, rectInPixels } from '@embedpdf/web';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
 import type { PageContextValue } from '../runtime/page';
 
@@ -68,6 +68,8 @@ const style = computed((): CSSProperties | null => {
     maxWidth: 'none',
     maxHeight: 'none',
     pointerEvents: 'none',
+    // Above the form's fields: over a field, the mark shows in it as the fill draws it.
+    zIndex: PREVIEW_Z_INDEX,
     opacity: ghostOpacity(current.opacity),
     ...(current.rot ? { transform: `rotate(${current.rot}deg)`, transformOrigin: 'center' } : {}),
   };
